@@ -1,0 +1,13 @@
+[tool.poetry]
+name = "tb_tool_b1"
+version = "0.1.0"
+description = "tb_tool_b1 super simple backend"
+authors = ["dev <dev@example.com>"]
+packages = []
+
+[tool.poetry.dependencies]
+python = ">=3.8,<3.11"
+flask = "1.1.4"
+flask-cors = "3.0.10"
+requests = "2.27.1"
+

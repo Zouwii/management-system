@@ -1,0 +1,12 @@
+services:
+  tb_tool_b1:
+    build: .
+    container_name: tb_tool_b1
+    ports:
+      - "5001:5001"
+    environment:
+      - DINGTALK_APPKEY=${DINGTALK_APPKEY}
+      - DINGTALK_APPSECRET=${DINGTALK_APPSECRET}
+      - TB_TOOL_B1_DEBUG=${TB_TOOL_B1_DEBUG:-false}
+    restart: unless-stopped
+

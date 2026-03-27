@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>tb_tool_b1 前端（独立版）</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="bg"></div>
+    <div class="app">
+      <header class="header">
+        <div class="brand">
+          <div class="logo">TB</div>
+          <div>
+            <div class="title">tb_tool_b1</div>
+            <div class="subtitle">独立前端 · 左右两套任务查询 · 工时统计</div>
+          </div>
+        </div>
+
+        <div class="topbar">
+          <div class="field">
+            <label>后端地址</label>
+            <input id="apiBaseInput" placeholder="例如：http://127.0.0.1:5001" />
+          </div>
+          <button id="btnSaveApiBase" class="btn btn-ghost">保存</button>
+          <button id="btnHealth" class="btn btn-primary">健康检查</button>
+          <button id="btnGetToken" class="btn btn-danger">GetToken</button>
+        </div>
+      </header>
+
+      <main class="grid">
+        <section class="card">
+          <div class="card-hd">
+            <div>
+              <div class="card-title">项目任务查询（左）</div>
+              <div class="card-desc">调用 <code>POST /api/b1/project/tasks/query</code></div>
+            </div>
+            <div class="pill">支持时间范围（含时分秒）</div>
+          </div>
+
+          <div class="form">
+            <div class="row">
+              <div class="field">
+                <label>人员（必填）</label>
+                <select id="projectUserSelect">
+                  <option value="">请选择人员</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>项目（必填）</label>
+                <select id="projectIdSelect">
+                  <option value="">请选择项目</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="field">
+                <label>开始时间</label>
+                <input
+                  id="dueDateStartInput"
+                  type="datetime-local"
+                  step="1"
+                  value="2026-01-01T00:00:00"
+                />
+              </div>
+              <div class="field">
+                <label>结束时间</label>
+                <input
+                  id="dueDateEndInput"
+                  type="datetime-local"
+                  step="1"
+                  value="2026-03-31T23:59:59"
+                />
+              </div>
+            </div>
+
+            <div class="row actions">
+              <button id="btnProjectTaskQuery" class="btn btn-success">查询项目任务</button>
+              <div class="hint" id="projectMetaHint">等待查询…</div>
+            </div>
+          </div>
+
+          <pre id="projectOut" class="out">等待查询项目任务...</pre>
+        </section>
+
+        <section class="card">
+          <div class="card-hd">
+            <div>
+              <div class="card-title">查任务（右）</div>
+              <div class="card-desc">调用 <code>POST /api/b1/tasks/query</code></div>
+            </div>
+            <div class="pill pill-blue">右侧下拉来自左侧结果</div>
+          </div>
+
+          <div class="form">
+            <div class="row">
+              <div class="field">
+                <label>人员（必填）</label>
+                <select id="taskUserSelect">
+                  <option value="">请选择人员</option>
+                </select>
+              </div>
+
+              <div class="field">
+                <label>执行者（筛选下拉）</label>
+                <select id="taskExecutorSelect">
+                  <option value="">执行者：全部</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="field">
+                <label>筛选任务（按标题/ID）</label>
+                <input id="taskFilterInput" placeholder="输入中文关键词或 taskId" />
+              </div>
+              <div class="field compact">
+                <label>工时调试</label>
+                <label class="toggle">
+                  <input id="workhourDebugToggle" type="checkbox" />
+                  <span>开启</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="field wide">
+                <label>任务（下拉）</label>
+                <select id="taskIdSelect">
+                  <option value="">请先在左侧查询项目任务</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="field wide">
+                <label>父任务ID（可选）</label>
+                <input id="parentTaskIdInput" placeholder="parentTaskId（默认空）" />
+              </div>
+            </div>
+
+            <div class="row actions">
+              <button id="btnUserTaskQuery" class="btn btn-warn">查询任务</button>
+              <button id="btnAccurateWorkhour" class="btn btn-info">
+                精确工时统计（逐个查详情）
+              </button>
+            </div>
+
+            <div class="kpis">
+              <div class="kpi">
+                <div class="kpi-label" id="taskOptionHint">任务候选：0</div>
+                <div class="kpi-value" id="workhourHint">
+                  有效工时合计：0（筛选任务：0，含字段任务：0，含值任务：0，非零命中：0）
+                </div>
+              </div>
+              <div class="kpi">
+                <div class="kpi-label">精确统计进度</div>
+                <div class="kpi-value" id="accurateWorkhourProgress">未开始</div>
+              </div>
+            </div>
+          </div>
+
+          <pre id="workhourDetailOut" class="out out-mini" style="display:none;">精确工时明细...</pre>
+          <pre id="workhourDebugOut" class="out out-mini" style="display:none;">工时调试信息...</pre>
+          <pre id="taskOut" class="out">等待查询任务...</pre>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <div>
+          提示：这是独立前端页面，需先启动后端（`http://127.0.0.1:5001`）。
+          如果同事访问你的机器，请把“后端地址”改成 `http://你的IP:5001`。
+        </div>
+      </footer>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
+

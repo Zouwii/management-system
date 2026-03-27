@@ -1,0 +1,11 @@
+# 避免把你本地的敏感配置打进镜像
+config.json
+
+# 开发产物
+.venv
+__pycache__/
+*.pyc
+
+# 日志
+*.log
+

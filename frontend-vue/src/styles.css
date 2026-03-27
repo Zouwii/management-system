@@ -1,0 +1,40 @@
+:root{
+  --bg0:#070A12;
+  --bg1:#0B1022;
+  --text:#e9edff;
+  --muted:#aab4ea;
+  --shadow: 0 30px 80px rgba(0,0,0,.55);
+  --shadow2: 0 14px 40px rgba(0,0,0,.35);
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  color:var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+  background: radial-gradient(1200px 600px at 20% 10%, rgba(108,92,231,.35), transparent 60%),
+              radial-gradient(1000px 700px at 90% 20%, rgba(0,210,255,.20), transparent 55%),
+              radial-gradient(900px 600px at 40% 90%, rgba(45,212,191,.18), transparent 55%),
+              linear-gradient(180deg, var(--bg0), var(--bg1));
+}
+
+.bg{
+  position:fixed; inset:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.03) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(600px 600px at 30% 15%, #000 35%, transparent 70%);
+  pointer-events:none;
+  opacity:.55;
+}
+
+.app{
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 22px 18px 40px;
+}
+
+code{color:#cfd7ff}
+
