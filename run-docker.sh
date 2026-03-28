@@ -10,6 +10,5 @@ if [ -f .env.example ] && [ ! -f .env ]; then
   exit 0
 fi
 
-echo "构建并启动 tb_tool_b1（端口 5001）..."
+echo "构建并启动 tb_tool_bt（端口 5001）..."
 docker compose -f docker-compose.yml up --build
-

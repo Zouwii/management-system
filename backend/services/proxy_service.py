@@ -20,7 +20,7 @@ def dingtalk_proxy_service(payload: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "success": ok,
         "data": dingtalk_data,
-        "meta": {"endpoint": "/api/b1/proxy"},
+        "meta": {"endpoint": "/api/bt/proxy"},
     }
 
 
@@ -36,6 +36,6 @@ def dingtalk_gettoken_service(payload: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "success": ok,
         "data": dingtalk_data,
-        "meta": {"endpoint": "/api/b1/gettoken"},
+        "meta": {"endpoint": "/api/bt/gettoken"},
     }
 

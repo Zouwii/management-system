@@ -1,13 +1,20 @@
 [tool.poetry]
-name = "tb_tool_b1"
+name = "tb_tool_bt"
 version = "0.1.0"
-description = "tb_tool_b1 super simple backend"
+description = "tb_tool_bt backend"
 authors = ["dev <dev@example.com>"]
+# 不发布为库，仅用 Poetry 锁依赖；请在 backend 目录下 poetry run / poetry shell
 packages = []
 
 [tool.poetry.dependencies]
-python = ">=3.8,<3.11"
-flask = "1.1.4"
-flask-cors = "3.0.10"
-requests = "2.27.1"
+python = "^3.8"
+flask = "^2.3.0"
+flask-cors = "^4.0.0"
+python-dotenv = "^1.0.0"
+requests = "^2.27.0"
+# urllib3 v2 需 OpenSSL 1.1.1+；旧 WSL/Ubuntu 自带 Python 常为 OpenSSL 1.0.2，锁在 1.x 才能 import requests
+urllib3 = ">=1.26.5,<2"
+sqlalchemy = "^2.0.0"
+# 与 requirements.txt 一致；部分镜像对 ^1.1.0 解析异常时可放宽为 >=1.0.2
+pymysql = ">=1.0.2,<2.0"
 

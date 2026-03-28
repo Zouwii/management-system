@@ -45,7 +45,7 @@ def search_project_tasks_service(payload: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "success": False,
             "error": "missing userId",
-            "meta": {"endpoint": "/api/b1/project/tasks/search"},
+            "meta": {"endpoint": "/api/bt/project/tasks/search"},
         }
 
     token_result = get_valid_access_token(payload)
@@ -54,7 +54,7 @@ def search_project_tasks_service(payload: Dict[str, Any]) -> Dict[str, Any]:
             "success": False,
             "error": token_result.get("error", "failed to get access token"),
             "data": token_result,
-            "meta": {"endpoint": "/api/b1/project/tasks/search"},
+            "meta": {"endpoint": "/api/bt/project/tasks/search"},
         }
 
     url = "https://api.dingtalk.com/v1.0/project/users/{}/tasks/search".format(user_id)
@@ -90,7 +90,7 @@ def search_project_tasks_service(payload: Dict[str, Any]) -> Dict[str, Any]:
                 "dingtalk": data,
             },
             "meta": {
-                "endpoint": "/api/b1/project/tasks/search",
+                "endpoint": "/api/bt/project/tasks/search",
                 "token_source": token_result.get("source"),
             },
         }
@@ -98,7 +98,7 @@ def search_project_tasks_service(payload: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "success": False,
             "error": str(e),
-            "meta": {"endpoint": "/api/b1/project/tasks/search"},
+            "meta": {"endpoint": "/api/bt/project/tasks/search"},
         }
 
 
@@ -114,7 +114,7 @@ def query_project_tasks_service(payload: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "success": False,
             "error": "missing userId or projectId",
-            "meta": {"endpoint": "/api/b1/project/tasks/query"},
+            "meta": {"endpoint": "/api/bt/query_project_tasks"},
         }
 
     # 允许直接使用你传入的 token；未传时回退到本地缓存/自动刷新
@@ -129,7 +129,7 @@ def query_project_tasks_service(payload: Dict[str, Any]) -> Dict[str, Any]:
                 "success": False,
                 "error": token_result.get("error", "failed to get access token"),
                 "data": token_result,
-                "meta": {"endpoint": "/api/b1/project/tasks/query"},
+                "meta": {"endpoint": "/api/bt/query_project_tasks"},
             }
         access_token = token_result["access_token"]
         token_source = token_result.get("source", "dingtalk_oapi_gettoken")
@@ -262,7 +262,7 @@ def query_project_tasks_service(payload: Dict[str, Any]) -> Dict[str, Any]:
                 "dingtalk": merged_dingtalk,
             },
             "meta": {
-                "endpoint": "/api/b1/project/tasks/query",
+                "endpoint": "/api/bt/query_project_tasks",
                 "token_source": token_source,
                 "cache_hit": False,
                 "page_count": page_count,
@@ -280,7 +280,7 @@ def query_project_tasks_service(payload: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "success": False,
             "error": str(e),
-            "meta": {"endpoint": "/api/b1/project/tasks/query"},
+            "meta": {"endpoint": "/api/bt/query_project_tasks"},
         }
 
 
@@ -295,7 +295,7 @@ def query_user_tasks_service(payload: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "success": False,
             "error": "missing userId",
-            "meta": {"endpoint": "/api/b1/tasks/query"},
+            "meta": {"endpoint": "/api/bt/query_task_details"},
         }
 
     # 优先使用外部传入 token，未传则回退缓存/刷新
@@ -310,7 +310,7 @@ def query_user_tasks_service(payload: Dict[str, Any]) -> Dict[str, Any]:
                 "success": False,
                 "error": token_result.get("error", "failed to get access token"),
                 "data": token_result,
-                "meta": {"endpoint": "/api/b1/tasks/query"},
+                "meta": {"endpoint": "/api/bt/query_task_details"},
             }
         access_token = token_result["access_token"]
         token_source = token_result.get("source", "dingtalk_oapi_gettoken")
@@ -400,7 +400,7 @@ def query_user_tasks_service(payload: Dict[str, Any]) -> Dict[str, Any]:
                 "dingtalk": data,
             },
             "meta": {
-                "endpoint": "/api/b1/tasks/query",
+                "endpoint": "/api/bt/query_task_details",
                 "token_source": token_source,
                 "cache_hit": False,
                 "refresh_attempted": refresh_attempted,
@@ -415,6 +415,6 @@ def query_user_tasks_service(payload: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "success": False,
             "error": str(e),
-            "meta": {"endpoint": "/api/b1/tasks/query"},
+            "meta": {"endpoint": "/api/bt/query_task_details"},
         }
 

@@ -1,21 +1,7 @@
 {
   "appkey": "ding4csm9vqefmcvjkut",
   "appsecret": "LmmfLvtFhk9oP7zTZDzXIxrMTk77T-xcZt9pesFMfxT_m3bnXI2OlJbsN9S9VWYe",
-  "access_token": "cc4cb52c5c4e35b585444f58e4efd4ca",
-  "token_expires_in": 7200,
-  "token_expire_at": 1774628230,
-  "userids": {
-    "伍浩贤": "6515680920352168",
-    "何鸿颉": "250124013220811839",
-    "王睿": "010408241117947540",
-    "邹宏睿": "01195014075436361289",
-    "潘铮": "2108411066921750",
-    "韩凯波": "496044202338050428",
-    "何华": "2739002424650905",
-    "郑世玉": "265352386036276420",
-    "朱庆涛": "166232264526164934"
-  },
-  "projectids": {
-    "本地开发部": "647854bc4a622b2e3199fa5a"
-  }
+  "access_token": "24a1cd12554930cb8d46dbf49dde16eb",
+  "token_expire_at": 1774703364,
+  "token_expires_in": 7200
 }

@@ -11,9 +11,15 @@ from services.project_task_service import (
     search_project_tasks_service,
 )
 from services.config_service import get_projectids_service, get_userids_service
+from services.task_sync_service import (
+    sync_project_tasks_to_db,
+    sync_task_detail_to_db,
+    sync_task_details_batch_to_db,
+)
+from services.workhour_aggregate_service import executor_workhours_aggregate_service
 
 
-api_bp = Blueprint("api_b1", __name__, url_prefix="/api/b1")
+api_bp = Blueprint("api_bt", __name__, url_prefix="/api/bt")
 
 
 def _ok(data):
@@ -71,8 +77,7 @@ def search_project_tasks():
         return _fail(str(e), code=500, data={})
 
 
-#
-@api_bp.route("/project/tasks/query", methods=["POST"])
+@api_bp.route("/query_project_tasks", methods=["POST"])
 def query_project_tasks():
     try:
         payload = request.get_json(silent=True) or {}
@@ -82,6 +87,14 @@ def query_project_tasks():
             return _fail("missing projectId", code=400, data={})
         result = query_project_tasks_service(payload)
         if result.get("success"):
+            # 与列表查询同一次钉钉结果：按 scenario 过滤后 upsert 到 project_tasks（A 表）
+            sync_out = sync_project_tasks_to_db(payload, query_result=result)
+            meta = dict(result.get("meta") or {})
+            if sync_out.get("success"):
+                meta["db_sync"] = sync_out.get("data")
+            else:
+                meta["db_sync_error"] = sync_out.get("error", "db sync failed")
+            result["meta"] = meta
             return _ok(result)
         status_code = ((result.get("data") or {}).get("status_code")) or 400
         return _fail(
@@ -109,8 +122,72 @@ def get_config_projectids():
         return _fail(str(e), code=500, data={})
 
 
-@api_bp.route("/tasks/query", methods=["POST"])
-def query_user_tasks():
+@api_bp.route("/db/sync/project-tasks", methods=["POST"])
+def db_sync_project_tasks():
+    """列表同步 → A 表（仅保留 scenarioFieldConfigId 匹配，默认软件开发）。"""
+    try:
+        payload = request.get_json(silent=True) or {}
+        if not (payload.get("userId") or payload.get("userid")):
+            return _fail("missing userId", code=400, data={})
+        if not (payload.get("projectId") or payload.get("projectid")):
+            return _fail("missing projectId", code=400, data={})
+        result = sync_project_tasks_to_db(payload)
+        if result.get("success"):
+            return _ok(result.get("data") or {})
+        return _fail(result.get("error", "sync project tasks failed"), code=400, data=result.get("data"))
+    except Exception as e:
+        return _fail(str(e), code=500, data={})
+
+
+@api_bp.route("/db/sync/task-detail", methods=["POST"])
+def db_sync_task_detail():
+    """单任务详情 → B 表（模式 1 覆盖）。"""
+    try:
+        payload = request.get_json(silent=True) or {}
+        if not (payload.get("userId") or payload.get("userid")):
+            return _fail("missing userId", code=400, data={})
+        if not payload.get("taskId"):
+            return _fail("missing taskId", code=400, data={})
+        result = sync_task_detail_to_db(payload)
+        if result.get("success"):
+            return _ok(result.get("data") or {})
+        return _fail(result.get("error", "sync task detail failed"), code=400, data=result.get("data"))
+    except Exception as e:
+        return _fail(str(e), code=500, data={})
+
+
+@api_bp.route("/db/sync/task-details-batch", methods=["POST"])
+def db_sync_task_details_batch():
+    """批量单任务详情 → B 表。"""
+    try:
+        payload = request.get_json(silent=True) or {}
+        result = sync_task_details_batch_to_db(payload)
+        if result.get("success"):
+            return _ok(result.get("data") or {})
+        return _fail(result.get("error", "batch sync failed"), code=400, data=result.get("data"))
+    except Exception as e:
+        return _fail(str(e), code=500, data={})
+
+
+@api_bp.route("/stats/executor_workhours", methods=["POST"])
+def stats_executor_workhours():
+    """服务端按执行者循环拉详情并汇总工时（单次请求，不在浏览器产生多条 API）。"""
+    try:
+        payload = request.get_json(silent=True) or {}
+        result = executor_workhours_aggregate_service(payload)
+        if result.get("success"):
+            return _ok(result.get("data") or {})
+        return _fail(
+            result.get("error", "aggregate failed"),
+            code=400,
+            data=result.get("data"),
+        )
+    except Exception as e:
+        return _fail(str(e), code=500, data={})
+
+
+@api_bp.route("/query_task_details", methods=["POST"])
+def query_task_details():
     try:
         payload = request.get_json(silent=True) or {}
         if not (payload.get("userId") or payload.get("userid")):

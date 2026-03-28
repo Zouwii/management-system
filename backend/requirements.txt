@@ -1,4 +1,8 @@
 flask
 flask-cors
+python-dotenv
+urllib3>=1.26.5,<2
 requests
+sqlalchemy>=2.0,<3
+pymysql>=1.1.0
 
