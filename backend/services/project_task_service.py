@@ -1,4 +1,5 @@
 from typing import Any, Dict
+from datetime import datetime, timedelta, timezone
 import copy
 import json
 
@@ -10,6 +11,9 @@ from dingtalk_client import get_valid_access_token
 _RESULT_CACHE: Dict[str, Dict[str, Any]] = {}
 _CACHE_TTL_PROJECT_QUERY_SEC = 45
 _CACHE_TTL_TASK_QUERY_SEC = 60
+
+# 软件开发 scenarioFieldConfigId：用于统计过滤
+DEFAULT_SCENARIO_FIELD_CONFIG_ID = "647854bcd999c893061ef8b5"
 
 
 def _make_cache_key(prefix: str, payload: Dict[str, Any], keys: list) -> str:
@@ -417,4 +421,129 @@ def query_user_tasks_service(payload: Dict[str, Any]) -> Dict[str, Any]:
             "error": str(e),
             "meta": {"endpoint": "/api/bt/query_task_details"},
         }
+
+
+def _parse_iso_dt(value: Any) -> datetime:
+    t = str(value or "").strip()
+    if not t:
+        raise ValueError("empty datetime value")
+    if t.endswith("Z"):
+        t = t[:-1] + "+00:00"
+    dt = datetime.fromisoformat(t)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _subtract_one_year(dt: datetime) -> datetime:
+    # 处理 2/29：若替换失败，则落到 2/28
+    try:
+        return dt.replace(year=dt.year - 1)
+    except ValueError:
+        # 通用兜底
+        day = min(dt.day, 28)
+        return dt.replace(year=dt.year - 1, day=day)
+
+
+def _format_dt_for_tql(dt: datetime) -> str:
+    # 参考前端 toISOString：包含毫秒 .000Z
+    d = dt.astimezone(timezone.utc).replace(microsecond=0)
+    # 强制补齐 .000Z
+    return d.strftime("%Y-%m-%dT%H:%M:%S") + ".000Z"
+
+
+def count_software_dev_tasks_in_config_last_year_service(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    统计：end_time 配置的一年前 到 end_time 区间内，
+    软件开发 scenarioFieldConfigId == 默认值 的项目任务数量。
+
+    输入：必须提供 userId / projectId（用于调用钉钉列表接口）
+    """
+    payload = payload or {}
+    user_id = payload.get("userId") or payload.get("userid")
+    project_id = payload.get("projectId") or payload.get("projectid")
+    if not user_id or not project_id:
+        return {
+            "success": False,
+            "error": "missing userId or projectId",
+            "data": {},
+        }
+
+    max_results = int(payload.get("maxResults", 500) or 500)
+    max_pages = int(payload.get("maxPages", 50) or 50)
+    if max_pages < 1:
+        max_pages = 1
+
+    # 从数据库 config 表读取 end_time
+    from db.engine import SessionLocal
+    from db.orm import Config as DbConfig
+
+    session = SessionLocal()
+    try:
+        end_row = (
+            session.query(DbConfig)
+            .filter(DbConfig.type_ == "end_time")
+            .first()
+        )
+        if not end_row:
+            return {
+                "success": False,
+                "error": "missing config end_time",
+                "data": {},
+            }
+        end_dt = _parse_iso_dt(end_row.value)
+    finally:
+        session.close()
+
+    start_dt = _subtract_one_year(end_dt)
+    start_iso = _format_dt_for_tql(start_dt)
+    end_iso = _format_dt_for_tql(end_dt)
+
+    query = "(dueDate >= '{start}') AND (dueDate <= '{end}')".format(
+        start=start_iso,
+        end=end_iso,
+    )
+
+    # 直接调用钉钉列表接口（并由 query_project_tasks_service 在成功后 upsert 到 A 表）
+    query_payload = {
+        "userId": user_id,
+        "projectId": project_id,
+        "query": query,
+        "maxResults": max_results,
+        "maxPages": max_pages,
+        # 可选：强制刷新可由前端传入
+        "force_refresh": bool(payload.get("force_refresh", False)),
+    }
+
+    list_res = query_project_tasks_service(query_payload)
+    if not list_res.get("success"):
+        return {
+            "success": False,
+            "error": list_res.get("error", "query project tasks failed"),
+            "data": {},
+        }
+
+    ding = ((list_res.get("data") or {}).get("dingtalk")) or {}
+    rows = ding.get("result") if isinstance(ding.get("result"), list) else []
+
+    task_ids = set()
+    for r in rows:
+        if not isinstance(r, dict):
+            continue
+        sid = str(r.get("scenarioFieldConfigId") or r.get("scenariofieldconfigId") or "")
+        if sid != DEFAULT_SCENARIO_FIELD_CONFIG_ID:
+            continue
+        tid = r.get("taskId")
+        if tid:
+            task_ids.add(str(tid))
+
+    return {
+        "success": True,
+        "data": {
+            "software_dev_task_count": len(task_ids),
+            "start_time": start_iso,
+            "end_time": end_iso,
+            "projectId": str(project_id),
+        },
+    }
 

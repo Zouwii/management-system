@@ -6,10 +6,15 @@ from __future__ import annotations
 
 import os
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
+from sqlalchemy import and_
+
+from db.engine import SessionLocal
+from db.orm import ProjectTask, ProjectTaskDetail, ProjectTaskOverdueDetail
 from services.project_task_service import query_project_tasks_service, query_user_tasks_service
 from services.workhour_util import parse_workhour_from_task_dict
+from services.config_service import get_time_range_service
 
 DEFAULT_SCENARIO_FIELD_CONFIG_ID = "647854bcd999c893061ef8b5"
 
@@ -59,127 +64,123 @@ def _parse_detail_item(ding: Any) -> Optional[Dict[str, Any]]:
     return None
 
 
-def executor_workhours_aggregate_service(payload: Dict[str, Any]) -> Dict[str, Any]:
+def executor_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
-    拉项目任务列表 → 筛「软件开发」+ 指定执行者 → 逐个拉详情（服务端循环）→ 汇总工时字段。
+    从数据库汇总“季度工时 / 季度逾期”：
+    - quarter_work_hour：B 表（project_task_details）工时总和
+    - quarter_overdue_work_hour：C 表（project_task_overdue_details）工时总和
+
+    说明：按 project_id + executor_id（query_user_id）统计，不再 join A 表。
     """
     payload = payload or {}
-    user_id = str(payload.get("userId") or payload.get("userid") or "").strip()
+    executor_id = str(payload.get("executorId") or payload.get("executorid") or "").strip()
     project_id = str(payload.get("projectId") or payload.get("projectid") or "").strip()
-    executor_id = str(payload.get("executorId") or "").strip()
-    if not user_id or not project_id:
-        return {"success": False, "error": "missing userId or projectId", "data": {}}
-    if not executor_id:
-        return {"success": False, "error": "missing executorId", "data": {}}
+    if not executor_id or not project_id:
+        return {"success": False, "error": "missing executorId or projectId", "data": {}}
 
-    scenario_id = str(
-        payload.get("scenarioFieldConfigId")
-        or payload.get("scenarioFieldConfigID")
-        or DEFAULT_SCENARIO_FIELD_CONFIG_ID
-    )
-    sleep_sec = float(payload.get("sleepSec", 0.12) or 0)
-    max_tasks = int(payload.get("maxTasks", 300) or 300)
-    if max_tasks < 1:
-        max_tasks = 1
-    if max_tasks > 500:
-        max_tasks = 500
+    tr = get_time_range_service() or {}
+    start_time = tr.get("start_time", "")
+    end_time = tr.get("end_time", "")
 
-    list_payload: Dict[str, Any] = {
-        "userId": user_id,
-        "projectId": project_id,
-        "query": payload.get("query", ""),
-        "maxResults": int(payload.get("maxResults", 500) or 500),
-        "maxPages": int(payload.get("maxPages", 20) or 20),
-        "force_refresh": bool(payload.get("force_refresh_list", False)),
-    }
-    if payload.get("access_token"):
-        list_payload["access_token"] = payload["access_token"]
+    session = SessionLocal()
+    try:
+        # B 表：季度工时候选（由同步阶段写入决定）
+        b_rows: List[Tuple[str, Optional[float]]] = (
+            session.query(ProjectTaskDetail.task_id, ProjectTaskDetail.work_hour)
+            .filter(ProjectTaskDetail.project_id == project_id)
+            .filter(ProjectTaskDetail.query_user_id == executor_id)
+            .all()
+        )
 
-    list_res = query_project_tasks_service(list_payload)
-    if not list_res.get("success"):
-        return {
-            "success": False,
-            "error": list_res.get("error", "project tasks query failed"),
-            "data": list_res,
-        }
+        # C 表：季度逾期明细（不按区间过滤，由同步阶段/落库决定）
+        c_rows: List[Tuple[str, Optional[float]]] = (
+            session.query(ProjectTaskOverdueDetail.task_id, ProjectTaskOverdueDetail.work_hour)
+            .filter(ProjectTaskOverdueDetail.project_id == project_id)
+            .filter(ProjectTaskOverdueDetail.query_user_id == executor_id)
+            .all()
+        )
 
-    ding = ((list_res.get("data") or {}).get("dingtalk")) or {}
-    rows = ding.get("result")
-    task_scope = _task_scope_rows(rows, scenario_id, executor_id)
-    if not task_scope:
-        return {
-            "success": True,
-            "data": {
-                "total_work_hour": 0.0,
-                "executor_id": executor_id,
-                "scenario_field_config_id": scenario_id,
-                "task_count_in_scope": 0,
-                "task_count_queried": 0,
-                "task_count_with_hour": 0,
-                "failures": [],
-                "breakdown": [],
-                "note": "列表中无匹配「软件开发」且执行者匹配的任务",
-            },
-        }
+        overdue_task_ids = {str(tid) for tid, _ in c_rows if tid is not None}
+        all_task_ids = {str(tid) for tid, _ in b_rows if tid is not None} | overdue_task_ids
 
-    if len(task_scope) > max_tasks:
-        task_scope = task_scope[:max_tasks]
-
-    field_id = _field_id(payload)
-    failures: List[Dict[str, str]] = []
-    breakdown: List[Dict[str, Any]] = []
-    total = 0.0
-    with_value = 0
-
-    for i, spec in enumerate(task_scope):
-        tid = spec["task_id"]
-        list_content = str(spec.get("list_content") or "")
-        q_payload: Dict[str, Any] = {
-            "userId": user_id,
-            "taskId": tid,
-            "force_refresh": True,
-        }
-        if payload.get("parentTaskId"):
-            q_payload["parentTaskId"] = payload.get("parentTaskId")
-        if payload.get("access_token"):
-            q_payload["access_token"] = payload["access_token"]
-
-        dres = query_user_tasks_service(q_payload)
-        if not dres.get("success"):
-            failures.append(
-                {"taskId": tid, "error": str(dres.get("error", "detail query failed"))}
+        # A 表只用于把 task_id 转中文 content（不参与统计口径）
+        content_map: Dict[str, str] = {}
+        if all_task_ids:
+            a_rows = (
+                session.query(ProjectTask.task_id, ProjectTask.content)
+                .filter(ProjectTask.project_id == project_id)
+                .filter(ProjectTask.task_id.in_(list(all_task_ids)))
+                .all()
             )
-        else:
-            raw = ((dres.get("data") or {}).get("dingtalk")) or {}
-            item = _parse_detail_item(raw.get("result"))
-            wh: Optional[float] = None
-            title = ""
-            if item:
-                title = str(item.get("content") or "").strip()
-                wh = parse_workhour_from_task_dict(item, field_id)
-            if not title:
-                title = list_content
-            if wh is not None and wh == wh:  # not nan
-                total += wh
-                with_value += 1
-            breakdown.append({"taskId": tid, "content": title, "work_hour": wh})
+            for tid, content in a_rows:
+                if tid is not None:
+                    content_map[str(tid)] = str(content or "")
+    finally:
+        session.close()
 
-        if sleep_sec > 0 and i < len(task_scope) - 1:
-            time.sleep(sleep_sec)
+    # 计算汇总 + 生成明细并集（B+C）
+    overdue_total = 0.0
+    overdue_count = 0
+    overdue_hour_map: Dict[str, Optional[float]] = {}
+    for task_id, wh in c_rows:
+        tid = str(task_id)
+        overdue_hour_map[tid] = wh
+        overdue_count += 1
+        if wh is not None and isinstance(wh, (int, float)) and wh == wh:
+            overdue_total += float(wh)
+
+    total = 0.0
+    task_count = 0
+    breakdown: List[Dict[str, Any]] = []
+
+    # 先输出 B 的行（按 B 表顺序），对 C 里的任务标记逾期并显示 C 的 work_hour
+    for task_id, wh in b_rows:
+        tid = str(task_id)
+        is_overdue = tid in overdue_task_ids
+        task_count += 1
+
+        show_wh = overdue_hour_map[tid] if is_overdue else wh
+        if show_wh is not None and isinstance(show_wh, (int, float)) and show_wh == show_wh and not is_overdue:
+            total += float(show_wh)
+
+        breakdown.append(
+            {
+                "taskId": tid,
+                "content": content_map.get(tid, tid),
+                "work_hour": show_wh,
+                "is_overdue": is_overdue,
+            }
+        )
+
+    # 再补上：B 中不存在但 C 中存在的逾期任务（保证逾期表不空）
+    b_task_ids = {str(tid) for tid, _ in b_rows if tid is not None}
+    for tid in overdue_task_ids:
+        if tid in b_task_ids:
+            continue
+        task_count += 1
+        show_wh = overdue_hour_map.get(tid)
+        breakdown.append(
+            {
+                "taskId": tid,
+                "content": content_map.get(tid, tid),
+                "work_hour": show_wh,
+                "is_overdue": True,
+            }
+        )
 
     total = round(total * 100) / 100
+    overdue_total = round(overdue_total * 100) / 100
 
     return {
         "success": True,
         "data": {
-            "total_work_hour": total,
-            "work_hour_field_id": field_id,
+            "quarter_work_hour": total,
+            "quarter_overdue_work_hour": overdue_total,
             "executor_id": executor_id,
-            "scenario_field_config_id": scenario_id,
-            "task_count_in_scope": len(task_scope),
-            "task_count_queried": len(task_scope),
-            "task_count_with_hour": with_value,
-            "failures": failures,
+            "project_id": project_id,
+            "task_count": task_count,
+            "overdue_task_count": overdue_count,
             "breakdown": breakdown,
+            "time_range": {"start_time": start_time, "end_time": end_time},
         },
     }

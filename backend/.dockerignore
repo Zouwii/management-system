@@ -1,3 +1,22 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+
+data/
+
+.git/
+.idea/
+.vscode/
+
+*.log
+
 # 避免把你本地的敏感配置打进镜像
 config.json
 

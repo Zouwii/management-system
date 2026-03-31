@@ -89,6 +89,37 @@ class ProjectTaskDetail(Base):
     task_stage_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     unique_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
+    # 是否逾期（由 tagIds 判断）
+    is_overdue: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+    fetched_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class ProjectTaskOverdueDetail(Base):
+    """
+    C 表 project_task_overdue_details：逾期明细快照（用于“季度逾期”等统计口径）。
+
+    约束：同一个 (project_id, task_id, query_user_id) 只保留一行，按同步覆盖。
+    """
+
+    __tablename__ = "project_task_overdue_details"
+    __table_args__ = (
+        UniqueConstraint(
+            "project_id",
+            "task_id",
+            "query_user_id",
+            name="uq_overdue_project_task_query_user",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    project_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    task_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    query_user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+
+    work_hour: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    custom_fields_json: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    raw_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     fetched_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
@@ -105,3 +136,37 @@ class SyncRun(Base):
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     row_count: Mapped[int] = mapped_column(Integer, default=0)
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+
+class Config(Base):
+    """
+    数据库配置表（参照你其它任务的 config 表）
+
+    只有四列：id，type，value，brief
+    """
+
+    __tablename__ = "config"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    # 避免在代码里用关键字 type 作为属性名；数据库列名仍为 type
+    type_: Mapped[str] = mapped_column("type", String(64), nullable=False, index=True, unique=True)
+    value: Mapped[str] = mapped_column(Text, nullable=False)
+    brief: Mapped[Optional[str]] = mapped_column(Text, default=None)
+
+
+class UserCharacter(Base):
+    """
+    用户维度的 character 配置表（供你之后手动填充）
+
+    字段：
+    - 中文名：name
+    - 钉钉用户 id：user_id
+    - character：character（1/2/3/4）
+    """
+
+    __tablename__ = "user_character"
+
+    # 以钉钉用户 id 作为唯一主键，方便后续 upsert
+    user_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    character: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
