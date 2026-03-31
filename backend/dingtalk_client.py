@@ -198,6 +198,55 @@ def get_valid_access_token(payload: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _normalize_userids(raw_userids: Any) -> Dict[str, str]:
+    """
+    兼容两种写法：
+    1) "张三": "012345"
+    2) "张三": {"userId": "012345", "character": 1}
+    """
+    out: Dict[str, str] = {}
+    if not isinstance(raw_userids, dict):
+        return out
+    for name, v in raw_userids.items():
+        nm = str(name)
+        if isinstance(v, dict):
+            uid = v.get("userId", v.get("user_id", v.get("id", "")))
+        else:
+            uid = v
+        uid_s = str(uid or "").strip()
+        if uid_s:
+            out[nm] = uid_s
+    return out
+
+
+def get_config_user_characters() -> Dict[str, int]:
+    """
+    从 ids.json/config.json 读取用户默认 character（按中文名索引）。
+    仅在 value 为对象且包含 character 字段时返回。
+    """
+    ids_path = Path(__file__).with_name("ids.json")
+    try:
+        raw = ids_path.read_text(encoding="utf-8")
+        data = json.loads(raw) if raw.strip() else {}
+        userids = (data or {}).get("userids")
+    except Exception:
+        cfg = _load_config_json()
+        userids = cfg.get("userids")
+
+    out: Dict[str, int] = {}
+    if not isinstance(userids, dict):
+        return out
+    for name, v in userids.items():
+        if not isinstance(v, dict):
+            continue
+        ch = v.get("character")
+        try:
+            out[str(name)] = int(ch)
+        except Exception:
+            continue
+    return out
+
+
 def get_config_userids() -> Dict[str, str]:
     """读取 config.json 里的 userids 配置。"""
     ids_path = Path(__file__).with_name("ids.json")
@@ -205,12 +254,12 @@ def get_config_userids() -> Dict[str, str]:
         raw = ids_path.read_text(encoding="utf-8")
         data = json.loads(raw) if raw.strip() else {}
         userids = (data or {}).get("userids")
-        return userids if isinstance(userids, dict) else {}
+        return _normalize_userids(userids)
     except Exception:
         # fallback：兼容旧逻辑（可能存在 config.json）
         cfg = _load_config_json()
         userids = cfg.get("userids")
-        return userids if isinstance(userids, dict) else {}
+        return _normalize_userids(userids)
 
 
 def get_config_projectids() -> Dict[str, str]:

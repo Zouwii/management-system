@@ -95,9 +95,10 @@ def init_db() -> None:
             # 初始化 user_character：把 ids.json 中的用户先落库，character 默认 0
             # 你之后可以直接更新 character。
             try:
-                from dingtalk_client import get_config_userids
+                from dingtalk_client import get_config_userids, get_config_user_characters
 
                 userids = get_config_userids()
+                user_characters = get_config_user_characters()
                 for name, user_id in (userids or {}).items():
                     uid = str(user_id)
                     nm = str(name)
@@ -110,8 +111,9 @@ def init_db() -> None:
                         if existing_u.name != nm:
                             existing_u.name = nm
                     else:
+                        init_character = int(user_characters.get(nm, 0) or 0)
                         session.add(
-                            DbUserCharacter(user_id=uid, name=nm, character=0)
+                            DbUserCharacter(user_id=uid, name=nm, character=init_character)
                         )
             except Exception:
                 # IDs 初始化失败不阻断服务启动

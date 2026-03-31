@@ -123,6 +123,12 @@ const updateLoading = ref(false);
 const workhourCoefficient = ref(WORKHOUR_COEFFICIENT);
 const executorCharacter = ref(null);
 
+function buildTbTaskUrl(taskId) {
+  const tid = String(taskId || "").trim();
+  if (!tid) return "";
+  return `https://www.teambition.com/task/${encodeURIComponent(tid)}`;
+}
+
 function splitBreakdownRows(d) {
   const rows = Array.isArray(d?.breakdown) ? d.breakdown : [];
   const normalRows = [];
@@ -134,7 +140,7 @@ function splitBreakdownRows(d) {
     const h = row?.work_hour;
     const workHour =
       h != null && typeof h === "number" && Number.isFinite(h) ? h : null;
-    const item = { name, workHour };
+    const item = { taskId, name, workHour };
     if (row?.is_overdue) overdueRows.push(item);
     else normalRows.push(item);
   }
@@ -252,13 +258,15 @@ const analysisDiff = computed(() => {
     typeof expected !== "number" || !Number.isFinite(expected) ||
     typeof done !== "number" || !Number.isFinite(done)
   ) return null;
-  return Math.round((expected - done) * 100) / 100;
+  // 差额 = 工时合计 - 所需工时
+  return Math.round((done - expected) * 100) / 100;
 });
 const analysisDiffColor = computed(() => {
   const d = analysisDiff.value;
   if (typeof d !== "number" || !Number.isFinite(d)) return "#909399";
-  if (d >= 0) return "#e6a23c";
-  return "#67c23a";
+  // 负数红，正数绿
+  if (d >= 0) return "#67c23a";
+  return "#f56c6c";
 });
 const hasAnalysisResult = ref(false);
 
@@ -659,6 +667,38 @@ onBeforeUnmount(() => {
         </el-dialog>
 
         <div
+          style="
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px 14px;
+            align-items: center;
+            justify-content: flex-start;
+            margin-bottom: 10px;
+          "
+        >
+          <div style="display: flex; align-items: center; gap: 8px">
+            <span style="font-size: 14px; color: #606266">开始时间</span>
+            <el-input
+              :model-value="dueDateStart ? dueDateStart.replace('T', ' ') : ''"
+              disabled
+              size="small"
+              placeholder="—"
+              style="width: 220px"
+            />
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px">
+            <span style="font-size: 14px; color: #606266">结束时间</span>
+            <el-input
+              :model-value="dueDateEnd ? dueDateEnd.replace('T', ' ') : ''"
+              disabled
+              size="small"
+              placeholder="—"
+              style="width: 220px"
+            />
+          </div>
+        </div>
+
+        <div
           class="statutory-workday-bar"
           :data-state="holidaySummary.state"
         >
@@ -697,12 +737,6 @@ onBeforeUnmount(() => {
               <span class="statutory-workday-bar__result-hours">
                 所需工时：
                 <strong>{{ expectedWorkhours }}</strong>
-              </span>
-              <span class="statutory-workday-bar__result-hours">
-                已有占比：
-                <strong :style="{ color: completionRatioColor }">
-                  {{ completionRatioPercent !== null ? `${completionRatioPercent}%` : "—" }}
-                </strong>
               </span>
             </div>
           </div>
@@ -771,8 +805,6 @@ onBeforeUnmount(() => {
                   <div>{{ executorOverdueTotalWorkhours ?? "—" }}</div>
                   <div style="color: #909399">工时合计</div>
                   <div>{{ executorCompletedTotalWorkhours ?? "—" }}</div>
-                  <div style="color: #909399">已有占比</div>
-                  <div><strong :style="{ color: completionRatioColor }">{{ completionRatioPercent !== null ? `${completionRatioPercent}%` : "—" }}</strong></div>
                   <div style="color: #909399">差额</div>
                   <div><strong :style="{ color: analysisDiffColor }">{{ analysisDiff ?? "—" }}</strong></div>
                 </div>
@@ -789,7 +821,20 @@ onBeforeUnmount(() => {
                   <div style="font-weight: 700">季度工时明细</div>
                 </template>
                 <el-table :data="quarterBreakdownRows" size="small" border>
-                  <el-table-column prop="name" label="任务" min-width="220" />
+                  <el-table-column prop="name" label="任务" min-width="220">
+                    <template #default="{ row }">
+                      <a
+                        v-if="row?.taskId"
+                        :href="buildTbTaskUrl(row.taskId)"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style="color: inherit; text-decoration: underline"
+                      >
+                        {{ row.name }}
+                      </a>
+                      <span v-else>{{ row?.name ?? "—" }}</span>
+                    </template>
+                  </el-table-column>
                   <el-table-column label="工时" width="110" align="right">
                     <template #default="{ row }">
                       {{ row.workHour ?? "—" }}
@@ -808,7 +853,20 @@ onBeforeUnmount(() => {
                   <div style="font-weight: 700">季度逾期明细</div>
                 </template>
                 <el-table :data="overdueBreakdownRows" size="small" border>
-                  <el-table-column prop="name" label="任务" min-width="220" />
+                  <el-table-column prop="name" label="任务" min-width="220">
+                    <template #default="{ row }">
+                      <a
+                        v-if="row?.taskId"
+                        :href="buildTbTaskUrl(row.taskId)"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style="color: inherit; text-decoration: underline"
+                      >
+                        {{ row.name }}
+                      </a>
+                      <span v-else>{{ row?.name ?? "—" }}</span>
+                    </template>
+                  </el-table-column>
                   <el-table-column label="工时" width="110" align="right">
                     <template #default="{ row }">
                       {{ row.workHour ?? "—" }}
