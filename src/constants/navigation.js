@@ -47,8 +47,8 @@ export const sideMenuConfig = [
   },
   {
     path: ROUTE_PATHS.AI_ANALYSIS,
-    label: 'AI分析页',
-    employeeLabel: 'AI分析中心',
+    label: 'AI助理',
+    employeeLabel: 'AI助理',
     section: '个人视角',
     employeeSection: '个人工作台',
     allowedRoles: [ROLES.EMPLOYEE, ROLES.MANAGER, ROLES.ADMIN],

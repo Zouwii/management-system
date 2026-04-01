@@ -53,6 +53,13 @@ export function realFetchAIInsightList() {
   return httpRequest('/dashboard/ai-insights');
 }
 
+export function realCreateAITaskTicket(_user, payload) {
+  return httpRequest('/dashboard/ai-task-ticket', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 export function realFetchPermissionMatrix() {
   return httpRequest('/dashboard/permission-matrix');
 }

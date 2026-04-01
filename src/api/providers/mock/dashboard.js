@@ -157,6 +157,15 @@ export function mockFetchAIInsightList() {
   return request(() => aiInsightList);
 }
 
+export function mockCreateAITaskTicket(_user, payload) {
+  return request(() => ({
+    success: true,
+    taskId: `BT-${Math.floor(10000 + Math.random() * 90000)}`,
+    taskUrl: 'https://www.teambition.com/project/mock/task/mock-task-id',
+    message: `已根据 AI 草稿创建任务单：${payload.title}`,
+  }));
+}
+
 export function mockFetchPermissionMatrix() {
   return request(() => permissionMatrix);
 }

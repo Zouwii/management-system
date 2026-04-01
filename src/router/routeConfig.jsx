@@ -56,8 +56,8 @@ export const appRouteConfig = [
   },
   {
     path: ROUTE_PATHS.AI_ANALYSIS,
-    label: 'AI分析页',
-    employeeLabel: 'AI分析中心',
+    label: 'AI助理',
+    employeeLabel: 'AI助理',
     menu: true,
     allowedRoles: [ROLES.EMPLOYEE, ROLES.MANAGER, ROLES.ADMIN],
     permissionCode: PAGE_PERMISSION_CODES.AI_ANALYSIS,

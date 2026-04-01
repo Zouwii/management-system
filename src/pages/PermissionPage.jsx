@@ -52,7 +52,7 @@ export default function PermissionPage() {
       <div className="grid grid-cols-3 gap-5">
         <Card className="p-5">
           <div className="text-lg font-semibold">员工</div>
-          <div className="mt-3 text-sm leading-7 text-slate-500">登录后仅可见：工时管理、绩效管理、AI分析中心。</div>
+          <div className="mt-3 text-sm leading-7 text-slate-500">登录后仅可见：工时管理、绩效管理、AI助理。</div>
           <div className="mt-4 space-y-2 text-sm">
             <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-emerald-800">可查看本人数据</div>
             <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-rose-800">不可查看组级 / 部门级 / 他人数据</div>
@@ -60,7 +60,7 @@ export default function PermissionPage() {
         </Card>
         <Card className="p-5">
           <div className="text-lg font-semibold">主管</div>
-          <div className="mt-3 text-sm leading-7 text-slate-500">可见：部门总览、组详情、个人详情、绩效页、AI分析页、权限管理页。</div>
+          <div className="mt-3 text-sm leading-7 text-slate-500">可见：部门总览、组详情、个人详情、绩效页、AI助理、权限管理页。</div>
           <div className="mt-4 space-y-2 text-sm">
             <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-emerald-800">可查看本人 + 所管小组 + 所属部门数据</div>
             <div className="rounded-2xl border border-amber-100 bg-amber-50 px-4 py-3 text-amber-800">可配置组内页面权限，不可越权看其他部门</div>
