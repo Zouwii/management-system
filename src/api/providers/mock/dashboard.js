@@ -3,7 +3,7 @@ import {
   allRows,
   integrationTeam,
   navTeam,
-  performanceHistory,
+  performanceArchives,
   permissionMatrix,
   personalHours,
   personalHoursDashboard,
@@ -90,6 +90,10 @@ function buildPersonalHoursPayload(user, target = ALL_TARGET, payload = {}) {
   };
 }
 
+function buildPerformancePayload(user) {
+  return performanceArchives[user?.name] ?? performanceArchives.李四;
+}
+
 export function mockFetchDepartmentOverview(user) {
   return request(() => {
     const rows = filterRowsByDataScope(allRows, user);
@@ -145,8 +149,8 @@ export function mockUpdatePersonalHours(user, payload) {
   }));
 }
 
-export function mockFetchPerformanceHistory() {
-  return request(() => performanceHistory);
+export function mockFetchPerformanceHistory(user) {
+  return request(() => buildPerformancePayload(user));
 }
 
 export function mockFetchAIInsightList() {

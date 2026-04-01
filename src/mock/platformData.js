@@ -72,11 +72,44 @@ export const personalHoursDashboard = {
   ],
 };
 
-export const performanceHistory = [
-  { quarter: '2025 Q3', score: 'B+', rank: '组内前40%', comment: '完成核心算法任务，但成果沉淀不足' },
-  { quarter: '2025 Q4', score: 'A-', rank: '组内前25%', comment: '承担复杂调试任务，交付稳定' },
-  { quarter: '2026 Q1', score: 'A', rank: '组内前15%', comment: '高价值研发任务占比上升，专项推进明显' },
-];
+export const performanceArchives = {
+  李四: {
+    targetLabel: '李四',
+    sourceLabel: '匿名样例 A',
+    desc: '当前页面使用匿名化归档样例展示季度绩效与结余绩效，不映射任何真实人员信息。',
+    history: [
+      { quarter: '2024 Q4', hourScore: 1.05, managerScore: 1, overallScore: 1.035, balanceScore: 1.035, overflowScore: 0.035, decayScore: 0.009, carryScore: 0.035, finalScore: 1.0 },
+      { quarter: '2025 Q1', hourScore: 1.02, managerScore: 1.2, overallScore: 1.074, balanceScore: 1.109, overflowScore: 0.074, decayScore: 0.025, carryScore: 0.100, finalScore: 1.0 },
+      { quarter: '2025 Q2', hourScore: 1.05, managerScore: 1.2, overallScore: 1.095, balanceScore: 1.195, overflowScore: 0.095, decayScore: 0.043, carryScore: 0.170, finalScore: 1.0 },
+      { quarter: '2025 Q3', hourScore: 1.05, managerScore: 1.2, overallScore: 1.095, balanceScore: 1.265, overflowScore: 0.095, decayScore: 0.006, carryScore: 0.022, finalScore: 1.2 },
+      { quarter: '2025 Q4', hourScore: 0.93, managerScore: 1.0, overallScore: 0.951, balanceScore: 0.973, overflowScore: 0.151, decayScore: 0.042, carryScore: 0.168, finalScore: 0.8 },
+    ],
+  },
+  王主管: {
+    targetLabel: '王主管',
+    sourceLabel: '匿名样例 B',
+    desc: '主管账号使用匿名化归档样例数据，保留季度最终绩效和结余绩效口径。',
+    history: [
+      { quarter: '2024 Q4', hourScore: 1.0, managerScore: 1.0, overallScore: 1.041, balanceScore: 1.070, overflowScore: 0.041, decayScore: 0.016, carryScore: 0.063, finalScore: 1.0 },
+      { quarter: '2025 Q1', hourScore: 0.98, managerScore: 1.0, overallScore: 0.976, balanceScore: 1.039, overflowScore: 0.176, decayScore: 0.009, carryScore: 0.023, finalScore: 1.0 },
+      { quarter: '2025 Q2', hourScore: 1.0, managerScore: 1.0, overallScore: 1.0, balanceScore: 1.023, overflowScore: 0.039, decayScore: 0.012, carryScore: 0.017, finalScore: 1.0 },
+      { quarter: '2025 Q3', hourScore: 0.91, managerScore: 1.0, overallScore: 0.897, balanceScore: 0.914, overflowScore: 0.097, decayScore: 0.028, carryScore: 0.110, finalScore: 0.8 },
+      { quarter: '2025 Q4', hourScore: 1.0, managerScore: 1.0, overallScore: 1.0, balanceScore: 1.110, overflowScore: 0.000, decayScore: 0.021, carryScore: 0.083, finalScore: 1.0 },
+    ],
+  },
+  系统管理员: {
+    targetLabel: '系统管理员',
+    sourceLabel: '匿名样例 C',
+    desc: '管理员账号使用匿名化高档位样例，便于验证结余绩效累计和颜色态。',
+    history: [
+      { quarter: '2024 Q4', hourScore: 1.13, managerScore: 1.0, overallScore: 1.091, balanceScore: 1.091, overflowScore: 0.091, decayScore: 0.023, carryScore: 0.091, finalScore: 1.0 },
+      { quarter: '2025 Q1', hourScore: 1.08, managerScore: 1.2, overallScore: 1.116, balanceScore: 1.207, overflowScore: 0.116, decayScore: 0.000, carryScore: 0.000, finalScore: 1.2 },
+      { quarter: '2025 Q2', hourScore: 1.13, managerScore: 1.2, overallScore: 1.151, balanceScore: 1.151, overflowScore: 0.151, decayScore: 0.038, carryScore: 0.151, finalScore: 1.0 },
+      { quarter: '2025 Q3', hourScore: 1.11, managerScore: 1.2, overallScore: 1.137, balanceScore: 1.370, overflowScore: 0.019, decayScore: 0.033, carryScore: 0.132, finalScore: 1.2 },
+      { quarter: '2025 Q4', hourScore: 1.07, managerScore: 1.0, overallScore: 1.049, balanceScore: 1.181, overflowScore: 0.049, decayScore: 0.037, carryScore: 0.148, finalScore: 1.0 },
+    ],
+  },
+};
 
 export const aiInsightList = [
   {
