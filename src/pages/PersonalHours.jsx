@@ -244,7 +244,7 @@ export default function PersonalHours() {
                 disabled={isQuerying}
                 className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
               >
-                本季度至今天23:59:59
+                本季度至今天
               </button>
               <button
                 type="button"
@@ -409,20 +409,6 @@ export default function PersonalHours() {
         <Card className="p-6">
           <div className="text-lg font-semibold">月度趋势</div>
           <div className="mt-1 text-sm text-slate-500">柱状图展示每月总工时、有效工时和已完成工时，下面只保留完成率。</div>
-          <div className="mt-4 grid grid-cols-3 gap-3">
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">
-              总工时峰值
-              <div className="mt-1 text-xl font-semibold text-slate-900">{formatDays(maxTrendValue)}天</div>
-            </div>
-            <div className="rounded-2xl border border-cyan-100 bg-cyan-50/70 px-4 py-3 text-sm text-cyan-700">
-              有效工时口径
-              <div className="mt-1 text-xl font-semibold text-slate-900">当月截止任务</div>
-            </div>
-            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3 text-sm text-emerald-700">
-              已完成工时口径
-              <div className="mt-1 text-xl font-semibold text-slate-900">截止当月且已完成</div>
-            </div>
-          </div>
           <div className="mt-5 rounded-3xl border border-slate-200 bg-slate-50 p-5">
             <div className="flex items-end justify-between gap-4">
               {trend.map((item) => {
@@ -564,36 +550,33 @@ export default function PersonalHours() {
                   </div>
                 </div>
               </div>
-              <div className="w-[260px] rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">查看控制</div>
-                  <button
-                    type="button"
-                    onClick={resetTaskControls}
-                    className="text-xs font-medium text-slate-500 hover:text-slate-700"
+              <div className="w-[420px] rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">查看控制</div>
+                <div className="grid grid-cols-[minmax(0,132px)_56px_84px_84px] items-center gap-2">
+                  <select
+                    value={taskSort}
+                    onChange={(event) => setTaskSort(event.target.value)}
+                    className="min-w-0 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 outline-none"
                   >
-                    重置条件
-                  </button>
-                </div>
-                <select
-                  value={taskSort}
-                  onChange={(event) => setTaskSort(event.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 outline-none"
-                >
-                  <option value="desc">工天从高到低</option>
-                  <option value="asc">工天从低到高</option>
-                </select>
-                <div className="mt-4 flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-sm text-slate-500">当前结果</div>
-                    <div className="mt-1 text-2xl font-semibold text-slate-900">{filteredTasks.length}</div>
+                    <option value="desc">工时降序</option>
+                    <option value="asc">工时升序</option>
+                  </select>
+                  <div className="text-center text-sm text-slate-500">
+                    <span className="font-semibold text-slate-900">{filteredTasks.length}</span> 项
                   </div>
                   <button
                     type="button"
                     onClick={() => setShowAllTasks((prev) => !prev)}
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    className="whitespace-nowrap rounded-2xl bg-slate-900 px-2 py-3 text-sm font-medium text-white hover:bg-slate-800"
                   >
-                    {showAllTasks ? '收起任务' : '展开全部任务'}
+                    {showAllTasks ? '收起' : '展开'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={resetTaskControls}
+                    className="whitespace-nowrap rounded-2xl border border-slate-200 bg-white px-2 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    重置
                   </button>
                 </div>
                 <div className="mt-2 text-xs leading-5 text-slate-500">
@@ -604,19 +587,19 @@ export default function PersonalHours() {
           </div>
         </div>
         <div className="mt-5 max-h-[420px] overflow-auto rounded-3xl border border-slate-200">
-          <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1.95fr)_108px_148px_108px_84px_132px] gap-4 border-b border-slate-200 bg-slate-50 px-5 py-4 text-sm font-medium text-slate-500">
+          <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1.82fr)_108px_148px_108px_108px_176px] gap-8 border-b border-slate-200 bg-slate-50 px-5 py-4 text-sm font-medium text-slate-500">
             <div>任务名称</div>
             <div>任务类型</div>
             <div>季度归属</div>
             <div>状态</div>
-            <div className="text-right">工天</div>
+            <div className="text-right">工时</div>
             <div>链接</div>
           </div>
           <div className="divide-y divide-slate-100">
             {filteredTasks.map((task) => (
               <div
                 key={task.name}
-                className="grid grid-cols-[minmax(0,1.95fr)_108px_148px_108px_84px_132px] items-center gap-4 bg-white px-5 py-4 text-sm transition-colors hover:bg-slate-50/70"
+                className="grid grid-cols-[minmax(0,1.82fr)_108px_148px_108px_108px_176px] items-center gap-8 bg-white px-5 py-4 text-sm transition-colors hover:bg-slate-50/70"
               >
                 <div className="min-w-0" title={task.name}>
                   <div className="truncate font-medium text-slate-900">{task.name}</div>

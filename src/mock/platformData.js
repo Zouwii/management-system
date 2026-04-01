@@ -60,12 +60,15 @@ export const personalHoursDashboard = {
     { name: '产品需求评审与拆解', hours: 19, type: '产品', quarterCategory: '当前季度排期', status: '已完成', deadline: '2026-05-18', link: 'https://www.teambition.com/task/product-review-006' },
     { name: '复杂场景日志复盘', hours: 23, type: '研发', quarterCategory: '当前季度排期', status: '已完成', deadline: '2026-05-21', link: 'https://www.teambition.com/task/log-review-007' },
     { name: '订单项目 C 交付联调', hours: 26, type: '订单', quarterCategory: '季度逾期排期', status: '未完成', deadline: '2026-05-28', link: 'https://www.teambition.com/task/order-delivery-008' },
+    { name: '订单项目 E 客户现场复测', hours: 22, type: '订单', quarterCategory: '当前季度排期', status: '已完成', deadline: '2026-05-30', link: 'https://www.teambition.com/task/order-retest-015' },
     { name: '路径规划专项方案沉淀', hours: 18, type: '研发', quarterCategory: '季度逾期排期', status: '已完成', deadline: '2026-06-05', link: 'https://www.teambition.com/task/route-doc-009' },
     { name: '产品配置项体验改进', hours: 16, type: '产品', quarterCategory: '当前季度排期', status: '已完成', deadline: '2026-06-10', link: 'https://www.teambition.com/task/product-config-010' },
     { name: '历史订单 D 遗留问题回归', hours: 21, type: '订单', quarterCategory: '季度逾期排期', status: '未完成', deadline: '2026-06-14', link: 'https://www.teambition.com/task/order-legacy-011' },
+    { name: '订单项目 F 版本灰度验证', hours: 29, type: '订单', quarterCategory: '当前季度排期', status: '未完成', deadline: '2026-06-16', link: 'https://www.teambition.com/task/order-gray-016' },
     { name: '旧版地图模块兼容修复', hours: 17, type: '研发', quarterCategory: '季度逾期排期', status: '已完成', deadline: '2026-06-18', link: 'https://www.teambition.com/task/map-legacy-012' },
     { name: '产品配置缺陷补丁处理', hours: 14, type: '产品', quarterCategory: '季度逾期排期', status: '未完成', deadline: '2026-06-21', link: 'https://www.teambition.com/task/product-patch-013' },
     { name: '本季度控制链路稳定性验证', hours: 20, type: '研发', quarterCategory: '当前季度排期', status: '未完成', deadline: '2026-06-26', link: 'https://www.teambition.com/task/control-verify-014' },
+    { name: '订单项目 G 上线后回访闭环', hours: 18, type: '订单', quarterCategory: '季度逾期排期', status: '已完成', deadline: '2026-06-27', link: 'https://www.teambition.com/task/order-followup-017' },
   ],
 };
 
