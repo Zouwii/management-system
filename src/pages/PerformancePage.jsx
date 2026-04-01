@@ -8,6 +8,12 @@ import { performanceHistory as fallbackData } from '../mock/platformData';
 
 export default function PerformancePage() {
   const [history, setHistory] = useState(fallbackData);
+  const scoreTagClassMap = {
+    A: 'bg-emerald-50 text-emerald-700',
+    'A-': 'bg-teal-50 text-teal-700',
+    'B+': 'bg-amber-50 text-amber-700',
+    B: 'bg-orange-50 text-orange-700',
+  };
 
   useEffect(() => {
     let active = true;
@@ -56,7 +62,7 @@ export default function PerformancePage() {
                 <tr key={item.quarter} className={index !== history.length - 1 ? 'border-b border-slate-100' : ''}>
                   <td className="px-5 py-4 font-medium">{item.quarter}</td>
                   <td className="px-5 py-4">
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{item.score}</span>
+                    <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${scoreTagClassMap[item.score] ?? 'bg-slate-100 text-slate-700'}`}>{item.score}</span>
                   </td>
                   <td className="px-5 py-4 text-slate-600">{item.rank}</td>
                   <td className="px-5 py-4 text-slate-600">{item.comment}</td>

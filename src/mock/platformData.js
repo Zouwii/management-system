@@ -23,9 +23,9 @@ export const integrationTeam = [
 ];
 
 export const personalHours = [
-  { month: '1月', total: 176, effective: 148, efficiency: '84%', taskType: '算法优化 42% / 联调支持 36% / 复盘沉淀 22%' },
-  { month: '2月', total: 168, effective: 142, efficiency: '85%', taskType: '算法优化 45% / 联调支持 31% / 复盘沉淀 24%' },
-  { month: '3月', total: 184, effective: 156, efficiency: '85%', taskType: '算法优化 49% / 联调支持 28% / 复盘沉淀 23%' },
+  { month: '4月', total: 15.0 * 8 },
+  { month: '5月', total: 18.0 * 8 },
+  { month: '6月', total: 16.5 * 8 },
 ];
 
 export const personalHoursDashboard = {
@@ -33,6 +33,8 @@ export const personalHoursDashboard = {
     startDate: '2026-04-01T09:00:00',
     endDate: '2026-06-30T18:00:00',
   },
+  lastUpdatedAt: '2026-04-01T10:30:00',
+  compensatoryDays: 0,
   statutoryHolidays: [
     { date: '2026-04-06', name: '清明节调休' },
     { date: '2026-05-01', name: '劳动节' },
@@ -50,16 +52,20 @@ export const personalHoursDashboard = {
     { type: '研发', hours: 188, ratio: '44%' },
   ],
   taskDetails: [
-    { name: '路径规划稳定性优化', hours: 42, type: '研发', link: 'https://www.teambition.com/task/route-plan-001' },
-    { name: '导航参数产品化配置梳理', hours: 24, type: '产品', link: 'https://www.teambition.com/task/product-nav-002' },
-    { name: '订单项目 A 现场问题闭环', hours: 38, type: '订单', link: 'https://www.teambition.com/task/order-field-003' },
-    { name: '控制器边界工况回归', hours: 31, type: '研发', link: 'https://www.teambition.com/task/control-regression-004' },
-    { name: '订单项目 B 版本适配', hours: 27, type: '订单', link: 'https://www.teambition.com/task/order-adapter-005' },
-    { name: '产品需求评审与拆解', hours: 19, type: '产品', link: 'https://www.teambition.com/task/product-review-006' },
-    { name: '复杂场景日志复盘', hours: 23, type: '研发', link: 'https://www.teambition.com/task/log-review-007' },
-    { name: '订单项目 C 交付联调', hours: 26, type: '订单', link: 'https://www.teambition.com/task/order-delivery-008' },
-    { name: '路径规划专项方案沉淀', hours: 18, type: '研发', link: 'https://www.teambition.com/task/route-doc-009' },
-    { name: '产品配置项体验改进', hours: 16, type: '产品', link: 'https://www.teambition.com/task/product-config-010' },
+    { name: '路径规划稳定性优化', hours: 42, type: '研发', quarterCategory: '当前季度排期', status: '未完成', deadline: '2026-04-18', link: 'https://www.teambition.com/task/route-plan-001' },
+    { name: '导航参数产品化配置梳理', hours: 24, type: '产品', quarterCategory: '当前季度排期', status: '已完成', deadline: '2026-04-26', link: 'https://www.teambition.com/task/product-nav-002' },
+    { name: '订单项目 A 现场问题闭环', hours: 38, type: '订单', quarterCategory: '季度逾期排期', status: '未完成', deadline: '2026-04-29', link: 'https://www.teambition.com/task/order-field-003' },
+    { name: '控制器边界工况回归', hours: 31, type: '研发', quarterCategory: '当前季度排期', status: '未完成', deadline: '2026-05-09', link: 'https://www.teambition.com/task/control-regression-004' },
+    { name: '订单项目 B 版本适配', hours: 27, type: '订单', quarterCategory: '季度逾期排期', status: '未完成', deadline: '2026-05-14', link: 'https://www.teambition.com/task/order-adapter-005' },
+    { name: '产品需求评审与拆解', hours: 19, type: '产品', quarterCategory: '当前季度排期', status: '已完成', deadline: '2026-05-18', link: 'https://www.teambition.com/task/product-review-006' },
+    { name: '复杂场景日志复盘', hours: 23, type: '研发', quarterCategory: '当前季度排期', status: '已完成', deadline: '2026-05-21', link: 'https://www.teambition.com/task/log-review-007' },
+    { name: '订单项目 C 交付联调', hours: 26, type: '订单', quarterCategory: '季度逾期排期', status: '未完成', deadline: '2026-05-28', link: 'https://www.teambition.com/task/order-delivery-008' },
+    { name: '路径规划专项方案沉淀', hours: 18, type: '研发', quarterCategory: '季度逾期排期', status: '已完成', deadline: '2026-06-05', link: 'https://www.teambition.com/task/route-doc-009' },
+    { name: '产品配置项体验改进', hours: 16, type: '产品', quarterCategory: '当前季度排期', status: '已完成', deadline: '2026-06-10', link: 'https://www.teambition.com/task/product-config-010' },
+    { name: '历史订单 D 遗留问题回归', hours: 21, type: '订单', quarterCategory: '季度逾期排期', status: '未完成', deadline: '2026-06-14', link: 'https://www.teambition.com/task/order-legacy-011' },
+    { name: '旧版地图模块兼容修复', hours: 17, type: '研发', quarterCategory: '季度逾期排期', status: '已完成', deadline: '2026-06-18', link: 'https://www.teambition.com/task/map-legacy-012' },
+    { name: '产品配置缺陷补丁处理', hours: 14, type: '产品', quarterCategory: '季度逾期排期', status: '未完成', deadline: '2026-06-21', link: 'https://www.teambition.com/task/product-patch-013' },
+    { name: '本季度控制链路稳定性验证', hours: 20, type: '研发', quarterCategory: '当前季度排期', status: '未完成', deadline: '2026-06-26', link: 'https://www.teambition.com/task/control-verify-014' },
   ],
 };
 

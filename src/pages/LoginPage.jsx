@@ -47,22 +47,22 @@ export default function LoginPage() {
   return (
     <div className="mx-auto max-w-5xl">
       <div className="grid min-h-[calc(100vh-3rem)] grid-cols-2 gap-6">
-        <Card className="flex flex-col justify-between p-8">
+        <Card className="flex flex-col justify-between overflow-hidden bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(240,249,255,0.92))] p-8">
           <div>
-            <div className="text-sm font-semibold text-slate-500">本体开发部数据平台</div>
+            <div className="text-sm font-semibold uppercase tracking-[0.16em] text-sky-600">本体开发部数据平台</div>
             <div className="mt-4 text-4xl font-semibold text-slate-900">登录页</div>
             <div className="mt-4 text-sm leading-7 text-slate-500">
               建议采用角色权限 + 数据范围权限双层控制，解决员工端、主管端和管理员端的访问边界。
             </div>
           </div>
-          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
+          <div className="rounded-3xl border border-sky-100 bg-[linear-gradient(135deg,rgba(224,242,254,0.75),rgba(236,253,245,0.9))] p-5">
             <div className="text-sm font-medium text-slate-900">权限提示</div>
             <div className="mt-2 text-sm leading-6 text-slate-500">
               登录成功后返回 role、menuCodes、pageScopes、dataScopes。前端根据 menuCodes 渲染侧边栏，根据 pageScopes 控制路由可访问性，根据 dataScopes 控制请求参数中的数据范围。
             </div>
           </div>
         </Card>
-        <Card className="p-8">
+        <Card className="bg-[linear-gradient(180deg,rgba(255,255,255,0.97),rgba(248,250,252,0.94))] p-8">
           <div className="text-lg font-semibold text-slate-900">账号登录</div>
           <div className="mt-1 text-sm text-slate-500">请输入账号和密码登录，注册入口已预留。</div>
           <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
@@ -71,7 +71,7 @@ export default function LoginPage() {
               <input
                 value={form.account}
                 onChange={(event) => handleChange('account', event.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                className="w-full rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 shadow-inner"
                 placeholder="请输入账号"
               />
             </div>
@@ -81,7 +81,7 @@ export default function LoginPage() {
                 type="password"
                 value={form.password}
                 onChange={(event) => handleChange('password', event.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                className="w-full rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 shadow-inner"
                 placeholder="请输入密码"
               />
             </div>
@@ -94,7 +94,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={isLoading}
-                className="rounded-2xl bg-slate-900 px-4 py-3 text-center font-medium text-white"
+                className="rounded-2xl bg-gradient-to-r from-slate-900 to-sky-700 px-4 py-3 text-center font-medium text-white shadow-[0_18px_30px_-18px_rgba(2,132,199,0.85)]"
               >
                 登录
               </button>

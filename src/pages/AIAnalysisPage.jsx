@@ -8,6 +8,12 @@ import { aiInsightList as fallbackData } from '../mock/platformData';
 
 export default function AIAnalysisPage() {
   const [insights, setInsights] = useState(fallbackData);
+  const insightTypeClassMap = {
+    效率优化: 'border-cyan-100 bg-cyan-50 text-cyan-700',
+    绩效关联: 'border-violet-100 bg-violet-50 text-violet-700',
+    风险提醒: 'border-amber-100 bg-amber-50 text-amber-700',
+    能力发展: 'border-emerald-100 bg-emerald-50 text-emerald-700',
+  };
 
   useEffect(() => {
     let active = true;
@@ -41,7 +47,7 @@ export default function AIAnalysisPage() {
           <Card key={item.title} className="p-5">
             <div className="flex items-center justify-between gap-3">
               <div className="text-lg font-semibold">{item.title}</div>
-              <div className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700">{item.type}</div>
+              <div className={`rounded-full border px-3 py-1 text-xs font-medium ${insightTypeClassMap[item.type] ?? 'border-slate-200 bg-slate-100 text-slate-700'}`}>{item.type}</div>
             </div>
             <div className="mt-3 text-sm leading-7 text-slate-600">{item.content}</div>
           </Card>

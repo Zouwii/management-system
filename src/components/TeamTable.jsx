@@ -1,4 +1,11 @@
 export default function TeamTable({ rows, showTeam = false }) {
+  const performanceTagClassMap = {
+    A: 'bg-emerald-50 text-emerald-700',
+    'A-': 'bg-teal-50 text-teal-700',
+    'B+': 'bg-amber-50 text-amber-700',
+    B: 'bg-orange-50 text-orange-700',
+  };
+
   return (
     <div className="overflow-auto">
       <table className="w-full text-sm">
@@ -25,7 +32,7 @@ export default function TeamTable({ rows, showTeam = false }) {
               <td className="px-5 py-4 text-slate-600">{row.hours}h</td>
               <td className="px-5 py-4 text-slate-600">{row.effectiveRate}</td>
               <td className="px-5 py-4">
-                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">{row.perf}</span>
+                <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${performanceTagClassMap[row.perf] ?? 'bg-slate-100 text-slate-700'}`}>{row.perf}</span>
               </td>
               <td className="px-5 py-4">
                 <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${row.risk === '低' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>

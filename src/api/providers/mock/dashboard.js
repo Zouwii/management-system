@@ -11,6 +11,18 @@ import {
 import { buildDepartmentStats, filterRowsByDataScope } from '../../../utils/dataScope';
 import { request } from '../../request';
 
+function getCurrentLocalDateTime() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+}
+
 export function mockFetchDepartmentOverview(user) {
   return request(() => {
     const rows = filterRowsByDataScope(allRows, user);
@@ -53,14 +65,18 @@ export function mockQueryPersonalHours(payload) {
     dashboard: {
       ...personalHoursDashboard,
       defaultRange: payload,
+      compensatoryDays: payload.compensatoryDays ?? personalHoursDashboard.compensatoryDays,
     },
   }));
 }
 
-export function mockUpdatePersonalHours(payload) {
+export function mockUpdatePersonalHours() {
+  const lastUpdatedAt = getCurrentLocalDateTime();
+
   return request(() => ({
     success: true,
-    message: `已根据 ${payload.startDate} 至 ${payload.endDate} 的时间区间触发更新`,
+    message: '已触发工时更新。',
+    lastUpdatedAt,
   }));
 }
 
