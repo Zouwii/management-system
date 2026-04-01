@@ -3,6 +3,7 @@ import { fetchPersonalHours, queryPersonalHours, updatePersonalHours } from '../
 import Card from '../components/Card';
 import SectionTitle from '../components/SectionTitle';
 import StatCard from '../components/StatCard';
+import { ROLES } from '../constants/roles';
 import EmployeeLayout from '../layouts/EmployeeLayout';
 import {
   personalHours as fallbackTrend,
@@ -15,13 +16,19 @@ import {
   formatDays,
   getDeltaStatus,
 } from '../utils/workHours';
+import { useAuthStore } from '../store/authStore';
 
 export default function PersonalHours() {
+  const user = useAuthStore((state) => state.user);
+  const canViewAllPeople = user?.role === ROLES.MANAGER || user?.role === ROLES.ADMIN;
+  const defaultTarget = canViewAllPeople ? 'ALL' : user?.name ?? '';
   const [sourceTrend, setSourceTrend] = useState(fallbackTrend);
   const [dashboard, setDashboard] = useState(fallbackDashboard);
   const [dateRange, setDateRange] = useState(fallbackDashboard.defaultRange);
   const [lastUpdatedAt, setLastUpdatedAt] = useState(fallbackDashboard.lastUpdatedAt ?? '');
   const [compensatoryDays, setCompensatoryDays] = useState(fallbackDashboard.compensatoryDays ?? 0);
+  const [memberOptions, setMemberOptions] = useState([]);
+  const [selectedTarget, setSelectedTarget] = useState(defaultTarget);
   const [showAllTasks, setShowAllTasks] = useState(false);
   const [taskFilter, setTaskFilter] = useState('全部');
   const [quarterFilter, setQuarterFilter] = useState('全部');
@@ -34,20 +41,22 @@ export default function PersonalHours() {
   useEffect(() => {
     let active = true;
 
-    fetchPersonalHours().then((response) => {
+    fetchPersonalHours(user, { target: defaultTarget }).then((response) => {
       if (active) {
         setSourceTrend(response.data.trend ?? fallbackTrend);
         setDashboard(response.data.dashboard);
         setDateRange(response.data.dashboard.defaultRange);
         setLastUpdatedAt(response.data.dashboard.lastUpdatedAt ?? '');
         setCompensatoryDays(response.data.dashboard.compensatoryDays ?? 0);
+        setMemberOptions(response.data.memberOptions ?? []);
+        setSelectedTarget(response.data.selectedTarget ?? defaultTarget);
       }
     });
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [defaultTarget, user]);
 
   const expectedSummary = useMemo(
     () => calculateExpectedEffectiveDays(
@@ -141,6 +150,7 @@ export default function PersonalHours() {
       startDate: formatInputDateTime(start),
       endDate: formatInputDateTime(end),
       compensatoryDays,
+      target: selectedTarget,
     };
   }
 
@@ -164,12 +174,14 @@ export default function PersonalHours() {
     setActionMessage('');
 
     try {
-      const response = await queryPersonalHours(payload);
+      const response = await queryPersonalHours(user, payload);
       setSourceTrend(response.data.trend ?? fallbackTrend);
       setDashboard(response.data.dashboard);
       setLastUpdatedAt((current) => response.data.dashboard.lastUpdatedAt ?? current);
       setCompensatoryDays(response.data.dashboard.compensatoryDays ?? 0);
-      setActionMessage('已完成当前时间区间的工时查询。');
+      setMemberOptions(response.data.memberOptions ?? memberOptions);
+      setSelectedTarget(response.data.selectedTarget ?? payload.target ?? selectedTarget);
+      setActionMessage(`已完成${response.data.dashboard.targetLabel ?? '当前对象'}的工时查询。`);
     } finally {
       setIsQuerying(false);
     }
@@ -180,9 +192,10 @@ export default function PersonalHours() {
     setActionMessage('');
 
     try {
-      const response = await updatePersonalHours({
+      const response = await updatePersonalHours(user, {
         ...dateRange,
         compensatoryDays,
+        target: selectedTarget,
       });
       setLastUpdatedAt(response.data.lastUpdatedAt ?? lastUpdatedAt);
       setActionMessage(response.data.message || '已触发工时更新。');
@@ -251,6 +264,7 @@ export default function PersonalHours() {
                 onClick={() => handleQuery({
                   ...dateRange,
                   compensatoryDays,
+                  target: selectedTarget,
                 })}
                 disabled={isQuerying}
                 className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
@@ -272,6 +286,29 @@ export default function PersonalHours() {
             </div>
           </div>
         </div>
+        {canViewAllPeople ? (
+          <div className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-4">
+            <div className="grid grid-cols-[88px_minmax(0,320px)_1fr] items-center gap-3">
+              <div className="text-sm text-slate-500">查看对象</div>
+              <select
+                value={selectedTarget}
+                onChange={(event) => setSelectedTarget(event.target.value)}
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 outline-none"
+              >
+                {memberOptions.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.team === '全部' ? option.name : `${option.name} · ${option.team}`}
+                  </option>
+                ))}
+              </select>
+              <div className="text-sm text-slate-500">
+                当前查看：
+                {' '}
+                <span className="font-medium text-slate-700">{dashboard.targetLabel ?? '全部人员'}</span>
+              </div>
+            </div>
+          </div>
+        ) : null}
         <div className="mt-5 rounded-3xl border border-slate-200 bg-slate-50 p-4">
           <div className="grid grid-cols-[88px_minmax(0,1fr)_88px_minmax(0,1fr)_1fr_88px_120px] items-center gap-3">
             <div className="text-sm text-slate-500">起始时间</div>
@@ -333,7 +370,7 @@ export default function PersonalHours() {
             <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div className="text-sm text-slate-500">计算说明</div>
               <div className="mt-2 text-sm leading-6 text-slate-600">
-                法定节假日 {expectedSummary.holidayCount} 天，调休天数 {expectedSummary.compensatoryDays.toFixed(1)} 天，折合 {expectedSummary.hours}h，可作为排期与完成情况的对比基线。
+                法定节假日 {expectedSummary.holidayCount} 天，调休天数 {expectedSummary.compensatoryDays.toFixed(1)} 天，折合 {formatDays(expectedSummary.hours)}天，可作为排期与完成情况的对比基线。
               </div>
             </div>
           </Card>
