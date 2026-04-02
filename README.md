@@ -1,6 +1,6 @@
 # 本体开发部数据平台
 
-基于 React + Vite + Tailwind CSS 的前端项目，面向“本体开发部数据平台”原型的持续开发。当前代码已经不是单纯骨架，而是包含角色登录、权限控制、主管端组织视图、员工端个人视图，以及 mock / real 双请求模式的一版可运行前端。
+仓库内 **React** 前端位于 `frontend-react/`（与 `frontend-vue/`、`backend/` 并列）。基于 React + Vite + Tailwind CSS，面向“本体开发部数据平台”原型的持续开发。当前代码已经不是单纯骨架，而是包含角色登录、权限控制、主管端组织视图、员工端个人视图，以及 mock / real 双请求模式的一版可运行前端。
 
 ## 当前实现
 
@@ -25,35 +25,40 @@
 ## 目录结构
 
 ```text
-src
-├── api
-│   ├── auth.js
-│   ├── client.js
-│   ├── dashboard.js
-│   ├── request.js
-│   └── providers
-│       ├── mock
-│       └── real
-├── components
-├── constants
-├── layouts
-├── mock
-├── pages
-├── router
-├── store
-└── utils
+frontend-react/
+├── src
+│   ├── api
+│   │   ├── auth.js
+│   │   ├── client.js
+│   │   ├── dashboard.js
+│   │   ├── request.js
+│   │   └── providers
+│   │       ├── mock
+│   │       └── real
+│   ├── components
+│   ├── constants
+│   ├── layouts
+│   ├── mock
+│   ├── pages
+│   ├── router
+│   ├── store
+│   └── utils
+├── public
+├── index.html
+├── package.json
+└── vite.config.js
 ```
 
 说明：
 
-- `src/pages` 按页面拆分，不同界面由不同文件管理
-- `src/components` 放通用组件和跨页面复用结构
-- `src/layouts` 放主管端 / 员工端布局
-- `src/api/providers/mock` 与 `src/api/providers/real` 分别对应 mock 数据源和真实接口
+- `frontend-react/src/pages` 按页面拆分，不同界面由不同文件管理
+- `frontend-react/src/components` 放通用组件和跨页面复用结构
+- `frontend-react/src/layouts` 放主管端 / 员工端布局
+- `frontend-react/src/api/providers/mock` 与 `frontend-react/src/api/providers/real` 分别对应 mock 数据源和真实接口
 
 ## 页面与路由
 
-当前主要路由定义在 [`src/router/routeConfig.jsx`](/home/wuhaoxian/body-dev-data-platform/src/router/routeConfig.jsx) 和 [`src/constants/routes.js`](/home/wuhaoxian/body-dev-data-platform/src/constants/routes.js)。
+当前主要路由定义在 [`frontend-react/src/router/routeConfig.jsx`](frontend-react/src/router/routeConfig.jsx) 和 [`frontend-react/src/constants/routes.js`](frontend-react/src/constants/routes.js)。
 
 | 页面 | 路径 | 说明 |
 | --- | --- | --- |
@@ -68,6 +73,12 @@ src
 | 原型整页 | `/prototype` | 仅管理员可见 |
 
 ## 运行方式
+
+进入 React 子项目目录：
+
+```bash
+cd frontend-react
+```
 
 安装依赖：
 
@@ -126,7 +137,7 @@ http://localhost:5173/login
 - `VITE_API_BASE_URL`
   真实接口模式下的接口前缀，默认值为 `/api`
 
-相关定义见 [`src/constants/api.js`](/home/wuhaoxian/body-dev-data-platform/src/constants/api.js)。
+相关定义见 [`frontend-react/src/constants/api.js`](frontend-react/src/constants/api.js)。
 
 ## mock 账号
 
@@ -138,7 +149,7 @@ mock 登录通过账号密码映射角色，当前演示账号如下：
 | `manager` | `123456` | 主管 |
 | `admin` | `123456` | 管理员 |
 
-对应 mock 用户信息见 [`src/mock/auth.js`](/home/wuhaoxian/body-dev-data-platform/src/mock/auth.js)。
+对应 mock 用户信息见 [`frontend-react/src/mock/auth.js`](frontend-react/src/mock/auth.js)。
 
 ## 权限模型
 
@@ -150,10 +161,10 @@ mock 登录通过账号密码映射角色，当前演示账号如下：
 
 核心文件：
 
-- [`src/constants/permissionCodes.js`](/home/wuhaoxian/body-dev-data-platform/src/constants/permissionCodes.js)
-- [`src/constants/permissions.js`](/home/wuhaoxian/body-dev-data-platform/src/constants/permissions.js)
-- [`src/router/guards.jsx`](/home/wuhaoxian/body-dev-data-platform/src/router/guards.jsx)
-- [`src/components/PermissionButton.jsx`](/home/wuhaoxian/body-dev-data-platform/src/components/PermissionButton.jsx)
+- [`frontend-react/src/constants/permissionCodes.js`](frontend-react/src/constants/permissionCodes.js)
+- [`frontend-react/src/constants/permissions.js`](frontend-react/src/constants/permissions.js)
+- [`frontend-react/src/router/guards.jsx`](frontend-react/src/router/guards.jsx)
+- [`frontend-react/src/components/PermissionButton.jsx`](frontend-react/src/components/PermissionButton.jsx)
 
 ### employee
 
@@ -177,18 +188,18 @@ mock 登录通过账号密码映射角色，当前演示账号如下：
 
 统一 API 入口：
 
-- [`src/api/auth.js`](/home/wuhaoxian/body-dev-data-platform/src/api/auth.js)
-- [`src/api/dashboard.js`](/home/wuhaoxian/body-dev-data-platform/src/api/dashboard.js)
+- [`frontend-react/src/api/auth.js`](frontend-react/src/api/auth.js)
+- [`frontend-react/src/api/dashboard.js`](frontend-react/src/api/dashboard.js)
 
 底层能力：
 
-- [`src/api/client.js`](/home/wuhaoxian/body-dev-data-platform/src/api/client.js) 负责真实 HTTP 请求和 mock / real 切换
-- [`src/api/request.js`](/home/wuhaoxian/body-dev-data-platform/src/api/request.js) 负责 mock 模式下的异步延迟模拟
+- [`frontend-react/src/api/client.js`](frontend-react/src/api/client.js) 负责真实 HTTP 请求和 mock / real 切换
+- [`frontend-react/src/api/request.js`](frontend-react/src/api/request.js) 负责 mock 模式下的异步延迟模拟
 
 切换规则：
 
-- `mock` 模式调用 `src/api/providers/mock/*`
-- `real` 模式调用 `src/api/providers/real/*`
+- `mock` 模式调用 `frontend-react/src/api/providers/mock/*`
+- `real` 模式调用 `frontend-react/src/api/providers/real/*`
 
 ### 当前 dashboard 接口约定
 
@@ -204,7 +215,7 @@ mock 登录通过账号密码映射角色，当前演示账号如下：
 
 ## 个人工时页说明
 
-个人工时页对应 [`src/pages/PersonalHours.jsx`](/home/wuhaoxian/body-dev-data-platform/src/pages/PersonalHours.jsx)，是当前功能最完整的一页，也是最适合优先对接后端的一页。
+个人工时页对应 [`frontend-react/src/pages/PersonalHours.jsx`](frontend-react/src/pages/PersonalHours.jsx)，是当前功能最完整的一页，也是最适合优先对接后端的一页。
 
 当前前端已支持：
 
@@ -232,7 +243,7 @@ mock / real provider 当前都已经支持以下调用方式：
 
 ### 部门总览
 
-[`src/pages/DepartmentOverview.jsx`](/home/wuhaoxian/body-dev-data-platform/src/pages/DepartmentOverview.jsx)
+[`frontend-react/src/pages/DepartmentOverview.jsx`](frontend-react/src/pages/DepartmentOverview.jsx)
 
 当前已实现：
 
@@ -245,12 +256,12 @@ mock / real provider 当前都已经支持以下调用方式：
 
 ### 团队详情
 
-[`src/pages/NavTeamDetail.jsx`](/home/wuhaoxian/body-dev-data-platform/src/pages/NavTeamDetail.jsx)
-[`src/pages/IntegrationTeamDetail.jsx`](/home/wuhaoxian/body-dev-data-platform/src/pages/IntegrationTeamDetail.jsx)
+[`frontend-react/src/pages/NavTeamDetail.jsx`](frontend-react/src/pages/NavTeamDetail.jsx)
+[`frontend-react/src/pages/IntegrationTeamDetail.jsx`](frontend-react/src/pages/IntegrationTeamDetail.jsx)
 
 团队详情页已抽出共享结构：
 
-- [`src/components/TeamDetailDashboard.jsx`](/home/wuhaoxian/body-dev-data-platform/src/components/TeamDetailDashboard.jsx)
+- [`frontend-react/src/components/TeamDetailDashboard.jsx`](frontend-react/src/components/TeamDetailDashboard.jsx)
 
 共享能力包括：
 
@@ -263,7 +274,7 @@ mock / real provider 当前都已经支持以下调用方式：
 
 ### 共享表格
 
-[`src/components/TeamTable.jsx`](/home/wuhaoxian/body-dev-data-platform/src/components/TeamTable.jsx)
+[`frontend-react/src/components/TeamTable.jsx`](frontend-react/src/components/TeamTable.jsx)
 
 当前支持：
 
@@ -279,7 +290,7 @@ mock / real provider 当前都已经支持以下调用方式：
 
 转换工具：
 
-- [`src/utils/workHours.js`](/home/wuhaoxian/body-dev-data-platform/src/utils/workHours.js) 中的 `formatDays`
+- [`frontend-react/src/utils/workHours.js`](frontend-react/src/utils/workHours.js) 中的 `formatDays`
 
 这意味着：
 
