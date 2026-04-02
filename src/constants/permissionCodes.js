@@ -1,0 +1,44 @@
+import { ROLES } from './roles';
+
+export const PAGE_PERMISSION_CODES = {
+  DEPARTMENT_OVERVIEW: 'page.department_overview',
+  NAV_TEAM_DETAIL: 'page.nav_team_detail',
+  INTEGRATION_TEAM_DETAIL: 'page.integration_team_detail',
+  PERSONAL_HOURS: 'page.personal_hours',
+  PERFORMANCE: 'page.performance',
+  AI_ANALYSIS: 'page.ai_analysis',
+  PERMISSIONS: 'page.permissions',
+  PROTOTYPE: 'page.prototype',
+};
+
+export const BUTTON_PERMISSION_CODES = {
+  EXPORT_REPORT: 'button.export_report',
+  VIEW_AI_SUGGESTIONS: 'button.view_ai_suggestions',
+  CONFIGURE_ROLE: 'button.configure_role',
+  CONFIGURE_DATA_SCOPE: 'button.configure_data_scope',
+  REVIEW_MEMBER: 'button.review_member',
+};
+
+export const ROLE_PERMISSION_CODE_MAP = {
+  [ROLES.EMPLOYEE]: [
+    PAGE_PERMISSION_CODES.PERSONAL_HOURS,
+    PAGE_PERMISSION_CODES.PERFORMANCE,
+    PAGE_PERMISSION_CODES.AI_ANALYSIS,
+  ],
+  [ROLES.MANAGER]: [
+    PAGE_PERMISSION_CODES.DEPARTMENT_OVERVIEW,
+    PAGE_PERMISSION_CODES.NAV_TEAM_DETAIL,
+    PAGE_PERMISSION_CODES.INTEGRATION_TEAM_DETAIL,
+    PAGE_PERMISSION_CODES.PERSONAL_HOURS,
+    PAGE_PERMISSION_CODES.PERFORMANCE,
+    PAGE_PERMISSION_CODES.AI_ANALYSIS,
+    PAGE_PERMISSION_CODES.PERMISSIONS,
+    BUTTON_PERMISSION_CODES.EXPORT_REPORT,
+    BUTTON_PERMISSION_CODES.VIEW_AI_SUGGESTIONS,
+    BUTTON_PERMISSION_CODES.REVIEW_MEMBER,
+  ],
+  [ROLES.ADMIN]: [
+    ...Object.values(PAGE_PERMISSION_CODES),
+    ...Object.values(BUTTON_PERMISSION_CODES),
+  ],
+};
