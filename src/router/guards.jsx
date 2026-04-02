@@ -15,11 +15,11 @@ export function ProtectedRoute({ allowedRoles, children }) {
   }
 
   if (!hasRoleAccess(user.role, allowedRoles)) {
-    return <Navigate to={getDefaultHomePath(user.role)} replace />;
+    return <Navigate to={getDefaultHomePath(user)} replace />;
   }
 
   if (requiredCode && !hasPermission(requiredCode)) {
-    return <Navigate to={getDefaultHomePath(user.role)} replace />;
+    return <Navigate to={getDefaultHomePath(user)} replace />;
   }
 
   return children;
@@ -30,7 +30,7 @@ export function PublicOnlyRoute({ children }) {
   const user = useAuthStore((state) => state.user);
 
   if (isAuthenticated && user) {
-    return <Navigate to={getDefaultHomePath(user.role)} replace />;
+    return <Navigate to={getDefaultHomePath(user)} replace />;
   }
 
   return children;
@@ -44,5 +44,5 @@ export function RootRedirect() {
     return <Navigate to={ROUTE_PATHS.LOGIN} replace />;
   }
 
-  return <Navigate to={getDefaultHomePath(user.role)} replace />;
+  return <Navigate to={getDefaultHomePath(user)} replace />;
 }

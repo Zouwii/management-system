@@ -17,7 +17,7 @@ export default function LoginPage() {
     try {
       setMessage('');
       const user = await login(form);
-      const fallbackPath = getDefaultHomePath(user.role);
+      const fallbackPath = getDefaultHomePath(user);
       const nextPath = location.state?.from ?? user.homePath ?? fallbackPath;
       navigate(nextPath, { replace: true });
     } catch (error) {

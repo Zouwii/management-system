@@ -2,6 +2,13 @@
 
 基于 React + Vite + Tailwind CSS 的前端项目，面向“本体开发部数据平台”原型的持续开发。当前代码已经不是单纯骨架，而是包含角色登录、权限控制、主管端组织视图、员工端个人视图，以及 mock / real 双请求模式的一版可运行前端。
 
+本轮代码扫视结论：
+
+- 当前仓库仍保持清晰的前端单仓结构，主链路为 `main -> router -> guards/layout -> pages -> api -> providers(mock/real)`
+- 权限与首页跳转逻辑集中在 `constants + utils/permission + router/guards`，没有明显出现页面内各自散落判断的失控情况
+- mock 数据、真实接口适配和页面展示层边界基本清楚，暂未发现阻塞交付的结构性问题
+- 已本地验证 `npm run lint` 与 `npm run build` 均通过
+
 ## 当前实现
 
 - 登录与注册入口
@@ -51,6 +58,42 @@ src
 - `src/layouts` 放主管端 / 员工端布局
 - `src/api/providers/mock` 与 `src/api/providers/real` 分别对应 mock 数据源和真实接口
 
+## 架构分层
+
+项目当前可以按 6 层理解：
+
+1. `src/main.jsx` / `src/App.jsx`
+   应用启动入口，仅负责挂载 React 和路由容器。
+2. `src/router`
+   负责路由注册、根路径跳转、公开页/受保护页分流，以及页面权限拦截。
+3. `src/layouts`
+   负责主管端、员工端的导航壳层和角色视图差异，不承担业务数据拼装。
+4. `src/pages`
+   负责页面级状态、查询参数、数据请求触发和业务展示组合。
+5. `src/api`
+   负责统一 API 入口和 `mock` / `real` provider 切换，避免页面直接感知数据源。
+6. `src/mock` + `src/utils` + `src/constants`
+   负责样例数据、领域常量、权限码、数据范围和展示转换等基础支撑。
+
+这种组织方式的好处是：
+
+- 页面层只关心“拿什么数据、怎么展示”
+- provider 层只关心“数据从哪里来、返回什么结构”
+- 权限、首页、菜单等横切规则集中维护，后续继续扩展页面时不容易失控
+
+## 主运行链路
+
+最核心的运行路径如下：
+
+1. [`src/main.jsx`](/home/wuhaoxian/body-dev-data-platform/src/main.jsx) 挂载 `BrowserRouter`
+2. [`src/router/index.jsx`](/home/wuhaoxian/body-dev-data-platform/src/router/index.jsx) 根据配置生成公开路由与受保护路由
+3. [`src/router/guards.jsx`](/home/wuhaoxian/body-dev-data-platform/src/router/guards.jsx) 结合登录态、角色和权限码决定是否放行或重定向
+4. [`src/layouts/ManagerLayout.jsx`](/home/wuhaoxian/body-dev-data-platform/src/layouts/ManagerLayout.jsx) / [`src/layouts/EmployeeLayout.jsx`](/home/wuhaoxian/body-dev-data-platform/src/layouts/EmployeeLayout.jsx) 根据角色生成菜单和端侧说明
+5. 页面通过 [`src/api/dashboard.js`](/home/wuhaoxian/body-dev-data-platform/src/api/dashboard.js) / [`src/api/auth.js`](/home/wuhaoxian/body-dev-data-platform/src/api/auth.js) 发起统一请求
+6. [`src/api/client.js`](/home/wuhaoxian/body-dev-data-platform/src/api/client.js) 根据 `VITE_API_MODE` 切到 `mock` 或 `real` provider
+
+这条链路当前比较顺，没有发现页面直接绕过统一 API 层去操作底层数据源的明显反模式。
+
 ## 页面与路由
 
 当前主要路由定义在 [`src/router/routeConfig.jsx`](/home/wuhaoxian/body-dev-data-platform/src/router/routeConfig.jsx) 和 [`src/constants/routes.js`](/home/wuhaoxian/body-dev-data-platform/src/constants/routes.js)。
@@ -64,7 +107,7 @@ src
 | 个人工时页 | `/employee/personal-hours` | 员工端主工作台，主管/管理员也可查看 |
 | 绩效页 | `/employee/performance` | 个人绩效历史 |
 | AI 分析页 | `/employee/ai-analysis` | AI 建议与分析 |
-| 权限管理 | `/manager/permissions` | 权限矩阵和说明 |
+| 权限管理 | `/manager/permissions` | 权限矩阵和说明，仅管理员可见 |
 | 原型整页 | `/prototype` | 仅管理员可见 |
 
 ## 运行方式
@@ -163,7 +206,7 @@ mock 登录通过账号密码映射角色，当前演示账号如下：
 
 ### manager
 
-- 可见页面：部门总览、导航组详情、对接组详情、工时管理、绩效管理、AI 分析中心、权限管理
+- 可见页面：部门总览、导航组详情、对接组详情、工时管理、绩效管理、AI 分析中心
 - 数据范围：本人 + 团队 + 部门
 - 典型按钮权限：导出报表、查看 AI 建议、点评成员
 
@@ -198,8 +241,9 @@ mock 登录通过账号密码映射角色，当前演示账号如下：
 - `GET /dashboard/personal-hours?target=...`
 - `POST /dashboard/personal-hours/query`
 - `POST /dashboard/personal-hours/update`
-- `GET /dashboard/performance-history`
+- `GET /dashboard/performance-history?target=...`
 - `GET /dashboard/ai-insights`
+- `POST /dashboard/ai-task-ticket`
 - `GET /dashboard/permission-matrix`
 
 ## 个人工时页说明
@@ -214,6 +258,33 @@ mock 登录通过账号密码映射角色，当前演示账号如下：
 - 调休天数输入
 - 查询与更新动作分离
 - 月度趋势、任务分布、任务明细筛选
+
+当前结构特点：
+
+- 页面展示口径使用“天”，底层 mock 统计仍保留 `hours` 作为基础字段
+- 查询和更新动作分离，便于后端后续分别接入“试算”和“落库”接口
+- `target` 参数模式已在个人工时和绩效页面复用，后续扩展组织级查询时可以继续沿用
+
+## 绩效页说明
+
+[`src/pages/PerformancePage.jsx`](/home/wuhaoxian/body-dev-data-platform/src/pages/PerformancePage.jsx)
+
+当前已支持：
+
+- 基于当前登录用户加载季度绩效历史
+- 主管 / 管理员按可见范围切换查看对象
+- 展示最终绩效、结余绩效和季度变化口径
+- mock / real provider 均支持按 `target` 查询
+
+## AI 助理页说明
+
+[`src/pages/AIAnalysisPage.jsx`](/home/wuhaoxian/body-dev-data-platform/src/pages/AIAnalysisPage.jsx)
+
+当前已支持：
+
+- 拉取 AI 建议列表
+- 根据建议创建任务单草稿
+- 为后续对接真实任务系统预留 `ai-task-ticket` 接口
 
 mock / real provider 当前都已经支持以下调用方式：
 
@@ -293,3 +364,21 @@ mock / real provider 当前都已经支持以下调用方式：
 - 后端先稳定个人工时相关接口字段和统计口径
 - 部门总览与团队页继续沿用统一的分析页风格优化
 - 后续如果扩展组织级接口，建议复用个人工时页的时间范围和目标对象参数模式
+
+## 本轮检查记录
+
+本次对代码层次和结构做了快速扫视，关注点主要是入口、路由守卫、布局、权限模型、统一 API 层，以及 mock/real provider 的职责边界。
+
+检查结果：
+
+- 未发现阻塞提交的结构性问题
+- 权限页当前已经收敛为仅管理员可访问，和路由、菜单、权限说明保持一致
+- 默认首页跳转已改为基于完整 `user` 对象计算，可兼容自定义 `homePath`
+- 页面命名、菜单文案和角色侧边栏分区比早期版本更统一
+
+本地验证命令：
+
+```bash
+npm run lint
+npm run build
+```

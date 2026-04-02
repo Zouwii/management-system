@@ -8,18 +8,18 @@ export const departmentStats = {
 };
 
 export const navTeam = [
-  { name: '李四', role: '导航算法工程师', level: 'P6', hours: 156, effectiveRate: '85%', perf: 'A', focus: '路径规划优化 / 控制调优', risk: '低', trend: '+8h' },
-  { name: '王强', role: '导航算法工程师', level: 'P5', hours: 149, effectiveRate: '83%', perf: 'B+', focus: 'Frenet绕障 / 回归测试', risk: '中', trend: '+5h' },
-  { name: '陈晨', role: '导航软件工程师', level: 'P5', hours: 161, effectiveRate: '87%', perf: 'A-', focus: '任务链路联调 / 日志分析', risk: '低', trend: '+11h' },
-  { name: '赵磊', role: '导航算法工程师', level: 'P5', hours: 144, effectiveRate: '81%', perf: 'B+', focus: 'LQR控制器优化', risk: '中', trend: '-2h' },
+  { name: '李四', role: '导航算法工程师', level: 'P6', hours: 156, effectiveRate: '85%', perf: 'A', finalPerformance: 1.2, focus: '路径规划优化 / 控制调优', risk: '低', trend: '+8h' },
+  { name: '王强', role: '导航算法工程师', level: 'P5', hours: 149, effectiveRate: '83%', perf: 'B+', finalPerformance: 1.0, focus: 'Frenet绕障 / 回归测试', risk: '中', trend: '+5h' },
+  { name: '陈晨', role: '导航软件工程师', level: 'P5', hours: 161, effectiveRate: '87%', perf: 'A-', finalPerformance: 1.2, focus: '任务链路联调 / 日志分析', risk: '低', trend: '+11h' },
+  { name: '赵磊', role: '导航算法工程师', level: 'P5', hours: 144, effectiveRate: '81%', perf: 'B+', finalPerformance: 1.0, focus: 'LQR控制器优化', risk: '中', trend: '-2h' },
 ];
 
 export const integrationTeam = [
-  { name: '孙涛', role: '对接工程师', level: 'P5', hours: 163, effectiveRate: '84%', perf: 'A-', focus: '项目接口对接 / 现场问题闭环', risk: '中', trend: '+7h' },
-  { name: '周凯', role: '对接工程师', level: 'P5', hours: 151, effectiveRate: '80%', perf: 'B+', focus: '客户需求适配 / 配置支持', risk: '低', trend: '+3h' },
-  { name: '何俊', role: '软件工程师', level: 'P6', hours: 158, effectiveRate: '86%', perf: 'A', focus: '地图模块 / 安全模块需求交付', risk: '低', trend: '+9h' },
-  { name: '刘洋', role: '软件工程师', level: 'P5', hours: 146, effectiveRate: '79%', perf: 'B', focus: '伺服模块维护 / 功能联调', risk: '中', trend: '-4h' },
-  { name: '吴彬', role: '对接工程师', level: 'P5', hours: 154, effectiveRate: '82%', perf: 'A-', focus: '项目问题定位 / 交付支持', risk: '低', trend: '+6h' },
+  { name: '孙涛', role: '对接工程师', level: 'P5', hours: 163, effectiveRate: '84%', perf: 'A-', finalPerformance: 1.2, focus: '项目接口对接 / 现场问题闭环', risk: '中', trend: '+7h' },
+  { name: '周凯', role: '对接工程师', level: 'P5', hours: 151, effectiveRate: '80%', perf: 'B+', finalPerformance: 1.0, focus: '客户需求适配 / 配置支持', risk: '低', trend: '+3h' },
+  { name: '何俊', role: '软件工程师', level: 'P6', hours: 158, effectiveRate: '86%', perf: 'A', finalPerformance: 1.2, focus: '地图模块 / 安全模块需求交付', risk: '低', trend: '+9h' },
+  { name: '刘洋', role: '软件工程师', level: 'P5', hours: 146, effectiveRate: '79%', perf: 'B', finalPerformance: 0.8, focus: '伺服模块维护 / 功能联调', risk: '中', trend: '-4h' },
+  { name: '吴彬', role: '对接工程师', level: 'P5', hours: 154, effectiveRate: '82%', perf: 'A-', finalPerformance: 1.2, focus: '项目问题定位 / 交付支持', risk: '低', trend: '+6h' },
 ];
 
 export const personalHours = [
@@ -44,6 +44,7 @@ export const personalHoursDashboard = {
   scheduledEffectiveHours: 432,
   completedEffectiveHours: 316,
   quarterlyOverdueEffectiveHours: 28,
+  quarterlyOverdueCompletedHours: 12,
   quarterlyPlannedEffectiveHours: 64,
   quarterlyPlannedCompletedHours: 48,
   taskDistribution: [

@@ -4,13 +4,14 @@ import {
   integrationTeam,
   navTeam,
   performanceArchives,
-  permissionMatrix,
   personalHours,
   personalHoursDashboard,
 } from '../../../mock/platformData';
 import { buildDepartmentStats, filterRowsByDataScope } from '../../../utils/dataScope';
+import { getDataScopeLabel } from '../../../utils/dataScope';
 import { request } from '../../request';
 import { ROLES } from '../../../constants/roles';
+import { mockAccounts, mockUsers } from '../../../mock/auth';
 
 const ALL_TARGET = 'ALL';
 const BASE_REFERENCE_HOURS = 156;
@@ -46,6 +47,25 @@ function buildMemberOptions(user) {
   return options;
 }
 
+function buildPerformanceMemberOptions(user) {
+  const rows = filterRowsByDataScope(allRows, user);
+  const options = rows.map((row) => ({
+    id: row.name,
+    name: row.name,
+    team: row.team,
+  }));
+
+  if (user?.name && !options.some((item) => item.id === user.name)) {
+    options.unshift({
+      id: user.name,
+      name: user.name,
+      team: user.role === ROLES.MANAGER ? '主管' : user.role === ROLES.ADMIN ? '管理员' : '个人',
+    });
+  }
+
+  return options;
+}
+
 function buildPersonalHoursPayload(user, target = ALL_TARGET, payload = {}) {
   const visibleRows = filterRowsByDataScope(allRows, user);
   const memberOptions = buildMemberOptions(user);
@@ -76,6 +96,7 @@ function buildPersonalHoursPayload(user, target = ALL_TARGET, payload = {}) {
       scheduledEffectiveHours: roundHours(personalHoursDashboard.scheduledEffectiveHours * scale),
       completedEffectiveHours: roundHours(personalHoursDashboard.completedEffectiveHours * scale),
       quarterlyOverdueEffectiveHours: roundHours(personalHoursDashboard.quarterlyOverdueEffectiveHours * scale),
+      quarterlyOverdueCompletedHours: roundHours(personalHoursDashboard.quarterlyOverdueCompletedHours * scale),
       quarterlyPlannedEffectiveHours: roundHours(personalHoursDashboard.quarterlyPlannedEffectiveHours * scale),
       quarterlyPlannedCompletedHours: roundHours(personalHoursDashboard.quarterlyPlannedCompletedHours * scale),
       taskDistribution: personalHoursDashboard.taskDistribution.map((item) => ({
@@ -90,8 +111,22 @@ function buildPersonalHoursPayload(user, target = ALL_TARGET, payload = {}) {
   };
 }
 
-function buildPerformancePayload(user) {
-  return performanceArchives[user?.name] ?? performanceArchives.李四;
+function buildPerformancePayload(user, target = user?.name) {
+  const memberOptions = buildPerformanceMemberOptions(user);
+  const fallbackTarget = user?.name ?? performanceArchives.李四.targetLabel;
+  const targetIds = new Set(memberOptions.map((item) => item.id));
+  const resolvedTarget = targetIds.has(target) ? target : fallbackTarget;
+  const templateEntries = Object.values(performanceArchives);
+  const template = performanceArchives[resolvedTarget]
+    ?? templateEntries[resolvedTarget.length % templateEntries.length]
+    ?? performanceArchives.李四;
+
+  return {
+    ...template,
+    targetLabel: resolvedTarget,
+    selectedTarget: resolvedTarget,
+    memberOptions,
+  };
 }
 
 export function mockFetchDepartmentOverview(user) {
@@ -149,8 +184,8 @@ export function mockUpdatePersonalHours(user, payload) {
   }));
 }
 
-export function mockFetchPerformanceHistory(user) {
-  return request(() => buildPerformancePayload(user));
+export function mockFetchPerformanceHistory(user, params = {}) {
+  return request(() => buildPerformancePayload(user, params.target));
 }
 
 export function mockFetchAIInsightList() {
@@ -167,5 +202,17 @@ export function mockCreateAITaskTicket(_user, payload) {
 }
 
 export function mockFetchPermissionMatrix() {
-  return request(() => permissionMatrix);
+  return request(() => Object.values(mockAccounts).map((account) => {
+    const user = mockUsers[account.userKey];
+
+    return {
+      account: account.account,
+      password: account.password,
+      name: user?.name ?? '-',
+      roleLabel: user?.roleLabel ?? '-',
+      team: user?.team ?? '-',
+      dataScopeLabel: getDataScopeLabel(user?.dataScope),
+      permissionCodes: user?.permissionCodes ?? [],
+    };
+  }));
 }

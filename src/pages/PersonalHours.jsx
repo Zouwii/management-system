@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { fetchPersonalHours, queryPersonalHours, updatePersonalHours } from '../api/dashboard';
 import Card from '../components/Card';
 import SectionTitle from '../components/SectionTitle';
@@ -21,7 +22,9 @@ import { useAuthStore } from '../store/authStore';
 export default function PersonalHours() {
   const user = useAuthStore((state) => state.user);
   const canViewAllPeople = user?.role === ROLES.MANAGER || user?.role === ROLES.ADMIN;
-  const defaultTarget = canViewAllPeople ? 'ALL' : user?.name ?? '';
+  const [searchParams, setSearchParams] = useSearchParams();
+  const targetFromQuery = searchParams.get('target') ?? '';
+  const defaultTarget = canViewAllPeople ? (targetFromQuery || 'ALL') : user?.name ?? '';
   const [sourceTrend, setSourceTrend] = useState(fallbackTrend);
   const [dashboard, setDashboard] = useState(fallbackDashboard);
   const [dateRange, setDateRange] = useState(fallbackDashboard.defaultRange);
@@ -68,8 +71,8 @@ export default function PersonalHours() {
     [compensatoryDays, dashboard.statutoryHolidays, dateRange.endDate, dateRange.startDate],
   );
 
-  const scheduledDelta = dashboard.scheduledEffectiveHours + dashboard.quarterlyPlannedEffectiveHours - expectedSummary.hours;
-  const completedDelta = dashboard.completedEffectiveHours + dashboard.quarterlyPlannedCompletedHours - expectedSummary.hours;
+  const scheduledDelta = dashboard.scheduledEffectiveHours + dashboard.quarterlyOverdueEffectiveHours - expectedSummary.hours;
+  const completedDelta = dashboard.completedEffectiveHours + dashboard.quarterlyOverdueCompletedHours - expectedSummary.hours;
   const scheduledStatus = getDeltaStatus(scheduledDelta);
   const completedStatus = getDeltaStatus(completedDelta);
   const trend = useMemo(() => buildMonthlyTrend(sourceTrend, dashboard.taskDetails), [dashboard.taskDetails, sourceTrend]);
@@ -180,7 +183,11 @@ export default function PersonalHours() {
       setLastUpdatedAt((current) => response.data.dashboard.lastUpdatedAt ?? current);
       setCompensatoryDays(response.data.dashboard.compensatoryDays ?? 0);
       setMemberOptions(response.data.memberOptions ?? memberOptions);
-      setSelectedTarget(response.data.selectedTarget ?? payload.target ?? selectedTarget);
+      const nextTarget = response.data.selectedTarget ?? payload.target ?? selectedTarget;
+      setSelectedTarget(nextTarget);
+      if (canViewAllPeople && nextTarget) {
+        setSearchParams({ target: nextTarget });
+      }
       setActionMessage(`已完成${response.data.dashboard.targetLabel ?? '当前对象'}的工时查询。`);
     } finally {
       setIsQuerying(false);
@@ -207,7 +214,7 @@ export default function PersonalHours() {
   return (
     <EmployeeLayout>
       <SectionTitle
-        title="个人工时管理"
+        title="工时管理"
         desc="员工端只展示本人数据，页面聚焦个人工时达成、趋势与任务分布。"
         right={(
           <div className="flex gap-3">
@@ -378,7 +385,7 @@ export default function PersonalHours() {
             <StatCard title="当前已排总有效工时" value={`${formatDays(dashboard.scheduledEffectiveHours)}天`} sub="已纳入当前区间任务排期" />
             <StatCard title="当前已完成总有效工时" value={`${formatDays(dashboard.completedEffectiveHours)}天`} sub="已完成任务的累计有效工时" />
             <StatCard title="季度逾期总有效工时" value={`${formatDays(dashboard.quarterlyOverdueEffectiveHours)}天`} sub="跨季度未按期关闭任务累计" />
-            <StatCard title="季度预期完成工时" value={`${formatDays(dashboard.quarterlyPlannedCompletedHours)}天`} sub="本季度计划完成任务的有效工时" />
+            <StatCard title="季度逾期完成工时" value={`${formatDays(dashboard.quarterlyOverdueCompletedHours)}天`} sub="跨季度已完成关闭任务累计" />
           </div>
         </div>
         <div className="mt-6 border-t border-slate-200 pt-6">
@@ -388,7 +395,7 @@ export default function PersonalHours() {
               <div className="mt-1 text-sm text-slate-500">对比预期有效工时与排期 / 完成进度，快速识别是否偏紧或偏松。</div>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-500">
-              负值表示偏紧，正值表示有余量
+              正值表示充足，负值表示不足
             </div>
           </div>
           <div className="mt-5 grid grid-cols-2 gap-5">
@@ -399,7 +406,7 @@ export default function PersonalHours() {
                 {formatDays(scheduledDelta)}天
               </div>
               <div className="mt-2 text-sm text-slate-600">
-                预期有效工时 vs (当前已排总有效工时 + 季度预期工时) = {expectedSummary.days.toFixed(1)}天 vs {formatDays(dashboard.scheduledEffectiveHours + dashboard.quarterlyPlannedEffectiveHours)}天
+                (当前已排总有效工时 + 季度逾期总有效工时) - 预期有效工时 = {formatDays(dashboard.scheduledEffectiveHours + dashboard.quarterlyOverdueEffectiveHours)}天 - {expectedSummary.days.toFixed(1)}天
               </div>
             </div>
             <div className={`rounded-2xl border p-5 ${completedStatus.bgClass}`}>
@@ -409,7 +416,7 @@ export default function PersonalHours() {
                 {formatDays(completedDelta)}天
               </div>
               <div className="mt-2 text-sm text-slate-600">
-                预期有效工时 vs (已完成有效工时 + 季度预期完成工时) = {expectedSummary.days.toFixed(1)}天 vs {formatDays(dashboard.completedEffectiveHours + dashboard.quarterlyPlannedCompletedHours)}天
+                (已完成有效工时 + 季度逾期完成工时) - 预期有效工时 = {formatDays(dashboard.completedEffectiveHours + dashboard.quarterlyOverdueCompletedHours)}天 - {expectedSummary.days.toFixed(1)}天
               </div>
             </div>
           </div>

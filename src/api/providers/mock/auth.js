@@ -11,7 +11,7 @@ export function mockLoginByCredentials({ account, password }) {
       throw new Error('账号或密码错误');
     }
 
-    return mockUsers[accountRecord.role];
+    return mockUsers[accountRecord.userKey];
   });
 }
 
