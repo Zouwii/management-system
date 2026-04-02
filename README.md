@@ -173,15 +173,21 @@ http://localhost:5173/login
 
 ## mock 账号
 
-mock 登录通过账号密码映射角色，当前演示账号如下：
+mock 登录通过账号密码映射到具体用户，当前演示账号如下：
 
 | 账号 | 密码 | 角色 |
 | --- | --- | --- |
 | `employee` | `123456` | 员工 |
-| `manager` | `123456` | 主管 |
+| `navManager` | `123456` | 主管（导航组） |
+| `servoManager` | `123456` | 主管（对接组） |
 | `admin` | `123456` | 管理员 |
 
 对应 mock 用户信息见 [`src/mock/auth.js`](/home/wuhaoxian/body-dev-data-platform/src/mock/auth.js)。
+
+说明：
+
+- `manager` 是角色类型，不是当前可登录的 mock 账号
+- 当前主管账号拆成 `navManager` 和 `servoManager`，分别落到不同团队首页
 
 ## 权限模型
 
