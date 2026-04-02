@@ -45,8 +45,10 @@ export function realUpdatePersonalHours(_user, payload) {
   });
 }
 
-export function realFetchPerformanceHistory() {
-  return httpRequest('/dashboard/performance-history');
+export function realFetchPerformanceHistory(_user, params = {}) {
+  return httpRequest(appendQuery('/dashboard/performance-history', {
+    target: params.target,
+  }));
 }
 
 export function realFetchAIInsightList() {

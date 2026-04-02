@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { fetchPerformanceHistory } from '../api/dashboard';
 import Card from '../components/Card';
 import SectionTitle from '../components/SectionTitle';
+import { ROLES } from '../constants/roles';
 import EmployeeLayout from '../layouts/EmployeeLayout';
 import { performanceArchives as fallbackArchives } from '../mock/platformData';
 import { useAuthStore } from '../store/authStore';
@@ -100,22 +102,33 @@ function HelpLabel({ label, tip, highlighted = false }) {
 
 export default function PerformancePage() {
   const user = useAuthStore((state) => state.user);
+  const canViewAllPeople = user?.role === ROLES.MANAGER || user?.role === ROLES.ADMIN;
+  const [searchParams, setSearchParams] = useSearchParams();
+  const targetFromQuery = searchParams.get('target') ?? '';
+  const defaultTarget = canViewAllPeople
+    ? (targetFromQuery || user?.name || fallbackArchives.李四.targetLabel)
+    : (user?.name ?? fallbackArchives.李四.targetLabel);
   const [archive, setArchive] = useState(fallbackArchives[user?.name] ?? fallbackArchives.李四);
+  const [memberOptions, setMemberOptions] = useState([]);
+  const [selectedTarget, setSelectedTarget] = useState(defaultTarget);
+  const [isQuerying, setIsQuerying] = useState(false);
   const [showMoreColumns, setShowMoreColumns] = useState(false);
 
   useEffect(() => {
     let active = true;
 
-    fetchPerformanceHistory(user).then((response) => {
+    fetchPerformanceHistory(user, { target: defaultTarget }).then((response) => {
       if (active) {
         setArchive(response.data);
+        setMemberOptions(response.data.memberOptions ?? []);
+        setSelectedTarget(response.data.selectedTarget ?? defaultTarget);
       }
     });
 
     return () => {
       active = false;
     };
-  }, [user]);
+  }, [defaultTarget, user]);
 
   const history = archive.history ?? [];
   const currentQuarter = history[history.length - 1];
@@ -157,15 +170,34 @@ export default function PerformancePage() {
     ? Math.max(nextBand.threshold - (currentQuarter.carryScore ?? 0), 0)
     : 0;
 
+  async function handleQuery() {
+    setIsQuerying(true);
+
+    try {
+      const response = await fetchPerformanceHistory(user, {
+        target: selectedTarget,
+      });
+      setArchive(response.data);
+      setMemberOptions(response.data.memberOptions ?? memberOptions);
+      const nextTarget = response.data.selectedTarget ?? selectedTarget;
+      setSelectedTarget(nextTarget);
+      if (canViewAllPeople && nextTarget) {
+        setSearchParams({ target: nextTarget });
+      }
+    } finally {
+      setIsQuerying(false);
+    }
+  }
+
   return (
     <EmployeeLayout>
       <SectionTitle
-        title="个人绩效管理"
+        title="绩效管理"
         desc="员工端按 3.1.2 评分标准将最终绩效映射到杰出、优秀、超出期望等正式档位，并展示结余绩效。"
         right={(
           <div className="flex gap-3">
             <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm">季度归档视图</div>
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm">样例：{archive.sourceLabel}</div>
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm">{archive.targetLabel ?? selectedTarget}</div>
           </div>
         )}
       />
@@ -191,6 +223,30 @@ export default function PerformancePage() {
             分及以上为符合预期
           </div>
         </div>
+        {canViewAllPeople ? (
+          <div className="mt-5 flex flex-wrap items-end gap-3 border-t border-slate-200 pt-5">
+            <label className="min-w-[240px]">
+              <div className="text-sm font-medium text-slate-700">查询对象</div>
+              <select
+                className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-slate-300"
+                value={selectedTarget}
+                onChange={(event) => setSelectedTarget(event.target.value)}
+              >
+                {memberOptions.map((item) => (
+                  <option key={item.id} value={item.id}>{item.name}{item.team ? ` · ${item.team}` : ''}</option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              className="rounded-full bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={handleQuery}
+              disabled={isQuerying}
+            >
+              {isQuerying ? '查询中...' : '查询绩效'}
+            </button>
+          </div>
+        ) : null}
       </Card>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,0.9fr)]">

@@ -11,7 +11,7 @@ export default function ManagerLayout({ children }) {
   const [collapsed, setCollapsed] = useState(false);
   const user = useAuthStore((state) => state.user);
   const role = user?.role ?? ROLES.MANAGER;
-  const menus = getMenuRoutesByRole(sideMenuConfig, role).map((route) => ({
+  const menus = getMenuRoutesByRole(sideMenuConfig, user ?? role).map((route) => ({
     label: route.label,
     section: route.section,
     to: route.path,
@@ -19,11 +19,11 @@ export default function ManagerLayout({ children }) {
 
   const subtitle = role === ROLES.ADMIN
     ? `${ROLE_LABELS[role]} / 全局权限`
-    : `${ROLE_LABELS[role]}端 / 组织级权限`;
+    : `${user?.team ?? '团队'}主管 / 组级权限`;
 
   const note = role === ROLES.ADMIN
     ? `管理员可访问全部页面与全部数据，当前数据范围：${getDataScopeLabel(user?.dataScope)}。`
-    : `主管端可查看个人、组级、部门级数据，并配置页面权限、角色权限和数据范围。当前数据范围：${getDataScopeLabel(user?.dataScope)}。`;
+    : `主管仅可查看本人和所管团队数据，不可访问部门页和其他团队页。当前数据范围：${getDataScopeLabel(user?.dataScope)}。`;
 
   return (
     <div className="grid grid-cols-12 gap-6">

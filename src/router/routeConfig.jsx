@@ -22,7 +22,7 @@ export const appRouteConfig = [
   },
   {
     path: ROUTE_PATHS.NAV_TEAM_DETAIL,
-    label: '导航组详情',
+    label: '导航组',
     menu: true,
     allowedRoles: [ROLES.MANAGER, ROLES.ADMIN],
     permissionCode: PAGE_PERMISSION_CODES.NAV_TEAM_DETAIL,
@@ -30,7 +30,7 @@ export const appRouteConfig = [
   },
   {
     path: ROUTE_PATHS.INTEGRATION_TEAM_DETAIL,
-    label: '对接组详情',
+    label: '对接组',
     menu: true,
     allowedRoles: [ROLES.MANAGER, ROLES.ADMIN],
     permissionCode: PAGE_PERMISSION_CODES.INTEGRATION_TEAM_DETAIL,
@@ -67,7 +67,7 @@ export const appRouteConfig = [
     path: ROUTE_PATHS.PERMISSIONS,
     label: '权限管理',
     menu: true,
-    allowedRoles: [ROLES.MANAGER, ROLES.ADMIN],
+    allowedRoles: [ROLES.ADMIN],
     permissionCode: PAGE_PERMISSION_CODES.PERMISSIONS,
     element: <PermissionPage />,
   },

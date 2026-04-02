@@ -32,6 +32,12 @@ export default function SideMenu({
   const actionButtonClass = theme === 'dark'
     ? 'mt-4 block rounded-2xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-medium text-slate-700 hover:bg-slate-50'
     : 'mt-4 block rounded-2xl border border-sky-100 bg-white/90 px-4 py-3 text-center text-sm font-medium text-sky-700 shadow-[0_10px_24px_-20px_rgba(14,165,233,0.9)] hover:bg-sky-50';
+  const sectionButtonClass = theme === 'dark'
+    ? 'mb-3 flex w-full items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left text-sm font-semibold text-slate-900 shadow-[0_8px_20px_-18px_rgba(15,23,42,0.35)] hover:bg-white'
+    : 'mb-3 flex w-full items-center justify-between rounded-2xl border border-sky-100 bg-[linear-gradient(135deg,rgba(239,246,255,0.95),rgba(236,253,245,0.9))] px-4 py-3 text-left text-sm font-semibold text-sky-950 shadow-[0_12px_24px_-18px_rgba(14,165,233,0.35)] hover:bg-white';
+  const sectionPillClass = theme === 'dark'
+    ? 'inline-flex h-7 min-w-7 items-center justify-center rounded-xl bg-slate-900 px-2 text-xs font-semibold text-white'
+    : 'inline-flex h-7 min-w-7 items-center justify-center rounded-xl bg-sky-500 px-2 text-xs font-semibold text-white';
   const collapseStorageKey = `side-menu-collapsed:${theme}:${title}`;
 
   function handleSwitchRole() {
@@ -116,15 +122,16 @@ export default function SideMenu({
                 <button
                   type="button"
                   onClick={() => toggleSection(section)}
-                  className="mb-2 flex w-full items-center justify-between rounded-2xl px-3 py-2 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-400 hover:bg-white/70"
+                  className={sectionButtonClass}
                 >
-                  <span>{section}</span>
-                  <span className={`text-slate-400 transition-transform ${resolvedCollapsedSections[section] ? '' : 'rotate-90'}`}>
-                    ›
+                  <span className="flex items-center gap-3">
+                    <span className={sectionPillClass}>{section.slice(0, 1)}</span>
+                    <span>{section}</span>
                   </span>
+                  <span className={`text-slate-400 transition-transform ${resolvedCollapsedSections[section] ? '' : 'rotate-90'}`}>›</span>
                 </button>
                 {!resolvedCollapsedSections[section] ? (
-                  <div className="space-y-2">
+                  <div className="space-y-2 pl-2">
                     {items.map((item) => (
                       <NavLink
                         key={item.to}

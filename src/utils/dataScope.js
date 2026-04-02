@@ -12,7 +12,8 @@ export function filterRowsByDataScope(rows, user) {
   switch (user.dataScope) {
     case DATA_SCOPES.SELF:
       return rows.filter((row) => row.name === user.name);
-    case DATA_SCOPES.TEAM_AND_DEPARTMENT:
+    case DATA_SCOPES.TEAM:
+      return rows.filter((row) => row.team === user.team);
     case DATA_SCOPES.ALL:
     default:
       return rows;

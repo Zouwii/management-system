@@ -12,7 +12,7 @@ export default function EmployeeLayout({ children }) {
   const user = useAuthStore((state) => state.user);
   const role = user?.role ?? ROLES.EMPLOYEE;
   const useEmployeeTheme = role === ROLES.EMPLOYEE;
-  const menus = getMenuRoutesByRole(sideMenuConfig, role).map((route) => ({
+  const menus = getMenuRoutesByRole(sideMenuConfig, user ?? role).map((route) => ({
     label: useEmployeeTheme ? route.employeeLabel ?? route.label : route.label,
     section: useEmployeeTheme ? route.employeeSection ?? route.section : route.section,
     to: route.path,
