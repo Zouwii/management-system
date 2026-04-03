@@ -31,6 +31,10 @@ from services.task_sync_service import (
     sync_project_details_in_config_time_range_service,
 )
 from services.workhour_aggregate_service import executor_quarter_workhours_db_service
+from services.perf_service import (
+    fill_member_input_service,
+    calculate_member_quarter_performance_service,
+)
 
 
 api_bp = Blueprint("api_bt", __name__, url_prefix="/api/bt")
@@ -262,6 +266,35 @@ def all_time_download():
         if result.get("success"):
             return _ok(result.get("data") or {})
         return _fail(result.get("error", "all_time_download failed"), code=400, data=result.get("data"))
+    except Exception as e:
+        return _fail(str(e), code=500, data={})
+
+
+# =========================
+# 绩效：成员规则（fill + calculate）
+# =========================
+
+
+@api_bp.route("/perf/fill-quarter-member", methods=["POST"])
+def perf_fill_quarter_member():
+    try:
+        payload = request.get_json(silent=True) or {}
+        out = fill_member_input_service(payload)
+        if out.get("success"):
+            return _ok(out.get("data") or {})
+        return _fail(out.get("error", "fill failed"), code=400, data=out.get("data") or {})
+    except Exception as e:
+        return _fail(str(e), code=500, data={})
+
+
+@api_bp.route("/perf/calculate-quarter-member", methods=["POST"])
+def perf_calculate_quarter_member():
+    try:
+        payload = request.get_json(silent=True) or {}
+        out = calculate_member_quarter_performance_service(payload)
+        if out.get("success"):
+            return _ok(out.get("data") or {})
+        return _fail(out.get("error", "calculate failed"), code=400, data=out.get("data") or {})
     except Exception as e:
         return _fail(str(e), code=500, data={})
 

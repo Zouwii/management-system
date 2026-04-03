@@ -170,3 +170,74 @@ class UserCharacter(Base):
     user_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     character: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+class PerfQuarterResult(Base):
+    """
+    绩效计算结果表（方法A：阈值不变、且不推倒重算）。
+
+    说明：
+    - 一张表覆盖“输入（工时绩效/主管绩效）+ 计算结果（总体/结余/最终）+ 下一季度衔接状态（new_carry_balance/carry_decay_value）”
+    - prev_carry_balance/prev_decay_value 取上一季度 perf_quarter_result 的 new_carry_balance/carry_decay_value
+    """
+
+    __tablename__ = "perf_quarter_result"
+    __table_args__ = (
+        UniqueConstraint("year", "quarter", "user_id", name="uq_perf_quarter_user"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    # 基本定位
+    year: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    quarter: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    user_name: Mapped[str] = mapped_column(String(128), nullable=True)
+    team_id: Mapped[str] = mapped_column(String(64), nullable=True, index=True)
+    team_name: Mapped[str] = mapped_column(String(128), nullable=True)
+
+    # 角色与规则口径
+    role_type: Mapped[str] = mapped_column(String(32), nullable=True)  # employee / manager
+    is_team_lead: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    rule_code: Mapped[str] = mapped_column(String(64), nullable=False, default="default_rule_code")
+
+    calc_status: Mapped[str] = mapped_column(String(32), nullable=False, default="filled")
+
+    # 审计时间
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.now)
+
+    # =========================
+    # 输入（主管填写/系统取数）
+    # =========================
+    work_hour_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)  # 成员：工时绩效（公式绩效项）
+    supervisor_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)  # 主管绩效（人工档位）
+    okr_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    team_avg_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
+    # =========================
+    # 总体与区间辅助（用于 finalScore 解释）
+    # =========================
+    overall_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    threshold_lower: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    threshold_upper: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    compensation_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    overflow_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
+    # =========================
+    # 跨季度结余衔接（用于下一季度 prev）
+    # =========================
+    prev_carry_balance: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    prev_decay_value: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    carry_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)  # overall_score + prev_carry_balance
+    new_carry_balance: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    carry_decay_value: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+
+    # =========================
+    # 最终输出（finalScore）
+    # =========================
+    final_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    company_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
+    carry_calc_mode: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    calc_trace_json: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
