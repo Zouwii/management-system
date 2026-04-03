@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional, Tuple
 from sqlalchemy import select
 
 from db.engine import SessionLocal
-from db.orm import PerfQuarterResult
+from db.orm import NavPerfQuarterResult, ServoPerfQuarterResult, UserCharacter
 
 
 def _to_decimal_3(x: Any) -> Decimal:
@@ -96,11 +96,24 @@ def fill_member_input_service(payload: Dict[str, Any]) -> Dict[str, Any]:
     now = datetime.now(timezone.utc)
     session = SessionLocal()
     try:
-        stmt = select(PerfQuarterResult).where(
-            PerfQuarterResult.year == year,
-            PerfQuarterResult.quarter == quarter,
-            PerfQuarterResult.user_id == user_id,
-        )
+        # 根据 user_character.team_id 决定写入 nav/servo 哪张表
+        c_row = session.query(UserCharacter).filter(UserCharacter.user_id == user_id).first()
+        if not c_row or not getattr(c_row, "team_id", None):
+            return {"success": False, "error": "missing user_character.team_id for user", "data": {}}
+
+        team_id = str(c_row.team_id)
+
+        def _select_model(tid: str):
+            # 兼容可能的取值：nav/servo，或 1/2
+            if tid in {"nav", "1", "navigation"}:
+                return NavPerfQuarterResult
+            if tid in {"servo", "2", "service", "对接", "servo_team"}:
+                return ServoPerfQuarterResult
+            raise ValueError(f"unsupported team_id: {tid}")
+
+        Model = _select_model(team_id)
+
+        stmt = select(Model).where(Model.year == year, Model.quarter == quarter, Model.user_id == user_id)
         row = session.scalars(stmt).first()
         if row:
             row.user_name = payload.get("user_name", payload.get("userName")) or row.user_name
@@ -114,12 +127,12 @@ def fill_member_input_service(payload: Dict[str, Any]) -> Dict[str, Any]:
             row.calc_status = "filled"
             row.updated_at = now
         else:
-            row = PerfQuarterResult(
+            row = Model(
                 year=year,
                 quarter=quarter,
                 user_id=user_id,
                 user_name=payload.get("user_name", payload.get("userName")),
-                team_id=str(payload.get("team_id") or payload.get("teamId") or "") or None,
+                team_id=str(payload.get("team_id") or payload.get("teamId") or "") or team_id,
                 team_name=payload.get("team_name", payload.get("teamName")),
                 role_type="employee",
                 is_team_lead=False,
@@ -160,11 +173,22 @@ def calculate_member_quarter_performance_service(payload: Dict[str, Any]) -> Dic
     session = SessionLocal()
     now = datetime.now(timezone.utc)
     try:
-        stmt = select(PerfQuarterResult).where(
-            PerfQuarterResult.year == year,
-            PerfQuarterResult.quarter == quarter,
-            PerfQuarterResult.user_id == user_id,
-        )
+        # 根据 user_character.team_id 决定从 nav/servo 哪张表取数
+        c_row = session.query(UserCharacter).filter(UserCharacter.user_id == user_id).first()
+        if not c_row or not getattr(c_row, "team_id", None):
+            return {"success": False, "error": "missing user_character.team_id for user", "data": {}}
+        team_id = str(c_row.team_id)
+
+        def _select_model(tid: str):
+            if tid in {"nav", "1", "navigation"}:
+                return NavPerfQuarterResult
+            if tid in {"servo", "2", "service", "对接", "servo_team"}:
+                return ServoPerfQuarterResult
+            raise ValueError(f"unsupported team_id: {tid}")
+
+        Model = _select_model(team_id)
+
+        stmt = select(Model).where(Model.year == year, Model.quarter == quarter, Model.user_id == user_id)
         row = session.scalars(stmt).first()
         if not row:
             return {"success": False, "error": "perf_quarter_result not found (need fill first)", "data": {}}
@@ -176,11 +200,7 @@ def calculate_member_quarter_performance_service(payload: Dict[str, Any]) -> Dic
             return {"success": False, "error": "missing input hour_score/manager_score", "data": {}}
 
         prev_year, prev_quarter = _prev_year_quarter(year, quarter)
-        prev_stmt = select(PerfQuarterResult).where(
-            PerfQuarterResult.year == prev_year,
-            PerfQuarterResult.quarter == prev_quarter,
-            PerfQuarterResult.user_id == user_id,
-        )
+        prev_stmt = select(Model).where(Model.year == prev_year, Model.quarter == prev_quarter, Model.user_id == user_id)
         prev_row = session.scalars(prev_stmt).first()
 
         prev_carry_balance = _round3((prev_row.new_carry_balance if prev_row and prev_row.new_carry_balance is not None else 0.0))

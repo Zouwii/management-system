@@ -43,6 +43,28 @@ def init_db() -> None:
         tables = set(inspector.get_table_names() or [])
         if "project_task_overdue_details" not in tables:
             Base.metadata.create_all(bind=engine)
+
+        # user_character 表字段补齐（无迁移环境下避免缺列导致启动失败）
+        try:
+            cols_user = {c.get("name") for c in inspector.get_columns("user_character")}
+            with engine.begin() as conn:
+                if "team_id" not in cols_user:
+                    conn.execute(text("ALTER TABLE user_character ADD COLUMN team_id VARCHAR(64)"))
+                if "is_nav_lead" not in cols_user:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE user_character ADD COLUMN is_nav_lead BOOLEAN NOT NULL DEFAULT 0"
+                        )
+                    )
+                if "is_servo_lead" not in cols_user:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE user_character ADD COLUMN is_servo_lead BOOLEAN NOT NULL DEFAULT 0"
+                        )
+                    )
+        except Exception:
+            # 不阻断服务启动；由上层业务容错或你手工执行迁移
+            pass
     except Exception:
         # 不阻断服务启动：字段不存在/表不存在由上层业务容错
         pass

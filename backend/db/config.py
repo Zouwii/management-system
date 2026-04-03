@@ -19,7 +19,7 @@ _DATA_DIR.mkdir(parents=True, exist_ok=True)
 _default_sqlite_path = _DATA_DIR / "tb_tool_bt.db"
 DEFAULT_SQLITE_URI = f"sqlite:///{_default_sqlite_path}"
 
-DEFAULT_MYSQL_DB_NAME = "tb_tool_bt"
+DEFAULT_MYSQL_DB_NAME = "tb_management"
 
 
 def env_bt(name: str, default: Optional[str] = None) -> Optional[str]:

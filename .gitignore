@@ -25,3 +25,12 @@ dist-ssr
 
 # Local tool state
 .codex
+backend/__pycache__/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Backend secrets (do not commit)
+backend/.env
+backend/.env.*
