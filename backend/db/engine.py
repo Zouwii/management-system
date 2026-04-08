@@ -3,27 +3,104 @@ from datetime import datetime, timezone
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 
-from db.config import DATABASE_URI
+from db.config import DATABASE_URI, PERF_DATABASE_URI
 from db.orm import Base  # 导入即注册 ProjectTask 等到 Base.metadata
 
 # SQLite 下多线程需 check_same_thread=False（Flask 每请求一线程）
-_connect_args = {}
+_main_connect_args = {}
 if DATABASE_URI.startswith("sqlite"):
-    _connect_args["check_same_thread"] = False
+    _main_connect_args["check_same_thread"] = False
 
+_perf_connect_args = {}
+if PERF_DATABASE_URI.startswith("sqlite"):
+    _perf_connect_args["check_same_thread"] = False
+
+# 主业务库（任务/配置等）
 engine = create_engine(
     DATABASE_URI,
-    connect_args=_connect_args,
+    connect_args=_main_connect_args,
     future=True,
     pool_pre_ping=True,
 )
 
 SessionLocal = scoped_session(sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True))
 
+# 绩效专用库（nav/servo 绩效表）
+perf_engine = create_engine(
+    PERF_DATABASE_URI,
+    connect_args=_perf_connect_args,
+    future=True,
+    pool_pre_ping=True,
+)
 
-def init_db() -> None:
-    """创建所有表（无迁移工具时用于开发；生产建议 Alembic）。"""
-    Base.metadata.create_all(bind=engine)
+PerfSessionLocal = scoped_session(sessionmaker(bind=perf_engine, autoflush=False, autocommit=False, future=True))
+
+
+def _table_registry():
+    """
+    表注册清单（可视化管理，类似 Go 的 createSQLs/dropSQLs 列表）。
+    """
+    # 延迟导入以避免循环
+    from db.orm import (
+        Config as DbConfig,
+        NavPerfQuarterResult,
+        ProjectTask,
+        ProjectTaskDetail,
+        ProjectTaskOverdueDetail,
+        ServoPerfQuarterResult,
+        SyncRun,
+        UpdateLock,
+        UserCharacter as DbUserCharacter,
+    )
+
+    main_tables = [
+        ("project_tasks", ProjectTask.__table__),
+        ("project_task_details", ProjectTaskDetail.__table__),
+        ("project_task_overdue_details", ProjectTaskOverdueDetail.__table__),
+        ("sync_runs", SyncRun.__table__),
+        ("config", DbConfig.__table__),
+        ("update_locks", UpdateLock.__table__),
+        ("user_character", DbUserCharacter.__table__),
+    ]
+    perf_tables = [
+        ("nav_perf_quarter_result", NavPerfQuarterResult.__table__),
+        ("servo_perf_quarter_result", ServoPerfQuarterResult.__table__),
+    ]
+    return main_tables, perf_tables
+
+
+def _execute_table_ops(bind, table_entries, action: str) -> None:
+    """
+    action:
+    - create: CREATE TABLE IF NOT EXISTS ...
+    - drop:   DROP TABLE IF EXISTS ...
+    """
+    if action not in {"create", "drop"}:
+        raise ValueError(f"unsupported action: {action}")
+
+    for name, table in table_entries:
+        if action == "create":
+            print(f"[init_db] create table if not exists: {name}")
+            table.create(bind=bind, checkfirst=True)
+        else:
+            raise ValueError("drop is disabled in this project init flow")
+
+
+def init_database() -> None:
+    """
+    数据库初始化入口（仅 init，不做 drop）：
+    - create tables if not exists（主库 + 绩效库）
+    - seed 默认配置（config 表、user_character 初始数据等）
+
+    设计目标：初始化内容“可视化、可读、可维护”。
+    """
+    main_tables, perf_tables = _table_registry()
+    # seed 阶段会直接使用这两个 ORM 模型
+    from db.orm import Config as DbConfig, UserCharacter as DbUserCharacter
+
+    print("[init_db] creating tables (no drop) ...")
+    _execute_table_ops(engine, main_tables, "create")
+    _execute_table_ops(perf_engine, perf_tables, "create")
 
     # 兼容无迁移环境：尝试为 B/C 表补齐新字段/新表（SQLite 场景常见）
     try:
@@ -38,11 +115,41 @@ def init_db() -> None:
                         "ALTER TABLE project_task_details ADD COLUMN is_overdue BOOLEAN NOT NULL DEFAULT 0"
                     )
                 )
+        if "business_type" not in cols_b:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE project_task_details ADD COLUMN business_type INTEGER"
+                    )
+                )
+        if "task_flow_status_id" not in cols_b:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE project_task_details ADD COLUMN task_flow_status_id INTEGER"
+                    )
+                )
 
         # C 表若不存在，create_all 理论上已创建；这里额外做一次兜底检查
         tables = set(inspector.get_table_names() or [])
         if "project_task_overdue_details" not in tables:
             Base.metadata.create_all(bind=engine)
+        else:
+            cols_c = [c.get("name") for c in inspector.get_columns("project_task_overdue_details")]
+            if "business_type" not in cols_c:
+                with engine.begin() as conn:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE project_task_overdue_details ADD COLUMN business_type INTEGER"
+                        )
+                    )
+            if "task_flow_status_id" not in cols_c:
+                with engine.begin() as conn:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE project_task_overdue_details ADD COLUMN task_flow_status_id INTEGER"
+                        )
+                    )
 
         # user_character 表字段补齐（无迁移环境下避免缺列导致启动失败）
         try:
@@ -70,18 +177,33 @@ def init_db() -> None:
         pass
 
     # 首次初始化：写入简单配置记录（当前默认配置）
-    # - type=start_time：value 为当前年份 1/1 00:00:00（ISO 格式）
-    # - type=end_time：value 为当前年份 3/31 23:59:59（ISO 格式）
     # 注意：生产环境建议使用迁移工具或显式初始化脚本。
+    #
+    # 这里的 seed 设计为“清单式”，便于你一眼看清初始化内容。
     try:
-        from db.orm import Config as DbConfig
-        from db.orm import UserCharacter as DbUserCharacter
-
         session = SessionLocal()
         try:
-            # 默认时间区间：固定写入 2026Q1（和前端默认保持一致）
+            # ===== seed: config 表默认值（type -> value）=====
             start_dt = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
             end_dt = datetime(2026, 3, 31, 23, 59, 59, tzinfo=timezone.utc)
+            default_config_seed = {
+                # 时间范围（和前端默认保持一致）
+                "start_time": start_dt.isoformat(),
+                "end_time": end_dt.isoformat(),
+                # character -> coefficient（工时折算系数映射）
+                "workhour_character_coefficients": '{"0":0.4,"1":0.7,"2":0.7,"3":1.0}',
+                # UI 展示“上次更新时间”（固定为 1970，避免每次启动都更新时间）
+                "last_update_time": "1970-01-01T00:00:00+00:00",
+                # 自动更新配置
+                "is_auto_update": "0",
+                "auto_update_time": "09:00",
+                # tagId -> business_type（0=产品，1=研发，2=订单）
+                # 命中规则：按 tagIds 顺序取第一个命中的类型。
+                "business_type_tag_mapping": '{"65264cfd697b6b909485bcbc":0,"65264cf79ed530912c3edf0f":1,"65264d01495638aacac3a9f9":2}',
+                # taskflowStatusId -> task_flow_status_id（从 0 开始）
+                "task_flow_status_mapping": '{"680a31478c1bdfc448d36ed0":0,"647854bcd999c893061ef89b":1,"67fe5c1f142821dbe1328ddf":2,"64785656c6215fd933a96631":3,"647854bcd999c893061ef89c":4,"64785656c6215fd933a96634":5}',
+            }
+            preserve_existing_keys = {"start_time", "end_time", "last_update_time"}
 
             def _ensure(cfg_type: str, value: str):
                 existing = (
@@ -90,40 +212,28 @@ def init_db() -> None:
                     .first()
                 )
                 if existing:
+                    # 时间相关配置若已存在，保留现值，不在初始化阶段覆盖。
+                    if cfg_type in preserve_existing_keys:
+                        return
                     if existing.value != value:
                         existing.value = value
                     return
                 session.add(DbConfig(type_=cfg_type, value=value, brief=None))
 
-            _ensure("start_time", start_dt.isoformat())
-            _ensure("end_time", end_dt.isoformat())
-            # 工时折算系数映射：用于把「有效工作日天数」换算为「预计工时」
-            # character -> coefficient
-            _ensure(
-                "workhour_character_coefficients",
-                '{"0":0.4,"1":0.7,"2":0.7,"3":1.0}',
-            )
+            for k, v in default_config_seed.items():
+                _ensure(k, v)
 
-            # last_update_time：用于 UI 展示“上次更新时间”
-            # 默认固定为 1970，避免 init_db 每次启动都更新时间。
-            _ensure("last_update_time", "1970-01-01T00:00:00+00:00")
-
-            # 自动更新配置：
-            # - is_auto_update：开启/关闭开关（字符串形式：1/0）
-            # - auto_update_time：每天触发的时间点（HH:MM，本地时间）
-            _ensure("is_auto_update", "0")
-            _ensure("auto_update_time", "09:00")
-
-            # 初始化 user_character：把 ids.json 中的用户先落库，character 默认 0
-            # 你之后可以直接更新 character。
+            # 初始化 user_character：把 ids.json 中的用户先落库
+            # 你之后可以直接在数据库里维护 character/team_id/is_nav_lead/is_servo_lead。
             try:
-                from dingtalk_client import get_config_userids, get_config_user_characters
+                from dingtalk_client import get_config_user_meta
 
-                userids = get_config_userids()
-                user_characters = get_config_user_characters()
-                for name, user_id in (userids or {}).items():
-                    uid = str(user_id)
+                user_meta = get_config_user_meta()
+                for name, meta in (user_meta or {}).items():
                     nm = str(name)
+                    uid = str((meta or {}).get("userId") or "").strip()
+                    if not uid:
+                        continue
                     existing_u = (
                         session.query(DbUserCharacter)
                         .filter(DbUserCharacter.user_id == uid)
@@ -132,10 +242,27 @@ def init_db() -> None:
                     if existing_u:
                         if existing_u.name != nm:
                             existing_u.name = nm
+                        # 扩展字段：有值就覆盖更新
+                        try:
+                            existing_u.character = int((meta or {}).get("character", existing_u.character) or 0)
+                        except Exception:
+                            pass
+                        # team_id 在表里是 VARCHAR(64)，这里统一转字符串
+                        if (meta or {}).get("team_id") is not None:
+                            existing_u.team_id = str((meta or {}).get("team_id"))
+                        existing_u.is_nav_lead = bool((meta or {}).get("is_nav_lead", existing_u.is_nav_lead))
+                        existing_u.is_servo_lead = bool((meta or {}).get("is_servo_lead", existing_u.is_servo_lead))
                     else:
-                        init_character = int(user_characters.get(nm, 0) or 0)
+                        init_character = int((meta or {}).get("character", 0) or 0)
                         session.add(
-                            DbUserCharacter(user_id=uid, name=nm, character=init_character)
+                            DbUserCharacter(
+                                user_id=uid,
+                                name=nm,
+                                character=init_character,
+                                team_id=str((meta or {}).get("team_id")) if (meta or {}).get("team_id") is not None else None,
+                                is_nav_lead=bool((meta or {}).get("is_nav_lead", False)),
+                                is_servo_lead=bool((meta or {}).get("is_servo_lead", False)),
+                            )
                         )
             except Exception:
                 # IDs 初始化失败不阻断服务启动
@@ -149,6 +276,18 @@ def init_db() -> None:
         pass
 
 
+def init_db() -> None:
+    """
+    兼容旧调用点：仅执行 init（不包含 drop/reset）。
+    """
+    init_database()
+
+
 def get_session():
     """获取当前线程会话（用完需 close 或在请求结束 teardown）。"""
     return SessionLocal()
+
+
+def get_perf_session():
+    """获取绩效专用库的会话。"""
+    return PerfSessionLocal()

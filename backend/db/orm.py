@@ -91,6 +91,10 @@ class ProjectTaskDetail(Base):
 
     # 是否逾期（由 tagIds 判断）
     is_overdue: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # 业务类型：0=产品，1=研发，2=订单
+    business_type: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+    # 任务状态映射值：0..N（由 taskflowStatusId 映射）
+    task_flow_status_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
 
     fetched_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
@@ -118,6 +122,10 @@ class ProjectTaskOverdueDetail(Base):
     query_user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
 
     work_hour: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    # 业务类型：0=产品，1=研发，2=订单
+    business_type: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+    # 任务状态映射值：0..N（由 taskflowStatusId 映射）
+    task_flow_status_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
     custom_fields_json: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
     raw_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     fetched_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -152,6 +160,23 @@ class Config(Base):
     type_: Mapped[str] = mapped_column("type", String(64), nullable=False, index=True, unique=True)
     value: Mapped[str] = mapped_column(Text, nullable=False)
     brief: Mapped[Optional[str]] = mapped_column(Text, default=None)
+
+
+class UpdateLock(Base):
+    """
+    更新互斥锁（数据库锁）：
+    - lock_key：锁粒度（例如 workhour_update:all）
+    - owner：持有者标识（userId + timestamp）
+    - expires_at：过期时间，防止异常退出导致死锁
+    """
+
+    __tablename__ = "update_locks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    lock_key: Mapped[str] = mapped_column(String(128), nullable=False, unique=True, index=True)
+    owner: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    locked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.now)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
 
 
 class UserCharacter(Base):

@@ -1,3 +1,5 @@
+import { countWorkdays } from 'chinese-workday';
+
 const HOURS_PER_DAY = 8;
 
 function toDate(dateString) {
@@ -5,9 +7,11 @@ function toDate(dateString) {
   return new Date(normalized);
 }
 
-function isWeekend(date) {
-  const day = date.getDay();
-  return day === 0 || day === 6;
+function toLocalYmd(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
 }
 
 export function calculateExpectedEffectiveDays(startDate, endDate, holidays = [], compensatoryDays = 0) {
@@ -21,26 +25,42 @@ export function calculateExpectedEffectiveDays(startDate, endDate, holidays = []
   }
 
   const holidaySet = new Set(holidays.map((item) => item.date));
-  let days = 0;
-  let holidayCount = 0;
-
   const start = toDate(startDate);
   const end = toDate(endDate);
-
-  for (let cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
-    const currentDate = cursor.toISOString().slice(0, 10);
-
-    if (holidaySet.has(currentDate)) {
-      holidayCount += 1;
-      continue;
-    }
-
-    if (!isWeekend(cursor)) {
-      days += 1;
-    }
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return {
+      days: 0,
+      hours: 0,
+      holidayCount: 0,
+      compensatoryDays: Number(compensatoryDays || 0),
+    };
   }
 
-  const adjustedDays = Math.max(days - Number(compensatoryDays || 0), 0);
+  // 必须使用“本地日历日期”，不能用 toISOString()（会触发时区回退导致多/少一天）。
+  const startYmd = toLocalYmd(start);
+  const endYmd = toLocalYmd(end);
+
+  let workdays = 0;
+  try {
+    // 对齐 Vue 旧口径：使用 chinese-workday（含法定节假日与调休补班）。
+    workdays = Number(countWorkdays(startYmd, endYmd) || 0);
+  } catch (e) {
+    workdays = 0;
+  }
+
+  const totalDays = Math.floor((new Date(
+    end.getFullYear(),
+    end.getMonth(),
+    end.getDate(),
+  ) - new Date(
+    start.getFullYear(),
+    start.getMonth(),
+    start.getDate(),
+  )) / 86400000) + 1;
+  // 若前端有显式 holiday 列表，优先展示其数量；否则按“总天数-法定工作日”估算。
+  const holidayCount = holidaySet.size > 0 ? holidaySet.size : Math.max(0, totalDays - workdays);
+
+  const adjustedDays = Math.max(workdays - Number(compensatoryDays || 0), 0);
 
   return {
     days: adjustedDays,
@@ -83,11 +103,9 @@ export function formatDateTime(value) {
     return normalized;
   }
 
-  if (!hasExplicitTimezone) {
-    return normalized.replace('T', ' ');
-  }
-
-  const date = new Date(normalized);
+  // 后端有些字段返回不带时区的时间字符串（例如 2026-04-07T08:34:06），
+  // 这里统一按 UTC 解释，再转换为 Asia/Shanghai 展示，避免少 8 小时。
+  const date = new Date(hasExplicitTimezone ? normalized : `${normalized}Z`);
 
   if (Number.isNaN(date.getTime())) {
     return normalized.replace('T', ' ');

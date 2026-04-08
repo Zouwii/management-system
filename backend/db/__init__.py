@@ -10,6 +10,22 @@ MySQL：TB_TOOL_BT_USE_MYSQL=1，库名默认 tb_tool_bt（可用 TB_TOOL_BT_DB_
 或整条：TB_TOOL_BT_DATABASE_URI=mysql+pymysql://user:pass@host:3306/tb_tool_bt?charset=utf8mb4
 """
 
-from db.engine import engine, get_session, init_db, SessionLocal
+from db.engine import (
+    engine,
+    perf_engine,
+    get_session,
+    get_perf_session,
+    init_db,
+    SessionLocal,
+    PerfSessionLocal,
+)
 
-__all__ = ["engine", "get_session", "init_db", "SessionLocal"]
+__all__ = [
+    "engine",
+    "perf_engine",
+    "get_session",
+    "get_perf_session",
+    "init_db",
+    "SessionLocal",
+    "PerfSessionLocal",
+]

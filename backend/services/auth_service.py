@@ -1,0 +1,173 @@
+from typing import Any, Dict, Optional, Tuple
+
+
+ROLE_LABELS = {
+    "employee": "员工",
+    "manager": "主管",
+    "admin": "管理员",
+}
+
+ROLE_DATA_SCOPE = {
+    "employee": "self",
+    "manager": "team",
+    "admin": "all",
+}
+
+ROLE_HOME_PATH = {
+    "employee": "/employee/personal-hours",
+    "manager": "/manager/nav-team-detail",
+    "admin": "/manager/department-overview",
+}
+
+ROLE_PERMISSION_CODES = {
+    "employee": [
+        "page.personal_hours",
+        "page.performance",
+        "page.ai_analysis",
+    ],
+    "manager": [
+        "page.department_overview",
+        "page.nav_team_detail",
+        "page.integration_team_detail",
+        "page.personal_hours",
+        "page.performance",
+        "page.ai_analysis",
+        "button.export_report",
+        "button.view_ai_suggestions",
+        "button.review_member",
+    ],
+    "admin": [
+        "page.department_overview",
+        "page.nav_team_detail",
+        "page.integration_team_detail",
+        "page.personal_hours",
+        "page.performance",
+        "page.ai_analysis",
+        "page.permissions",
+        "page.prototype",
+        "button.export_report",
+        "button.view_ai_suggestions",
+        "button.configure_role",
+        "button.configure_data_scope",
+        "button.review_member",
+    ],
+}
+
+
+def _get_profile_from_db(_external_id: str, _dingtalk_user: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    # phase-2 预留：后续迁移到 DB RBAC 时，在这里接入数据库查询。
+    return None
+
+
+def _role_from_character(character: int) -> str:
+    """
+    你的新规则：
+    - character == 0 -> 主管端（manager）
+    - character in {1,2,3} -> 员工端（employee）
+    其余值默认 employee。
+    """
+    try:
+        c = int(character)
+    except Exception:
+        c = 0
+    return "manager" if c == 0 else "employee"
+
+
+def _team_name_from_team_id(team_id_value: Any) -> Optional[str]:
+    """
+    team_id 规则：
+    - 0 -> 导航组
+    - 1 -> 对接组
+    其余/空值返回 None（后续走默认“未分组”）。
+    """
+    if team_id_value is None:
+        return None
+    val = str(team_id_value).strip()
+    if val == "0":
+        return "导航组"
+    if val == "1":
+        return "对接组"
+    return None
+
+
+def _get_user_character_row(external_ids: Tuple[str, ...]):
+    """
+    用钉钉侧标识去找本地 user_character.user_id。
+    约定：user_character.user_id 存的是钉钉 userId（通常为数字串）。
+    """
+    from db.engine import SessionLocal
+    from db.orm import UserCharacter as DbUserCharacter
+
+    session = SessionLocal()
+    try:
+        for uid in external_ids:
+            uid = str(uid or "").strip()
+            if not uid:
+                continue
+            row = session.query(DbUserCharacter).filter(DbUserCharacter.user_id == uid).first()
+            if row:
+                return row
+        return None
+    finally:
+        session.close()
+
+
+def _normalize_profile(base: Dict[str, Any], dingtalk_user: Dict[str, Any]) -> Dict[str, Any]:
+    role = str(base.get("role") or "employee").strip().lower()
+    if role not in {"employee", "manager", "admin"}:
+        role = "employee"
+
+    name = str(base.get("name") or dingtalk_user.get("nick") or "未命名用户")
+    team = str(base.get("team") or "未分组")
+    permission_codes = base.get("permissionCodes")
+    if not isinstance(permission_codes, list) or not permission_codes:
+        permission_codes = ROLE_PERMISSION_CODES[role]
+
+    profile = {
+        "id": str(base.get("id") or (dingtalk_user.get("unionId") or dingtalk_user.get("openId") or dingtalk_user.get("userid") or "")),
+        "user_id": str(base.get("user_id") or dingtalk_user.get("userid") or ""),
+        "name": name,
+        "team": team,
+        "teamId": str(base.get("teamId") or ""),
+        "role": role,
+        "roleLabel": ROLE_LABELS[role],
+        "dataScope": str(base.get("dataScope") or ROLE_DATA_SCOPE[role]),
+        "permissionCodes": permission_codes,
+        "homePath": str(base.get("homePath") or ROLE_HOME_PATH[role]),
+        "dingtalkUserId": str(
+            dingtalk_user.get("unionId")
+            or dingtalk_user.get("openId")
+            or dingtalk_user.get("userid")
+            or ""
+        ),
+    }
+    return profile
+
+
+def resolve_user_profile(dingtalk_user: Dict[str, Any]) -> Dict[str, Any]:
+    union_id = str(dingtalk_user.get("unionId") or "").strip()
+    open_id = str(dingtalk_user.get("openId") or "").strip()
+    user_id = str(dingtalk_user.get("userid") or "").strip()
+
+    # phase-2: DB RBAC 预留（如果后续你要接更完整的 user/role/permission 表）
+    for external_id in (union_id, open_id, user_id):
+        if not external_id:
+            continue
+        db_profile = _get_profile_from_db(external_id, dingtalk_user)
+        if db_profile:
+            return {"ok": True, "source": "db", "profile": _normalize_profile(db_profile, dingtalk_user)}
+
+    # 当前规则：不走 auth_mapping 白名单；改为查 user_character.character 决定角色
+    c_row = _get_user_character_row((user_id, union_id, open_id))
+    character = int(getattr(c_row, "character", 1) or 1) if c_row else 1
+    role = _role_from_character(character)
+
+    base: Dict[str, Any] = {
+        "role": role,
+        # 如果库里有人名/组别信息，就优先用库里的；否则回退钉钉 nick / 未分组
+        "name": getattr(c_row, "name", None) if c_row else None,
+        "team": _team_name_from_team_id(getattr(c_row, "team_id", None)) if c_row else None,
+        "teamId": getattr(c_row, "team_id", "") if c_row else "",
+    }
+
+    return {"ok": True, "source": "user_character", "profile": _normalize_profile(base, dingtalk_user)}

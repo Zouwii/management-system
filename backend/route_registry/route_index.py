@@ -1,0 +1,309 @@
+"""API 路由索引：用于可视化查看「URL -> 处理函数 -> service」映射。"""
+
+from typing import Dict, List
+
+
+API_BT_ROUTE_INDEX: List[Dict[str, str]] = [
+    # health_proxy
+    {
+        "module": "health_proxy",
+        "method": "GET",
+        "path": "/api/bt/health",
+        "desc": "健康检查（用于探活/确认服务存活）",
+        "handler": "route_registry.health_proxy.health",
+        "service": "services.proxy_service.health_service",
+    },
+    {
+        "module": "health_proxy",
+        "method": "POST",
+        "path": "/api/bt/proxy",
+        "desc": "通用钉钉 API 代理转发（调试/透传用）",
+        "handler": "route_registry.health_proxy.proxy_dingtalk",
+        "service": "services.proxy_service.dingtalk_proxy_service",
+    },
+    {
+        "module": "health_proxy",
+        "method": "GET,POST",
+        "path": "/api/bt/gettoken",
+        "desc": "获取/刷新钉钉 access_token（本服务封装版）",
+        "handler": "route_registry.health_proxy.gettoken",
+        "service": "services.proxy_service.dingtalk_gettoken_service",
+    },
+    # auth
+    {
+        "module": "auth",
+        "method": "GET",
+        "path": "/api/bt/auth/dingtalk/url",
+        "desc": "获取钉钉网页 OAuth 授权跳转地址（登录页用）",
+        "handler": "route_registry.auth.auth_dingtalk_url",
+        "service": "dingtalk_client.build_dingtalk_oauth_url",
+    },
+    {
+        "module": "auth",
+        "method": "GET",
+        "path": "/api/bt/auth/callback",
+        "desc": "钉钉网页 OAuth 回调：用 authCode 建立 session 并重定向",
+        "handler": "route_registry.auth.auth_dingtalk_callback",
+        "service": "route_registry.auth._session_from_dingtalk_auth_code",
+    },
+    {
+        "module": "auth",
+        "method": "POST",
+        "path": "/api/bt/auth/get_token",
+        "desc": "钉钉免登：前端传 code，后端换 token + 建立 session",
+        "handler": "route_registry.auth.auth_get_token",
+        "service": "route_registry.auth._session_from_dingtalk_auth_code",
+    },
+    {
+        "module": "auth",
+        "method": "GET",
+        "path": "/api/bt/auth/me",
+        "desc": "获取当前会话用户信息（前端初始化用）",
+        "handler": "route_registry.auth.auth_me",
+        "service": "session.auth_user",
+    },
+    {
+        "module": "auth",
+        "method": "POST",
+        "path": "/api/bt/auth/logout",
+        "desc": "退出登录：清理 session",
+        "handler": "route_registry.auth.auth_logout",
+        "service": "session.pop(auth_user)",
+    },
+    # projects
+    {
+        "module": "updates",
+        "method": "POST",
+        "path": "/api/bt/time_range_update",
+        "desc": "更新时间窗：按 startDate/endDate 同步 A+B（按钮用）",
+        "handler": "route_registry.updates.time_range_update",
+        "service": "services.task_sync_service.sync_project_details_in_time_range_service",
+    },
+    {
+        "module": "updates",
+        "method": "POST",
+        "path": "/api/bt/full_update",
+        "desc": "全量更新：update_endtime + 最近一年窗口 + 同步 A + 3 线程同步 B/C",
+        "handler": "route_registry.updates.full_update",
+        "service": "services.task_sync_service.full_update_service",
+    },
+    {
+        "module": "projects",
+        "method": "POST",
+        "path": "/api/bt/project/tasks/search",
+        "desc": "项目任务搜索（钉钉 tasks/search，偏搜索/检索）",
+        "handler": "route_registry.projects.search_project_tasks",
+        "service": "services.project_task_service.search_project_tasks_service",
+    },
+    {
+        "module": "projects",
+        "method": "POST",
+        "path": "/api/bt/query_project_tasks",
+        "desc": "项目任务列表查询；可选触发按 payload 时间窗同步 A/B 表",
+        "handler": "route_registry.projects.query_project_tasks",
+        "service": (
+            "services.project_task_service.query_project_tasks_service OR "
+            "services.task_sync_service.sync_project_details_in_time_range_service"
+        ),
+    },
+    {
+        "module": "projects",
+        "method": "POST",
+        "path": "/api/bt/query_task_details",
+        "desc": "按用户查询任务明细（钉钉 users/{userId}/tasks）",
+        "handler": "route_registry.projects.query_task_details",
+        "service": "services.project_task_service.query_user_tasks_service",
+    },
+    # config
+    {
+        "module": "config",
+        "method": "GET",
+        "path": "/api/bt/config/userids",
+        "desc": "读取 ids/config 中的用户列表（用于下拉/批量更新）",
+        "handler": "route_registry.config_routes.get_config_userids",
+        "service": "services.config_service.get_userids_service",
+    },
+    {
+        "module": "config",
+        "method": "GET",
+        "path": "/api/bt/config/projectids",
+        "desc": "读取 ids/config 中的项目列表（用于同步目标）",
+        "handler": "route_registry.config_routes.get_config_projectids",
+        "service": "services.config_service.get_projectids_service",
+    },
+    {
+        "module": "config",
+        "method": "GET",
+        "path": "/api/bt/config/workhour_coefficient",
+        "desc": "读取工时系数（用于工时统计换算/口径）",
+        "handler": "route_registry.config_routes.get_config_workhour_coefficient",
+        "service": "services.config_service.get_workhour_coefficient_service",
+    },
+    {
+        "module": "config",
+        "method": "GET",
+        "path": "/api/bt/config/workhour_character_coefficients",
+        "desc": "读取不同角色工时系数（管理员/员工等）",
+        "handler": "route_registry.config_routes.get_config_workhour_character_coefficients",
+        "service": "services.config_service.get_workhour_character_coefficients_service",
+    },
+    {
+        "module": "config",
+        "method": "GET",
+        "path": "/api/bt/config/user_character",
+        "desc": "读取用户角色/分组（user_character 表）",
+        "handler": "route_registry.config_routes.get_config_user_character",
+        "service": "services.config_service.get_user_character_service",
+    },
+    {
+        "module": "config",
+        "method": "GET",
+        "path": "/api/bt/config/last_update_time",
+        "desc": "读取 last_update_time（页面显示“最后更新时间”）",
+        "handler": "route_registry.config_routes.get_config_last_update_time",
+        "service": "services.config_service.get_last_update_time_service",
+    },
+    {
+        "module": "config",
+        "method": "GET",
+        "path": "/api/bt/config/default_time_range",
+        "desc": "读取默认 start/end/last_update_time（只读，用于页面初始化）",
+        "handler": "route_registry.config_routes.get_config_default_time_range",
+        "service": "services.config_service.get_default_time_range_service",
+    },
+    {
+        "module": "config",
+        "method": "POST",
+        "path": "/api/bt/config/touch_last_update_time",
+        "desc": "触摸 last_update_time（用于显示“最后更新时间”）",
+        "handler": "route_registry.config_routes.touch_config_last_update_time",
+        "service": "services.config_service.touch_last_update_time_service",
+    },
+    {
+        "module": "config",
+        "method": "POST",
+        "path": "/api/bt/config/update_endtime",
+        "desc": "将 end_time 的日期更新为今天（保留原时分秒）",
+        "handler": "route_registry.config_routes.update_config_endtime",
+        "service": "services.config_service.update_endtime_service",
+    },
+    {
+        "module": "config",
+        "method": "GET",
+        "path": "/api/bt/config/workhour_auto_calc",
+        "desc": "读取自动计算配置（是否定时触发更新）",
+        "handler": "route_registry.config_routes.get_workhour_auto_calc",
+        "service": "services.config_service.get_workhour_auto_calc_service",
+    },
+    {
+        "module": "config",
+        "method": "POST",
+        "path": "/api/bt/config/workhour_auto_calc",
+        "desc": "更新自动计算配置（开关 + 时间点）",
+        "handler": "route_registry.config_routes.update_workhour_auto_calc",
+        "service": "services.config_service.update_workhour_auto_calc_service",
+    },
+    # db_sync
+    {
+        "module": "db_sync",
+        "method": "POST",
+        "path": "/api/bt/db/sync/project-tasks",
+        "desc": "同步项目任务到 A 表（project_tasks）",
+        "handler": "route_registry.db_sync.db_sync_project_tasks",
+        "service": "services.task_sync_service.sync_project_tasks_to_db",
+    },
+    {
+        "module": "db_sync",
+        "method": "POST",
+        "path": "/api/bt/db/sync/task-detail",
+        "desc": "同步单个任务明细到 B/C 表（按 taskId）",
+        "handler": "route_registry.db_sync.db_sync_task_detail",
+        "service": "services.task_sync_service.sync_task_detail_to_db",
+    },
+    {
+        "module": "db_sync",
+        "method": "POST",
+        "path": "/api/bt/db/sync/task-details-batch",
+        "desc": "批量同步任务明细到 B/C 表（批处理）",
+        "handler": "route_registry.db_sync.db_sync_task_details_batch",
+        "service": "services.task_sync_service.sync_task_details_batch_to_db",
+    },
+    # perf
+    {
+        "module": "perf",
+        "method": "POST",
+        "path": "/api/bt/perf/fill-quarter-member",
+        "desc": "绩效：填充季度成员输入（表单预填/规则落地）",
+        "handler": "route_registry.perf.perf_fill_quarter_member",
+        "service": "services.perf_service.fill_member_input_service",
+    },
+    {
+        "module": "perf",
+        "method": "POST",
+        "path": "/api/bt/perf/calculate-quarter-member",
+        "desc": "绩效：计算季度成员结果（汇总/评分）",
+        "handler": "route_registry.perf.perf_calculate_quarter_member",
+        "service": "services.perf_service.calculate_member_quarter_performance_service",
+    },
+    # stats
+    {
+        "module": "stats",
+        "method": "POST",
+        "path": "/api/bt/stats/workdays",
+        "desc": "统计：计算区间内法定工作日/节假日等（若启用）",
+        "handler": "route_registry.stats.stats_workdays",
+        "service": "services.workhour_aggregate_service.workdays_in_range_service",
+    },
+    {
+        "module": "stats",
+        "method": "POST",
+        "path": "/api/bt/stats/executor_quarter_workhours",
+        "desc": "统计：从 DB 聚合某执行人季度工时与任务明细（dashboard 用）",
+        "handler": "route_registry.stats.stats_executor_quarter_workhours",
+        "service": "services.workhour_aggregate_service.executor_quarter_workhours_db_service",
+    },
+    {
+        "module": "stats",
+        "method": "POST",
+        "path": "/api/bt/stats/software_dev_count_last_year",
+        "desc": "统计：按配置最近一年窗口统计软件开发任务数量",
+        "handler": "route_registry.stats.stats_software_dev_count_last_year",
+        "service": "services.project_task_service.count_software_dev_tasks_in_config_last_year_service",
+    },
+]
+
+
+API_DASHBOARD_ROUTE_INDEX: List[Dict[str, str]] = [
+    {
+        "module": "dashboard",
+        "method": "GET",
+        "path": "/api/dashboard/personal-hours",
+        "desc": "员工工时页：默认结构（含默认时间范围、成员选项）",
+        "handler": "dashboard_api.personal_hours",
+        "service": "dashboard_api._build_default_personal_hours_payload",
+    },
+    {
+        "module": "dashboard",
+        "method": "POST",
+        "path": "/api/dashboard/personal-hours/query",
+        "desc": "员工工时页：查询（当前主要返回结构+回显时间）",
+        "handler": "dashboard_api.personal_hours_query",
+        "service": "dashboard_api._build_default_personal_hours_payload",
+    },
+    {
+        "module": "dashboard",
+        "method": "POST",
+        "path": "/api/dashboard/personal-hours/update",
+        "desc": "员工工时页：更新/全量更新入口（当前前端已直连 /api/bt/*）",
+        "handler": "dashboard_api.personal_hours_update",
+        "service": "services.task_sync_service.sync_project_details_in_time_range_service",
+    },
+]
+
+
+def get_all_route_index() -> Dict[str, List[Dict[str, str]]]:
+    return {
+        "api_bt": API_BT_ROUTE_INDEX,
+        "api_dashboard": API_DASHBOARD_ROUTE_INDEX,
+    }
+

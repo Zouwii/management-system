@@ -14,6 +14,7 @@ function buildUrl(path) {
 
 export async function httpRequest(path, options = {}) {
   const response = await fetch(buildUrl(path), {
+    credentials: 'include',
     headers: DEFAULT_HEADERS,
     ...options,
   });

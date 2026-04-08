@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { registerUser } from '../api/auth';
 import Card from '../components/Card';
+import { API_MODE, API_MODES } from '../constants/api';
 import { useAuthStore } from '../store/authStore';
 import { getDefaultHomePath } from '../utils/permission';
 
@@ -9,14 +10,38 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const login = useAuthStore((state) => state.login);
+  const restoreSession = useAuthStore((state) => state.restoreSession);
   const isLoading = useAuthStore((state) => state.isLoading);
   const [form, setForm] = useState({ account: '', password: '' });
   const [message, setMessage] = useState('');
+  const isRealMode = API_MODE === API_MODES.REAL;
+  const authError = useMemo(() => new URLSearchParams(location.search).get('auth_error') || '', [location.search]);
+
+  useEffect(() => {
+    let active = true;
+    async function boot() {
+      if (!isRealMode) return;
+      if (authError) {
+        setMessage(decodeURIComponent(authError));
+        return;
+      }
+      const user = await restoreSession();
+      if (!active || !user) return;
+      const fallbackPath = getDefaultHomePath(user);
+      const nextPath = location.state?.from ?? user.homePath ?? fallbackPath;
+      navigate(nextPath, { replace: true });
+    }
+    boot();
+    return () => {
+      active = false;
+    };
+  }, [authError, isRealMode, location.state, navigate, restoreSession]);
 
   async function handleLogin() {
     try {
       setMessage('');
-      const user = await login(form);
+      const user = await login(isRealMode ? {} : form);
+      if (isRealMode) return;
       const fallbackPath = getDefaultHomePath(user);
       const nextPath = location.state?.from ?? user.homePath ?? fallbackPath;
       navigate(nextPath, { replace: true });
@@ -63,50 +88,70 @@ export default function LoginPage() {
           </div>
         </Card>
         <Card className="bg-[linear-gradient(180deg,rgba(255,255,255,0.97),rgba(248,250,252,0.94))] p-8">
-          <div className="text-lg font-semibold text-slate-900">账号登录</div>
-          <div className="mt-1 text-sm text-slate-500">请输入账号和密码登录，注册入口已预留。</div>
-          <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-            <div>
-              <div className="mb-2 text-sm text-slate-500">账号</div>
-              <input
-                value={form.account}
-                onChange={(event) => handleChange('account', event.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 shadow-inner"
-                placeholder="请输入账号"
-              />
-            </div>
-            <div>
-              <div className="mb-2 text-sm text-slate-500">密码</div>
-              <input
-                type="password"
-                value={form.password}
-                onChange={(event) => handleChange('password', event.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 shadow-inner"
-                placeholder="请输入密码"
-              />
-            </div>
-            {message ? (
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
-                {message}
-              </div>
-            ) : null}
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="rounded-2xl bg-gradient-to-r from-slate-900 to-sky-700 px-4 py-3 text-center font-medium text-white shadow-[0_18px_30px_-18px_rgba(2,132,199,0.85)]"
-              >
-                登录
-              </button>
+          <div className="text-lg font-semibold text-slate-900">{isRealMode ? '钉钉登录' : '账号登录'}</div>
+          <div className="mt-1 text-sm text-slate-500">
+            {isRealMode ? '点击下方按钮，通过钉钉授权登录。' : '请输入账号和密码登录，注册入口已预留。'}
+          </div>
+          {isRealMode ? (
+            <div className="mt-6 space-y-4">
+              {message ? (
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600">
+                  {message}
+                </div>
+              ) : null}
               <button
                 type="button"
-                onClick={handleRegisterClick}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-center font-medium text-slate-700"
+                disabled={isLoading}
+                onClick={handleLogin}
+                className="w-full rounded-2xl bg-gradient-to-r from-slate-900 to-sky-700 px-4 py-3 text-center font-medium text-white shadow-[0_18px_30px_-18px_rgba(2,132,199,0.85)]"
               >
-                注册
+                使用钉钉登录
               </button>
             </div>
-          </form>
+          ) : (
+            <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
+              <div>
+                <div className="mb-2 text-sm text-slate-500">账号</div>
+                <input
+                  value={form.account}
+                  onChange={(event) => handleChange('account', event.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 shadow-inner"
+                  placeholder="请输入账号"
+                />
+              </div>
+              <div>
+                <div className="mb-2 text-sm text-slate-500">密码</div>
+                <input
+                  type="password"
+                  value={form.password}
+                  onChange={(event) => handleChange('password', event.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 shadow-inner"
+                  placeholder="请输入密码"
+                />
+              </div>
+              {message ? (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+                  {message}
+                </div>
+              ) : null}
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="rounded-2xl bg-gradient-to-r from-slate-900 to-sky-700 px-4 py-3 text-center font-medium text-white shadow-[0_18px_30px_-18px_rgba(2,132,199,0.85)]"
+                >
+                  登录
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRegisterClick}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-center font-medium text-slate-700"
+                >
+                  注册
+                </button>
+              </div>
+            </form>
+          )}
           <div className="mt-8 grid grid-cols-3 gap-4 text-sm">
             <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-emerald-800">可查看本人数据</div>
             <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-amber-800">可查看本人 + 所管小组 + 所属部门数据</div>

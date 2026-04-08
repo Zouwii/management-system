@@ -139,6 +139,36 @@ http://localhost:5173/login
 
 相关定义见 [`frontend-react/src/constants/api.js`](frontend-react/src/constants/api.js)。
 
+后端钉钉登录（Flask Session）相关环境变量见 `backend/.env.example`，关键项：
+
+- `DINGTALK_APPKEY` / `DINGTALK_APPSECRET`
+- `DINGTALK_CORP_ID`（可选；也可放在 `backend/config.json` 的 `corpId`）
+- `DINGTALK_REDIRECT_URI`（例如 `http://localhost:5001/api/bt/auth/callback`）
+- `SECRET_KEY`
+- `SESSION_COOKIE_SAMESITE`、`SESSION_COOKIE_SECURE`
+- `SESSION_EXPIRE_SECONDS`
+- `CORS_ORIGINS`
+
+## 钉钉登录（real 模式）
+
+当 `VITE_API_MODE=real` 时，登录页使用钉钉 OAuth 登录，不再走账号密码。
+
+后端认证接口：
+
+- `GET /api/bt/auth/dingtalk/url`：获取钉钉授权地址，同时返回 `corpId/clientId`（供 `dd.requestAuthCode` 使用）
+- `GET /api/bt/auth/callback`：钉钉回调，建立服务端会话
+- `POST /api/bt/auth/get_token`：钉钉内免登，`dd.requestAuthCode` 拿到 `code` 后 POST `{ "code": "...", "clientId": "..." }`（`clientId` 可选，等于 `appKey`），成功后设置 Session Cookie 并返回 `data.user`
+- `GET /api/bt/auth/me`：获取当前会话用户
+- `POST /api/bt/auth/logout`：登出并销毁会话
+
+说明：登录时若钉钉用户信息未返回 `userid`，后端会自动调用 `getUseridByUnionid` 补齐，再按 `userid` 查询 `user_character`，并将解析后的 `team/teamId/role` 缓存到会话里。
+
+权限映射配置：
+
+- 文件：`backend/auth_mapping.json`
+- 作用：把钉钉用户标识（优先 `unionId`，其次 `openId/userid`）映射到系统角色与权限
+- 迁移策略：当前是“静态映射兜底”；后续可接入 DB RBAC，代码预留在 `backend/services/auth_service.py`
+
 ## mock 账号
 
 mock 登录通过账号密码映射角色，当前演示账号如下：

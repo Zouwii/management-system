@@ -364,10 +364,22 @@ async function doWorkhourAnalysis(opts = {}) {
       return;
     }
 
+    const startTime = toIsoForQueryStart(dueDateStart.value || "");
+    const endTime = toIsoForQueryEnd(dueDateEnd.value || "");
+    if (!startTime || !endTime) {
+      ElMessage.warning("开始时间/结束时间无效，请先在设置中检查时间区间。");
+      return;
+    }
+
     const res = await apiFetch("/api/bt/stats/executor_quarter_workhours", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ projectId: pid, executorId: ex }),
+      body: JSON.stringify({
+        projectId: pid,
+        executorId: ex,
+        start_time: startTime,
+        end_time: endTime,
+      }),
     });
 
     const d = (res && res.data) || {};
@@ -460,7 +472,7 @@ async function doFullUpdateData() {
   updateLoading.value = true;
   try {
     // 全量更新：按 end_time 往前一年窗口，同步 A+B+C(overdue)
-    await apiFetch("/api/bt/all_time_download", {
+    await apiFetch("/api/bt/full_update", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

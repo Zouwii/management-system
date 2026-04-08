@@ -10,6 +10,7 @@ import {
   mockFetchPersonalHours,
   mockQueryPersonalHours,
   mockUpdatePersonalHours,
+  mockUpdatePersonalHours as mockFullUpdatePersonalHours,
 } from './providers/mock/dashboard';
 import {
   realFetchAIInsightList,
@@ -22,6 +23,7 @@ import {
   realFetchPersonalHours,
   realQueryPersonalHours,
   realUpdatePersonalHours,
+  realFullUpdatePersonalHours,
 } from './providers/real/dashboard';
 
 export const fetchDepartmentOverview = createApiSwitch(mockFetchDepartmentOverview, realFetchDepartmentOverview);
@@ -30,6 +32,7 @@ export const fetchIntegrationTeamDetail = createApiSwitch(mockFetchIntegrationTe
 export const fetchPersonalHours = createApiSwitch(mockFetchPersonalHours, realFetchPersonalHours);
 export const queryPersonalHours = createApiSwitch(mockQueryPersonalHours, realQueryPersonalHours);
 export const updatePersonalHours = createApiSwitch(mockUpdatePersonalHours, realUpdatePersonalHours);
+export const fullUpdatePersonalHours = createApiSwitch(mockFullUpdatePersonalHours, realFullUpdatePersonalHours);
 export const fetchPerformanceHistory = createApiSwitch(mockFetchPerformanceHistory, realFetchPerformanceHistory);
 export const fetchAIInsightList = createApiSwitch(mockFetchAIInsightList, realFetchAIInsightList);
 export const createAITaskTicket = createApiSwitch(mockCreateAITaskTicket, realCreateAITaskTicket);

@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { fetchPersonalHours, queryPersonalHours, updatePersonalHours } from '../api/dashboard';
+import {
+  fetchPersonalHours,
+  queryPersonalHours,
+  updatePersonalHours,
+  fullUpdatePersonalHours,
+} from '../api/dashboard';
 import Card from '../components/Card';
 import SectionTitle from '../components/SectionTitle';
 import StatCard from '../components/StatCard';
@@ -14,7 +19,6 @@ import {
   buildMonthlyTrend,
   calculateExpectedEffectiveDays,
   formatDateTime,
-  formatDays,
   getDeltaStatus,
 } from '../utils/workHours';
 import { useAuthStore } from '../store/authStore';
@@ -39,6 +43,7 @@ export default function PersonalHours() {
   const [taskSort, setTaskSort] = useState('desc');
   const [isQuerying, setIsQuerying] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isFullUpdating, setIsFullUpdating] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
 
   useEffect(() => {
@@ -71,11 +76,14 @@ export default function PersonalHours() {
     [compensatoryDays, dashboard.statutoryHolidays, dateRange.endDate, dateRange.startDate],
   );
 
-  const scheduledDelta = dashboard.scheduledEffectiveHours + dashboard.quarterlyOverdueEffectiveHours - expectedSummary.hours;
-  const completedDelta = dashboard.completedEffectiveHours + dashboard.quarterlyOverdueCompletedHours - expectedSummary.hours;
+  const scheduledDelta = dashboard.scheduledEffectiveHours + dashboard.quarterlyOverdueEffectiveHours - expectedSummary.days;
+  const completedDelta = dashboard.completedEffectiveHours + dashboard.quarterlyOverdueCompletedHours - expectedSummary.days;
   const scheduledStatus = getDeltaStatus(scheduledDelta);
   const completedStatus = getDeltaStatus(completedDelta);
-  const trend = useMemo(() => buildMonthlyTrend(sourceTrend, dashboard.taskDetails), [dashboard.taskDetails, sourceTrend]);
+  const trend = useMemo(
+    () => buildMonthlyTrend(sourceTrend, dashboard.taskDetails.filter((t) => t?.quarterCategory !== '季度逾期排期')),
+    [dashboard.taskDetails, sourceTrend],
+  );
   const maxTrendValue = Math.max(...trend.flatMap((item) => [item.total, item.effective, item.completed]), 1);
   const distributionBarClassMap = {
     产品: 'bg-sky-500',
@@ -87,6 +95,10 @@ export default function PersonalHours() {
     季度逾期排期: 'border-amber-100 bg-amber-50 text-amber-700',
   };
   const statusTagClassMap = {
+    创建中: 'border-slate-200 bg-slate-50 text-slate-700',
+    待评审: 'border-indigo-100 bg-indigo-50 text-indigo-700',
+    评审中: 'border-blue-100 bg-blue-50 text-blue-700',
+    搁置: 'border-amber-100 bg-amber-50 text-amber-700',
     已完成: 'border-emerald-100 bg-emerald-50 text-emerald-700',
     未完成: 'border-rose-100 bg-rose-50 text-rose-700',
   };
@@ -97,7 +109,7 @@ export default function PersonalHours() {
   };
   const taskTypeOptions = ['全部', '产品', '订单', '研发'];
   const quarterFilterOptions = ['全部', '当前季度排期', '季度逾期排期'];
-  const statusFilterOptions = ['全部', '已完成', '未完成'];
+  const statusFilterOptions = ['全部', '创建中', '未完成', '待评审', '评审中', '已完成', '搁置'];
   const filteredTasks = useMemo(() => {
     const nextTasks = dashboard.taskDetails
       .filter((task) => taskFilter === '全部' || task.type === taskFilter)
@@ -105,7 +117,7 @@ export default function PersonalHours() {
       .filter((task) => statusFilter === '全部' || task.status === statusFilter)
       .sort((left, right) => (taskSort === 'desc' ? right.hours - left.hours : left.hours - right.hours));
 
-    return showAllTasks ? nextTasks : nextTasks.slice(0, 5);
+    return nextTasks;
   }, [dashboard.taskDetails, quarterFilter, showAllTasks, statusFilter, taskFilter, taskSort]);
   const overdueTaskCount = dashboard.taskDetails.filter((task) => task.quarterCategory === '季度逾期排期').length;
   const currentQuarterTaskCount = dashboard.taskDetails.filter((task) => task.quarterCategory === '当前季度排期').length;
@@ -138,6 +150,11 @@ export default function PersonalHours() {
     const seconds = String(date.getSeconds()).padStart(2, '0');
 
     return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+  }
+
+  function formatRawDays(value) {
+    const n = Number(value || 0);
+    return Number.isFinite(n) ? n.toFixed(1) : '0.0';
   }
 
   function buildQuarterRange(useTodayEnd = false) {
@@ -211,6 +228,29 @@ export default function PersonalHours() {
     }
   }
 
+  async function handleFullUpdate() {
+    setIsFullUpdating(true);
+    setActionMessage('');
+
+    try {
+      const response = await fullUpdatePersonalHours(user, {
+        ...dateRange,
+        compensatoryDays,
+        target: selectedTarget,
+        fullSync: true,
+      });
+      setLastUpdatedAt(response.data.lastUpdatedAt ?? lastUpdatedAt);
+      setActionMessage(response.data.message || '已触发全量更新。');
+      await handleQuery({
+        ...dateRange,
+        compensatoryDays,
+        target: selectedTarget,
+      });
+    } finally {
+      setIsFullUpdating(false);
+    }
+  }
+
   return (
     <EmployeeLayout>
       <SectionTitle
@@ -235,7 +275,7 @@ export default function PersonalHours() {
               {' '}
               <span className="font-medium text-slate-700">{lastUpdatedAt ? formatDateTime(lastUpdatedAt) : '暂无'}</span>
             </div>
-            <div className="flex flex-wrap justify-end gap-2">
+            <div className="flex flex-nowrap justify-end gap-2 overflow-x-auto">
               <button
                 type="button"
                 onClick={() => {
@@ -281,15 +321,24 @@ export default function PersonalHours() {
               <button
                 type="button"
                 onClick={handleUpdate}
-                disabled={isUpdating}
+                disabled={isUpdating || isFullUpdating}
                 className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-60"
               >
                 {isUpdating ? '更新中...' : '更新'}
+              </button>
+              <button
+                type="button"
+                onClick={handleFullUpdate}
+                disabled={isFullUpdating || isUpdating}
+                className="whitespace-nowrap rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-60"
+              >
+                {isFullUpdating ? '全量更新中...' : '全量更新'}
               </button>
             </div>
             <div className="flex flex-wrap justify-end gap-4 text-xs text-slate-500">
               <div>查询：按当前时间区间刷新页面统计结果</div>
               <div>更新：触发后台同步并刷新最后更新时间</div>
+              <div>全量更新：触发 /query_project_tasks 同步 A+B 后再刷新统计</div>
             </div>
           </div>
         </div>
@@ -377,15 +426,15 @@ export default function PersonalHours() {
             <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div className="text-sm text-slate-500">计算说明</div>
               <div className="mt-2 text-sm leading-6 text-slate-600">
-                法定节假日 {expectedSummary.holidayCount} 天，调休天数 {expectedSummary.compensatoryDays.toFixed(1)} 天，折合 {formatDays(expectedSummary.hours)}天，可作为排期与完成情况的对比基线。
+                法定节假日 {expectedSummary.holidayCount} 天，调休天数 {expectedSummary.compensatoryDays.toFixed(1)} 天，折合 {expectedSummary.days.toFixed(1)} 天，可作为排期与完成情况的对比基线。
               </div>
             </div>
           </Card>
           <div className="col-span-7 grid grid-cols-2 gap-5">
-            <StatCard title="当前已排总有效工时" value={`${formatDays(dashboard.scheduledEffectiveHours)}天`} sub="已纳入当前区间任务排期" />
-            <StatCard title="当前已完成总有效工时" value={`${formatDays(dashboard.completedEffectiveHours)}天`} sub="已完成任务的累计有效工时" />
-            <StatCard title="季度逾期总有效工时" value={`${formatDays(dashboard.quarterlyOverdueEffectiveHours)}天`} sub="跨季度未按期关闭任务累计" />
-            <StatCard title="季度逾期完成工时" value={`${formatDays(dashboard.quarterlyOverdueCompletedHours)}天`} sub="跨季度已完成关闭任务累计" />
+            <StatCard title="当前已排总有效工时" value={`${formatRawDays(dashboard.scheduledEffectiveHours)}天`} sub="已纳入当前区间任务排期" />
+            <StatCard title="当前已完成总有效工时" value={`${formatRawDays(dashboard.completedEffectiveHours)}天`} sub="已完成任务的累计有效工时" />
+            <StatCard title="季度逾期总有效工时" value={`${formatRawDays(dashboard.quarterlyOverdueEffectiveHours)}天`} sub="跨季度未按期关闭任务累计" />
+            <StatCard title="季度逾期完成工时" value={`${formatRawDays(dashboard.quarterlyOverdueCompletedHours)}天`} sub="跨季度已完成关闭任务累计" />
           </div>
         </div>
         <div className="mt-6 border-t border-slate-200 pt-6">
@@ -403,20 +452,20 @@ export default function PersonalHours() {
               <div className="text-sm text-slate-500">任务分配情况</div>
               <div className={`mt-2 text-2xl font-semibold ${scheduledStatus.textClass}`}>
                 {scheduledStatus.sign}
-                {formatDays(scheduledDelta)}天
+                {formatRawDays(scheduledDelta)}天
               </div>
               <div className="mt-2 text-sm text-slate-600">
-                (当前已排总有效工时 + 季度逾期总有效工时) - 预期有效工时 = {formatDays(dashboard.scheduledEffectiveHours + dashboard.quarterlyOverdueEffectiveHours)}天 - {expectedSummary.days.toFixed(1)}天
+                (当前已排总有效工时 + 季度逾期总有效工时) - 预期有效工时 = {formatRawDays(dashboard.scheduledEffectiveHours + dashboard.quarterlyOverdueEffectiveHours)}天 - {expectedSummary.days.toFixed(1)}天
               </div>
             </div>
             <div className={`rounded-2xl border p-5 ${completedStatus.bgClass}`}>
               <div className="text-sm text-slate-500">任务完成情况</div>
               <div className={`mt-2 text-2xl font-semibold ${completedStatus.textClass}`}>
                 {completedStatus.sign}
-                {formatDays(completedDelta)}天
+                {formatRawDays(completedDelta)}天
               </div>
               <div className="mt-2 text-sm text-slate-600">
-                (已完成有效工时 + 季度逾期完成工时) - 预期有效工时 = {formatDays(dashboard.completedEffectiveHours + dashboard.quarterlyOverdueCompletedHours)}天 - {expectedSummary.days.toFixed(1)}天
+                (已完成有效工时 + 季度逾期完成工时) - 预期有效工时 = {formatRawDays(dashboard.completedEffectiveHours + dashboard.quarterlyOverdueCompletedHours)}天 - {expectedSummary.days.toFixed(1)}天
               </div>
             </div>
           </div>
@@ -432,7 +481,7 @@ export default function PersonalHours() {
                 <div className="flex items-center justify-between gap-4">
                   <div className="text-sm font-medium text-slate-900">{item.type}</div>
                   <div className="text-sm text-slate-500">
-                    {formatDays(item.hours)}天
+                    {formatRawDays(item.hours)}天
                     {' · '}
                     {item.ratio}
                   </div>
@@ -464,27 +513,27 @@ export default function PersonalHours() {
                   <div key={item.month} className="flex flex-1 flex-col items-center">
                     <div className="flex h-52 items-end gap-2">
                       <div className="flex flex-col items-center gap-2">
-                        <div className="text-[11px] font-medium text-slate-500">{formatDays(item.total)}天</div>
+                        <div className="text-[11px] font-medium text-slate-500">{formatRawDays(item.total)}天</div>
                         <div
                           className="w-6 rounded-t-2xl bg-slate-300"
                           style={{ height: totalHeight }}
-                          title={`${item.month} 总工时 ${formatDays(item.total)}天`}
+                          title={`${item.month} 总工时 ${formatRawDays(item.total)}天`}
                         />
                       </div>
                       <div className="flex flex-col items-center gap-2">
-                        <div className="text-[11px] font-medium text-cyan-700">{formatDays(item.effective)}天</div>
+                        <div className="text-[11px] font-medium text-cyan-700">{formatRawDays(item.effective)}天</div>
                         <div
                           className="w-6 rounded-t-2xl bg-cyan-500"
                           style={{ height: effectiveHeight }}
-                          title={`${item.month} 有效工时 ${formatDays(item.effective)}天`}
+                          title={`${item.month} 有效工时 ${formatRawDays(item.effective)}天`}
                         />
                       </div>
                       <div className="flex flex-col items-center gap-2">
-                        <div className="text-[11px] font-medium text-emerald-700">{formatDays(item.completed)}天</div>
+                        <div className="text-[11px] font-medium text-emerald-700">{formatRawDays(item.completed)}天</div>
                         <div
                           className="w-6 rounded-t-2xl bg-emerald-500"
                           style={{ height: completedHeight }}
-                          title={`${item.month} 已完成工时 ${formatDays(item.completed)}天`}
+                          title={`${item.month} 已完成工时 ${formatRawDays(item.completed)}天`}
                         />
                       </div>
                     </div>
@@ -635,18 +684,18 @@ export default function PersonalHours() {
             <div>任务名称</div>
             <div>任务类型</div>
             <div>季度归属</div>
-            <div>状态</div>
+            <div>任务状态</div>
             <div className="text-right">工时</div>
             <div>链接</div>
           </div>
           <div className="divide-y divide-slate-100">
             {filteredTasks.map((task) => (
               <div
-                key={task.name}
+                key={task.taskId || task.name}
                 className="grid grid-cols-[minmax(0,1.82fr)_108px_148px_108px_108px_176px] items-center gap-8 bg-white px-5 py-4 text-sm transition-colors hover:bg-slate-50/70"
               >
-                <div className="min-w-0" title={task.name}>
-                  <div className="truncate font-medium text-slate-900">{task.name}</div>
+                <div className="min-w-0" title={task.content || task.text || task.name || task.taskId || '-'}>
+                  <div className="truncate font-medium text-slate-900">{task.content || task.text || task.name || task.taskId || '-'}</div>
                 </div>
                 <div className="justify-self-start">
                   <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium ${taskTypeTagClassMap[task.type]}`}>
@@ -663,10 +712,12 @@ export default function PersonalHours() {
                     {task.status}
                   </span>
                 </div>
-                <div className="text-right font-medium text-slate-700">{formatDays(task.hours)}天</div>
+                <div className="text-right font-medium text-slate-700">
+                  {typeof task.work_hour === 'number' ? formatRawDays(task.work_hour) : formatRawDays(task.hours)}天
+                </div>
                 <div>
                   <a
-                    href={task.link}
+                    href={task.link || (task.taskId ? `https://www.teambition.com/task/${encodeURIComponent(task.taskId)}` : '#')}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"

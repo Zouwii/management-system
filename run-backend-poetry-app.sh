@@ -3,11 +3,58 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="${SCRIPT_DIR}/backend"
-
-cd "$BACKEND_DIR"
+FRONTEND_DIR="${SCRIPT_DIR}/frontend-react"
 
 APP_HOST="${APP_HOST:-0.0.0.0}"
 APP_PORT="${APP_PORT:-5001}"
+MODE_ARG="${1:-mode=1}"
+
+# mode=1(默认): real 登录页（钉钉）
+# mode=2: mock 登录页（账号密码）
+if [[ "${MODE_ARG}" =~ ^mode= ]]; then
+  MODE="${MODE_ARG#mode=}"
+else
+  MODE="${MODE_ARG}"
+fi
+
+case "${MODE}" in
+  1)
+    FRONTEND_API_MODE="real"
+    ;;
+  2)
+    FRONTEND_API_MODE="mock"
+    ;;
+  *)
+    echo "[tb_tool_bt] ERROR: invalid mode: ${MODE_ARG}"
+    echo "[tb_tool_bt] Usage: bash run-backend-poetry-app.sh [mode=1|mode=2]"
+    echo "[tb_tool_bt]   mode=1 => real (DingTalk login)"
+    echo "[tb_tool_bt]   mode=2 => mock (account/password login)"
+    exit 1
+    ;;
+esac
+
+if ! command -v npm >/dev/null 2>&1; then
+  echo "[tb_tool_bt] ERROR: npm not found"
+  echo "[tb_tool_bt] Please install Node.js and npm first."
+  exit 1
+fi
+
+if [ ! -d "${FRONTEND_DIR}" ]; then
+  echo "[tb_tool_bt] ERROR: frontend directory not found: ${FRONTEND_DIR}"
+  exit 1
+fi
+
+cd "${FRONTEND_DIR}"
+
+if [ ! -d node_modules ]; then
+  echo "[tb_tool_bt] node_modules not found in frontend-react, running: npm install"
+  npm install
+fi
+
+echo "[tb_tool_bt] Building frontend mode=${MODE} (VITE_API_MODE=${FRONTEND_API_MODE})"
+VITE_API_MODE="${FRONTEND_API_MODE}" npm run build
+
+cd "$BACKEND_DIR"
 
 if [ -f ".env.example" ] && [ ! -f ".env" ]; then
   cp ".env.example" ".env"
@@ -23,6 +70,6 @@ fi
 export FLASK_RUN_HOST="${APP_HOST}"
 export FLASK_RUN_PORT="${APP_PORT}"
 
-echo "[tb_tool_bt] Starting backend: http://${APP_HOST}:${APP_PORT}"
+echo "[tb_tool_bt] Starting backend: http://${APP_HOST}:${APP_PORT} (frontend mode=${MODE})"
 exec poetry run python app.py
 

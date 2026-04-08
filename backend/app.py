@@ -11,21 +11,38 @@ except ImportError:
 import threading
 import time as _time
 from datetime import datetime
+from datetime import timedelta
 
-from flask import Flask, send_from_directory
+from flask import Flask, abort, send_from_directory
 from flask_cors import CORS
 
 from api import api_bp
+from dashboard_api import dashboard_bp
 from db import SessionLocal, init_db
 from db.config import env_bt
 
-_VUE_DIR = Path(__file__).resolve().parent / "static" / "vue"
+_VUE_DIR = Path(__file__).resolve().parent / "static" / "react"
 
 
 def create_app() -> Flask:
     app = Flask(__name__, static_folder=None)
+    app.config["SECRET_KEY"] = env_bt("SECRET_KEY", "replace-this-in-production")
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
+    app.config["SESSION_COOKIE_SAMESITE"] = env_bt("SESSION_COOKIE_SAMESITE", "Lax")
+    app.config["SESSION_COOKIE_SECURE"] = str(env_bt("SESSION_COOKIE_SECURE", "false")).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(seconds=int(env_bt("SESSION_EXPIRE_SECONDS", "86400")))
 
-    CORS(app, resources={r"/api/bt/*": {"origins": "*"}})
+    cors_origins = env_bt("CORS_ORIGINS", "*")
+    if cors_origins.strip() == "*":
+        CORS(app, resources={r"/api/bt/*": {"origins": "*"}})
+    else:
+        origins = [x.strip() for x in cors_origins.split(",") if x.strip()]
+        CORS(app, resources={r"/api/bt/*": {"origins": origins}}, supports_credentials=True)
 
     init_db()
 
@@ -39,7 +56,7 @@ def create_app() -> Flask:
             from services.config_service import (
                 get_workhour_auto_calc_service,
                 touch_last_update_time_service,
-                get_time_range_service,
+                get_last_update_time_service,
             )
 
             while True:
@@ -64,8 +81,8 @@ def create_app() -> Flask:
 
                     # 用 last_update_time 的日期去重：确保同一天只触发一次
                     today = now.strftime("%Y-%m-%d")
-                    tr = get_time_range_service() or {}
-                    last = tr.get("last_update_time") or ""
+                    lu = get_last_update_time_service() or {}
+                    last = lu.get("last_update_time") or ""
                     if last:
                         try:
                             last_dt = datetime.fromisoformat(last)
@@ -93,6 +110,7 @@ def create_app() -> Flask:
         SessionLocal.remove()
 
     app.register_blueprint(api_bp)
+    app.register_blueprint(dashboard_bp)
 
     @app.route("/")
     def vue_index():
@@ -101,6 +119,18 @@ def create_app() -> Flask:
     @app.route("/assets/<path:path>")
     def vue_assets(path: str):
         return send_from_directory(_VUE_DIR / "assets", path)
+
+    @app.route("/<path:path>")
+    def spa_fallback(path: str):
+        # API 路由不走前端兜底，保持后端接口 404/405 语义。
+        if path.startswith("api/"):
+            abort(404)
+        # 若是静态文件（如 favicon.svg、icons.svg）则直接返回文件。
+        candidate = _VUE_DIR / path
+        if candidate.exists() and candidate.is_file():
+            return send_from_directory(_VUE_DIR, path)
+        # 其余前端路由（如 /login）统一回落到 index.html。
+        return send_from_directory(_VUE_DIR, "index.html")
 
     return app
 

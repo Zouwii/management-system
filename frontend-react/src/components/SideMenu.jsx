@@ -40,8 +40,8 @@ export default function SideMenu({
     : 'inline-flex h-7 min-w-7 items-center justify-center rounded-xl bg-sky-500 px-2 text-xs font-semibold text-white';
   const collapseStorageKey = `side-menu-collapsed:${theme}:${title}`;
 
-  function handleSwitchRole() {
-    logout();
+  async function handleSwitchRole() {
+    await logout();
     navigate(actionTo, { replace: true });
   }
 

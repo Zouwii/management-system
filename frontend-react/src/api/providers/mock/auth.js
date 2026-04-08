@@ -18,3 +18,13 @@ export function mockLoginByCredentials({ account, password }) {
 export function mockRegister() {
   return request(() => ({ success: true }));
 }
+
+export function mockFetchCurrentUser() {
+  return request(() => {
+    throw new Error('unauthenticated');
+  });
+}
+
+export function mockLogout() {
+  return request(() => ({ success: true }));
+}

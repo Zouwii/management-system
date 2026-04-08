@@ -10,6 +10,7 @@ import {
 import { buildDepartmentStats, filterRowsByDataScope } from '../../../utils/dataScope';
 import { getDataScopeLabel } from '../../../utils/dataScope';
 import { request } from '../../request';
+import { httpRequest } from '../../client';
 import { ROLES } from '../../../constants/roles';
 import { mockAccounts, mockUsers } from '../../../mock/auth';
 
@@ -158,30 +159,295 @@ export function mockFetchIntegrationTeamDetail(user) {
   }));
 }
 
+function toUtcISOString(dateTimeLocalValue) {
+  const d = new Date(dateTimeLocalValue);
+  if (Number.isNaN(d.getTime())) return dateTimeLocalValue;
+  return d.toISOString();
+}
+
+function toLocalDateTimeInputValue(isoValue) {
+  if (!isoValue) return '';
+  const d = new Date(isoValue);
+  if (Number.isNaN(d.getTime())) return isoValue;
+
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(
+    d.getMinutes(),
+  )}:${pad(d.getSeconds())}`;
+}
+
+function safeNumber(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+async function fetchProjectId() {
+  const res = await httpRequest('/bt/config/projectids');
+  const projects = (res?.data || {}).projects || [];
+  if (!projects.length) throw new Error('missing config projectId');
+  return String(projects[0].projectId);
+}
+
+async function fetchUserids() {
+  const res = await httpRequest('/bt/config/userids');
+  const users = (res?.data || {}).users || [];
+  return users.map((u) => ({ name: String(u.name), userId: String(u.userId) }));
+}
+
+async function fetchTimeRange() {
+  const res = await httpRequest('/bt/config/time_range');
+  const tr = res?.data || {};
+  return {
+    startTime: tr.start_time || '',
+    endTime: tr.end_time || '',
+    lastUpdateTime: tr.last_update_time || '',
+  };
+}
+
+function resolveExecutorIdsByTarget(user, target, userids) {
+  const nameToUserId = new Map(userids.map((u) => [u.name, u.userId]));
+  const isAll = target === ALL_TARGET;
+  const resolvedNames = isAll ? userids.map((u) => u.name) : [target];
+  const executorIds = resolvedNames
+    .filter((nm) => nameToUserId.has(nm))
+    .map((nm) => nameToUserId.get(nm));
+
+  if (!executorIds.length && user?.name && nameToUserId.has(user.name)) {
+    executorIds.push(nameToUserId.get(user.name));
+  }
+
+  return Array.from(new Set(executorIds));
+}
+
+function buildSourceTrendFromTasks(monthLabels, tasks) {
+  const totalsByMonth = new Map(monthLabels.map((label) => [label, 0]));
+  tasks.forEach((t) => {
+    if (!t?.deadline) return;
+    const parts = String(t.deadline).split('-');
+    if (parts.length < 2) return;
+    const monthLabel = `${Number(parts[1])}月`;
+    if (!totalsByMonth.has(monthLabel)) return;
+    totalsByMonth.set(monthLabel, safeNumber(totalsByMonth.get(monthLabel)) + safeNumber(t.hours));
+  });
+
+  return monthLabels.map((label) => ({
+    month: label,
+    total: safeNumber(totalsByMonth.get(label)),
+    effective: 0,
+    completed: 0,
+  }));
+}
+
+function buildMonthlyLabels(startDateISO, endDateISO) {
+  const start = new Date(startDateISO);
+  const end = new Date(endDateISO);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return ['1月', '2月', '3月'];
+
+  // 直接按时间区间生成去重月份标签（通常就是一个季度 3 个月）。
+  const labels = [];
+  const cursor = new Date(start);
+  cursor.setDate(1);
+  while (cursor <= end) {
+    labels.push(`${cursor.getMonth() + 1}月`);
+    cursor.setMonth(cursor.getMonth() + 1);
+    // 防止死循环
+    if (labels.length > 24) break;
+  }
+  return Array.from(new Set(labels));
+}
+
+async function buildPersonalHoursByQuarterAgg({ user, target, compensatoryDays }) {
+  const canViewAllPeople = user?.role === ROLES.MANAGER || user?.role === ROLES.ADMIN;
+  const fallback = buildPersonalHoursPayload(user, target);
+
+  try {
+    const projectId = await fetchProjectId();
+    const userids = await fetchUserids(); // [{name, userId}]
+    const tr = await fetchTimeRange();
+    const startTime = tr.startTime || '';
+    const endTime = tr.endTime || '';
+
+    let resolvedTarget = target;
+    const executorIds = resolveExecutorIdsByTarget(user, target, userids);
+
+    // 没映射到执行者则回退到当前用户
+    if (!executorIds.length && user?.name) {
+      resolvedTarget = user.name;
+    }
+    if (!executorIds.length) return fallback;
+
+    const quarters = [];
+    for (const executorId of executorIds) {
+      const res = await httpRequest('/bt/stats/executor_quarter_workhours', {
+        method: 'POST',
+        body: JSON.stringify({
+          executorId,
+          projectId,
+          start_time: startTime,
+          end_time: endTime,
+        }),
+      });
+      quarters.push(res?.data || {});
+    }
+
+    const first = quarters[0] || {};
+    const scheduledEffectiveHours = quarters.reduce((sum, q) => sum + safeNumber(q.quarter_work_hour), 0);
+    const quarterlyOverdueEffectiveHours = quarters.reduce((sum, q) => sum + safeNumber(q.quarter_overdue_work_hour), 0);
+    const breakdown = quarters.flatMap((q) => (Array.isArray(q.breakdown) ? q.breakdown : []));
+
+    const rawStart = first?.time_range?.start_time || '';
+    const rawEnd = first?.time_range?.end_time || '';
+    const startDate = toLocalDateTimeInputValue(rawStart);
+    const endDate = toLocalDateTimeInputValue(rawEnd);
+
+    const monthLabels = buildMonthlyLabels(rawStart, rawEnd);
+    const yearFromRange = (() => {
+      const y = new Date(rawStart).getFullYear();
+      return Number.isFinite(y) ? y : new Date().getFullYear();
+    })();
+
+    const tasks = breakdown.map((item, idx) => {
+      const isOverdue = Boolean(item?.is_overdue);
+      const deadlineMonthLabel = monthLabels[idx % Math.max(monthLabels.length, 1)];
+      const deadlineMonth = Number(String(deadlineMonthLabel).replace('月', ''));
+      const year = yearFromRange;
+
+      return {
+        name: String(item?.content || item?.taskId || `任务-${idx + 1}`),
+        type: '研发',
+        hours: safeNumber(item?.work_hour),
+        quarterCategory: isOverdue ? '季度逾期排期' : '当前季度排期',
+        status: isOverdue ? '未完成' : '已完成',
+        deadline: `${year}-${String(deadlineMonth).padStart(2, '0')}-15`,
+        link: '',
+        taskId: String(item?.taskId || ''),
+      };
+    });
+
+    const sourceTrend = buildSourceTrendFromTasks(monthLabels, tasks);
+    const targetLabel = resolvedTarget === ALL_TARGET ? '全部人员' : resolvedTarget;
+
+    const memberOptions = canViewAllPeople
+      ? [
+          { id: ALL_TARGET, name: '全部人员', team: '全部' },
+          ...userids.map((u) => ({
+            id: u.name,
+            name: u.name,
+            team: u.name === user?.name ? user?.team || '' : '未知',
+          })),
+        ]
+      : [{ id: user?.name || target, name: user?.name || target, team: user?.team || '' }];
+
+    return {
+      trend: sourceTrend,
+      selectedTarget: resolvedTarget,
+      memberOptions,
+      dashboard: {
+        ...personalHoursDashboard,
+        lastUpdatedAt: tr.lastUpdateTime || '',
+        compensatoryDays: Number(compensatoryDays ?? 0),
+        defaultRange: {
+          startDate,
+          endDate,
+        },
+        targetLabel,
+        scheduledEffectiveHours,
+        completedEffectiveHours: scheduledEffectiveHours, // 默认：未逾期任务按“已完成”口径展示
+        quarterlyOverdueEffectiveHours,
+        quarterlyOverdueCompletedHours: 0,
+        // 其余字段在当前页未使用，但保留占位保证渲染不出错
+        quarterlyPlannedEffectiveHours: 0,
+        quarterlyPlannedCompletedHours: 0,
+        taskDetails: tasks,
+        taskDistribution: [],
+      },
+    };
+  } catch (e) {
+    // 出错时至少保证页面可渲染
+    // eslint-disable-next-line no-console
+    console.error('[personal-hours][quarter-agg] failed:', e);
+    return fallback;
+  }
+}
+
 export function mockFetchPersonalHours(user, params = {}) {
-  return request(() => buildPersonalHoursPayload(user, params.target));
+  return Promise.resolve()
+    .then(() => buildPersonalHoursByQuarterAgg({ user, target: params.target || ALL_TARGET, compensatoryDays: personalHoursDashboard.compensatoryDays }))
+    .then((data) => ({ code: 0, message: 'ok', data }));
 }
 
 export function mockQueryPersonalHours(user, payload) {
-  return request(() => buildPersonalHoursPayload(user, payload.target, {
-    defaultRange: {
-      startDate: payload.startDate,
-      endDate: payload.endDate,
-    },
-    compensatoryDays: payload.compensatoryDays ?? personalHoursDashboard.compensatoryDays,
-  }));
+  const startDate = payload?.startDate || '';
+  const endDate = payload?.endDate || '';
+  const compensatoryDays = payload?.compensatoryDays ?? personalHoursDashboard.compensatoryDays;
+  const target = payload?.target || ALL_TARGET;
+
+  // 查询时先更新 config 时间窗，保证页面上的“预期有效工时”与后端口径一致。
+  return Promise.resolve()
+    .then(async () => {
+      if (startDate && endDate) {
+        await httpRequest('/bt/config/time_range', {
+          method: 'POST',
+          body: JSON.stringify({
+            start_time: toUtcISOString(startDate),
+            end_time: toUtcISOString(endDate),
+          }),
+        });
+      }
+
+      return buildPersonalHoursByQuarterAgg({ user, target, compensatoryDays });
+    })
+    .then((data) => ({ code: 0, message: 'ok', data }));
 }
 
 export function mockUpdatePersonalHours(user, payload) {
-  const lastUpdatedAt = getCurrentLocalDateTime();
-  const { selectedTarget, targetLabel } = buildPersonalHoursPayload(user, payload.target);
+  const startDate = payload?.startDate || '';
+  const endDate = payload?.endDate || '';
+  const target = payload?.target || user?.name || ALL_TARGET;
+  const targetLabel = target === ALL_TARGET ? '全部人员' : target;
+  const isFullSync = Boolean(payload?.fullSync);
 
-  return request(() => ({
-    success: true,
-    selectedTarget,
-    message: `已触发${targetLabel}的工时更新。`,
-    lastUpdatedAt,
-  }));
+  return Promise.resolve()
+    .then(async () => {
+      if (startDate && endDate) {
+        await httpRequest('/bt/config/time_range', {
+          method: 'POST',
+          body: JSON.stringify({
+            start_time: toUtcISOString(startDate),
+            end_time: toUtcISOString(endDate),
+          }),
+        });
+      }
+
+      if (isFullSync) {
+        const projectId = await fetchProjectId();
+        const userids = await fetchUserids();
+        const executorIds = resolveExecutorIdsByTarget(user, target, userids);
+
+        for (const executorId of executorIds) {
+          await httpRequest('/bt/query_project_tasks', {
+            method: 'POST',
+            body: JSON.stringify({
+              userId: executorId,
+              projectId,
+              sync_ab_by_config_time_range: true,
+              start_time: toUtcISOString(startDate),
+              end_time: toUtcISOString(endDate),
+            }),
+          });
+        }
+      }
+
+      await httpRequest('/bt/config/touch_last_update_time', { method: 'POST' });
+      const tr = await fetchTimeRange();
+      return {
+        success: true,
+        selectedTarget: target,
+        message: isFullSync ? `已触发${targetLabel}的全量更新。` : `已触发${targetLabel}的工时更新。`,
+        lastUpdatedAt: tr.lastUpdateTime || '',
+      };
+    })
+    .then((data) => ({ code: 0, message: 'ok', data }));
 }
 
 export function mockFetchPerformanceHistory(user, params = {}) {

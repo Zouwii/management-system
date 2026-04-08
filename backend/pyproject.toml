@@ -17,4 +17,5 @@ urllib3 = ">=1.26.5,<2"
 sqlalchemy = "^2.0.0"
 # 与 requirements.txt 一致；部分镜像对 ^1.1.0 解析异常时可放宽为 >=1.0.2
 pymysql = ">=1.0.2,<2.0"
+chinese-calendar = "^1.11.0"
 

@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional, Tuple
 
 from sqlalchemy import select
 
-from db.engine import SessionLocal
+from db.engine import PerfSessionLocal
 from db.orm import NavPerfQuarterResult, ServoPerfQuarterResult, UserCharacter
 
 
@@ -94,7 +94,7 @@ def fill_member_input_service(payload: Dict[str, Any]) -> Dict[str, Any]:
         return {"success": False, "error": "missing hour_score or manager_score", "data": {}}
 
     now = datetime.now(timezone.utc)
-    session = SessionLocal()
+    session = PerfSessionLocal()
     try:
         # 根据 user_character.team_id 决定写入 nav/servo 哪张表
         c_row = session.query(UserCharacter).filter(UserCharacter.user_id == user_id).first()
@@ -170,7 +170,7 @@ def calculate_member_quarter_performance_service(payload: Dict[str, Any]) -> Dic
     if not user_id:
         return {"success": False, "error": "missing user_id", "data": {}}
 
-    session = SessionLocal()
+    session = PerfSessionLocal()
     now = datetime.now(timezone.utc)
     try:
         # 根据 user_character.team_id 决定从 nav/servo 哪张表取数

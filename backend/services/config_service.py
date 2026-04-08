@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from dingtalk_client import get_config_projectids, get_config_userids
@@ -145,10 +145,29 @@ def get_user_character_service(user_id: str) -> Dict[str, Any]:
         session.close()
 
 
-def get_time_range_service() -> Dict[str, Any]:
+def get_last_update_time_service() -> Dict[str, Any]:
     """
-    读取 config 表里的 start_time / end_time / last_update_time。
+    读取 config 表里的 last_update_time（不再提供 time_range）。
     返回值的字符串格式与数据库 value 保持一致（前端负责展示/解析）。
+    """
+    from db.engine import SessionLocal
+    from db.orm import Config as DbConfig
+
+    session = SessionLocal()
+    try:
+        row = session.query(DbConfig).filter(DbConfig.type_ == "last_update_time").first()
+        return {
+            "success": True,
+            "last_update_time": str(getattr(row, "value", "") or "") if row else "",
+        }
+    finally:
+        session.close()
+
+
+def get_default_time_range_service() -> Dict[str, Any]:
+    """
+    只读：读取 config 表里的 start_time / end_time / last_update_time，用于页面初始化默认值。
+    注意：本服务不提供写入接口；更新/同步时由前端传入 startDate/endDate 控制时间窗。
     """
     from db.engine import SessionLocal
     from db.orm import Config as DbConfig
@@ -179,31 +198,6 @@ def _upsert_config_value(session, cfg_type: str, value: str) -> None:
     session.add(DbConfig(type_=cfg_type, value=value, brief=None))
 
 
-def update_time_range_service(start_time: str, end_time: str) -> Dict[str, Any]:
-    """
-    更新 config 表里的 start_time / end_time（不触碰 last_update_time）。
-    入参建议使用 ISO 字符串（例如：2026-03-30T12:00:00.000Z / 含 +00:00）。
-    """
-    from db.engine import SessionLocal
-
-    start_time = str(start_time or "").strip()
-    end_time = str(end_time or "").strip()
-    if not start_time or not end_time:
-        return {"success": False, "error": "missing start_time or end_time", "data": {}}
-
-    session = SessionLocal()
-    try:
-        _upsert_config_value(session, "start_time", start_time)
-        _upsert_config_value(session, "end_time", end_time)
-        session.commit()
-        return get_time_range_service()
-    except Exception as e:
-        session.rollback()
-        return {"success": False, "error": str(e), "data": {}}
-    finally:
-        session.close()
-
-
 def touch_last_update_time_service() -> Dict[str, Any]:
     """
     仅更新 config 表里的 last_update_time 为当前时间。
@@ -215,7 +209,55 @@ def touch_last_update_time_service() -> Dict[str, Any]:
     try:
         _upsert_config_value(session, "last_update_time", now)
         session.commit()
-        return get_time_range_service()
+        return get_last_update_time_service()
+    except Exception as e:
+        session.rollback()
+        return {"success": False, "error": str(e), "data": {}}
+    finally:
+        session.close()
+
+
+def update_endtime_service() -> Dict[str, Any]:
+    """
+    将 config.end_time 更新为“今天所在季度的季度末(UTC) 23:59:59”。
+    """
+    from db.engine import SessionLocal
+    from db.orm import Config as DbConfig
+
+    session = SessionLocal()
+    try:
+        row = session.query(DbConfig).filter(DbConfig.type_ == "end_time").first()
+        now_utc = datetime.now(timezone.utc)
+
+        old_raw = str(getattr(row, "value", "") or "").strip() if row else ""
+        quarter_end_month = ((now_utc.month - 1) // 3 + 1) * 3
+        if quarter_end_month == 12:
+            next_month_first = datetime(now_utc.year + 1, 1, 1, tzinfo=timezone.utc)
+        else:
+            next_month_first = datetime(now_utc.year, quarter_end_month + 1, 1, tzinfo=timezone.utc)
+        quarter_end_day = (next_month_first - timedelta(days=1)).day
+        new_dt = datetime(
+            now_utc.year,
+            quarter_end_month,
+            quarter_end_day,
+            23,
+            59,
+            59,
+            tzinfo=timezone.utc,
+        )
+
+        new_value = new_dt.isoformat()
+        if row:
+            row.value = new_value
+        else:
+            session.add(DbConfig(type_="end_time", value=new_value, brief=None))
+
+        session.commit()
+        return {
+            "success": True,
+            "end_time": new_value,
+            "old_end_time": old_raw,
+        }
     except Exception as e:
         session.rollback()
         return {"success": False, "error": str(e), "data": {}}

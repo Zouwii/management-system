@@ -1,14 +1,14 @@
 {
   "userids": {
-    "伍浩贤": { "userId": "6515680920352168", "character": 0 },
-    "何鸿颉": { "userId": "250124013220811839", "character": 1 },
-    "王睿": { "userId": "010408241117947540", "character": 1 },
-    "邹宏睿": { "userId": "01195014075436361289", "character": 1 },
-    "潘铮": { "userId": "2108411066921750", "character": 3 },
-    "韩凯波": { "userId": "496044202338050428", "character": 2 },
-    "何华": { "userId": "2739002424650905", "character": 2 },
-    "郑世玉": { "userId": "265352386036276420", "character": 3 },
-    "朱庆涛": { "userId": "166232264526164934", "character": 3 }
+    "伍浩贤": { "userId": "6515680920352168", "character": 0 ,"team_id": 0 , "is_nav_lead": true, "is_servo_lead": true},
+    "何鸿颉": { "userId": "250124013220811839", "character": 1 ,"team_id": 0 , "is_nav_lead": false, "is_servo_lead": false},
+    "王睿": { "userId": "010408241117947540", "character": 1 ,"team_id": 0 , "is_nav_lead": false, "is_servo_lead": false},
+    "邹宏睿": { "userId": "01195014075436361289", "character": 1 ,"team_id": 0 , "is_nav_lead": false, "is_servo_lead": false},
+    "潘铮": { "userId": "2108411066921750", "character": 3 ,"team_id": 0 , "is_nav_lead": false, "is_servo_lead": false},
+    "韩凯波": { "userId": "496044202338050428", "character": 2 ,"team_id": 0 , "is_nav_lead": false, "is_servo_lead": false},
+    "何华": { "userId": "2739002424650905", "character": 2 ,"team_id": 0 , "is_nav_lead": false, "is_servo_lead": false},
+    "郑世玉": { "userId": "265352386036276420", "character": 3 ,"team_id": 0 , "is_nav_lead": false, "is_servo_lead": false},
+    "朱庆涛": { "userId": "166232264526164934", "character": 3 ,"team_id": 0 , "is_nav_lead": false, "is_servo_lead": false}
   },
   "projectids": {
     "本地开发部": "647854bc4a622b2e3199fa5a"
