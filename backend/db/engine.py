@@ -191,7 +191,7 @@ def init_database() -> None:
                 "start_time": start_dt.isoformat(),
                 "end_time": end_dt.isoformat(),
                 # character -> coefficient（工时折算系数映射）
-                "workhour_character_coefficients": '{"0":0.4,"1":0.7,"2":0.7,"3":1.0}',
+                "workhour_character_coefficients": '{"0":0.4,"1":0.7,"2":0.7,"3":1.0,"4":0.7}',
                 # UI 展示“上次更新时间”（固定为 1970，避免每次启动都更新时间）
                 "last_update_time": "1970-01-01T00:00:00+00:00",
                 # 自动更新配置
@@ -240,18 +240,8 @@ def init_database() -> None:
                         .first()
                     )
                     if existing_u:
-                        if existing_u.name != nm:
-                            existing_u.name = nm
-                        # 扩展字段：有值就覆盖更新
-                        try:
-                            existing_u.character = int((meta or {}).get("character", existing_u.character) or 0)
-                        except Exception:
-                            pass
-                        # team_id 在表里是 VARCHAR(64)，这里统一转字符串
-                        if (meta or {}).get("team_id") is not None:
-                            existing_u.team_id = str((meta or {}).get("team_id"))
-                        existing_u.is_nav_lead = bool((meta or {}).get("is_nav_lead", existing_u.is_nav_lead))
-                        existing_u.is_servo_lead = bool((meta or {}).get("is_servo_lead", existing_u.is_servo_lead))
+                        # 已有记录不覆盖，避免 init_db 把你手工维护的角色/组别改回去。
+                        continue
                     else:
                         init_character = int((meta or {}).get("character", 0) or 0)
                         session.add(

@@ -1,7 +1,7 @@
 import DepartmentOverview from '../pages/DepartmentOverview';
 import NavTeamDetail from '../pages/NavTeamDetail';
 import IntegrationTeamDetail from '../pages/IntegrationTeamDetail';
-import PersonalHours from '../pages/PersonalHours';
+import PersonalHoursByRole from '../pages/PersonalHoursByRole';
 import PerformancePage from '../pages/PerformancePage';
 import AIAnalysisPage from '../pages/AIAnalysisPage';
 import PermissionPage from '../pages/PermissionPage';
@@ -43,7 +43,7 @@ export const appRouteConfig = [
     menu: true,
     allowedRoles: [ROLES.EMPLOYEE, ROLES.MANAGER, ROLES.ADMIN],
     permissionCode: PAGE_PERMISSION_CODES.PERSONAL_HOURS,
-    element: <PersonalHours />,
+    element: <PersonalHoursByRole />,
   },
   {
     path: ROUTE_PATHS.PERFORMANCE,

@@ -26,7 +26,6 @@ ROLE_PERMISSION_CODES = {
         "page.ai_analysis",
     ],
     "manager": [
-        "page.department_overview",
         "page.nav_team_detail",
         "page.integration_team_detail",
         "page.personal_hours",
@@ -61,8 +60,8 @@ def _get_profile_from_db(_external_id: str, _dingtalk_user: Dict[str, Any]) -> O
 
 def _role_from_character(character: int) -> str:
     """
-    你的新规则：
-    - character == 0 -> 主管端（manager）
+    基础规则：
+    - character == 0 -> 主管端（manager，后续再结合 lead 标记细分权限）
     - character in {1,2,3} -> 员工端（employee）
     其余值默认 employee。
     """
@@ -71,6 +70,61 @@ def _role_from_character(character: int) -> str:
     except Exception:
         c = 0
     return "manager" if c == 0 else "employee"
+
+
+def _derive_role_and_access(character: int, is_nav_lead: bool, is_servo_lead: bool) -> Dict[str, Any]:
+    """
+    角色/权限细分规则：
+    1) character == 0:
+       - is_nav_lead && is_servo_lead -> admin
+       - is_servo_lead -> manager（仅对接组分栏）
+       - is_nav_lead -> manager（仅导航组分栏）
+       - 两者都不是 -> manager（保留默认 manager 权限）
+    2) character in {1,2,3} -> employee
+    3) 其它 -> employee
+    """
+    role = _role_from_character(character)
+    if role != "manager":
+        return {"role": role}
+
+    nav = bool(is_nav_lead)
+    servo = bool(is_servo_lead)
+    if nav and servo:
+        return {"role": "admin"}
+
+    if nav and not servo:
+        return {
+            "role": "manager",
+            "permissionCodes": [
+                "page.nav_team_detail",
+                "page.personal_hours",
+                "page.performance",
+                "page.ai_analysis",
+                "button.export_report",
+                "button.view_ai_suggestions",
+                "button.review_member",
+            ],
+            "homePath": "/manager/nav-team-detail",
+            "dataScope": "team",
+        }
+
+    if servo and not nav:
+        return {
+            "role": "manager",
+            "permissionCodes": [
+                "page.integration_team_detail",
+                "page.personal_hours",
+                "page.performance",
+                "page.ai_analysis",
+                "button.export_report",
+                "button.view_ai_suggestions",
+                "button.review_member",
+            ],
+            "homePath": "/manager/integration-team-detail",
+            "dataScope": "team",
+        }
+
+    return {"role": "manager"}
 
 
 def _team_name_from_team_id(team_id_value: Any) -> Optional[str]:
@@ -100,13 +154,30 @@ def _get_user_character_row(external_ids: Tuple[str, ...]):
 
     session = SessionLocal()
     try:
+        print("ZHR TEMP [auth] user_character lookup candidates={}".format(
+            [str(x or "").strip() for x in external_ids]
+        ))
         for uid in external_ids:
             uid = str(uid or "").strip()
             if not uid:
+                print("ZHR TEMP [auth] user_character skip empty candidate")
                 continue
+            print("ZHR TEMP [auth] user_character query user_id={}".format(uid))
             row = session.query(DbUserCharacter).filter(DbUserCharacter.user_id == uid).first()
             if row:
+                print(
+                    "ZHR TEMP [auth] user_character hit user_id={} name={} character={} team_id={} is_nav_lead={} is_servo_lead={}".format(
+                        getattr(row, "user_id", ""),
+                        getattr(row, "name", ""),
+                        getattr(row, "character", ""),
+                        getattr(row, "team_id", ""),
+                        getattr(row, "is_nav_lead", ""),
+                        getattr(row, "is_servo_lead", ""),
+                    )
+                )
                 return row
+            print("ZHR TEMP [auth] user_character miss user_id={}".format(uid))
+        print("ZHR TEMP [auth] user_character no match for all candidates")
         return None
     finally:
         session.close()
@@ -126,6 +197,7 @@ def _normalize_profile(base: Dict[str, Any], dingtalk_user: Dict[str, Any]) -> D
     profile = {
         "id": str(base.get("id") or (dingtalk_user.get("unionId") or dingtalk_user.get("openId") or dingtalk_user.get("userid") or "")),
         "user_id": str(base.get("user_id") or dingtalk_user.get("userid") or ""),
+        "character": int(base.get("character", 1) or 1),
         "name": name,
         "team": team,
         "teamId": str(base.get("teamId") or ""),
@@ -159,11 +231,39 @@ def resolve_user_profile(dingtalk_user: Dict[str, Any]) -> Dict[str, Any]:
 
     # 当前规则：不走 auth_mapping 白名单；改为查 user_character.character 决定角色
     c_row = _get_user_character_row((user_id, union_id, open_id))
-    character = int(getattr(c_row, "character", 1) or 1) if c_row else 1
-    role = _role_from_character(character)
+    raw_character = getattr(c_row, "character", None) if c_row else None
+    if raw_character is None or str(raw_character).strip() == "":
+        character = 1
+        character_defaulted = True
+    else:
+        character = int(raw_character)
+        character_defaulted = False
+    is_nav_lead = bool(getattr(c_row, "is_nav_lead", False)) if c_row else False
+    is_servo_lead = bool(getattr(c_row, "is_servo_lead", False)) if c_row else False
+    derived = _derive_role_and_access(character, is_nav_lead, is_servo_lead)
+    role = str(derived.get("role") or "employee")
+
+    print(
+        "ZHR TEMP [auth] decision user_id={} union_id={} open_id={} c_row_found={} raw_character={} defaulted={} final_character={} is_nav_lead={} is_servo_lead={} role={}".format(
+            user_id,
+            union_id,
+            open_id,
+            bool(c_row),
+            raw_character,
+            character_defaulted,
+            character,
+            is_nav_lead,
+            is_servo_lead,
+            role,
+        )
+    )
 
     base: Dict[str, Any] = {
         "role": role,
+        "permissionCodes": derived.get("permissionCodes"),
+        "homePath": derived.get("homePath"),
+        "dataScope": derived.get("dataScope"),
+        "character": character,
         # 如果库里有人名/组别信息，就优先用库里的；否则回退钉钉 nick / 未分组
         "name": getattr(c_row, "name", None) if c_row else None,
         "team": _team_name_from_team_id(getattr(c_row, "team_id", None)) if c_row else None,

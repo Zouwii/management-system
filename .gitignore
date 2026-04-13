@@ -34,3 +34,5 @@ __pycache__/
 # Backend secrets (do not commit)
 backend/.env
 backend/.env.*
+
+tar/

@@ -172,6 +172,6 @@ export function buildMonthlyTrend(baseTrend = [], tasks = []) {
     .sort((left, right) => Number(left.month.replace('月', '')) - Number(right.month.replace('月', '')))
     .map(({ taskCount, completedTaskCount, ...item }) => ({
       ...item,
-      completionRate: taskCount > 0 ? `${Math.round((completedTaskCount / taskCount) * 100)}%` : '0%',
+      completionRate: item.effective > 0 ? `${Math.round((item.completed / item.effective) * 100)}%` : '0%',
     }));
 }

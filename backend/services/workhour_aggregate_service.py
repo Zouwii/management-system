@@ -97,7 +97,8 @@ def executor_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, 
         except Exception:
             return None
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
+            # datetime-local（无时区）按 Asia/Shanghai 本地时间解释，再转 UTC
+            dt = dt.replace(tzinfo=SH_TZ).astimezone(timezone.utc)
         else:
             dt = dt.astimezone(timezone.utc)
         return dt
@@ -136,7 +137,7 @@ def executor_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, 
             .all()
         )
 
-        # C 表：同样按 payload 时间窗过滤（通过 A 表 due_date 关联）
+        # C 表：当前逾期快照口径（不按 payload 时间窗过滤）
         c_rows: List[Tuple[str, Optional[float], Optional[int], Optional[int]]] = (
             session.query(
                 ProjectTaskOverdueDetail.task_id,
@@ -154,9 +155,6 @@ def executor_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, 
             .filter(ProjectTaskOverdueDetail.project_id == project_id)
             .filter(ProjectTaskOverdueDetail.query_user_id == executor_id)
             .filter(ProjectTask.scenario_field_config_id == DEFAULT_SCENARIO_FIELD_CONFIG_ID)
-            .filter(ProjectTask.due_date != None)  # noqa: E711
-            .filter(ProjectTask.due_date >= start_dt)
-            .filter(ProjectTask.due_date <= end_dt)
             .all()
         )
 
@@ -291,6 +289,15 @@ def workdays_in_range_service(payload: Dict[str, Any]) -> Dict[str, Any]:
     仅使用 payload.start/end（不再回退 config）。
     """
     payload = payload or {}
+    start_raw_input = payload.get("startDate") or payload.get("start_time") or ""
+    end_raw_input = payload.get("endDate") or payload.get("end_time") or ""
+    print(
+        "ZHR TEMP [workdays] request start_raw={} end_raw={} compensatoryDays={}".format(
+            start_raw_input,
+            end_raw_input,
+            payload.get("compensatoryDays"),
+        )
+    )
     start_raw = payload.get("startDate") or payload.get("start_time") or ""
     end_raw = payload.get("endDate") or payload.get("end_time") or ""
 
@@ -305,7 +312,8 @@ def workdays_in_range_service(payload: Dict[str, Any]) -> Dict[str, Any]:
         except Exception:
             return None
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
+            # datetime-local（无时区）按 Asia/Shanghai 本地时间解释，再转 UTC
+            dt = dt.replace(tzinfo=SH_TZ).astimezone(timezone.utc)
         else:
             dt = dt.astimezone(timezone.utc)
         return dt
@@ -313,8 +321,20 @@ def workdays_in_range_service(payload: Dict[str, Any]) -> Dict[str, Any]:
     start_dt = _to_utc_dt(start_raw)
     end_dt = _to_utc_dt(end_raw)
     if not start_dt or not end_dt:
+        print(
+            "ZHR TEMP [workdays] invalid_range start_dt={} end_dt={}".format(
+                start_dt,
+                end_dt,
+            )
+        )
         return {"success": False, "error": "invalid start/end time", "data": {}}
     if start_dt > end_dt:
+        print(
+            "ZHR TEMP [workdays] invalid_order start_dt={} end_dt={}".format(
+                start_dt.isoformat(),
+                end_dt.isoformat(),
+            )
+        )
         return {"success": False, "error": "start_time must be <= end_time", "data": {}}
 
     holiday_raw = payload.get("statutoryHolidays") or []
@@ -353,6 +373,7 @@ def workdays_in_range_service(payload: Dict[str, Any]) -> Dict[str, Any]:
     workdays = 0
     weekend_days = 0
     holiday_days = 0
+    monthly_workdays: Dict[str, int] = {}
 
     while cur <= last:
         d0 = cur.date()
@@ -377,13 +398,15 @@ def workdays_in_range_service(payload: Dict[str, Any]) -> Dict[str, Any]:
             weekend_days += 1
         elif is_work:
             workdays += 1
+            month_label = f"{int(cur.month)}月"
+            monthly_workdays[month_label] = int(monthly_workdays.get(month_label, 0)) + 1
         else:
             # 非节假日且非周末但也非工作日（理论上少见），视作非工作日
             pass
         cur += timedelta(days=1)
 
     adjusted_days = max(float(workdays) - compensatory_days, 0.0)
-    return {
+    result = {
         "success": True,
         "data": {
             "start_time": start_local.isoformat(),
@@ -397,5 +420,25 @@ def workdays_in_range_service(payload: Dict[str, Any]) -> Dict[str, Any]:
             "hours_per_day": HOURS_PER_DAY,
             "timezone": "Asia/Shanghai",
             "calendar_source": "chinese_calendar",
+            "month_workdays": [
+                {"month": month, "day": day}
+                for month, day in sorted(monthly_workdays.items(), key=lambda x: int(str(x[0]).replace("月", "")))
+            ],
+            "month_day": dict(monthly_workdays),
         },
     }
+    print(
+        "ZHR TEMP [workdays] result utc_start={} utc_end={} sh_start={} sh_end={} workday_count={} effective_workday_count={} holiday_count={} weekend_count={} compensatory_days={} calendar_source={}".format(
+            start_dt.isoformat(),
+            end_dt.isoformat(),
+            start_local.isoformat(),
+            end_local.isoformat(),
+            result["data"]["workday_count"],
+            result["data"]["effective_workday_count"],
+            result["data"]["holiday_count"],
+            result["data"]["weekend_count"],
+            result["data"]["compensatory_days"],
+            result["data"]["calendar_source"],
+        )
+    )
+    return result

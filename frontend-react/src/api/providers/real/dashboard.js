@@ -3,6 +3,7 @@ import { httpRequest } from '../../client';
 let _cachedProjectId = '';
 let _cachedUserids = null;
 let _configWarmupPromise = null;
+const _teamMemberOptionsCache = new Map();
 
 function appendQuery(path, params = {}) {
   const searchParams = new URLSearchParams();
@@ -36,9 +37,13 @@ async function fetchProjectId() {
 
 async function fetchUserids() {
   if (Array.isArray(_cachedUserids)) return _cachedUserids;
-  const res = await httpRequest('/bt/config/userids');
-  const users = (res?.data || {}).users || [];
-  _cachedUserids = users.map((u) => ({ name: String(u.name), userId: String(u.userId) }));
+  const res = await httpRequest('/dashboard/personal-hours/members');
+  const users = (res?.data || {}).memberOptions || [];
+  _cachedUserids = users.map((u) => ({
+    id: String(u.id || ''),
+    name: String(u.name || ''),
+    userId: String(u.userId || u.id || ''),
+  }));
   return _cachedUserids;
 }
 
@@ -52,16 +57,41 @@ async function fetchLastUpdateTime() {
 
 function resolveExecutorIdsByTarget(user, target, userids) {
   const nameToUserId = new Map(userids.map((u) => [u.name, u.userId]));
+  const idToUserId = new Map(userids.map((u) => [u.id, u.userId]));
   const isAll = target === 'ALL';
-  const resolvedNames = isAll ? userids.map((u) => u.name) : [target];
-  const executorIds = resolvedNames
-    .filter((nm) => nameToUserId.has(nm))
-    .map((nm) => nameToUserId.get(nm));
+  const normalizedTarget = String(target || '').trim();
+  let executorIds = [];
 
-  if (!executorIds.length && user?.name && nameToUserId.has(user.name)) {
+  if (isAll) {
+    executorIds = userids
+      .map((u) => String(u.userId || '').trim())
+      .filter((uid) => uid && uid !== 'ALL');
+  } else if (normalizedTarget) {
+    // 当前页面下拉 value 就是 user_id，优先按 user_id 直通；
+    // 再兼容历史 name/id 映射，避免旧数据口径下查不到人。
+    executorIds = [normalizedTarget];
+    if (idToUserId.has(normalizedTarget)) {
+      executorIds = [String(idToUserId.get(normalizedTarget) || '').trim()];
+    } else if (nameToUserId.has(normalizedTarget)) {
+      executorIds = [String(nameToUserId.get(normalizedTarget) || '').trim()];
+    }
+    executorIds = executorIds.filter((uid) => uid && uid !== 'ALL');
+  }
+
+  if (!executorIds.length && user?.user_id) {
+    executorIds.push(String(user.user_id));
+  } else if (!executorIds.length && user?.name && nameToUserId.has(user.name)) {
     executorIds.push(nameToUserId.get(user.name));
   }
   return Array.from(new Set(executorIds));
+}
+
+function resolveTargetLabelByUserids(target, userids) {
+  const t = String(target || '').trim();
+  if (!t || t === 'ALL') return '全部人员';
+  const hit = userids.find((u) => String(u.id || '').trim() === t || String(u.userId || '').trim() === t);
+  if (hit && String(hit.name || '').trim()) return String(hit.name).trim();
+  return t;
 }
 
 async function warmupConfigCache() {
@@ -114,12 +144,55 @@ export function realFetchDepartmentOverview() {
   return httpRequest('/dashboard/department-overview');
 }
 
-export function realFetchNavTeamDetail() {
-  return httpRequest('/dashboard/nav-team-detail');
+async function fetchTeamMemberOptions(teamId) {
+  const tid = String(teamId);
+  if (_teamMemberOptionsCache.has(tid)) {
+    return _teamMemberOptionsCache.get(tid);
+  }
+  const res = await httpRequest('/dashboard/personal-hours/members');
+  const all = (res?.data || {}).memberOptions || [];
+  const options = all
+    .filter((item) => String(item?.teamId || '') === tid)
+    .map((item) => ({
+      id: String(item?.id || ''),
+      name: String(item?.name || ''),
+      team: String(item?.team || ''),
+      teamId: String(item?.teamId || ''),
+    }));
+  _teamMemberOptionsCache.set(tid, options);
+  return options;
 }
 
-export function realFetchIntegrationTeamDetail() {
-  return httpRequest('/dashboard/integration-team-detail');
+export function realFetchNavTeamDetail(_user, params = {}) {
+  const expected = params?.expected || 'quarter';
+  return Promise.all([
+    httpRequest(appendQuery('/dashboard/nav-team-detail', { expected })),
+    fetchTeamMemberOptions(0),
+    fetchLastUpdateTime(),
+  ]).then(([base, memberOptions, tr]) => ({
+    ...(base || {}),
+    data: {
+      ...(base?.data || {}),
+      memberOptions,
+      lastUpdatedAt: tr?.lastUpdateTime || '',
+    },
+  }));
+}
+
+export function realFetchIntegrationTeamDetail(_user, params = {}) {
+  const expected = params?.expected || 'quarter';
+  return Promise.all([
+    httpRequest(appendQuery('/dashboard/integration-team-detail', { expected })),
+    fetchTeamMemberOptions(1),
+    fetchLastUpdateTime(),
+  ]).then(([base, memberOptions, tr]) => ({
+    ...(base || {}),
+    data: {
+      ...(base?.data || {}),
+      memberOptions,
+      lastUpdatedAt: tr?.lastUpdateTime || '',
+    },
+  }));
 }
 
 export function realFetchPersonalHours(_user, params = {}) {
@@ -146,13 +219,23 @@ export function realFetchPersonalHours(_user, params = {}) {
     });
 }
 
+export function realFetchPersonalHoursMembers() {
+  return httpRequest('/dashboard/personal-hours/members');
+}
+
+export function realFetchPersonalHoursBase(_user, params = {}) {
+  return httpRequest(appendQuery('/dashboard/personal-hours', {
+    target: params.target,
+  }));
+}
+
 export function realQueryPersonalHours(_user, payload) {
   const user = _user || {};
   const startDate = payload?.startDate || '';
   const endDate = payload?.endDate || '';
   const startTime = toUtcISOString(startDate);
   const endTime = toUtcISOString(endDate);
-  const target = payload?.target || user?.name || 'ALL';
+  const target = payload?.target || user?.user_id || user?.name || 'ALL';
   const targetLabel = target === 'ALL' ? '全部人员' : target;
 
   return Promise.resolve()
@@ -166,6 +249,8 @@ export function realQueryPersonalHours(_user, payload) {
       const projectId = await fetchProjectId();
       const userids = await fetchUserids();
       const executorIds = resolveExecutorIdsByTarget(user, target, userids);
+      const memberOptions = Array.isArray(base?.data?.memberOptions) ? base.data.memberOptions : [];
+      const resolvedTargetLabel = resolveTargetLabelByUserids(target, memberOptions);
 
       let quarterWorkHour = 0;
       let quarterOverdueHour = 0;
@@ -238,8 +323,10 @@ export function realQueryPersonalHours(_user, payload) {
 
       const dashboard = { ...(base?.data?.dashboard || {}) };
       const taskDetails = Array.from(mergedTaskMap.values()).sort((a, b) => b.hours - a.hours);
-      const completedHours = taskDetails
-        .filter((x) => x.status === '已完成')
+      // “已完成”口径：按 task_flow_status_id==4 映射到的 status=已完成 汇总。
+      // 并且区分当前季度排期与季度逾期排期，避免口径混淆/重复统计。
+      const plannedCompletedHours = taskDetails
+        .filter((x) => x.quarterCategory === '当前季度排期' && x.status === '已完成')
         .reduce((sum, x) => sum + Number(x.hours || 0), 0);
       const overdueCompletedHours = taskDetails
         .filter((x) => x.quarterCategory === '季度逾期排期' && x.status === '已完成')
@@ -260,12 +347,12 @@ export function realQueryPersonalHours(_user, payload) {
       }));
 
       dashboard.scheduledEffectiveHours = quarterWorkHour;
-      dashboard.completedEffectiveHours = completedHours;
-      dashboard.quarterlyPlannedCompletedHours = completedHours;
+      dashboard.completedEffectiveHours = plannedCompletedHours;
+      dashboard.quarterlyPlannedCompletedHours = plannedCompletedHours;
       dashboard.quarterlyPlannedEffectiveHours = quarterWorkHour;
       dashboard.quarterlyOverdueEffectiveHours = quarterOverdueHour;
       dashboard.quarterlyOverdueCompletedHours = overdueCompletedHours;
-      dashboard.targetLabel = targetLabel;
+      dashboard.targetLabel = resolvedTargetLabel;
       dashboard.taskDetails = taskDetails;
       dashboard.taskDistribution = taskDistribution;
 
@@ -288,7 +375,7 @@ export function realUpdatePersonalHours(_user, payload) {
   const endDate = payload?.endDate || '';
   const startTime = toUtcISOString(startDate);
   const endTime = toUtcISOString(endDate);
-  const target = payload?.target || user?.name || 'ALL';
+  const target = payload?.target || user?.user_id || user?.name || 'ALL';
   const targetLabel = target === 'ALL' ? '全部人员' : target;
 
   return Promise.resolve()
@@ -296,6 +383,7 @@ export function realUpdatePersonalHours(_user, payload) {
       const projectId = await fetchProjectId();
       const userids = await fetchUserids();
       const executorIds = resolveExecutorIdsByTarget(user, target, userids);
+      const resolvedTargetLabel = resolveTargetLabelByUserids(target, userids) || targetLabel;
       for (const executorId of executorIds) {
         await httpRequest('/bt/query_project_tasks', {
           method: 'POST',
@@ -316,7 +404,7 @@ export function realUpdatePersonalHours(_user, payload) {
         error: '',
         data: {
           fullSync: false,
-          message: `已触发${targetLabel}的工时更新。`,
+          message: `已触发${resolvedTargetLabel}的工时更新。`,
           lastUpdatedAt: tr.lastUpdateTime || '',
         },
       };
@@ -327,7 +415,7 @@ export function realFullUpdatePersonalHours(_user, payload) {
   const user = _user || {};
   const startDate = payload?.startDate || '';
   const endDate = payload?.endDate || '';
-  const target = payload?.target || user?.name || 'ALL';
+  const target = payload?.target || user?.user_id || user?.name || 'ALL';
   const targetLabel = target === 'ALL' ? '全部人员' : target;
 
   return Promise.resolve()
@@ -335,6 +423,7 @@ export function realFullUpdatePersonalHours(_user, payload) {
       const projectId = await fetchProjectId();
       const userids = await fetchUserids();
       const executorIds = resolveExecutorIdsByTarget(user, target, userids);
+      const resolvedTargetLabel = resolveTargetLabelByUserids(target, userids) || targetLabel;
       for (const executorId of executorIds) {
         await httpRequest('/bt/full_update', {
           method: 'POST',
@@ -354,7 +443,7 @@ export function realFullUpdatePersonalHours(_user, payload) {
         error: '',
         data: {
           fullSync: true,
-          message: `已触发${targetLabel}的全量更新。`,
+          message: `已触发${resolvedTargetLabel}的全量更新。`,
           lastUpdatedAt: tr.lastUpdateTime || '',
         },
       };

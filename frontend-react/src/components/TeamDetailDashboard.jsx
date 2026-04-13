@@ -4,13 +4,14 @@ import Card from './Card';
 import SectionTitle from './SectionTitle';
 import ManagerLayout from '../layouts/ManagerLayout';
 import { ROUTE_PATHS } from '../constants/routes';
+import { ROLES } from '../constants/roles';
 import { useAuthStore } from '../store/authStore';
-import { performanceArchives, personalHoursDashboard } from '../mock/platformData';
-import { getCurrentLocalDateTime } from '../utils/managerDashboard';
-import { calculateExpectedEffectiveDays, formatDateTime, formatDays } from '../utils/workHours';
+import { formatDateTime } from '../utils/workHours';
 
-const BASE_REFERENCE_HOURS = 156;
-const CURRENT_PROGRESS_RATIO = 0.72;
+function formatRawDays(value) {
+  const n = Number(value || 0);
+  return Number.isFinite(n) ? n.toFixed(1) : '0.0';
+}
 
 function getRiskLevel(actual, expected) {
   const ratio = expected > 0 ? actual / expected : 1;
@@ -89,28 +90,22 @@ function getPerformanceBand(score) {
   return '不及格';
 }
 
-function getArchiveByIndex(row, index) {
-  const templates = Object.values(performanceArchives);
-  return performanceArchives[row.name] ?? templates[index % templates.length];
-}
-
-function buildHoursRows(rows) {
-  const baseQuarterExpectedHours = calculateExpectedEffectiveDays(
-    personalHoursDashboard.defaultRange.startDate,
-    personalHoursDashboard.defaultRange.endDate,
-    personalHoursDashboard.statutoryHolidays,
-    personalHoursDashboard.compensatoryDays,
-  ).hours;
-  const baseCurrentExpectedHours = baseQuarterExpectedHours * CURRENT_PROGRESS_RATIO;
-
+function normalizeHoursRows(rows) {
   return rows.map((row) => {
-    const scale = Number(row.hours || 0) / BASE_REFERENCE_HOURS || 1;
-    const quarterExpectedHours = baseQuarterExpectedHours * scale;
-    const currentExpectedHours = baseCurrentExpectedHours * scale;
-    const scheduledHours = Number(personalHoursDashboard.scheduledEffectiveHours || 0) * scale;
-    const completedHours = Number(personalHoursDashboard.completedEffectiveHours || 0) * scale;
-    const overdueEffectiveHours = Number(personalHoursDashboard.quarterlyOverdueEffectiveHours || 0) * scale;
-    const overdueCompletedHours = Number(personalHoursDashboard.quarterlyOverdueCompletedHours || 0) * scale;
+    const quarterExpectedHours = Number(row.quarterExpectedHours || 0);
+    const currentExpectedHours = Number(row.currentExpectedHours || row.quarterExpectedHours || 0);
+    const scheduledHours = Number(row.scheduledHours || 0);
+    const completedHours = Number(row.completedHours || 0);
+    const overdueEffectiveHours = Number(row.overdueEffectiveHours || 0);
+    const overdueCompletedHours = Number(row.overdueCompletedHours || 0);
+    const allocationActualHours = scheduledHours;
+    const completionActualHours = completedHours;
+    const allocationDelta = Number.isFinite(Number(row.allocationDelta))
+      ? Number(row.allocationDelta)
+      : (scheduledHours - quarterExpectedHours);
+    const completionDelta = Number.isFinite(Number(row.completionDelta))
+      ? Number(row.completionDelta)
+      : (completedHours - quarterExpectedHours);
     return {
       ...row,
       quarterExpectedHours,
@@ -119,47 +114,38 @@ function buildHoursRows(rows) {
       completedHours,
       overdueEffectiveHours,
       overdueCompletedHours,
-    };
-  });
-}
-
-function buildDisplayedHoursRows(rows, expectedView) {
-  return rows.map((row) => {
-    const expectedHours = expectedView === 'current' ? row.currentExpectedHours : row.quarterExpectedHours;
-    const allocationActualHours = row.scheduledHours + row.overdueEffectiveHours;
-    const completionActualHours = row.completedHours + row.overdueCompletedHours;
-    const allocationDelta = allocationActualHours - expectedHours;
-    const completionDelta = completionActualHours - expectedHours;
-
-    return {
-      ...row,
-      selectedExpectedHours: expectedHours,
       allocationActualHours,
       completionActualHours,
       allocationDelta,
       completionDelta,
       allocationInsufficient: allocationDelta < 0,
       completionInsufficient: completionDelta < 0,
-      allocationRiskLevel: getRiskLevel(allocationActualHours, expectedHours),
-      completionRiskLevel: getRiskLevel(completionActualHours, expectedHours),
+      allocationRiskLevel: getRiskLevel(allocationActualHours, quarterExpectedHours),
+      completionRiskLevel: getRiskLevel(completionActualHours, quarterExpectedHours),
     };
   });
 }
 
 function buildPerformanceRows(rows, quarter) {
-  return rows.map((row, index) => {
-    const archive = getArchiveByIndex(row, index);
-    const record = archive.history.find((item) => item.quarter === quarter) ?? archive.history[archive.history.length - 1];
-
+  return rows.map((row) => {
+    const finalScore = Number(row.finalScore);
+    const carryScore = Number(row.carryScore);
+    const score = Number.isFinite(finalScore) ? finalScore : 0;
     return {
       ...row,
-      quarter: record.quarter,
-      finalScore: record.finalScore,
-      carryScore: record.carryScore ?? 0,
-      band: getPerformanceBand(record.finalScore),
-      performanceRisk: record.finalScore < 1.0,
+      quarter: row.quarter || quarter,
+      finalScore: score,
+      carryScore: Number.isFinite(carryScore) ? carryScore : 0,
+      band: Number.isFinite(finalScore) ? getPerformanceBand(score) : '-',
+      performanceRisk: Number.isFinite(finalScore) ? score < 1.0 : false,
     };
   });
+}
+
+function getCurrentQuarterLabel() {
+  const now = new Date();
+  const q = Math.floor(now.getMonth() / 3) + 1;
+  return `${now.getFullYear()}Q${q}`;
 }
 
 export default function TeamDetailDashboard({
@@ -170,8 +156,12 @@ export default function TeamDetailDashboard({
   fallbackRows,
 }) {
   const user = useAuthStore((state) => state.user);
+  const isAdmin = user?.role === ROLES.ADMIN;
   const [searchParams] = useSearchParams();
-  const initialExpectedView = searchParams.get('expected') === 'current' ? 'current' : 'quarter';
+  const initialExpectedParam = searchParams.get('expected');
+  const initialExpectedView = ['quarter', 'current', 'last_quarter'].includes(initialExpectedParam)
+    ? initialExpectedParam
+    : 'quarter';
   const initialHoursAbnormal = ({
     abnormal: '只看异常成员',
     allocation: '只看分配不足',
@@ -183,7 +173,8 @@ export default function TeamDetailDashboard({
     high: '1.2及以上',
   })[searchParams.get('performanceScore') || ''] ?? '全部绩效';
   const [rows, setRows] = useState(fallbackRows);
-  const [lastUpdatedAt, setLastUpdatedAt] = useState(getCurrentLocalDateTime());
+  const [memberOptions, setMemberOptions] = useState(['全部', ...fallbackRows.map((row) => row.name)]);
+  const [lastUpdatedAt, setLastUpdatedAt] = useState('');
   const [hoursMemberFilter, setHoursMemberFilter] = useState('全部');
   const [hoursAbnormalFilter, setHoursAbnormalFilter] = useState(initialHoursAbnormal);
   const [allocationSort, setAllocationSort] = useState('none');
@@ -192,9 +183,9 @@ export default function TeamDetailDashboard({
   const [performanceMemberFilter, setPerformanceMemberFilter] = useState('全部');
   const [performanceScoreFilter, setPerformanceScoreFilter] = useState(initialPerformanceScore);
   const performanceQuarters = useMemo(() => {
-    const template = Object.values(performanceArchives)[0];
-    return template?.history?.map((item) => item.quarter) ?? [];
-  }, []);
+    const fromRows = Array.from(new Set(rows.map((row) => String(row.quarter || '').trim()).filter(Boolean)));
+    return fromRows.length ? fromRows : [getCurrentQuarterLabel()];
+  }, [rows]);
   const latestQuarter = performanceQuarters[performanceQuarters.length - 1] ?? '';
   const [selectedQuarter, setSelectedQuarter] = useState(latestQuarter);
   const [appliedQuarter, setAppliedQuarter] = useState(latestQuarter);
@@ -202,19 +193,28 @@ export default function TeamDetailDashboard({
   useEffect(() => {
     let active = true;
 
-    fetcher(user).then((response) => {
+    fetcher(user, { expected: expectedView }).then((response) => {
       if (!active) {
         return;
       }
 
-      setRows(response.data.rows ?? fallbackRows);
-      setLastUpdatedAt(getCurrentLocalDateTime());
+      const nextRows = response.data.rows ?? fallbackRows;
+      setRows(nextRows);
+      const fromMembers = Array.isArray(response?.data?.memberOptions)
+        ? response.data.memberOptions.map((m) => String(m?.name || '').trim()).filter(Boolean)
+        : [];
+      if (fromMembers.length) {
+        setMemberOptions(['全部', ...fromMembers]);
+      } else {
+        setMemberOptions(['全部', ...nextRows.map((row) => row.name)]);
+      }
+      setLastUpdatedAt(String(response?.data?.lastUpdatedAt || ''));
     });
 
     return () => {
       active = false;
     };
-  }, [fallbackRows, fetcher, user]);
+  }, [expectedView, fallbackRows, fetcher, user]);
 
   useEffect(() => {
     setSelectedQuarter(latestQuarter);
@@ -239,9 +239,27 @@ export default function TeamDetailDashboard({
     setPerformanceScoreFilter(nextPerformanceScore);
   }, [searchParams]);
 
-  const memberOptions = useMemo(() => ['全部', ...rows.map((row) => row.name)], [rows]);
+  useEffect(() => {
+    if (memberOptions.includes(hoursMemberFilter)) return;
+    setHoursMemberFilter('全部');
+  }, [hoursMemberFilter, memberOptions]);
 
-  const allHourRows = useMemo(() => buildDisplayedHoursRows(buildHoursRows(rows), expectedView), [expectedView, rows]);
+  useEffect(() => {
+    if (memberOptions.includes(performanceMemberFilter)) return;
+    setPerformanceMemberFilter('全部');
+  }, [memberOptions, performanceMemberFilter]);
+
+  const allHourRows = useMemo(() => {
+    const normalized = normalizeHoursRows(rows);
+    return normalized.map((row) => ({
+      ...row,
+      selectedExpectedHours: row.quarterExpectedHours,
+      allocationInsufficient: row.allocationDelta < 0,
+      completionInsufficient: row.completionDelta < 0,
+      allocationRiskLevel: getRiskLevel(row.scheduledHours, row.quarterExpectedHours),
+      completionRiskLevel: getRiskLevel(row.completedHours, row.quarterExpectedHours),
+    }));
+  }, [rows]);
   const visibleHourRows = useMemo(() => {
     const filteredRows = allHourRows.filter((row) => {
       if (hoursMemberFilter !== '全部' && row.name !== hoursMemberFilter) {
@@ -317,11 +335,14 @@ export default function TeamDetailDashboard({
   }), [visibleHourRows]);
   const teamHoursStats = useMemo(() => ({
     memberCount: visibleHourRows.length,
-    totalHours: visibleHourRows.reduce((sum, row) => sum + Number(row.hours || 0), 0),
     allocationRiskCount: visibleHourRows.filter((row) => row.allocationDelta < 0).length,
     completionRiskCount: visibleHourRows.filter((row) => row.completionDelta < 0).length,
     highRiskCount: visibleHourRows.filter((row) => row.allocationRiskLevel === '高风险' || row.completionRiskLevel === '高风险').length,
   }), [visibleHourRows]);
+  const currentIntervalWorkdayCount = useMemo(() => {
+    const first = rows.find((r) => Number.isFinite(Number(r?.workdayCount)));
+    return Number(first?.workdayCount || 0);
+  }, [rows]);
   const avgFinalPerformance = visiblePerformanceRows.length
     ? (visiblePerformanceRows.reduce((sum, row) => sum + row.finalScore, 0) / visiblePerformanceRows.length).toFixed(2)
     : '0.00';
@@ -373,6 +394,13 @@ export default function TeamDetailDashboard({
         summaryValue: teamHoursSummary.selectedExpectedHours,
         rowValue: 'selectedExpectedHours',
       }
+    : expectedView === 'last_quarter'
+      ? {
+          label: '上季度预期有效工时',
+          description: '当前筛选成员上一季度的预期总有效工时',
+          summaryValue: teamHoursSummary.selectedExpectedHours,
+          rowValue: 'selectedExpectedHours',
+        }
     : {
         label: '本季度预期有效工时',
         description: '当前筛选成员本季度的预期总有效工时',
@@ -393,32 +421,32 @@ export default function TeamDetailDashboard({
         )}
       />
 
-      <Card className="p-6">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          <div>
-            <div className="text-lg font-semibold">筛选条件</div>
-            <div className="mt-1 text-sm text-slate-500">先筛成员，再分别查看团队工时情况和绩效情况。</div>
+      {isAdmin ? (
+        <Card className="p-6">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+            <div>
+              <div className="text-lg font-semibold">筛选条件</div>
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
+              {quickLinks.map((item) => (
+                <Link
+                  key={item.label}
+                  to={item.to}
+                  className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
+                    item.active ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </div>
           </div>
-          <div className="flex flex-wrap justify-end gap-2">
-            {quickLinks.map((item) => (
-              <Link
-                key={item.label}
-                to={item.to}
-                className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                  item.active ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                }`}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </div>
-        </div>
-      </Card>
+        </Card>
+      ) : null}
 
       <Card className="overflow-hidden">
         <div className="border-b border-slate-200 bg-slate-50 px-5 py-5">
           <div className="text-lg font-semibold">工时情况</div>
-          <div className="mt-1 text-sm text-slate-500">聚合展示成员工时情况，并直接标记工时分配不足和完成情况不足的成员。</div>
         </div>
         <div className="border-b border-slate-200 bg-white px-5 py-4">
           <div className="grid gap-3">
@@ -437,8 +465,9 @@ export default function TeamDetailDashboard({
                 onChange={(event) => setExpectedView(event.target.value)}
                 className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none"
               >
-                <option value="quarter">本季度预期有效工时</option>
-                <option value="current">本季度至今天预期有效工时</option>
+                <option value="quarter">本季度</option>
+                <option value="current">本季度至今天</option>
+                <option value="last_quarter">上季度</option>
               </select>
               <div className="flex items-center justify-end text-sm text-slate-500">
                 当前成员
@@ -448,7 +477,7 @@ export default function TeamDetailDashboard({
                 人
               </div>
             </div>
-            <div className="grid gap-3 xl:grid-cols-[220px_180px_180px]">
+            <div className="grid gap-3 xl:grid-cols-[220px_180px_180px_auto]">
               <select
                 value={hoursAbnormalFilter}
                 onChange={(event) => setHoursAbnormalFilter(event.target.value)}
@@ -487,6 +516,9 @@ export default function TeamDetailDashboard({
                 <option value="asc">完成差值升序</option>
                 <option value="desc">完成差值降序</option>
               </select>
+              <div className="inline-flex w-fit items-center justify-self-end rounded-2xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-500">
+                当前区间共 <span className="mx-1 font-medium text-slate-700">{formatRawDays(currentIntervalWorkdayCount)}</span> 个工作日
+              </div>
             </div>
           </div>
         </div>
@@ -494,35 +526,27 @@ export default function TeamDetailDashboard({
           <Card className="p-5">
             <div className="text-sm text-slate-500">当前成员数</div>
             <div className="mt-2 text-3xl font-semibold text-slate-900">{teamHoursStats.memberCount}</div>
-            <div className="mt-2 text-sm text-slate-500">团队当前筛选范围内的成员数量</div>
           </Card>
           <Card className="p-5">
             <div className="text-sm text-slate-500">{expectedConfig.label}</div>
-            <div className="mt-2 text-3xl font-semibold text-slate-900">{formatDays(expectedConfig.summaryValue)}天</div>
-            <div className="mt-2 text-sm text-slate-500">{expectedConfig.description}</div>
+            <div className="mt-2 text-3xl font-semibold text-slate-900">{formatRawDays(expectedConfig.summaryValue)}天</div>
           </Card>
           <Card className="p-5">
             <div className="text-sm text-slate-500">任务分配差值</div>
             <div className={`mt-2 text-3xl font-semibold ${teamHoursSummary.allocationDelta >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
               {teamHoursSummary.allocationDelta > 0 ? '+' : ''}
-              {formatDays(teamHoursSummary.allocationDelta)}天
+              {formatRawDays(teamHoursSummary.allocationDelta)}天
             </div>
-            <div className="mt-2 text-sm text-slate-500">当前已排总有效工时与季度逾期总有效工时合计减去{expectedConfig.label}，正值表示分配充足。</div>
           </Card>
           <Card className="p-5">
             <div className="text-sm text-slate-500">任务完成差值</div>
             <div className={`mt-2 text-3xl font-semibold ${teamHoursSummary.completionDelta >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
               {teamHoursSummary.completionDelta > 0 ? '+' : ''}
-              {formatDays(teamHoursSummary.completionDelta)}天
+              {formatRawDays(teamHoursSummary.completionDelta)}天
             </div>
-            <div className="mt-2 text-sm text-slate-500">当前已完成有效工时与季度逾期完成工时合计减去{expectedConfig.label}，正值表示完成充足。</div>
           </Card>
         </div>
-        <div className="grid gap-4 border-b border-slate-200 bg-white px-5 py-4 md:grid-cols-4">
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <div className="text-xs text-slate-500">团队总工时</div>
-            <div className="mt-2 text-lg font-semibold text-slate-900">{formatDays(teamHoursStats.totalHours)}天</div>
-          </div>
+        <div className="grid gap-4 border-b border-slate-200 bg-white px-5 py-4 md:grid-cols-3">
           <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3">
             <div className="text-xs text-rose-700">分配不足人数</div>
             <div className="mt-2 text-lg font-semibold text-rose-700">{teamHoursStats.allocationRiskCount}</div>
@@ -556,20 +580,20 @@ export default function TeamDetailDashboard({
                 <tr key={`${row.name}-${index}`} className={`${getRiskRowClass(row.allocationRiskLevel === '高风险' ? '高风险' : row.completionRiskLevel)} ${index !== visibleHourRows.length - 1 ? 'border-b border-slate-100' : ''}`}>
                   <td className="px-5 py-4 font-medium text-slate-900">{row.name}</td>
                   <td className="px-5 py-4 text-slate-600">{row.role}</td>
-                  <td className="px-5 py-4 text-slate-600">{formatDays(row[expectedConfig.rowValue])}天</td>
-                  <td className="px-5 py-4 text-slate-600">{formatDays(row.scheduledHours)}天</td>
-                  <td className="px-5 py-4 text-slate-600">{formatDays(row.completedHours)}天</td>
-                  <td className="px-5 py-4 text-slate-600">{formatDays(row.overdueEffectiveHours)}天</td>
-                  <td className="px-5 py-4 text-slate-600">{formatDays(row.overdueCompletedHours)}天</td>
+                  <td className="px-5 py-4 text-slate-600">{formatRawDays(row[expectedConfig.rowValue])}天</td>
+                  <td className="px-5 py-4 text-slate-600">{formatRawDays(row.scheduledHours)}天</td>
+                  <td className="px-5 py-4 text-slate-600">{formatRawDays(row.completedHours)}天</td>
+                  <td className="px-5 py-4 text-slate-600">{formatRawDays(row.overdueEffectiveHours)}天</td>
+                  <td className="px-5 py-4 text-slate-600">{formatRawDays(row.overdueCompletedHours)}天</td>
                   <td className="px-5 py-4">
                     <div className={`flex items-center gap-2 font-medium ${row.allocationInsufficient ? 'text-rose-700' : 'text-emerald-700'}`}>
-                      <span>{row.allocationDelta > 0 ? '+' : ''}{formatDays(row.allocationDelta)}天</span>
+                      <span>{row.allocationDelta > 0 ? '+' : ''}{formatRawDays(row.allocationDelta)}天</span>
                       <span className={`rounded-full px-2 py-1 text-xs ${getRiskTagClass(row.allocationRiskLevel)}`}>{row.allocationRiskLevel}</span>
                     </div>
                   </td>
                   <td className="px-5 py-4">
                     <div className={`flex items-center gap-2 font-medium ${row.completionInsufficient ? 'text-rose-700' : 'text-emerald-700'}`}>
-                      <span>{row.completionDelta > 0 ? '+' : ''}{formatDays(row.completionDelta)}天</span>
+                      <span>{row.completionDelta > 0 ? '+' : ''}{formatRawDays(row.completionDelta)}天</span>
                       <span className={`rounded-full px-2 py-1 text-xs ${getRiskTagClass(row.completionRiskLevel)}`}>{row.completionRiskLevel}</span>
                     </div>
                   </td>

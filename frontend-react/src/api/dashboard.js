@@ -8,6 +8,8 @@ import {
   mockFetchPerformanceHistory,
   mockFetchPermissionMatrix,
   mockFetchPersonalHours,
+  mockFetchPersonalHoursMembers,
+  mockFetchPersonalHoursBase,
   mockQueryPersonalHours,
   mockUpdatePersonalHours,
   mockUpdatePersonalHours as mockFullUpdatePersonalHours,
@@ -21,6 +23,8 @@ import {
   realFetchPerformanceHistory,
   realFetchPermissionMatrix,
   realFetchPersonalHours,
+  realFetchPersonalHoursMembers,
+  realFetchPersonalHoursBase,
   realQueryPersonalHours,
   realUpdatePersonalHours,
   realFullUpdatePersonalHours,
@@ -30,6 +34,8 @@ export const fetchDepartmentOverview = createApiSwitch(mockFetchDepartmentOvervi
 export const fetchNavTeamDetail = createApiSwitch(mockFetchNavTeamDetail, realFetchNavTeamDetail);
 export const fetchIntegrationTeamDetail = createApiSwitch(mockFetchIntegrationTeamDetail, realFetchIntegrationTeamDetail);
 export const fetchPersonalHours = createApiSwitch(mockFetchPersonalHours, realFetchPersonalHours);
+export const fetchPersonalHoursMembers = createApiSwitch(mockFetchPersonalHoursMembers, realFetchPersonalHoursMembers);
+export const fetchPersonalHoursBase = createApiSwitch(mockFetchPersonalHoursBase, realFetchPersonalHoursBase);
 export const queryPersonalHours = createApiSwitch(mockQueryPersonalHours, realQueryPersonalHours);
 export const updatePersonalHours = createApiSwitch(mockUpdatePersonalHours, realUpdatePersonalHours);
 export const fullUpdatePersonalHours = createApiSwitch(mockFullUpdatePersonalHours, realFullUpdatePersonalHours);

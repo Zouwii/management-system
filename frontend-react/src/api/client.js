@@ -1,4 +1,5 @@
 import { API_BASE_URL, API_MODE, API_MODES } from '../constants/api';
+import { useSessionExpiredStore } from '../store/sessionExpiredStore';
 
 const DEFAULT_HEADERS = {
   'Content-Type': 'application/json',
@@ -13,17 +14,33 @@ function buildUrl(path) {
 }
 
 export async function httpRequest(path, options = {}) {
+  const { skipSessionExpired = false, ...fetchOptions } = options;
   const response = await fetch(buildUrl(path), {
     credentials: 'include',
     headers: DEFAULT_HEADERS,
-    ...options,
+    ...fetchOptions,
   });
 
-  if (!response.ok) {
-    throw new Error(`请求失败: ${response.status}`);
+  const text = await response.text();
+  let data = {};
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { raw: text };
+    }
   }
 
-  return response.json();
+  if (response.status === 401 && !skipSessionExpired) {
+    useSessionExpiredStore.getState().show();
+    throw new Error(data?.error || 'unauthenticated');
+  }
+
+  if (!response.ok) {
+    throw new Error(data?.error || `请求失败: ${response.status}`);
+  }
+
+  return data;
 }
 
 export function createApiSwitch(mockHandler, realHandler) {

@@ -376,6 +376,32 @@ export function mockFetchPersonalHours(user, params = {}) {
     .then((data) => ({ code: 0, message: 'ok', data }));
 }
 
+export function mockFetchPersonalHoursMembers(user) {
+  const memberOptions = buildMemberOptions(user);
+  const selectedTarget = user?.role === ROLES.MANAGER || user?.role === ROLES.ADMIN ? ALL_TARGET : (user?.name || ALL_TARGET);
+  return Promise.resolve().then(() => ({ code: 0, message: 'ok', data: { memberOptions, selectedTarget } }));
+}
+
+export function mockFetchPersonalHoursBase(user, params = {}) {
+  const memberOptions = buildMemberOptions(user);
+  const canViewAll = user?.role === ROLES.MANAGER || user?.role === ROLES.ADMIN;
+  const selectedTarget = params.target || (canViewAll ? ALL_TARGET : (user?.name || ALL_TARGET));
+  const targetLabel = selectedTarget === ALL_TARGET ? '全部人员' : selectedTarget;
+  return Promise.resolve().then(() => ({
+    code: 0,
+    message: 'ok',
+    data: {
+      trend: [],
+      memberOptions,
+      selectedTarget,
+      dashboard: {
+        ...personalHoursDashboard,
+        targetLabel,
+      },
+    },
+  }));
+}
+
 export function mockQueryPersonalHours(user, payload) {
   const startDate = payload?.startDate || '';
   const endDate = payload?.endDate || '';

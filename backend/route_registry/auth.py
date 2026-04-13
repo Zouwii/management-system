@@ -40,15 +40,39 @@ def _session_from_dingtalk_auth_code(auth_code: str, payload=None):
     # 某些登录链路只返回 unionId/openId，不含 userid。
     # 这里补一跳 getUseridByUnionid，确保能命中本地 user_character.user_id。
     if not str(user_data.get("userid") or "").strip() and str(user_data.get("unionId") or "").strip():
+        print(
+            "ZHR TEMP [auth] missing userid, try unionId->userid union_id={}".format(
+                str(user_data.get("unionId") or "").strip()
+            )
+        )
         u2i_out = get_userid_by_unionid(user_data.get("unionId"))
+        print(
+            "ZHR TEMP [auth] unionId->userid result ok={} error={} data={}".format(
+                u2i_out.get("ok"),
+                u2i_out.get("error"),
+                u2i_out.get("data"),
+            )
+        )
         if u2i_out.get("ok"):
             user_data["userid"] = (u2i_out.get("data") or {}).get("userid")
+            print(
+                "ZHR TEMP [auth] unionId->userid applied userid={}".format(
+                    str(user_data.get("userid") or "").strip()
+                )
+            )
+        else:
+            print("ZHR TEMP [auth] unionId->userid failed, keep userid empty")
 
     profile_out = resolve_user_profile(user_data)
     if not profile_out.get("ok"):
         return None, str(profile_out.get("error") or "unauthorized account")
 
     profile = profile_out.get("profile")
+    print("ZHR TEMP [auth] session profile role={} user_id={} teamId={}".format(
+    (profile or {}).get("role"),
+    (profile or {}).get("user_id"),
+    (profile or {}).get("teamId"),
+    ))
     session["auth_user"] = profile
     session.permanent = True
     return profile, None

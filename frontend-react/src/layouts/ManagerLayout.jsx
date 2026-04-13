@@ -4,7 +4,6 @@ import { sideMenuConfig } from '../constants/navigation';
 import { ROLE_LABELS, ROLES } from '../constants/roles';
 import { ROUTE_PATHS } from '../constants/routes';
 import { useAuthStore } from '../store/authStore';
-import { getDataScopeLabel } from '../utils/dataScope';
 import { getMenuRoutesByRole } from '../utils/permission';
 
 export default function ManagerLayout({ children }) {
@@ -21,13 +20,11 @@ export default function ManagerLayout({ children }) {
     ? `${ROLE_LABELS[role]} / 全局权限`
     : `${user?.team ?? '团队'}主管 / 组级权限`;
 
-  const note = role === ROLES.ADMIN
-    ? `管理员可访问全部页面与全部数据，当前数据范围：${getDataScopeLabel(user?.dataScope)}。`
-    : `主管仅可查看本人和所管团队数据，不可访问部门页和其他团队页。当前数据范围：${getDataScopeLabel(user?.dataScope)}。`;
+  const note = '';
 
   return (
     <div className="grid grid-cols-12 gap-6">
-      <aside className={collapsed ? 'col-span-1' : 'col-span-3'}>
+      <aside className={collapsed ? 'col-span-1' : 'col-span-2'}>
         <SideMenu
           title="本体开发部数据平台"
           subtitle={subtitle}
@@ -40,7 +37,7 @@ export default function ManagerLayout({ children }) {
           onToggleCollapse={() => setCollapsed((prev) => !prev)}
         />
       </aside>
-      <main className={collapsed ? 'col-span-11 space-y-6' : 'col-span-9 space-y-6'}>{children}</main>
+      <main className={collapsed ? 'col-span-11 space-y-6' : 'col-span-10 space-y-6'}>{children}</main>
     </div>
   );
 }

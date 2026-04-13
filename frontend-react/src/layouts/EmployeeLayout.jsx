@@ -4,7 +4,6 @@ import { sideMenuConfig } from '../constants/navigation';
 import { ROLE_LABELS, ROLES } from '../constants/roles';
 import { ROUTE_PATHS } from '../constants/routes';
 import { useAuthStore } from '../store/authStore';
-import { getDataScopeLabel } from '../utils/dataScope';
 import { getMenuRoutesByRole } from '../utils/permission';
 
 export default function EmployeeLayout({ children }) {
@@ -23,13 +22,11 @@ export default function EmployeeLayout({ children }) {
     ? `${user?.team ?? '导航组'} / ${ROLE_LABELS[role]}个人端`
     : `${ROLE_LABELS[role]}端 / 组织级权限`;
 
-  const note = useEmployeeTheme
-    ? `员工端仅允许查看本人数据，不可访问组级和部门级页面。当前数据范围：${getDataScopeLabel(user?.dataScope)}。`
-    : `${ROLE_LABELS[role]}可查看个人、组级、部门级数据。当前数据范围：${getDataScopeLabel(user?.dataScope)}。`;
+  const note = '';
 
   return (
     <div className="grid grid-cols-12 gap-6">
-      <aside className={collapsed ? 'col-span-1' : 'col-span-3'}>
+      <aside className={collapsed ? 'col-span-1' : 'col-span-2'}>
         <SideMenu
           title={title}
           subtitle={subtitle}
@@ -42,7 +39,7 @@ export default function EmployeeLayout({ children }) {
           onToggleCollapse={() => setCollapsed((prev) => !prev)}
         />
       </aside>
-      <main className={collapsed ? 'col-span-11 space-y-6' : 'col-span-9 space-y-6'}>{children}</main>
+      <main className={collapsed ? 'col-span-11 space-y-6' : 'col-span-10 space-y-6'}>{children}</main>
     </div>
   );
 }

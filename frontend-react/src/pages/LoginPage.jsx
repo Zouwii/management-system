@@ -80,12 +80,6 @@ export default function LoginPage() {
               建议采用角色权限 + 数据范围权限双层控制，解决员工端、主管端和管理员端的访问边界。
             </div>
           </div>
-          <div className="rounded-3xl border border-sky-100 bg-[linear-gradient(135deg,rgba(224,242,254,0.75),rgba(236,253,245,0.9))] p-5">
-            <div className="text-sm font-medium text-slate-900">权限提示</div>
-            <div className="mt-2 text-sm leading-6 text-slate-500">
-              登录成功后返回 role、menuCodes、pageScopes、dataScopes。前端根据 menuCodes 渲染侧边栏，根据 pageScopes 控制路由可访问性，根据 dataScopes 控制请求参数中的数据范围。
-            </div>
-          </div>
         </Card>
         <Card className="bg-[linear-gradient(180deg,rgba(255,255,255,0.97),rgba(248,250,252,0.94))] p-8">
           <div className="text-lg font-semibold text-slate-900">{isRealMode ? '钉钉登录' : '账号登录'}</div>

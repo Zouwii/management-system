@@ -146,10 +146,11 @@ export default function SideMenu({
               </div>
             ))}
           </div>
-          <div className={`mt-8 rounded-2xl border p-4 ${noteClass}`}>
-            <div className="text-sm font-medium text-slate-900">权限提示</div>
-            <div className="mt-2 text-sm leading-6">{note}</div>
-          </div>
+          {note ? (
+            <div className={`mt-8 rounded-2xl border p-4 ${noteClass}`}>
+              <div className="mt-2 text-sm leading-6">{note}</div>
+            </div>
+          ) : null}
           <button
             type="button"
             onClick={handleSwitchRole}

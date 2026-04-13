@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   fetchPersonalHours,
+  fetchPersonalHoursBase,
+  fetchPersonalHoursMembers,
   queryPersonalHours,
   updatePersonalHours,
   fullUpdatePersonalHours,
@@ -17,18 +19,24 @@ import {
 } from '../mock/platformData';
 import {
   buildMonthlyTrend,
-  calculateExpectedEffectiveDays,
   formatDateTime,
   getDeltaStatus,
 } from '../utils/workHours';
 import { useAuthStore } from '../store/authStore';
 
-export default function PersonalHours() {
+export default function PersonalHours({ forceCanViewAllPeople = null }) {
   const user = useAuthStore((state) => state.user);
-  const canViewAllPeople = user?.role === ROLES.MANAGER || user?.role === ROLES.ADMIN;
+  const canViewAllByRole = user?.role === ROLES.MANAGER || user?.role === ROLES.ADMIN;
+  const canViewAllPeople = typeof forceCanViewAllPeople === 'boolean' ? forceCanViewAllPeople : canViewAllByRole;
   const [searchParams, setSearchParams] = useSearchParams();
   const targetFromQuery = searchParams.get('target') ?? '';
-  const defaultTarget = canViewAllPeople ? (targetFromQuery || 'ALL') : user?.name ?? '';
+  const initialTargetRef = useRef('');
+  if (!initialTargetRef.current) {
+    initialTargetRef.current = canViewAllPeople
+      ? (targetFromQuery || user?.user_id || user?.name || 'ALL')
+      : (user?.user_id || user?.name || '');
+  }
+  const defaultTarget = initialTargetRef.current;
   const [sourceTrend, setSourceTrend] = useState(fallbackTrend);
   const [dashboard, setDashboard] = useState(fallbackDashboard);
   const [dateRange, setDateRange] = useState(fallbackDashboard.defaultRange);
@@ -49,8 +57,24 @@ export default function PersonalHours() {
   useEffect(() => {
     let active = true;
 
-    fetchPersonalHours(user, { target: defaultTarget }).then((response) => {
-      if (active) {
+    const init = async () => {
+      if (canViewAllPeople) {
+        const [membersRes, baseRes] = await Promise.all([
+          fetchPersonalHoursMembers(user),
+          fetchPersonalHoursBase(user, { target: defaultTarget }),
+        ]);
+        if (!active) return;
+        setMemberOptions(membersRes?.data?.memberOptions ?? []);
+        setSelectedTarget(membersRes?.data?.selectedTarget ?? defaultTarget);
+
+        setSourceTrend([]);
+        setDashboard(baseRes?.data?.dashboard ?? fallbackDashboard);
+        setDateRange((baseRes?.data?.dashboard ?? fallbackDashboard).defaultRange ?? fallbackDashboard.defaultRange);
+        setLastUpdatedAt((baseRes?.data?.dashboard ?? {}).lastUpdatedAt ?? '');
+        setCompensatoryDays((baseRes?.data?.dashboard ?? {}).compensatoryDays ?? 0);
+      } else {
+        const response = await fetchPersonalHours(user, { target: defaultTarget });
+        if (!active) return;
         setSourceTrend(response.data.trend ?? fallbackTrend);
         setDashboard(response.data.dashboard);
         setDateRange(response.data.dashboard.defaultRange);
@@ -59,43 +83,69 @@ export default function PersonalHours() {
         setMemberOptions(response.data.memberOptions ?? []);
         setSelectedTarget(response.data.selectedTarget ?? defaultTarget);
       }
-    });
+    };
+
+    init();
 
     return () => {
       active = false;
     };
-  }, [defaultTarget, user]);
+  }, [canViewAllPeople, user]);
 
-  const expectedSummary = useMemo(
-    () => calculateExpectedEffectiveDays(
-      dateRange.startDate,
-      dateRange.endDate,
-      dashboard.statutoryHolidays,
-      compensatoryDays,
-    ),
-    [compensatoryDays, dashboard.statutoryHolidays, dateRange.endDate, dateRange.startDate],
-  );
+  const workhourCharacterCoefficients = useMemo(() => {
+    const fromDashboard = dashboard.workhourCharacterCoefficients;
+    if (fromDashboard && typeof fromDashboard === 'object') return fromDashboard;
+    return { 0: 0.4, 1: 0.7, 2: 0.7, 3: 1.0, 4: 0.7 };
+  }, [dashboard.workhourCharacterCoefficients]);
+  const selectedCharacter = useMemo(() => {
+    if (canViewAllPeople) {
+      const hit = memberOptions.find((x) => String(x?.id || '') === String(selectedTarget || ''));
+      if (hit && hit.character !== undefined && hit.character !== null && String(hit.character).trim() !== '') {
+        return Number(hit.character);
+      }
+    }
+    return Number(user?.character ?? 1);
+  }, [canViewAllPeople, memberOptions, selectedTarget, user?.character]);
+  const expectedCoefficient = useMemo(() => {
+    const backendCoeff = Number(dashboard.expectedCoefficient);
+    if (Number.isFinite(backendCoeff) && backendCoeff > 0) {
+      return backendCoeff;
+    }
+    const key = String(Number.isFinite(selectedCharacter) ? selectedCharacter : 1);
+    const v = Number(workhourCharacterCoefficients?.[key]);
+    return Number.isFinite(v) && v > 0 ? v : 1.0;
+  }, [dashboard.expectedCoefficient, selectedCharacter, workhourCharacterCoefficients]);
+  const baseWorkdayCount = Number(dashboard.workdayCount || 0);
+  const expectedWorkdayCount = Math.max(baseWorkdayCount - Number(compensatoryDays || 0), 0);
+  const expectedEffectiveDays = expectedWorkdayCount * expectedCoefficient;
 
-  const scheduledDelta = dashboard.scheduledEffectiveHours + dashboard.quarterlyOverdueEffectiveHours - expectedSummary.days;
-  const completedDelta = dashboard.completedEffectiveHours + dashboard.quarterlyOverdueCompletedHours - expectedSummary.days;
+  const scheduledDelta = dashboard.scheduledEffectiveHours + dashboard.quarterlyOverdueEffectiveHours - expectedEffectiveDays;
+  const completedDelta = dashboard.completedEffectiveHours + dashboard.quarterlyOverdueCompletedHours - expectedEffectiveDays;
   const scheduledStatus = getDeltaStatus(scheduledDelta);
   const completedStatus = getDeltaStatus(completedDelta);
   const trend = useMemo(
-    () => buildMonthlyTrend(sourceTrend, dashboard.taskDetails.filter((t) => t?.quarterCategory !== '季度逾期排期')),
-    [dashboard.taskDetails, sourceTrend],
+    () => buildMonthlyTrend(
+      sourceTrend,
+      dashboard.taskDetails.filter((t) => t?.quarterCategory !== '季度逾期排期'),
+    ).map((item) => ({
+      ...item,
+      // 月度“预期有效工时”：法定工作日按当前查看对象系数折算
+      total: Number(item.total || 0) * expectedCoefficient,
+    })),
+    [dashboard.taskDetails, expectedCoefficient, sourceTrend],
   );
   const maxTrendValue = Math.max(...trend.flatMap((item) => [item.total, item.effective, item.completed]), 1);
   const distributionBarClassMap = {
-    产品: 'bg-sky-500',
+    产品: 'bg-emerald-500',
     订单: 'bg-amber-500',
-    研发: 'bg-emerald-500',
+    研发: 'bg-violet-500',
   };
   const quarterTagClassMap = {
-    当前季度排期: 'border-sky-100 bg-sky-50 text-sky-700',
-    季度逾期排期: 'border-amber-100 bg-amber-50 text-amber-700',
+    当前季度: 'border-sky-100 bg-sky-50 text-sky-700',
+    季度逾期: 'border-amber-100 bg-amber-50 text-amber-700',
   };
   const statusTagClassMap = {
-    创建中: 'border-slate-200 bg-slate-50 text-slate-700',
+    创建中: 'border-yellow-200 bg-yellow-50 text-yellow-800',
     待评审: 'border-indigo-100 bg-indigo-50 text-indigo-700',
     评审中: 'border-blue-100 bg-blue-50 text-blue-700',
     搁置: 'border-amber-100 bg-amber-50 text-amber-700',
@@ -103,22 +153,29 @@ export default function PersonalHours() {
     未完成: 'border-rose-100 bg-rose-50 text-rose-700',
   };
   const taskTypeTagClassMap = {
-    产品: 'border-violet-100 bg-violet-50 text-violet-700',
+    产品: 'border-emerald-100 bg-emerald-50 text-emerald-700',
     订单: 'border-amber-100 bg-amber-50 text-amber-700',
-    研发: 'border-cyan-100 bg-cyan-50 text-cyan-700',
+    研发: 'border-violet-100 bg-violet-50 text-violet-700',
   };
   const taskTypeOptions = ['全部', '产品', '订单', '研发'];
-  const quarterFilterOptions = ['全部', '当前季度排期', '季度逾期排期'];
+  const quarterFilterOptions = ['全部', '当前季度', '季度逾期'];
   const statusFilterOptions = ['全部', '创建中', '未完成', '待评审', '评审中', '已完成', '搁置'];
   const filteredTasks = useMemo(() => {
     const nextTasks = dashboard.taskDetails
       .filter((task) => taskFilter === '全部' || task.type === taskFilter)
-      .filter((task) => quarterFilter === '全部' || task.quarterCategory === quarterFilter)
+      .filter((task) => {
+        if (quarterFilter === '全部') return true;
+        const normalized = String(task.quarterCategory || '')
+          .replace('当前季度排期', '当前季度')
+          .replace('季度逾期排期', '季度逾期');
+        return normalized === quarterFilter;
+      })
       .filter((task) => statusFilter === '全部' || task.status === statusFilter)
       .sort((left, right) => (taskSort === 'desc' ? right.hours - left.hours : left.hours - right.hours));
 
     return nextTasks;
   }, [dashboard.taskDetails, quarterFilter, showAllTasks, statusFilter, taskFilter, taskSort]);
+  const visibleTasks = filteredTasks;
   const overdueTaskCount = dashboard.taskDetails.filter((task) => task.quarterCategory === '季度逾期排期').length;
   const currentQuarterTaskCount = dashboard.taskDetails.filter((task) => task.quarterCategory === '当前季度排期').length;
   const completedTaskCount = dashboard.taskDetails.filter((task) => task.status === '已完成').length;
@@ -175,10 +232,21 @@ export default function PersonalHours() {
   }
 
   function handleDateChange(field, value) {
-    setDateRange((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+    setDateRange((prev) => {
+      const next = {
+        ...prev,
+        [field]: value,
+      };
+      // 前端限制：终止时间不能早于起始时间
+      if (next.startDate && next.endDate && next.endDate < next.startDate) {
+        if (field === 'startDate') {
+          next.endDate = next.startDate;
+        } else {
+          next.startDate = next.endDate;
+        }
+      }
+      return next;
+    });
   }
 
   function resetTaskControls() {
@@ -190,6 +258,10 @@ export default function PersonalHours() {
   }
 
   async function handleQuery(payload = { ...dateRange, compensatoryDays }) {
+    if (payload?.startDate && payload?.endDate && payload.endDate < payload.startDate) {
+      setActionMessage('终止时间不能早于起始时间。');
+      return;
+    }
     setIsQuerying(true);
     setActionMessage('');
 
@@ -255,11 +327,13 @@ export default function PersonalHours() {
     <EmployeeLayout>
       <SectionTitle
         title="工时管理"
-        desc="员工端只展示本人数据，页面聚焦个人工时达成、趋势与任务分布。"
+        desc={canViewAllPeople
+          ? ''
+          : ''}
         right={(
           <div className="flex gap-3">
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm">个人账号已登录</div>
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm">仅本人可见</div>
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm">{canViewAllPeople ? '管理账号已登录' : '个人账号已登录'}</div>
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm">{canViewAllPeople ? '可切换查看成员' : '仅本人可见'}</div>
           </div>
         )}
       />
@@ -267,7 +341,6 @@ export default function PersonalHours() {
         <div className="flex items-center justify-between gap-4">
           <div>
             <div className="text-lg font-semibold">时间区间</div>
-            <div className="mt-1 text-sm text-slate-500">支持输入起始时间和终止时间，结合法定节假日计算预期有效工时。</div>
           </div>
           <div className="flex flex-col items-end gap-3">
             <div className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-500">
@@ -335,11 +408,6 @@ export default function PersonalHours() {
                 {isFullUpdating ? '全量更新中...' : '全量更新'}
               </button>
             </div>
-            <div className="flex flex-wrap justify-end gap-4 text-xs text-slate-500">
-              <div>查询：按当前时间区间刷新页面统计结果</div>
-              <div>更新：触发后台同步并刷新最后更新时间</div>
-              <div>全量更新：触发 /query_project_tasks 同步 A+B 后再刷新统计</div>
-            </div>
           </div>
         </div>
         {canViewAllPeople ? (
@@ -373,6 +441,7 @@ export default function PersonalHours() {
               step="1"
               value={dateRange.startDate}
               onChange={(event) => handleDateChange('startDate', event.target.value)}
+              max={dateRange.endDate || undefined}
               className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
             />
             <div className="text-sm text-slate-500">终止时间</div>
@@ -381,6 +450,7 @@ export default function PersonalHours() {
               step="1"
               value={dateRange.endDate}
               onChange={(event) => handleDateChange('endDate', event.target.value)}
+              min={dateRange.startDate || undefined}
               className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
             />
             <div />
@@ -408,40 +478,35 @@ export default function PersonalHours() {
         <div className="flex items-center justify-between gap-4">
           <div>
             <div className="text-lg font-semibold">工时数据总览</div>
-            <div className="mt-1 text-sm text-slate-500">先看当前区间的工时概览，再看排期和完成进度相对预期的差值分析。</div>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-500">
-            当前区间共 {expectedSummary.days.toFixed(1)} 个有效工天
+            当前区间共 {expectedWorkdayCount.toFixed(1)} 个工作日
           </div>
         </div>
         <div className="mt-5 grid grid-cols-12 gap-5">
           <Card className="col-span-5 row-span-2 flex flex-col justify-between p-6">
             <div>
               <div className="text-sm text-slate-500">预期有效工时</div>
-              <div className="mt-3 text-4xl font-semibold text-slate-900">{expectedSummary.days.toFixed(1)}天</div>
-              <div className="mt-3 text-sm leading-7 text-slate-500">
-                依据起始时间、终止时间、法定节假日与双休日综合计算后，再扣减调休天数，得到当前区间的有效工天。
-              </div>
+              <div className="mt-3 text-4xl font-semibold text-slate-900">{expectedEffectiveDays.toFixed(1)}天</div>
             </div>
             <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div className="text-sm text-slate-500">计算说明</div>
               <div className="mt-2 text-sm leading-6 text-slate-600">
-                法定节假日 {expectedSummary.holidayCount} 天，调休天数 {expectedSummary.compensatoryDays.toFixed(1)} 天，折合 {expectedSummary.days.toFixed(1)} 天，可作为排期与完成情况的对比基线。
+                法定工作日 {baseWorkdayCount.toFixed(1)} 天，调休天数 {Number(compensatoryDays || 0).toFixed(1)} 天，先扣减后按角色系数 {expectedCoefficient.toFixed(2)} 计算，折合 {expectedEffectiveDays.toFixed(1)} 天。
               </div>
             </div>
           </Card>
           <div className="col-span-7 grid grid-cols-2 gap-5">
-            <StatCard title="当前已排总有效工时" value={`${formatRawDays(dashboard.scheduledEffectiveHours)}天`} sub="已纳入当前区间任务排期" />
-            <StatCard title="当前已完成总有效工时" value={`${formatRawDays(dashboard.completedEffectiveHours)}天`} sub="已完成任务的累计有效工时" />
-            <StatCard title="季度逾期总有效工时" value={`${formatRawDays(dashboard.quarterlyOverdueEffectiveHours)}天`} sub="跨季度未按期关闭任务累计" />
-            <StatCard title="季度逾期完成工时" value={`${formatRawDays(dashboard.quarterlyOverdueCompletedHours)}天`} sub="跨季度已完成关闭任务累计" />
+            <StatCard title="当前已排总有效工时" value={`${formatRawDays(dashboard.scheduledEffectiveHours)}天`} sub="" />
+            <StatCard title="当前已完成总有效工时" value={`${formatRawDays(dashboard.completedEffectiveHours)}天`} sub="" />
+            <StatCard title="季度逾期总有效工时" value={`${formatRawDays(dashboard.quarterlyOverdueEffectiveHours)}天`} sub="" />
+            <StatCard title="季度逾期完成工时" value={`${formatRawDays(dashboard.quarterlyOverdueCompletedHours)}天`} sub="" />
           </div>
         </div>
         <div className="mt-6 border-t border-slate-200 pt-6">
           <div className="flex items-center justify-between gap-4">
             <div>
               <div className="text-lg font-semibold">工时情况</div>
-              <div className="mt-1 text-sm text-slate-500">对比预期有效工时与排期 / 完成进度，快速识别是否偏紧或偏松。</div>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-500">
               正值表示充足，负值表示不足
@@ -455,7 +520,7 @@ export default function PersonalHours() {
                 {formatRawDays(scheduledDelta)}天
               </div>
               <div className="mt-2 text-sm text-slate-600">
-                (当前已排总有效工时 + 季度逾期总有效工时) - 预期有效工时 = {formatRawDays(dashboard.scheduledEffectiveHours + dashboard.quarterlyOverdueEffectiveHours)}天 - {expectedSummary.days.toFixed(1)}天
+                (当前已排总有效工时 + 季度逾期总有效工时) - 预期有效工时 = {formatRawDays(dashboard.scheduledEffectiveHours + dashboard.quarterlyOverdueEffectiveHours)}天 - {expectedEffectiveDays.toFixed(1)}天
               </div>
             </div>
             <div className={`rounded-2xl border p-5 ${completedStatus.bgClass}`}>
@@ -465,7 +530,7 @@ export default function PersonalHours() {
                 {formatRawDays(completedDelta)}天
               </div>
               <div className="mt-2 text-sm text-slate-600">
-                (已完成有效工时 + 季度逾期完成工时) - 预期有效工时 = {formatRawDays(dashboard.completedEffectiveHours + dashboard.quarterlyOverdueCompletedHours)}天 - {expectedSummary.days.toFixed(1)}天
+                (已完成有效工时 + 季度逾期完成工时) - 预期有效工时 = {formatRawDays(dashboard.completedEffectiveHours + dashboard.quarterlyOverdueCompletedHours)}天 - {expectedEffectiveDays.toFixed(1)}天
               </div>
             </div>
           </div>
@@ -474,7 +539,6 @@ export default function PersonalHours() {
       <div className="grid grid-cols-2 gap-5">
         <Card className="p-6">
           <div className="text-lg font-semibold">季度已排任务分布</div>
-          <div className="mt-1 text-sm text-slate-500">当前数据口径仅统计“当前季度排期”的任务，不包含“季度逾期排期”任务，按产品、订单、研发三类展示结构占比。</div>
           <div className="mt-5 space-y-4">
             {currentQuarterDistribution.map((item) => (
               <div key={item.type} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -495,13 +559,9 @@ export default function PersonalHours() {
               </div>
             ))}
           </div>
-          <div className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">
-            统计口径：仅包含当前季度排期任务，不包含季度逾期排期任务，也不区分已完成与未完成。
-          </div>
         </Card>
         <Card className="p-6">
           <div className="text-lg font-semibold">月度趋势</div>
-          <div className="mt-1 text-sm text-slate-500">柱状图展示每月总工时、有效工时和已完成工时，下面只保留完成率。</div>
           <div className="mt-5 rounded-3xl border border-slate-200 bg-slate-50 p-5">
             <div className="flex items-end justify-between gap-4">
               {trend.map((item) => {
@@ -517,7 +577,7 @@ export default function PersonalHours() {
                         <div
                           className="w-6 rounded-t-2xl bg-slate-300"
                           style={{ height: totalHeight }}
-                          title={`${item.month} 总工时 ${formatRawDays(item.total)}天`}
+                          title={`${item.month} 预期有效工时 ${formatRawDays(item.total)}天`}
                         />
                       </div>
                       <div className="flex flex-col items-center gap-2">
@@ -525,7 +585,7 @@ export default function PersonalHours() {
                         <div
                           className="w-6 rounded-t-2xl bg-cyan-500"
                           style={{ height: effectiveHeight }}
-                          title={`${item.month} 有效工时 ${formatRawDays(item.effective)}天`}
+                          title={`${item.month} 已排有效工时 ${formatRawDays(item.effective)}天`}
                         />
                       </div>
                       <div className="flex flex-col items-center gap-2">
@@ -533,7 +593,7 @@ export default function PersonalHours() {
                         <div
                           className="w-6 rounded-t-2xl bg-emerald-500"
                           style={{ height: completedHeight }}
-                          title={`${item.month} 已完成工时 ${formatRawDays(item.completed)}天`}
+                          title={`${item.month} 已完成有效工时 ${formatRawDays(item.completed)}天`}
                         />
                       </div>
                     </div>
@@ -545,15 +605,15 @@ export default function PersonalHours() {
             <div className="mt-4 flex gap-4 text-xs text-slate-500">
               <div className="flex items-center gap-2">
                 <span className="h-3 w-3 rounded-full bg-slate-300" />
-                <span>总工天</span>
+                <span>预期有效工时</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="h-3 w-3 rounded-full bg-cyan-500" />
-                <span>有效工天</span>
+                <span>已排有效工时</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="h-3 w-3 rounded-full bg-emerald-500" />
-                <span>已完成工天</span>
+                <span>已完成有效工时</span>
               </div>
             </div>
           </div>
@@ -573,7 +633,6 @@ export default function PersonalHours() {
         <div className="flex items-center justify-between gap-4">
           <div>
             <div className="text-lg font-semibold">任务明细</div>
-            <div className="mt-1 text-sm text-slate-500">以紧凑表格展示任务名称、类型、季度归属、工天与 Teambition 链接。</div>
           </div>
           <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-500">
             当前季度排期 {currentQuarterTaskCount} 项
@@ -679,7 +738,7 @@ export default function PersonalHours() {
             </div>
           </div>
         </div>
-        <div className="mt-5 max-h-[420px] overflow-auto rounded-3xl border border-slate-200">
+        <div className={`mt-5 rounded-3xl border border-slate-200 ${showAllTasks ? '' : 'max-h-[320px] overflow-auto'}`}>
           <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1.82fr)_108px_148px_108px_108px_176px] gap-8 border-b border-slate-200 bg-slate-50 px-5 py-4 text-sm font-medium text-slate-500">
             <div>任务名称</div>
             <div>任务类型</div>
@@ -689,7 +748,7 @@ export default function PersonalHours() {
             <div>链接</div>
           </div>
           <div className="divide-y divide-slate-100">
-            {filteredTasks.map((task) => (
+            {visibleTasks.map((task) => (
               <div
                 key={task.taskId || task.name}
                 className="grid grid-cols-[minmax(0,1.82fr)_108px_148px_108px_108px_176px] items-center gap-8 bg-white px-5 py-4 text-sm transition-colors hover:bg-slate-50/70"
@@ -703,8 +762,12 @@ export default function PersonalHours() {
                   </span>
                 </div>
                 <div className="justify-self-start">
-                  <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium ${quarterTagClassMap[task.quarterCategory]}`}>
-                    {task.quarterCategory}
+                  <span
+                    className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium ${
+                      quarterTagClassMap[(task.quarterCategory || '').replace('当前季度排期', '当前季度').replace('季度逾期排期', '季度逾期')]
+                    }`}
+                  >
+                    {(task.quarterCategory || '').replace('当前季度排期', '当前季度').replace('季度逾期排期', '季度逾期')}
                   </span>
                 </div>
                 <div className="justify-self-start">
