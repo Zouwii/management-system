@@ -6,10 +6,14 @@ variables:
 
 package-on-tag:
   stage: package
-  image: node:20
+  image: ubuntu2404:20260319
   only:
     - tags
   script:
+    - apt-get update
+    - apt-get install -y nodejs npm
+    - node -v
+    - npm -v
     - chmod +x ./package-tb-tool-bt.sh
     - ./package-tb-tool-bt.sh
   artifacts:
