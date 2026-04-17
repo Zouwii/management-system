@@ -7,7 +7,11 @@ set -euo pipefail
 # 目标：当本次 push 包含 tag（refs/tags/*）时，自动执行本地打包脚本。
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+if [[ -z "${REPO_ROOT}" ]]; then
+  # 兜底：当脚本被复制到 .git/hooks 下时，仓库根目录应为其上两级
+  REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+fi
 PACKAGE_SCRIPT="${REPO_ROOT}/package-tb-tool-bt.sh"
 
 need_package="0"
