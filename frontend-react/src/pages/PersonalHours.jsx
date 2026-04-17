@@ -53,6 +53,7 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [isFullUpdating, setIsFullUpdating] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
+  const [showSyncActions, setShowSyncActions] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -323,6 +324,47 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
     }
   }
 
+  function escapeCsvCell(value) {
+    const text = value === null || value === undefined ? '' : String(value);
+    if (text.includes('"') || text.includes(',') || text.includes('\n') || text.includes('\r')) {
+      return `"${text.replace(/"/g, '""')}"`;
+    }
+    return text;
+  }
+
+  function handleExportTasksCsv() {
+    if (!filteredTasks.length) {
+      setActionMessage('暂无可导出的任务数据，请先查询或调整筛选条件。');
+      return;
+    }
+
+    const headers = ['任务名称', '任务类型', '季度归属', '任务状态', '工时(天)', '链接'];
+    const rows = filteredTasks.map((task) => {
+      const taskName = task.content || task.text || task.name || task.taskId || '-';
+      const quarterCategory = (task.quarterCategory || '')
+        .replace('当前季度排期', '当前季度')
+        .replace('季度逾期排期', '季度逾期');
+      const workHours = typeof task.work_hour === 'number' ? formatRawDays(task.work_hour) : formatRawDays(task.hours);
+      const link = task.link || (task.taskId ? `https://www.teambition.com/task/${encodeURIComponent(task.taskId)}` : '');
+      return [taskName, task.type || '', quarterCategory, task.status || '', workHours, link];
+    });
+
+    const csvLines = [headers, ...rows].map((row) => row.map(escapeCsvCell).join(','));
+    const csvContent = `\uFEFF${csvLines.join('\n')}`;
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const now = new Date();
+    const filename = `任务明细_${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}.csv`;
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = filename;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    URL.revokeObjectURL(url);
+    setActionMessage(`已导出 ${filteredTasks.length} 条任务明细。`);
+  }
+
   return (
     <EmployeeLayout>
       <SectionTitle
@@ -393,21 +435,41 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
               </button>
               <button
                 type="button"
-                onClick={handleUpdate}
+                onClick={() => setShowSyncActions((prev) => !prev)}
                 disabled={isUpdating || isFullUpdating}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-60"
+                aria-expanded={showSyncActions}
+                aria-label={showSyncActions ? '收起同步' : '展开同步'}
+                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-60"
               >
-                {isUpdating ? '更新中...' : '更新'}
-              </button>
-              <button
-                type="button"
-                onClick={handleFullUpdate}
-                disabled={isFullUpdating || isUpdating}
-                className="whitespace-nowrap rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-60"
-              >
-                {isFullUpdating ? '全量更新中...' : '全量更新'}
+                <span>同步</span>
+                <span className="text-xs text-slate-500" aria-hidden="true">
+                  {showSyncActions ? '▼' : '▶'}
+                </span>
               </button>
             </div>
+            {showSyncActions ? (
+              <div className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                <div className="flex flex-wrap items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={handleUpdate}
+                    disabled={isUpdating || isFullUpdating}
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-60"
+                  >
+                    {isUpdating ? '更新中...' : '更新'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleFullUpdate}
+                    disabled={isFullUpdating || isUpdating}
+                    className="whitespace-nowrap rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-60"
+                  >
+                    {isFullUpdating ? '全量更新中...' : '全量更新'}
+                  </button>
+                </div>
+                <div className="mt-2 text-right text-xs text-slate-500">更新用于增量同步，全量更新会重新拉取并刷新当前数据。</div>
+              </div>
+            ) : null}
           </div>
         </div>
         {canViewAllPeople ? (
@@ -739,19 +801,28 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
           </div>
         </div>
         <div className={`mt-5 rounded-3xl border border-slate-200 ${showAllTasks ? '' : 'max-h-[320px] overflow-auto'}`}>
-          <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1.82fr)_108px_148px_108px_108px_176px] gap-8 border-b border-slate-200 bg-slate-50 px-5 py-4 text-sm font-medium text-slate-500">
+          <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1.82fr)_108px_148px_108px_108px_176px_108px] gap-6 border-b border-slate-200 bg-slate-50 px-5 py-4 text-sm font-medium text-slate-500">
             <div>任务名称</div>
             <div>任务类型</div>
             <div>季度归属</div>
             <div>任务状态</div>
             <div className="text-right">工时</div>
             <div>链接</div>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={handleExportTasksCsv}
+                className="whitespace-nowrap rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-100"
+              >
+                导出CSV
+              </button>
+            </div>
           </div>
           <div className="divide-y divide-slate-100">
             {visibleTasks.map((task) => (
               <div
                 key={task.taskId || task.name}
-                className="grid grid-cols-[minmax(0,1.82fr)_108px_148px_108px_108px_176px] items-center gap-8 bg-white px-5 py-4 text-sm transition-colors hover:bg-slate-50/70"
+                className="grid grid-cols-[minmax(0,1.82fr)_108px_148px_108px_108px_176px_108px] items-center gap-6 bg-white px-5 py-4 text-sm transition-colors hover:bg-slate-50/70"
               >
                 <div className="min-w-0" title={task.content || task.text || task.name || task.taskId || '-'}>
                   <div className="truncate font-medium text-slate-900">{task.content || task.text || task.name || task.taskId || '-'}</div>
@@ -788,6 +859,7 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
                     查看任务
                   </a>
                 </div>
+                <div />
               </div>
             ))}
           </div>

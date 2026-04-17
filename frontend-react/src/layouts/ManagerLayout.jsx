@@ -26,10 +26,12 @@ export default function ManagerLayout({ children }) {
     <div className="grid grid-cols-12 gap-6">
       <aside className={collapsed ? 'col-span-1' : 'col-span-2'}>
         <SideMenu
-          title="本体开发部数据平台"
+          title="本体开发部数据管理平台"
           subtitle={subtitle}
           menus={menus}
           theme="dark"
+          logoSrc="/竖版-中文(1).png"
+          logoAlt="迦智科技"
           note={note}
           actionLabel="退出登录"
           actionTo={ROUTE_PATHS.LOGIN}

@@ -45,6 +45,18 @@ def _team_name_from_team_id(team_id_value):
     return "未分组"
 
 
+def _to_character(value, default: int = 0) -> int:
+    """
+    安全解析 character，避免 0 被 `or 1` 误判成 1。
+    """
+    try:
+        if value is None:
+            return int(default)
+        return int(value)
+    except Exception:
+        return int(default)
+
+
 def _load_user_character_members():
     from db.engine import SessionLocal
     from db.orm import UserCharacter as DbUserCharacter
@@ -63,12 +75,45 @@ def _load_user_character_members():
                     "id": uid,
                     "name": name or uid,
                     "userId": uid,
-                    "character": int(getattr(row, "character", 1) or 1),
+                    "character": _to_character(getattr(row, "character", None), default=0),
                     "team": _team_name_from_team_id(getattr(row, "team_id", None)),
                     "teamId": str(getattr(row, "team_id", "") or ""),
                 }
             )
         return members
+    finally:
+        session.close()
+
+
+def _load_single_user_character_member(user_id: str, user_name: str = ""):
+    """
+    单用户模式下也统一从 user_character 表取实时数据，避免回退到 session 里的旧 character。
+    """
+    from db.engine import SessionLocal
+    from db.orm import UserCharacter as DbUserCharacter
+
+    uid = str(user_id or "").strip()
+    uname = str(user_name or "").strip()
+    if not uid and not uname:
+        return None
+
+    session = SessionLocal()
+    try:
+        row = None
+        if uid:
+            row = session.query(DbUserCharacter).filter(DbUserCharacter.user_id == uid).first()
+        if not row and uname:
+            row = session.query(DbUserCharacter).filter(DbUserCharacter.name == uname).first()
+        if not row:
+            return None
+        return {
+            "id": str(getattr(row, "user_id", "") or "").strip(),
+            "name": str(getattr(row, "name", "") or "").strip() or uid or uname,
+            "userId": str(getattr(row, "user_id", "") or "").strip(),
+            "character": int(getattr(row, "character", 0) or 0),
+            "team": _team_name_from_team_id(getattr(row, "team_id", None)),
+            "teamId": str(getattr(row, "team_id", "") or ""),
+        }
     finally:
         session.close()
 
@@ -178,7 +223,7 @@ def _group_detail_rows(team_id_value: str, expected_mode: str = "quarter"):
                 getattr(m, "is_nav_lead", False),
                 getattr(m, "is_servo_lead", False),
             )
-            member_character = int(getattr(m, "character", 1) or 1)
+            member_character = _to_character(getattr(m, "character", None), default=0)
             coefficient = float(coeff_map.get(str(member_character), 1.0) or 1.0)
             expected_effective_hours = quarter_expected_days * coefficient
 
@@ -330,15 +375,20 @@ def _build_default_personal_hours_payload(user, target: str):
     if role in {"manager", "admin"}:
         all_members = _load_user_character_members()
         member_options = [{"id": "ALL", "name": "全部人员", "team": "全部", "teamId": ""}] + all_members
-    elif user_id:
-        member_options = [{
-            "id": user_id,
-            "name": user_name or user_id,
-            "userId": user_id,
-            "character": int((user or {}).get("character", 1) or 1),
-            "team": str((user or {}).get("team") or ""),
-            "teamId": str((user or {}).get("teamId") or ""),
-        }]
+    elif user_id or user_name:
+        me = _load_single_user_character_member(user_id=user_id, user_name=user_name)
+        if me:
+            member_options = [me]
+        elif user_id:
+            # 保底仅为页面可用；系数计算仍按 user_character 命中结果，不使用 session 回退。
+            member_options = [{
+                "id": user_id,
+                "name": user_name or user_id,
+                "userId": user_id,
+                "character": None,
+                "team": str((user or {}).get("team") or ""),
+                "teamId": str((user or {}).get("teamId") or ""),
+            }]
     elif user_name:
         # 兼容：极端情况下 auth_user 没有 user_id，仍保证页面可用
         member_options = [{"id": user_name, "name": user_name, "team": str((user or {}).get("team") or "")}]
@@ -353,20 +403,17 @@ def _build_default_personal_hours_payload(user, target: str):
 
     # 个人工时页口径：
     # 后端仅返回区间法定工作日（不扣调休），前端再按 (工作日-调休)*系数 动态计算预期值。
-    target_character = 1
+    target_character = None
     target_hit = next((x for x in member_options if str(x.get("id") or "") == selected_target), None)
     if target_hit and target_hit.get("character") is not None:
         try:
             target_character = int(target_hit.get("character"))
         except Exception:
-            target_character = 1
-    elif (user or {}).get("character") is not None:
-        try:
-            target_character = int((user or {}).get("character"))
-        except Exception:
-            target_character = 1
+            target_character = None
 
-    coeff = float(workhour_character_coefficients.get(str(target_character), 1.0) or 1.0)
+    coeff = 1.0
+    if target_character is not None:
+        coeff = float(workhour_character_coefficients.get(str(target_character), 1.0) or 1.0)
     wd_out = workdays_in_range_service(
         {
             "start_time": start_time,
@@ -452,19 +499,16 @@ def personal_hours_query():
     end_date = str((out.get("dashboard") or {}).get("defaultRange", {}).get("endDate") or "")
     coeff_map = out.get("workhourCharacterCoefficients") or {}
     member_options = out.get("memberOptions") or []
-    target_character = 1
+    target_character = None
     target_hit = next((x for x in member_options if str(x.get("id") or "") == target), None)
     if target_hit and target_hit.get("character") is not None:
         try:
             target_character = int(target_hit.get("character"))
         except Exception:
-            target_character = 1
-    elif (user or {}).get("character") is not None:
-        try:
-            target_character = int((user or {}).get("character"))
-        except Exception:
-            target_character = 1
-    coeff = float(coeff_map.get(str(target_character), 1.0) or 1.0)
+            target_character = None
+    coeff = 1.0
+    if target_character is not None:
+        coeff = float(coeff_map.get(str(target_character), 1.0) or 1.0)
     wd_out = workdays_in_range_service(
         {
             "start_time": start_date,
@@ -509,7 +553,7 @@ def personal_hours_update():
                 if not isinstance(one, dict):
                     continue
                 try:
-                    ch = int(one.get("character", 1) or 1)
+                    ch = _to_character(one.get("character"), default=1)
                 except Exception:
                     ch = 1
                 if ch == 0:

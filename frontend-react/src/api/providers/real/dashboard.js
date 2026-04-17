@@ -467,6 +467,38 @@ export function realCreateAITaskTicket(_user, payload) {
   });
 }
 
+export function realSendAIChatSingleTask(_user, payload) {
+  return httpRequest('/bt/ai/chat/single_task', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function realSendAIChatMultiTurn(_user, payload) {
+  return httpRequest('/bt/ai/chat/multi_turn', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function realSendAIChatSessionMessage(_user, payload) {
+  return httpRequest('/bt/ai/chat/session_message', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function realEndAIChatSession(_user, payload) {
+  return httpRequest('/bt/ai/chat/session_end', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export function realFetchAIModels() {
+  return httpRequest('/bt/ai/models');
+}
+
 export function realFetchPermissionMatrix() {
   return httpRequest('/dashboard/permission-matrix');
 }

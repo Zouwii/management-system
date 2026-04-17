@@ -2,7 +2,15 @@
   "corpId": "dingca883cf037b3741435c2f4657eb6378f",
   "appkey": "ding4csm9vqefmcvjkut",
   "appsecret": "LmmfLvtFhk9oP7zTZDzXIxrMTk77T-xcZt9pesFMfxT_m3bnXI2OlJbsN9S9VWYe",
-  "access_token": "c365ef5b404933ed89575f39aca05757",
-  "token_expire_at": 1775739394,
-  "token_expires_in": 7200
+  "access_token": "029020aad6ab38fbaf39a710516f9aad",
+  "token_expire_at": 1776244198,
+  "token_expires_in": 7200,
+  "ai_token_api": "http://claude.server22.jz/api/v1/token",
+  "ai_api_key": "rk-e2656b3f3cda40f8bae8376277e36926c929c6176b1efa2f",
+  "ai_access_token": "f135a8aa2d566553176bbdae42b44e46099599705e1437955da5fa3eb294ad3f",
+  "ai_authorization": "Bearer f135a8aa2d566553176bbdae42b44e46099599705e1437955da5fa3eb294ad3f",
+  "ai_token_expires_in": 3600,
+  "ai_token_refresh_seconds": 3600,
+  "ai_token_expire_at": 1776325713,
+  "ai_token_last_refresh_at": 1776322113
 }

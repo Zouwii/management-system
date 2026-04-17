@@ -141,4 +141,11 @@ app = create_app()
 if __name__ == "__main__":
     debug_raw = env_bt("DEBUG", "false")
     debug = str(debug_raw).strip().lower() in {"1", "true", "yes", "y", "on"}
-    app.run(host="0.0.0.0", port=5001, debug=debug)
+    # Flask 启动参数直接读 FLASK_RUN_* 环境变量，兼容 run_on_pc*.sh 的 export
+    host = str(os.getenv("FLASK_RUN_HOST", "0.0.0.0")).strip() or "0.0.0.0"
+    port_raw = str(os.getenv("FLASK_RUN_PORT", "5001")).strip() or "5001"
+    try:
+        port = int(port_raw)
+    except ValueError as exc:
+        raise RuntimeError(f"Invalid FLASK_RUN_PORT value: {port_raw}") from exc
+    app.run(host=host, port=port, debug=debug)

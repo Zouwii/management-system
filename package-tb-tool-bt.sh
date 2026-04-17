@@ -4,7 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_NAME="tb_tool_bt"
 TS="$(date +%Y%m%d-%H%M%S)"
-OUT_TS="${SCRIPT_DIR}/${PROJECT_NAME}_backend-${TS}.tar.gz"
+TAR_DIR="${SCRIPT_DIR}/tar"
+OUT_TS="${TAR_DIR}/${PROJECT_NAME}_backend-${TS}.tar.gz"
 STAGE_DIR="${SCRIPT_DIR}/.package_stage/${PROJECT_NAME}"
 
 FRONTEND_API_MODE="${FRONTEND_API_MODE:-real}"
@@ -20,6 +21,7 @@ popd >/dev/null
 
 echo "[${PROJECT_NAME}] preparing package stage..."
 rm -rf "${SCRIPT_DIR}/.package_stage"
+mkdir -p "${TAR_DIR}"
 mkdir -p "${STAGE_DIR}"
 
 # 只打包 backend 部署所需目录，避免把开发缓存和大体积依赖带进去

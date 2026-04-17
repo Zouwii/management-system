@@ -203,7 +203,13 @@ def init_database() -> None:
                 # taskflowStatusId -> task_flow_status_id（从 0 开始）
                 "task_flow_status_mapping": '{"680a31478c1bdfc448d36ed0":0,"647854bcd999c893061ef89b":1,"67fe5c1f142821dbe1328ddf":2,"64785656c6215fd933a96631":3,"647854bcd999c893061ef89c":4,"64785656c6215fd933a96634":5}',
             }
-            preserve_existing_keys = {"start_time", "end_time", "last_update_time"}
+            preserve_existing_keys = {
+                "start_time",
+                "end_time",
+                "last_update_time",
+                # 保留数据库中已维护的系数映射，重启不覆盖
+                "workhour_character_coefficients",
+            }
 
             def _ensure(cfg_type: str, value: str):
                 existing = (

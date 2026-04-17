@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { createAITaskTicket, fetchAIInsightList } from '../api/dashboard';
+import {
+  createAITaskTicket,
+  endAIChatSession,
+  fetchAIModels,
+  fetchAIInsightList,
+  sendAIChatSessionMessage,
+} from '../api/dashboard';
 import Card from '../components/Card';
 import SectionTitle from '../components/SectionTitle';
 import EmployeeLayout from '../layouts/EmployeeLayout';
@@ -66,6 +72,32 @@ function buildAssistantReply(input, insights) {
   };
 }
 
+function createConversationId() {
+  return `ai-chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function extractSessionReply(response) {
+  const res = response?.data?.result;
+  return String(
+    res?.data?.result
+    || res?.result
+    || '',
+  ).trim();
+}
+
+function buildModelSelectionPrompt(models) {
+  const list = Array.isArray(models) ? models : [];
+  if (!list.length) {
+    return '未获取到模型列表，默认使用 glm。';
+  }
+  const lines = list.map((item, idx) => {
+    const name = String(item?.name || '').trim() || `model-${idx + 1}`;
+    const desc = String(item?.description || '').trim();
+    return `${idx + 1}. ${name}${desc ? `（${desc}）` : ''}`;
+  });
+  return `请选择模型，回复数字即可：\n${lines.join('\n')}`;
+}
+
 export default function AIAnalysisPage() {
   const user = useAuthStore((state) => state.user);
   const [insights, setInsights] = useState(fallbackData);
@@ -91,6 +123,11 @@ export default function AIAnalysisPage() {
   const [analysisStatus, setAnalysisStatus] = useState('未分析');
   const [analysisBusy, setAnalysisBusy] = useState(false);
   const [analysisInput, setAnalysisInput] = useState('');
+  const [chatSending, setChatSending] = useState(false);
+  const [chatError, setChatError] = useState('');
+  const [conversationId, setConversationId] = useState(() => createConversationId());
+  const [availableModels, setAvailableModels] = useState([]);
+  const [selectedModel, setSelectedModel] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -105,6 +142,45 @@ export default function AIAnalysisPage() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    fetchAIModels(user)
+      .then((response) => {
+        if (!active) return;
+        const models = Array.isArray(response?.data?.models) ? response.data.models : [];
+        const fallback = models[0]?.name || 'glm';
+        setAvailableModels(models);
+        setSelectedModel('');
+        setMessages([
+          {
+            id: 'assistant-model-select',
+            role: 'assistant',
+            content: buildModelSelectionPrompt(models.length ? models : [{ name: fallback }]),
+          },
+        ]);
+      })
+      .catch(() => {
+        if (!active) return;
+        setAvailableModels([{ name: 'glm', description: '默认模型' }]);
+        setSelectedModel('');
+        setMessages([
+          {
+            id: 'assistant-model-select-fallback',
+            role: 'assistant',
+            content: buildModelSelectionPrompt([{ name: 'glm', description: '默认模型' }]),
+          },
+        ]);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [user]);
+
+  useEffect(() => () => {
+    endAIChatSession(user, { conversationId }).catch(() => {});
+  }, [conversationId, user]);
 
   const hourInsights = useMemo(
     () => insights
@@ -129,22 +205,75 @@ export default function AIAnalysisPage() {
     [analysisInput, insights],
   );
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const value = input.trim();
-    if (!value) {
+    if (!value || chatSending) {
       return;
+    }
+
+    const userMessage = { id: `${Date.now()}-user`, role: 'user', content: value };
+    setMessages((current) => [...current, userMessage]);
+    setInput('');
+    setChatError('');
+    setChatSending(true);
+
+    if (!selectedModel) {
+      const choice = Number.parseInt(value, 10);
+      const chosen = Number.isFinite(choice) ? availableModels[choice - 1] : null;
+      if (!chosen) {
+        setMessages((current) => [
+          ...current,
+          {
+            id: `${Date.now()}-assistant-model-invalid`,
+            role: 'assistant',
+            content: '模型编号无效，请回复列表中的数字（例如：1）。',
+          },
+        ]);
+        setChatSending(false);
+        return;
+      }
+
+      const modelName = String(chosen.name || '').trim() || 'glm';
+      setSelectedModel(modelName);
+      setMessages((current) => [
+        ...current,
+        {
+          id: `${Date.now()}-assistant-model-selected`,
+          role: 'assistant',
+          content: `已选择模型：${modelName}。现在可以开始提问了。`,
+        },
+      ]);
+      setChatSending(false);
+      return;
+    }
+
+    let aiReply = '';
+    try {
+      const response = await sendAIChatSessionMessage(user, {
+        conversationId,
+        model: selectedModel,
+        prompt: value,
+        timeoutSeconds: 45,
+      });
+      aiReply = extractSessionReply(response);
+      if (!aiReply) {
+        aiReply = 'AI 暂未返回有效结果，请稍后重试。';
+      }
+    } catch (error) {
+      aiReply = '请求 AI 失败，请检查后端服务与 token 状态后重试。';
+      setChatError(error instanceof Error ? error.message : '请求 AI 失败');
+    } finally {
+      setChatSending(false);
     }
 
     const reply = buildAssistantReply(value, insights);
     setMessages((current) => [
       ...current,
-      { id: `${Date.now()}-user`, role: 'user', content: value },
-      { id: `${Date.now()}-assistant`, role: 'assistant', content: reply.summary },
+      { id: `${Date.now()}-assistant`, role: 'assistant', content: aiReply },
     ]);
     setDraft(reply);
     setConfirmed(false);
     setCreateResult(null);
-    setInput('');
   };
 
   const handleConfirmDraft = () => {
@@ -272,7 +401,10 @@ export default function AIAnalysisPage() {
                 <span className="rounded-full border border-sky-100 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">对话确认</span>
               </div>
 
-              <div className="mt-5 flex-1 space-y-3 overflow-auto rounded-[28px] border border-slate-200 bg-white p-4">
+              <div
+                className="mt-5 h-[420px] space-y-3 overflow-y-auto rounded-[28px] border border-slate-200 bg-white p-4"
+                style={{ scrollbarWidth: 'thin' }}
+              >
                 {messages.map((message) => (
                   <div
                     key={message.id}
@@ -289,29 +421,45 @@ export default function AIAnalysisPage() {
 
               <div className="mt-4 rounded-[28px] border border-slate-200 bg-white p-4">
                 <textarea
-                  className="min-h-[120px] w-full resize-none bg-transparent text-sm leading-6 text-slate-700 outline-none"
+                  className="min-h-[120px] max-h-[280px] w-full resize-y bg-transparent text-sm leading-6 text-slate-700 outline-none"
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && !event.shiftKey) {
+                      event.preventDefault();
+                      handleSend();
+                    }
+                  }}
                   placeholder="例如：我需要创建一个多段虚拟规划算法实车测试任务，需要产出测试说明、结果结论，并评估实际有效工时。"
                 />
+                {chatError ? (
+                  <div className="mt-2 text-xs text-rose-500">
+                    AI 调用失败：{chatError}
+                  </div>
+                ) : null}
                 <div className="mt-4 flex flex-wrap gap-3">
                   <button
                     type="button"
-                    className="rounded-full bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
+                    className="rounded-full bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
                     onClick={handleSend}
+                    disabled={chatSending || !input.trim()}
                   >
-                    发送给 AI
+                    {chatSending ? '发送中...' : '发送给 AI'}
                   </button>
                   <button
                     type="button"
                     className="rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
                     onClick={() => {
+                      endAIChatSession(user, { conversationId }).catch(() => {});
+                      const nextConversationId = createConversationId();
+                      setConversationId(nextConversationId);
+                      setSelectedModel('');
                       setInput('');
                       setMessages([
                         {
-                          id: 'assistant-default',
+                          id: 'assistant-model-select-reset',
                           role: 'assistant',
-                          content: '请描述任务背景和需要 AI 帮你补齐的内容。我会整理需求描述、任务产出、任务类型和参与度评估。',
+                          content: buildModelSelectionPrompt(availableModels),
                         },
                       ]);
                       setDraft({

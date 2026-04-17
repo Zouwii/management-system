@@ -1,0 +1,2 @@
+"""Legacy AI protocol implementations."""
+

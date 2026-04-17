@@ -8,6 +8,8 @@ export default function SideMenu({
   subtitle,
   menus,
   theme = 'dark',
+  logoSrc,
+  logoAlt = '平台Logo',
   note,
   actionLabel = '切换登录角色',
   actionTo = '/login',
@@ -95,12 +97,14 @@ export default function SideMenu({
     <Card className={`${containerClass} p-5`}>
       <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-5">
         <div className="flex items-center gap-3">
-          <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl font-semibold ${logoClass}`}>
-            {theme === 'dark' ? 'BD' : '李'}
+          <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl font-semibold ${logoSrc ? 'border border-slate-200 bg-white shadow-none' : logoClass}`}>
+            {logoSrc ? (
+              <img src={logoSrc} alt={logoAlt} className="h-9 w-9 rounded-lg bg-white p-1 object-contain" />
+            ) : (theme === 'dark' ? 'LOGO' : '李')}
           </div>
           {!collapsed ? (
-            <div>
-              <div className="font-semibold text-slate-900">{title}</div>
+            <div className="min-w-0">
+              <div className="truncate whitespace-nowrap text-[15px] font-semibold text-slate-900">{title}</div>
               <div className="text-sm text-slate-500">{subtitle}</div>
             </div>
           ) : null}
@@ -108,7 +112,7 @@ export default function SideMenu({
         <button
           type="button"
           onClick={onToggleCollapse}
-          className="flex h-9 w-9 items-center justify-center rounded-2xl border border-slate-200 bg-white/90 text-slate-500 hover:bg-slate-50"
+          className="mt-1 flex h-9 w-9 items-center justify-center rounded-2xl border border-slate-200 bg-white/90 text-slate-500 hover:bg-slate-50"
           title={collapsed ? '展开导航栏' : '折叠导航栏'}
         >
           <span className={`text-base transition-transform ${collapsed ? 'rotate-180' : ''}`}>◀</span>

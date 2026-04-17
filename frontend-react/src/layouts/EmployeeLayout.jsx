@@ -17,7 +17,7 @@ export default function EmployeeLayout({ children }) {
     to: route.path,
   }));
 
-  const title = useEmployeeTheme ? user?.name ?? '李四' : '本体开发部数据平台';
+  const title = useEmployeeTheme ? user?.name ?? '李四' : '本体开发部数据管理平台';
   const subtitle = useEmployeeTheme
     ? `${user?.team ?? '导航组'} / ${ROLE_LABELS[role]}个人端`
     : `${ROLE_LABELS[role]}端 / 组织级权限`;
@@ -32,6 +32,8 @@ export default function EmployeeLayout({ children }) {
           subtitle={subtitle}
           menus={menus}
           theme={useEmployeeTheme ? 'blue' : 'dark'}
+          logoSrc="/竖版-中文(1).png"
+          logoAlt="迦智科技"
           note={note}
           actionLabel="退出登录"
           actionTo={ROUTE_PATHS.LOGIN}

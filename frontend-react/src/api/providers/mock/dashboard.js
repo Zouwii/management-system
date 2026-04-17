@@ -493,6 +493,100 @@ export function mockCreateAITaskTicket(_user, payload) {
   }));
 }
 
+export function mockSendAIChatSingleTask(_user, payload) {
+  const prompt = String(payload?.prompt || '').trim();
+  const result = prompt
+    ? `（Mock）已收到你的问题：${prompt.slice(0, 80)}`
+    : '（Mock）请先输入问题。';
+  return request(() => ({
+    success: true,
+    http_status: 200,
+    request: {
+      model: payload?.model || 'glm',
+      prompt,
+      timeout_ms: payload?.timeoutMs || payload?.timeout_ms || 30000,
+    },
+    response: {
+      status: 'success',
+      model: payload?.model || 'glm',
+      result,
+      duration_ms: 420,
+      task_id: `mock_${Date.now()}`,
+    },
+    task_url: 'http://claude.server22.jz/api/v1/task',
+    error: '',
+  }));
+}
+
+export function mockSendAIChatMultiTurn(_user, payload) {
+  const prompts = Array.isArray(payload?.prompts) ? payload.prompts.map((x) => String(x || '').trim()).filter(Boolean) : [];
+  const lastPrompt = prompts[prompts.length - 1] || '';
+  return request(() => ({
+    success: true,
+    server: { host: 'mock-server', port: 80 },
+    started: { type: 'started', session_id: `mock_session_${Date.now()}` },
+    rounds: prompts.map((prompt, idx) => ({
+      round: idx + 1,
+      prompt,
+      response: {
+        type: 'result',
+        data: {
+          type: 'result',
+          result: idx === prompts.length - 1
+            ? `（Mock-多轮）已结合上下文回复：${lastPrompt.slice(0, 80)}`
+            : `（Mock-多轮）已记录第${idx + 1}轮上下文`,
+          is_error: false,
+          duration_ms: 320,
+        },
+      },
+    })),
+    ended: { type: 'ended', session_id: `mock_session_${Date.now()}` },
+  }));
+}
+
+export function mockSendAIChatSessionMessage(_user, payload) {
+  const prompt = String(payload?.prompt || '').trim();
+  const conversationId = String(payload?.conversationId || payload?.conversation_id || `mock-${Date.now()}`);
+  return request(() => ({
+    success: true,
+    conversation_id: conversationId,
+    result: {
+      type: 'result',
+      data: {
+        type: 'result',
+        result: `（Mock-会话）已回复：${prompt.slice(0, 80)}`,
+        is_error: false,
+        duration_ms: 360,
+      },
+    },
+    timing: {
+      message_ms: 360,
+      total_ms: 420,
+    },
+  }));
+}
+
+export function mockEndAIChatSession(_user, payload) {
+  const conversationId = String(payload?.conversationId || payload?.conversation_id || '');
+  return request(() => ({
+    success: true,
+    conversation_id: conversationId,
+    ended: true,
+    result: { type: 'ended', session_id: `mock-session-${Date.now()}` },
+  }));
+}
+
+export function mockFetchAIModels() {
+  return request(() => ({
+    success: true,
+    models: [
+      { name: 'glm', description: '智谱，国家队老大哥', type: 'apikey' },
+      { name: 'claude', description: 'Anthropic 原生模型', type: 'oauth' },
+      { name: 'kimi', description: '国产四小龙之一', type: 'apikey' },
+    ],
+  }));
+}
+
 export function mockFetchPermissionMatrix() {
   return request(() => Object.values(mockAccounts).map((account) => {
     const user = mockUsers[account.userKey];

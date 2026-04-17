@@ -1,6 +1,8 @@
 {
   "userids": {
     "伍浩贤": { "userId": "6515680920352168", "character": 0 ,"team_id": 0 , "is_nav_lead": true, "is_servo_lead": true},
+    "戴舒炜": { "userId": "012563513725212033", "character": 0 ,"team_id": 0 , "is_nav_lead": true, "is_servo_lead": true},
+    "孙逸超": { "userId": "0133111623653734", "character": 0 ,"team_id": 0 , "is_nav_lead": true, "is_servo_lead": true},
     "何鸿颉": { "userId": "250124013220811839", "character": 1 ,"team_id": 0 , "is_nav_lead": false, "is_servo_lead": false},
     "王睿": { "userId": "010408241117947540", "character": 1 ,"team_id": 0 , "is_nav_lead": false, "is_servo_lead": false},
     "邹宏睿": { "userId": "01195014075436361289", "character": 1 ,"team_id": 0 , "is_nav_lead": false, "is_servo_lead": false},

@@ -4,45 +4,42 @@ from typing import Any, Dict, List, Optional
 
 from dingtalk_client import get_config_projectids, get_config_userids
 
-DEFAULT_WORKHOUR_CHARACTER_COEFFICIENTS: Dict[int, float] = {
-    0: 0.4,
-    1: 0.7,
-    2: 0.7,
-    3: 1.0,
-}
+DEFAULT_WORKHOUR_COEFFICIENT = 1.0
 
 
 def _parse_character_coefficients(raw: Any) -> Dict[int, float]:
     """
     将 db config.value（JSON 字符串）解析为 {0:0.4,1:0.7,...}。
-    解析失败/缺字段时回退到 DEFAULT_WORKHOUR_CHARACTER_COEFFICIENTS。
+    不限制 key 范围，完全按配置表里的数字 key 返回。
     """
     if raw is None:
-        return dict(DEFAULT_WORKHOUR_CHARACTER_COEFFICIENTS)
+        return {}
     try:
         data = raw
         if isinstance(raw, str):
             data = json.loads(raw)
         if not isinstance(data, dict):
-            return dict(DEFAULT_WORKHOUR_CHARACTER_COEFFICIENTS)
+            return {}
 
         out: Dict[int, float] = {}
-        for k, v in DEFAULT_WORKHOUR_CHARACTER_COEFFICIENTS.items():
-            # key 可能是 "0" 或 0
-            kk = str(k)
-            vv = data.get(kk, data.get(k))
-            if vv is None:
-                out[k] = float(v)
+        for raw_k, raw_v in data.items():
+            try:
+                k_int = int(str(raw_k).strip())
+            except Exception:
+                continue
+            if k_int < 0:
                 continue
             try:
-                fv = float(vv)
-                out[k] = fv if fv >= 0 else float(v)
+                v_float = float(raw_v)
             except Exception:
-                out[k] = float(v)
+                continue
+            if v_float < 0:
+                continue
+            out[k_int] = v_float
 
         return out
     except Exception:
-        return dict(DEFAULT_WORKHOUR_CHARACTER_COEFFICIENTS)
+        return {}
 
 
 def get_userids_service() -> Dict[str, Any]:
@@ -73,16 +70,15 @@ def get_workhour_coefficient_service() -> Dict[str, Any]:
     try:
         row = session.query(DbConfig).filter(DbConfig.type_ == "workhour_coefficient").first()
         if not row:
-            # 旧逻辑回退到 1/2 的系数（0.7）
-            return {"success": True, "workhour_coefficient": DEFAULT_WORKHOUR_CHARACTER_COEFFICIENTS[1]}
+            return {"success": True, "workhour_coefficient": DEFAULT_WORKHOUR_COEFFICIENT}
 
         try:
             v = float(row.value)
             if not (v >= 0):
-                return {"success": True, "workhour_coefficient": DEFAULT_WORKHOUR_CHARACTER_COEFFICIENTS[1]}
+                return {"success": True, "workhour_coefficient": DEFAULT_WORKHOUR_COEFFICIENT}
             return {"success": True, "workhour_coefficient": v}
         except Exception:
-            return {"success": True, "workhour_coefficient": DEFAULT_WORKHOUR_CHARACTER_COEFFICIENTS[1]}
+            return {"success": True, "workhour_coefficient": DEFAULT_WORKHOUR_COEFFICIENT}
     finally:
         session.close()
 
@@ -131,10 +127,7 @@ def get_user_character_service(user_id: str) -> Dict[str, Any]:
             .first()
         )
         character: int = int(getattr(c_row, "character", 0) or 0)
-        if character not in mapping:
-            character = 0
-
-        coefficient = float(mapping[character])
+        coefficient = float(mapping.get(character, DEFAULT_WORKHOUR_COEFFICIENT))
         return {
             "success": True,
             "userId": user_id,
