@@ -26,12 +26,24 @@ if [[ "${need_package}" != "1" ]]; then
   exit 0
 fi
 
+if [[ "${LOCAL_TAG_PACKAGE:-0}" != "1" ]]; then
+  echo "[pre-push] detected tag push."
+  echo "[pre-push] local packaging disabled by default; CI (.gitlab-ci.yml) will package on tag."
+  echo "[pre-push] set LOCAL_TAG_PACKAGE=1 if you want local package before push."
+  exit 0
+fi
+
 if [[ ! -x "${PACKAGE_SCRIPT}" ]]; then
   echo "[pre-push] package script not executable: ${PACKAGE_SCRIPT}"
   echo "[pre-push] run: chmod +x ./package-tb-tool-bt.sh"
   exit 1
 fi
 
-echo "[pre-push] detected tag push, running package script..."
+if ! command -v npm >/dev/null 2>&1; then
+  echo "[pre-push] npm not found, cannot run local package with LOCAL_TAG_PACKAGE=1."
+  exit 1
+fi
+
+echo "[pre-push] detected tag push, running local package script..."
 bash "${PACKAGE_SCRIPT}"
-echo "[pre-push] package completed."
+echo "[pre-push] local package completed."

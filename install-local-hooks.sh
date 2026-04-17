@@ -16,4 +16,5 @@ chmod +x "${TARGET_HOOK}"
 chmod +x "${SCRIPT_DIR}/package-tb-tool-bt.sh" || true
 
 echo "installed local hook: ${TARGET_HOOK}"
-echo "now IDE tag + push will trigger package script."
+echo "now IDE tag + push will run pre-push checks."
+echo "CI will package on tag by default; set LOCAL_TAG_PACKAGE=1 to enable local package before push."
