@@ -122,6 +122,12 @@ npm run build
 npm run lint
 ```
 
+本地安装 Git hooks（让 IDE 打 tag 并 push 时自动执行打包脚本）：
+
+```bash
+./install-local-hooks.sh
+```
+
 默认访问地址：
 
 ```text

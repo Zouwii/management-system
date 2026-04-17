@@ -1,0 +1,19 @@
+stages:
+  - package
+
+variables:
+  GIT_STRATEGY: fetch
+
+package-on-tag:
+  stage: package
+  image: node:20
+  only:
+    - tags
+  script:
+    - chmod +x ./package-tb-tool-bt.sh
+    - ./package-tb-tool-bt.sh
+  artifacts:
+    name: "tb_tool_bt_backend-${CI_COMMIT_TAG}"
+    paths:
+      - tar/*.tar.gz
+    expire_in: 30 days
