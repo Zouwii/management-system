@@ -5,6 +5,7 @@ from flask import request
 from services.project_task_service import count_software_dev_tasks_in_config_last_year_service
 from services.workhour_aggregate_service import (
     executor_quarter_workhours_db_service,
+    team_quarter_workhours_db_service,
     workdays_in_range_service,
 )
 
@@ -44,5 +45,16 @@ def register(bp, ok, fail):
                 code=400,
                 data=result.get("data") or {},
             )
+        except Exception as e:
+            return fail(str(e), code=500, data={})
+
+    @bp.route("/stats/team_quarter_workhours", methods=["POST"])
+    def stats_team_quarter_workhours():
+        try:
+            payload = request.get_json(silent=True) or {}
+            result = team_quarter_workhours_db_service(payload)
+            if result.get("success"):
+                return ok(result.get("data") or {})
+            return fail(result.get("error", "team quarter aggregate failed"), code=400, data=result.get("data") or {})
         except Exception as e:
             return fail(str(e), code=500, data={})

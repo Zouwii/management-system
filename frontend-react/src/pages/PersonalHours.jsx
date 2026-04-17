@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  fetchPersonalHours,
-  fetchPersonalHoursBase,
   fetchPersonalHoursMembers,
   queryPersonalHours,
   updatePersonalHours,
@@ -54,33 +52,62 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
   const [isFullUpdating, setIsFullUpdating] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
   const [showSyncActions, setShowSyncActions] = useState(false);
+  const [showBusyModal, setShowBusyModal] = useState(false);
+  const [quickRangePreset, setQuickRangePreset] = useState('quarter_to_today');
+  const isAdmin = user?.role === ROLES.ADMIN;
+
+  async function runInitialQuery(target) {
+    const initialRange = buildQuarterRange(true);
+    const payload = {
+      ...initialRange,
+      target,
+    };
+    const response = await queryPersonalHours(user, payload);
+    return { payload, response };
+  }
 
   useEffect(() => {
     let active = true;
 
     const init = async () => {
       if (canViewAllPeople) {
-        const [membersRes, baseRes] = await Promise.all([
-          fetchPersonalHoursMembers(user),
-          fetchPersonalHoursBase(user, { target: defaultTarget }),
-        ]);
+        const membersRes = await fetchPersonalHoursMembers(user);
         if (!active) return;
-        setMemberOptions(membersRes?.data?.memberOptions ?? []);
-        setSelectedTarget(membersRes?.data?.selectedTarget ?? defaultTarget);
-
-        setSourceTrend([]);
-        setDashboard(baseRes?.data?.dashboard ?? fallbackDashboard);
-        setDateRange((baseRes?.data?.dashboard ?? fallbackDashboard).defaultRange ?? fallbackDashboard.defaultRange);
-        setLastUpdatedAt((baseRes?.data?.dashboard ?? {}).lastUpdatedAt ?? '');
-        setCompensatoryDays((baseRes?.data?.dashboard ?? {}).compensatoryDays ?? 0);
-      } else {
-        const response = await fetchPersonalHours(user, { target: defaultTarget });
+        const nextMemberOptions = membersRes?.data?.memberOptions ?? [];
+        const availableTargets = new Set(nextMemberOptions.map((item) => String(item?.id || '')));
+        const targetFromUrl = String(defaultTarget || '').trim();
+        const preferredTarget = availableTargets.has(targetFromUrl)
+          ? targetFromUrl
+          : (membersRes?.data?.selectedTarget ?? targetFromUrl);
+        const nextTarget = availableTargets.has(String(preferredTarget || ''))
+          ? String(preferredTarget || '')
+          : (nextMemberOptions[0]?.id ?? defaultTarget);
+        setMemberOptions(nextMemberOptions);
+        // 先切换下拉选中，再发起工时查询，保证“跳转后先选人”。
+        setSelectedTarget(nextTarget);
+        const { payload, response } = await runInitialQuery(nextTarget);
         if (!active) return;
         setSourceTrend(response.data.trend ?? fallbackTrend);
-        setDashboard(response.data.dashboard);
-        setDateRange(response.data.dashboard.defaultRange);
-        setLastUpdatedAt(response.data.dashboard.lastUpdatedAt ?? '');
-        setCompensatoryDays(response.data.dashboard.compensatoryDays ?? 0);
+        setDashboard(response.data.dashboard ?? fallbackDashboard);
+        setDateRange({
+          startDate: payload.startDate,
+          endDate: payload.endDate,
+        });
+        setQuickRangePreset('quarter_to_today');
+        setLastUpdatedAt((response.data.dashboard ?? {}).lastUpdatedAt ?? '');
+        setCompensatoryDays((response.data.dashboard ?? {}).compensatoryDays ?? 0);
+      } else {
+        const { payload, response } = await runInitialQuery(defaultTarget);
+        if (!active) return;
+        setSourceTrend(response.data.trend ?? fallbackTrend);
+        setDashboard(response.data.dashboard ?? fallbackDashboard);
+        setDateRange({
+          startDate: payload.startDate,
+          endDate: payload.endDate,
+        });
+        setQuickRangePreset('quarter_to_today');
+        setLastUpdatedAt(response.data.dashboard?.lastUpdatedAt ?? '');
+        setCompensatoryDays(response.data.dashboard?.compensatoryDays ?? 0);
         setMemberOptions(response.data.memberOptions ?? []);
         setSelectedTarget(response.data.selectedTarget ?? defaultTarget);
       }
@@ -119,6 +146,17 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
   const baseWorkdayCount = Number(dashboard.workdayCount || 0);
   const expectedWorkdayCount = Math.max(baseWorkdayCount - Number(compensatoryDays || 0), 0);
   const expectedEffectiveDays = expectedWorkdayCount * expectedCoefficient;
+  const memberGroupOptions = useMemo(() => {
+    if (!isAdmin) return [];
+    const navMembers = memberOptions.filter((option) => option.team === '导航组');
+    const integrationMembers = memberOptions.filter((option) => option.team === '对接组');
+    const others = memberOptions.filter((option) => !['全部', '导航组', '对接组'].includes(String(option.team || '')));
+    return [
+      { label: '导航组', options: navMembers },
+      { label: '对接组', options: integrationMembers },
+      ...(others.length ? [{ label: '其他', options: others }] : []),
+    ].filter((group) => group.options.length > 0);
+  }, [isAdmin, memberOptions]);
 
   const scheduledDelta = dashboard.scheduledEffectiveHours + dashboard.quarterlyOverdueEffectiveHours - expectedEffectiveDays;
   const completedDelta = dashboard.completedEffectiveHours + dashboard.quarterlyOverdueCompletedHours - expectedEffectiveDays;
@@ -157,8 +195,9 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
     产品: 'border-emerald-100 bg-emerald-50 text-emerald-700',
     订单: 'border-amber-100 bg-amber-50 text-amber-700',
     研发: 'border-violet-100 bg-violet-50 text-violet-700',
+    无: 'border-slate-200 bg-slate-50 text-slate-600',
   };
-  const taskTypeOptions = ['全部', '产品', '订单', '研发'];
+  const taskTypeOptions = ['全部', '产品', '订单', '研发', '无'];
   const quarterFilterOptions = ['全部', '当前季度', '季度逾期'];
   const statusFilterOptions = ['全部', '创建中', '未完成', '待评审', '评审中', '已完成', '搁置'];
   const filteredTasks = useMemo(() => {
@@ -185,7 +224,7 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
     const currentQuarterTasks = dashboard.taskDetails.filter((task) => task.quarterCategory === '当前季度排期');
     const totalHours = currentQuarterTasks.reduce((sum, task) => sum + task.hours, 0);
 
-    return ['产品', '订单', '研发'].map((type) => {
+    return ['产品', '订单', '研发', '无'].map((type) => {
       const hours = currentQuarterTasks
         .filter((task) => task.type === type)
         .reduce((sum, task) => sum + task.hours, 0);
@@ -233,6 +272,7 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
   }
 
   function handleDateChange(field, value) {
+    setQuickRangePreset('');
     setDateRange((prev) => {
       const next = {
         ...prev,
@@ -258,6 +298,16 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
     setShowAllTasks(false);
   }
 
+  function isUpdateBusyError(error) {
+    const text = String(error?.message || '').toLowerCase();
+    return text.includes('更新中') || text.includes('update is in progress');
+  }
+
+  function showBusyHint() {
+    setShowBusyModal(true);
+    setActionMessage('正在更新中，暂时无法查询');
+  }
+
   async function handleQuery(payload = { ...dateRange, compensatoryDays }) {
     if (payload?.startDate && payload?.endDate && payload.endDate < payload.startDate) {
       setActionMessage('终止时间不能早于起始时间。');
@@ -279,6 +329,12 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
         setSearchParams({ target: nextTarget });
       }
       setActionMessage(`已完成${response.data.dashboard.targetLabel ?? '当前对象'}的工时查询。`);
+    } catch (error) {
+      if (isUpdateBusyError(error)) {
+        showBusyHint();
+        return;
+      }
+      setActionMessage(`查询失败：${error?.message || '未知错误'}`);
     } finally {
       setIsQuerying(false);
     }
@@ -296,6 +352,12 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
       });
       setLastUpdatedAt(response.data.lastUpdatedAt ?? lastUpdatedAt);
       setActionMessage(response.data.message || '已触发工时更新。');
+    } catch (error) {
+      if (isUpdateBusyError(error)) {
+        showBusyHint();
+        return;
+      }
+      setActionMessage(`更新失败：${error?.message || '未知错误'}`);
     } finally {
       setIsUpdating(false);
     }
@@ -319,6 +381,12 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
         compensatoryDays,
         target: selectedTarget,
       });
+    } catch (error) {
+      if (isUpdateBusyError(error)) {
+        showBusyHint();
+        return;
+      }
+      setActionMessage(`全量更新失败：${error?.message || '未知错误'}`);
     } finally {
       setIsFullUpdating(false);
     }
@@ -346,7 +414,7 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
         .replace('季度逾期排期', '季度逾期');
       const workHours = typeof task.work_hour === 'number' ? formatRawDays(task.work_hour) : formatRawDays(task.hours);
       const link = task.link || (task.taskId ? `https://www.teambition.com/task/${encodeURIComponent(task.taskId)}` : '');
-      return [taskName, task.type || '', quarterCategory, task.status || '', workHours, link];
+      return [taskName, task.type || '无', quarterCategory, task.status || '', workHours, link];
     });
 
     const csvLines = [headers, ...rows].map((row) => row.map(escapeCsvCell).join(','));
@@ -373,9 +441,12 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
           ? ''
           : ''}
         right={(
-          <div className="flex gap-3">
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm">{canViewAllPeople ? '管理账号已登录' : '个人账号已登录'}</div>
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm">{canViewAllPeople ? '可切换查看成员' : '仅本人可见'}</div>
+          <div className="flex flex-wrap justify-end gap-3">
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm">
+              最后同步：
+              {' '}
+              {lastUpdatedAt ? formatDateTime(lastUpdatedAt) : '暂无'}
+            </div>
           </div>
         )}
       />
@@ -384,43 +455,8 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
           <div>
             <div className="text-lg font-semibold">时间区间</div>
           </div>
-          <div className="flex flex-col items-end gap-3">
-            <div className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-500">
-              最后更新时间：
-              {' '}
-              <span className="font-medium text-slate-700">{lastUpdatedAt ? formatDateTime(lastUpdatedAt) : '暂无'}</span>
-            </div>
-            <div className="flex flex-nowrap justify-end gap-2 overflow-x-auto">
-              <button
-                type="button"
-                onClick={() => {
-                  const nextRange = buildQuarterRange(false);
-                  setDateRange({
-                    startDate: nextRange.startDate,
-                    endDate: nextRange.endDate,
-                  });
-                  handleQuery(nextRange);
-                }}
-                disabled={isQuerying}
-                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-              >
-                本季度
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const nextRange = buildQuarterRange(true);
-                  setDateRange({
-                    startDate: nextRange.startDate,
-                    endDate: nextRange.endDate,
-                  });
-                  handleQuery(nextRange);
-                }}
-                disabled={isQuerying}
-                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-              >
-                本季度至今天
-              </button>
+          <div className="flex flex-col items-start gap-3">
+            <div className="flex items-start gap-2">
               <button
                 type="button"
                 onClick={() => handleQuery({
@@ -439,17 +475,19 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
                 disabled={isUpdating || isFullUpdating}
                 aria-expanded={showSyncActions}
                 aria-label={showSyncActions ? '收起同步' : '展开同步'}
-                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-60"
+                className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-medium disabled:opacity-60 ${
+                  showSyncActions
+                    ? 'border-slate-900 bg-slate-900 text-white'
+                    : 'border-slate-200 bg-white text-slate-700'
+                }`}
               >
                 <span>同步</span>
-                <span className="text-xs text-slate-500" aria-hidden="true">
-                  {showSyncActions ? '▼' : '▶'}
+                <span className={`text-xs ${showSyncActions ? 'text-white' : 'text-slate-500'}`} aria-hidden="true">
+                  {showSyncActions ? '◀' : '▶'}
                 </span>
               </button>
-            </div>
-            {showSyncActions ? (
-              <div className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                <div className="flex flex-wrap items-center justify-end gap-2">
+              {showSyncActions ? (
+                <>
                   <button
                     type="button"
                     onClick={handleUpdate}
@@ -466,37 +504,43 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
                   >
                     {isFullUpdating ? '全量更新中...' : '全量更新'}
                   </button>
-                </div>
-                <div className="mt-2 text-right text-xs text-slate-500">更新用于增量同步，全量更新会重新拉取并刷新当前数据。</div>
-              </div>
-            ) : null}
+                </>
+              ) : null}
+            </div>
           </div>
         </div>
         {canViewAllPeople ? (
           <div className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-4">
-            <div className="grid grid-cols-[88px_minmax(0,320px)_1fr] items-center gap-3">
+            <div className="grid grid-cols-[88px_minmax(0,320px)] items-center gap-3">
               <div className="text-sm text-slate-500">查看对象</div>
               <select
                 value={selectedTarget}
                 onChange={(event) => setSelectedTarget(event.target.value)}
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 outline-none"
               >
-                {memberOptions.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.team === '全部' ? option.name : `${option.name} · ${option.team}`}
-                  </option>
-                ))}
+                {isAdmin ? (
+                  memberGroupOptions.map((group) => (
+                    <optgroup key={group.label} label={group.label}>
+                      {group.options.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))
+                ) : (
+                  memberOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.team === '全部' ? option.name : `${option.name} · ${option.team}`}
+                    </option>
+                  ))
+                )}
               </select>
-              <div className="text-sm text-slate-500">
-                当前查看：
-                {' '}
-                <span className="font-medium text-slate-700">{dashboard.targetLabel ?? '全部人员'}</span>
-              </div>
             </div>
           </div>
         ) : null}
         <div className="mt-5 rounded-3xl border border-slate-200 bg-slate-50 p-4">
-          <div className="grid grid-cols-[88px_minmax(0,1fr)_88px_minmax(0,1fr)_1fr_88px_120px] items-center gap-3">
+          <div className="grid grid-cols-[88px_minmax(0,1fr)_88px_minmax(0,1fr)_auto_1fr_88px_120px] items-center gap-3">
             <div className="text-sm text-slate-500">起始时间</div>
             <input
               type="datetime-local"
@@ -515,6 +559,48 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
               min={dateRange.startDate || undefined}
               className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
             />
+            <div className="flex flex-nowrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const nextRange = buildQuarterRange(false);
+                  setQuickRangePreset('quarter');
+                  setDateRange({
+                    startDate: nextRange.startDate,
+                    endDate: nextRange.endDate,
+                  });
+                  handleQuery(nextRange);
+                }}
+                disabled={isQuerying}
+                className={`whitespace-nowrap rounded-full border px-3 py-2 text-sm font-medium disabled:opacity-60 ${
+                  quickRangePreset === 'quarter'
+                    ? 'border-slate-900 bg-slate-900 text-white'
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                本季度
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const nextRange = buildQuarterRange(true);
+                  setQuickRangePreset('quarter_to_today');
+                  setDateRange({
+                    startDate: nextRange.startDate,
+                    endDate: nextRange.endDate,
+                  });
+                  handleQuery(nextRange);
+                }}
+                disabled={isQuerying}
+                className={`whitespace-nowrap rounded-full border px-3 py-2 text-sm font-medium disabled:opacity-60 ${
+                  quickRangePreset === 'quarter_to_today'
+                    ? 'border-slate-900 bg-slate-900 text-white'
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                本季度至今天
+              </button>
+            </div>
             <div />
             <div className="text-sm text-right text-slate-500">调休天数</div>
             <div className="flex items-center rounded-2xl border border-slate-200 bg-white">
@@ -551,12 +637,6 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
               <div className="text-sm text-slate-500">预期有效工时</div>
               <div className="mt-3 text-4xl font-semibold text-slate-900">{expectedEffectiveDays.toFixed(1)}天</div>
             </div>
-            <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="text-sm text-slate-500">计算说明</div>
-              <div className="mt-2 text-sm leading-6 text-slate-600">
-                法定工作日 {baseWorkdayCount.toFixed(1)} 天，调休天数 {Number(compensatoryDays || 0).toFixed(1)} 天，先扣减后按角色系数 {expectedCoefficient.toFixed(2)} 计算，折合 {expectedEffectiveDays.toFixed(1)} 天。
-              </div>
-            </div>
           </Card>
           <div className="col-span-7 grid grid-cols-2 gap-5">
             <StatCard title="当前已排总有效工时" value={`${formatRawDays(dashboard.scheduledEffectiveHours)}天`} sub="" />
@@ -576,23 +656,21 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
           </div>
           <div className="mt-5 grid grid-cols-2 gap-5">
             <div className={`rounded-2xl border p-5 ${scheduledStatus.bgClass}`}>
-              <div className="text-sm text-slate-500">任务分配情况</div>
-              <div className={`mt-2 text-2xl font-semibold ${scheduledStatus.textClass}`}>
-                {scheduledStatus.sign}
-                {formatRawDays(scheduledDelta)}天
-              </div>
-              <div className="mt-2 text-sm text-slate-600">
-                (当前已排总有效工时 + 季度逾期总有效工时) - 预期有效工时 = {formatRawDays(dashboard.scheduledEffectiveHours + dashboard.quarterlyOverdueEffectiveHours)}天 - {expectedEffectiveDays.toFixed(1)}天
+              <div className="flex items-center justify-between gap-4">
+                <div className="text-sm text-slate-500">任务分配情况</div>
+                <div className={`text-right text-4xl font-semibold ${scheduledStatus.textClass}`}>
+                  {scheduledStatus.sign}
+                  {formatRawDays(scheduledDelta)}天
+                </div>
               </div>
             </div>
             <div className={`rounded-2xl border p-5 ${completedStatus.bgClass}`}>
-              <div className="text-sm text-slate-500">任务完成情况</div>
-              <div className={`mt-2 text-2xl font-semibold ${completedStatus.textClass}`}>
-                {completedStatus.sign}
-                {formatRawDays(completedDelta)}天
-              </div>
-              <div className="mt-2 text-sm text-slate-600">
-                (已完成有效工时 + 季度逾期完成工时) - 预期有效工时 = {formatRawDays(dashboard.completedEffectiveHours + dashboard.quarterlyOverdueCompletedHours)}天 - {expectedEffectiveDays.toFixed(1)}天
+              <div className="flex items-center justify-between gap-4">
+                <div className="text-sm text-slate-500">任务完成情况</div>
+                <div className={`text-right text-4xl font-semibold ${completedStatus.textClass}`}>
+                  {completedStatus.sign}
+                  {formatRawDays(completedDelta)}天
+                </div>
               </div>
             </div>
           </div>
@@ -801,13 +879,12 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
           </div>
         </div>
         <div className={`mt-5 rounded-3xl border border-slate-200 ${showAllTasks ? '' : 'max-h-[320px] overflow-auto'}`}>
-          <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1.82fr)_108px_148px_108px_108px_176px_108px] gap-6 border-b border-slate-200 bg-slate-50 px-5 py-4 text-sm font-medium text-slate-500">
+          <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1.82fr)_108px_148px_108px_108px_108px] gap-6 border-b border-slate-200 bg-slate-50 px-5 py-4 text-sm font-medium text-slate-500">
             <div>任务名称</div>
             <div>任务类型</div>
             <div>季度归属</div>
             <div>任务状态</div>
             <div className="text-right">工时</div>
-            <div>链接</div>
             <div className="flex justify-end">
               <button
                 type="button"
@@ -822,14 +899,25 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
             {visibleTasks.map((task) => (
               <div
                 key={task.taskId || task.name}
-                className="grid grid-cols-[minmax(0,1.82fr)_108px_148px_108px_108px_176px_108px] items-center gap-6 bg-white px-5 py-4 text-sm transition-colors hover:bg-slate-50/70"
+                className="grid grid-cols-[minmax(0,1.82fr)_108px_148px_108px_108px_108px] items-center gap-6 bg-white px-5 py-4 text-sm transition-colors hover:bg-slate-50/70"
               >
                 <div className="min-w-0" title={task.content || task.text || task.name || task.taskId || '-'}>
-                  <div className="truncate font-medium text-slate-900">{task.content || task.text || task.name || task.taskId || '-'}</div>
+                  {(task.link || task.taskId) ? (
+                    <a
+                      href={task.link || `https://www.teambition.com/task/${encodeURIComponent(task.taskId)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="truncate font-medium text-sky-700 underline-offset-2 hover:underline"
+                    >
+                      {task.content || task.text || task.name || task.taskId || '-'}
+                    </a>
+                  ) : (
+                    <div className="truncate font-medium text-slate-900">{task.content || task.text || task.name || task.taskId || '-'}</div>
+                  )}
                 </div>
                 <div className="justify-self-start">
-                  <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium ${taskTypeTagClassMap[task.type]}`}>
-                    {task.type}
+                  <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium ${taskTypeTagClassMap[task.type] || taskTypeTagClassMap.无}`}>
+                    {task.type || '无'}
                   </span>
                 </div>
                 <div className="justify-self-start">
@@ -849,22 +937,38 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
                 <div className="text-right font-medium text-slate-700">
                   {typeof task.work_hour === 'number' ? formatRawDays(task.work_hour) : formatRawDays(task.hours)}天
                 </div>
-                <div>
-                  <a
-                    href={task.link || (task.taskId ? `https://www.teambition.com/task/${encodeURIComponent(task.taskId)}` : '#')}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
-                  >
-                    查看任务
-                  </a>
-                </div>
                 <div />
               </div>
             ))}
           </div>
         </div>
       </Card>
+      {showBusyModal ? (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="busy-updating-title"
+            className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-xl"
+          >
+            <h2 id="busy-updating-title" className="text-lg font-semibold text-slate-900">
+              正在更新中
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-slate-600">
+              正在更新中，暂时无法查询
+            </p>
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowBusyModal(false)}
+                className="rounded-2xl bg-slate-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-800"
+              >
+                我知道了
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </EmployeeLayout>
   );
 }

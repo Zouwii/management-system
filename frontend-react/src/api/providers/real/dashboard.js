@@ -3,7 +3,6 @@ import { httpRequest } from '../../client';
 let _cachedProjectId = '';
 let _cachedUserids = null;
 let _configWarmupPromise = null;
-const _teamMemberOptionsCache = new Map();
 
 function appendQuery(path, params = {}) {
   const searchParams = new URLSearchParams();
@@ -114,19 +113,18 @@ function buildTaskLink(taskId) {
   return tid ? `https://www.teambition.com/task/${encodeURIComponent(tid)}` : '';
 }
 
-function guessTaskTypeByContent(content) {
-  const text = String(content || '');
-  if (/(产品|需求|PRD|方案)/i.test(text)) return '产品';
-  if (/(订单|交付|客户|验收)/i.test(text)) return '订单';
-  return '研发';
-}
-
-function mapBusinessTypeLabel(v, fallbackContent = '') {
+function mapBusinessTypeLabel(v) {
+  if (v === null || v === undefined || String(v).trim() === '') {
+    return '无';
+  }
   const n = Number(v);
+  if (Number.isNaN(n)) {
+    return '无';
+  }
   if (n === 0) return '产品';
   if (n === 1) return '研发';
   if (n === 2) return '订单';
-  return guessTaskTypeByContent(fallbackContent);
+  return '无';
 }
 
 function mapTaskFlowStatusLabel(v) {
@@ -140,59 +138,99 @@ function mapTaskFlowStatusLabel(v) {
   return '';
 }
 
+function isUpdateBusyError(message) {
+  const text = String(message || '').toLowerCase();
+  return text.includes('update is in progress') || text.includes('更新中');
+}
+
+async function ensureNoGlobalUpdateLock() {
+  const res = await httpRequest('/bt/update_lock_status');
+  const locked = Boolean(res?.data?.locked);
+  if (locked) {
+    throw new Error('更新中');
+  }
+}
+
 export function realFetchDepartmentOverview() {
   return httpRequest('/dashboard/department-overview');
 }
 
-async function fetchTeamMemberOptions(teamId) {
-  const tid = String(teamId);
-  if (_teamMemberOptionsCache.has(tid)) {
-    return _teamMemberOptionsCache.get(tid);
-  }
-  const res = await httpRequest('/dashboard/personal-hours/members');
-  const all = (res?.data || {}).memberOptions || [];
-  const options = all
-    .filter((item) => String(item?.teamId || '') === tid)
-    .map((item) => ({
-      id: String(item?.id || ''),
-      name: String(item?.name || ''),
-      team: String(item?.team || ''),
-      teamId: String(item?.teamId || ''),
-    }));
-  _teamMemberOptionsCache.set(tid, options);
-  return options;
-}
-
 export function realFetchNavTeamDetail(_user, params = {}) {
-  const expected = params?.expected || 'quarter';
-  return Promise.all([
-    httpRequest(appendQuery('/dashboard/nav-team-detail', { expected })),
-    fetchTeamMemberOptions(0),
-    fetchLastUpdateTime(),
-  ]).then(([base, memberOptions, tr]) => ({
-    ...(base || {}),
-    data: {
-      ...(base?.data || {}),
-      memberOptions,
-      lastUpdatedAt: tr?.lastUpdateTime || '',
-    },
-  }));
+  const expected = String(params?.expected || 'quarter');
+  const now = new Date();
+  const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
+  const pad = (n) => String(n).padStart(2, '0');
+  const formatLocalInput = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  const start = expected === 'last_quarter'
+    ? new Date(quarterStartMonth === 0 ? now.getFullYear() - 1 : now.getFullYear(), quarterStartMonth === 0 ? 9 : quarterStartMonth - 3, 1, 0, 0, 0)
+    : new Date(now.getFullYear(), quarterStartMonth, 1, 0, 0, 0);
+  const end = expected === 'current'
+    ? new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
+    : expected === 'last_quarter'
+      ? new Date(now.getFullYear(), quarterStartMonth, 0, 23, 59, 59)
+      : new Date(now.getFullYear(), quarterStartMonth + 3, 0, 23, 59, 59);
+  return Promise.resolve()
+    .then(async () => {
+      const projectId = await fetchProjectId();
+      return httpRequest('/bt/stats/team_quarter_workhours', {
+        method: 'POST',
+        body: JSON.stringify({
+          teamId: '0',
+          projectId,
+          start_time: formatLocalInput(start),
+          end_time: formatLocalInput(end),
+          exclude_character_zero: true,
+        }),
+      });
+    })
+    .then((res) => ({
+      code: 200,
+      error: '',
+      data: {
+        rows: res?.data?.rows || [],
+        memberOptions: res?.data?.memberOptions || [],
+        lastUpdatedAt: res?.data?.lastUpdatedAt || '',
+      },
+    }));
 }
 
 export function realFetchIntegrationTeamDetail(_user, params = {}) {
-  const expected = params?.expected || 'quarter';
-  return Promise.all([
-    httpRequest(appendQuery('/dashboard/integration-team-detail', { expected })),
-    fetchTeamMemberOptions(1),
-    fetchLastUpdateTime(),
-  ]).then(([base, memberOptions, tr]) => ({
-    ...(base || {}),
-    data: {
-      ...(base?.data || {}),
-      memberOptions,
-      lastUpdatedAt: tr?.lastUpdateTime || '',
-    },
-  }));
+  const expected = String(params?.expected || 'quarter');
+  const now = new Date();
+  const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
+  const pad = (n) => String(n).padStart(2, '0');
+  const formatLocalInput = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  const start = expected === 'last_quarter'
+    ? new Date(quarterStartMonth === 0 ? now.getFullYear() - 1 : now.getFullYear(), quarterStartMonth === 0 ? 9 : quarterStartMonth - 3, 1, 0, 0, 0)
+    : new Date(now.getFullYear(), quarterStartMonth, 1, 0, 0, 0);
+  const end = expected === 'current'
+    ? new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
+    : expected === 'last_quarter'
+      ? new Date(now.getFullYear(), quarterStartMonth, 0, 23, 59, 59)
+      : new Date(now.getFullYear(), quarterStartMonth + 3, 0, 23, 59, 59);
+  return Promise.resolve()
+    .then(async () => {
+      const projectId = await fetchProjectId();
+      return httpRequest('/bt/stats/team_quarter_workhours', {
+        method: 'POST',
+        body: JSON.stringify({
+          teamId: '1',
+          projectId,
+          start_time: formatLocalInput(start),
+          end_time: formatLocalInput(end),
+          exclude_character_zero: true,
+        }),
+      });
+    })
+    .then((res) => ({
+      code: 200,
+      error: '',
+      data: {
+        rows: res?.data?.rows || [],
+        memberOptions: res?.data?.memberOptions || [],
+        lastUpdatedAt: res?.data?.lastUpdatedAt || '',
+      },
+    }));
 }
 
 export function realFetchPersonalHours(_user, params = {}) {
@@ -240,6 +278,7 @@ export function realQueryPersonalHours(_user, payload) {
 
   return Promise.resolve()
     .then(async () => {
+      await ensureNoGlobalUpdateLock();
       // 先取现有 dashboard 结构，避免页面字段缺失。
       const base = await httpRequest('/dashboard/personal-hours/query', {
         method: 'POST',
@@ -285,7 +324,7 @@ export function realQueryPersonalHours(_user, payload) {
             business_type: row?.business_type ?? null,
             task_flow_status_id: row?.task_flow_status_id ?? null,
             name: taskName,
-            type: mapBusinessTypeLabel(row?.business_type, taskName),
+            type: mapBusinessTypeLabel(row?.business_type),
             quarterCategory: row?.is_overdue ? '季度逾期排期' : '当前季度排期',
             status: mapTaskFlowStatusLabel(row?.task_flow_status_id),
             hours: 0,
@@ -301,7 +340,7 @@ export function realQueryPersonalHours(_user, payload) {
           }
           if (row?.business_type !== undefined && row?.business_type !== null) {
             prev.business_type = row.business_type;
-            prev.type = mapBusinessTypeLabel(row.business_type, taskName);
+            prev.type = mapBusinessTypeLabel(row.business_type);
           }
           if (row?.task_flow_status_id !== undefined && row?.task_flow_status_id !== null) {
             prev.task_flow_status_id = row.task_flow_status_id;
@@ -336,9 +375,10 @@ export function realQueryPersonalHours(_user, payload) {
         ['产品', 0],
         ['订单', 0],
         ['研发', 0],
+        ['无', 0],
       ]);
       taskDetails.forEach((x) => {
-        const t = distributionMap.has(x.type) ? x.type : '研发';
+        const t = distributionMap.has(x.type) ? x.type : '无';
         distributionMap.set(t, Number(distributionMap.get(t) || 0) + Number(x.hours || 0));
       });
       const taskDistribution = Array.from(distributionMap.entries()).map(([type, hours]) => ({
@@ -366,6 +406,12 @@ export function realQueryPersonalHours(_user, payload) {
           selectedTarget: target,
         },
       };
+    })
+    .catch((error) => {
+      if (isUpdateBusyError(error?.message)) {
+        throw new Error('更新中');
+      }
+      throw error;
     });
 }
 
@@ -380,6 +426,7 @@ export function realUpdatePersonalHours(_user, payload) {
 
   return Promise.resolve()
     .then(async () => {
+      await ensureNoGlobalUpdateLock();
       const projectId = await fetchProjectId();
       const userids = await fetchUserids();
       const executorIds = resolveExecutorIdsByTarget(user, target, userids);
@@ -408,6 +455,12 @@ export function realUpdatePersonalHours(_user, payload) {
           lastUpdatedAt: tr.lastUpdateTime || '',
         },
       };
+    })
+    .catch((error) => {
+      if (isUpdateBusyError(error?.message)) {
+        throw new Error('更新中');
+      }
+      throw error;
     });
 }
 
@@ -420,6 +473,7 @@ export function realFullUpdatePersonalHours(_user, payload) {
 
   return Promise.resolve()
     .then(async () => {
+      await ensureNoGlobalUpdateLock();
       const projectId = await fetchProjectId();
       const userids = await fetchUserids();
       const executorIds = resolveExecutorIdsByTarget(user, target, userids);
@@ -447,6 +501,12 @@ export function realFullUpdatePersonalHours(_user, payload) {
           lastUpdatedAt: tr.lastUpdateTime || '',
         },
       };
+    })
+    .catch((error) => {
+      if (isUpdateBusyError(error?.message)) {
+        throw new Error('更新中');
+      }
+      throw error;
     });
 }
 

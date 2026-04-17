@@ -101,6 +101,34 @@ def _release_update_lock(lock_key: str, owner: str) -> None:
         sess.close()
 
 
+def _get_update_lock_status(lock_key: str = DEFAULT_UPDATE_LOCK_KEY) -> Dict[str, Any]:
+    now = datetime.now(timezone.utc)
+    sess = SessionLocal()
+    try:
+        row = sess.query(UpdateLock).filter(UpdateLock.lock_key == str(lock_key)).first()
+        if not row:
+            return {"locked": False, "lock": {}}
+        row_exp = _cmp_dt_utc(getattr(row, "expires_at", None))
+        if row_exp and row_exp > now:
+            return {
+                "locked": True,
+                "lock": {
+                    "lock_key": str(lock_key),
+                    "owner": str(getattr(row, "owner", "") or ""),
+                    "expires_at": row_exp.isoformat(),
+                },
+            }
+        # 锁已过期：清理脏锁，避免阻塞后续操作
+        sess.delete(row)
+        sess.commit()
+        return {"locked": False, "lock": {}}
+    except Exception as e:
+        sess.rollback()
+        return {"locked": False, "error": str(e), "lock": {}}
+    finally:
+        sess.close()
+
+
 def _parse_iso_dt(s: Optional[str]) -> Optional[datetime]:
     if not s:
         return None

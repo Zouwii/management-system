@@ -11,7 +11,7 @@ from services.config_service import (
     get_workhour_character_coefficients_service,
 )
 from services.task_sync_service import sync_project_details_in_time_range_service
-from services.workhour_aggregate_service import workdays_in_range_service
+from services.workhour_aggregate_service import team_quarter_workhours_db_service, workdays_in_range_service
 from dingtalk_client import get_config_projectids, get_config_user_meta, get_config_userids
 
 
@@ -83,6 +83,67 @@ def _load_user_character_members():
         return members
     finally:
         session.close()
+
+
+def _load_current_user_scope(user_id: str, user_name: str = ""):
+    """
+    读取当前登录人的 user_character 信息，用于限定可见成员范围。
+    """
+    from db.engine import SessionLocal
+    from db.orm import UserCharacter as DbUserCharacter
+
+    uid = str(user_id or "").strip()
+    uname = str(user_name or "").strip()
+    if not uid and not uname:
+        return {
+            "character": None,
+            "teamId": "",
+            "isNavLead": False,
+            "isServoLead": False,
+        }
+
+    session = SessionLocal()
+    try:
+        row = None
+        if uid:
+            row = session.query(DbUserCharacter).filter(DbUserCharacter.user_id == uid).first()
+        if not row and uname:
+            row = session.query(DbUserCharacter).filter(DbUserCharacter.name == uname).first()
+        if not row:
+            return {
+                "character": None,
+                "teamId": "",
+                "isNavLead": False,
+                "isServoLead": False,
+            }
+        return {
+            "character": _to_character(getattr(row, "character", None), default=0),
+            "teamId": str(getattr(row, "team_id", "") or ""),
+            "isNavLead": bool(getattr(row, "is_nav_lead", False)),
+            "isServoLead": bool(getattr(row, "is_servo_lead", False)),
+        }
+    finally:
+        session.close()
+
+
+def _filter_member_options_by_scope(member_options, current_scope):
+    """
+    工时管理下拉成员过滤规则：
+    1) 所有 character=0 的成员不展示
+    2) nav lead 仅看导航组（teamId=0）
+    3) servo lead 仅看对接组（teamId=1）
+    """
+    options = list(member_options or [])
+    # 先全局过滤 character=0
+    options = [m for m in options if _to_character(m.get("character"), default=0) != 0]
+
+    is_nav_lead = bool((current_scope or {}).get("isNavLead"))
+    is_servo_lead = bool((current_scope or {}).get("isServoLead"))
+    if is_nav_lead and not is_servo_lead:
+        return [m for m in options if str(m.get("teamId") or "") == "0"]
+    if is_servo_lead and not is_nav_lead:
+        return [m for m in options if str(m.get("teamId") or "") == "1"]
+    return options
 
 
 def _load_single_user_character_member(user_id: str, user_name: str = ""):
@@ -208,6 +269,7 @@ def _group_detail_rows(team_id_value: str, expected_mode: str = "quarter"):
         members = (
             session.query(DbUserCharacter)
             .filter(DbUserCharacter.team_id == str(team_id_value))
+            .filter(DbUserCharacter.character != 0)
             .order_by(DbUserCharacter.user_id.asc())
             .all()
         )
@@ -224,6 +286,8 @@ def _group_detail_rows(team_id_value: str, expected_mode: str = "quarter"):
                 getattr(m, "is_servo_lead", False),
             )
             member_character = _to_character(getattr(m, "character", None), default=0)
+            if member_character == 0:
+                continue
             coefficient = float(coeff_map.get(str(member_character), 1.0) or 1.0)
             expected_effective_hours = quarter_expected_days * coefficient
 
@@ -282,6 +346,7 @@ def _group_detail_rows(team_id_value: str, expected_mode: str = "quarter"):
 
             rows.append(
                 {
+                    "userId": uid,
                     "name": name,
                     "role": role_label,
                     "quarterExpectedHours": round(expected_effective_hours, 2),
@@ -374,7 +439,12 @@ def _build_default_personal_hours_payload(user, target: str):
     member_options = []
     if role in {"manager", "admin"}:
         all_members = _load_user_character_members()
-        member_options = [{"id": "ALL", "name": "全部人员", "team": "全部", "teamId": ""}] + all_members
+        current_scope = _load_current_user_scope(
+            user_id=str((user or {}).get("user_id") or ""),
+            user_name=str((user or {}).get("name") or ""),
+        )
+        scoped_members = _filter_member_options_by_scope(all_members, current_scope)
+        member_options = [{"id": "ALL", "name": "全部人员", "team": "全部", "teamId": ""}] + scoped_members
     elif user_id or user_name:
         me = _load_single_user_character_member(user_id=user_id, user_name=user_name)
         if me:
@@ -394,6 +464,12 @@ def _build_default_personal_hours_payload(user, target: str):
         member_options = [{"id": user_name, "name": user_name, "team": str((user or {}).get("team") or "")}]
 
     selected_target = str(target or "").strip() or "ALL"
+    member_ids = {str(item.get("id") or "").strip() for item in member_options}
+    if selected_target not in member_ids:
+        if "ALL" in member_ids:
+            selected_target = "ALL"
+        else:
+            selected_target = next((mid for mid in member_ids if mid), "")
     if selected_target == "ALL":
         target_label = "全部人员"
     else:
@@ -637,7 +713,25 @@ def nav_team_detail():
     expected_mode = str(request.args.get("expected") or "quarter").strip()
     if expected_mode not in {"quarter", "current", "last_quarter"}:
         expected_mode = "quarter"
-    return _ok(_group_detail_rows("0", expected_mode=expected_mode))
+    projectids = get_config_projectids() or {}
+    project_id = ""
+    if isinstance(projectids, dict) and projectids:
+        project_id = str(next(iter(projectids.values())) or "").strip()
+    if not project_id:
+        return _fail("missing projectId in ids/config", code=400, data={})
+    start_dt, end_dt = _current_quarter_utc_range(expected_mode=expected_mode)
+    result = team_quarter_workhours_db_service(
+        {
+            "teamId": "0",
+            "projectId": project_id,
+            "start_time": start_dt.isoformat(),
+            "end_time": end_dt.isoformat(),
+            "exclude_character_zero": True,
+        }
+    )
+    if not result.get("success"):
+        return _fail(result.get("error", "team quarter aggregate failed"), code=400, data=result.get("data") or {})
+    return _ok(result.get("data") or {})
 
 
 @dashboard_bp.route("/integration-team-detail", methods=["GET"])
@@ -648,5 +742,23 @@ def integration_team_detail():
     expected_mode = str(request.args.get("expected") or "quarter").strip()
     if expected_mode not in {"quarter", "current", "last_quarter"}:
         expected_mode = "quarter"
-    return _ok(_group_detail_rows("1", expected_mode=expected_mode))
+    projectids = get_config_projectids() or {}
+    project_id = ""
+    if isinstance(projectids, dict) and projectids:
+        project_id = str(next(iter(projectids.values())) or "").strip()
+    if not project_id:
+        return _fail("missing projectId in ids/config", code=400, data={})
+    start_dt, end_dt = _current_quarter_utc_range(expected_mode=expected_mode)
+    result = team_quarter_workhours_db_service(
+        {
+            "teamId": "1",
+            "projectId": project_id,
+            "start_time": start_dt.isoformat(),
+            "end_time": end_dt.isoformat(),
+            "exclude_character_zero": True,
+        }
+    )
+    if not result.get("success"):
+        return _fail(result.get("error", "team quarter aggregate failed"), code=400, data=result.get("data") or {})
+    return _ok(result.get("data") or {})
 

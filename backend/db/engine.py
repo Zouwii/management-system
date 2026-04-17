@@ -129,6 +129,13 @@ def init_database() -> None:
                         "ALTER TABLE project_task_details ADD COLUMN task_flow_status_id INTEGER"
                     )
                 )
+        if "parent_task_id" not in cols_b:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE project_task_details ADD COLUMN parent_task_id VARCHAR(64)"
+                    )
+                )
 
         # C 表若不存在，create_all 理论上已创建；这里额外做一次兜底检查
         tables = set(inspector.get_table_names() or [])

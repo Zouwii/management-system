@@ -578,7 +578,14 @@ export default function TeamDetailDashboard({
             <tbody>
               {visibleHourRows.map((row, index) => (
                 <tr key={`${row.name}-${index}`} className={`${getRiskRowClass(row.allocationRiskLevel === '高风险' ? '高风险' : row.completionRiskLevel)} ${index !== visibleHourRows.length - 1 ? 'border-b border-slate-100' : ''}`}>
-                  <td className="px-5 py-4 font-medium text-slate-900">{row.name}</td>
+                  <td className="px-5 py-4 font-medium text-slate-900">
+                    <Link
+                      to={`${ROUTE_PATHS.PERSONAL_HOURS}?target=${encodeURIComponent(row.userId || row.name)}`}
+                      className="text-sky-700 underline-offset-2 hover:underline"
+                    >
+                      {row.name}
+                    </Link>
+                  </td>
                   <td className="px-5 py-4 text-slate-600">{row.role}</td>
                   <td className="px-5 py-4 text-slate-600">{formatRawDays(row[expectedConfig.rowValue])}天</td>
                   <td className="px-5 py-4 text-slate-600">{formatRawDays(row.scheduledHours)}天</td>

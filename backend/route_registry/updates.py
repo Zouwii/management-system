@@ -6,6 +6,7 @@ from flask import request
 
 from services.task_sync_service import (
     _acquire_update_lock,
+    _get_update_lock_status,
     _release_update_lock,
     DEFAULT_UPDATE_LOCK_KEY,
     full_update_service,
@@ -14,6 +15,14 @@ from services.task_sync_service import (
 
 
 def register(bp, ok, fail):
+    @bp.route("/update_lock_status", methods=["GET"])
+    def update_lock_status():
+        try:
+            status = _get_update_lock_status(DEFAULT_UPDATE_LOCK_KEY)
+            return ok(status)
+        except Exception as e:
+            return fail(str(e), code=500, data={})
+
     @bp.route("/time_range_update", methods=["POST"])
     def time_range_update():
         """

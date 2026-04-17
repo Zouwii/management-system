@@ -12,11 +12,13 @@ from zoneinfo import ZoneInfo
 
 import chinese_calendar as cn_cal
 
-from sqlalchemy import and_
+from sqlalchemy import and_, func
 
 from db.engine import SessionLocal
-from db.orm import ProjectTask, ProjectTaskDetail, ProjectTaskOverdueDetail
+from db.orm import Config as DbConfig
+from db.orm import ProjectTask, ProjectTaskDetail, ProjectTaskOverdueDetail, UserCharacter as DbUserCharacter
 from services.project_task_service import query_project_tasks_service, query_user_tasks_service
+from services.config_service import get_workhour_character_coefficients_service
 from services.workhour_util import parse_workhour_from_task_dict
 
 DEFAULT_SCENARIO_FIELD_CONFIG_ID = "647854bcd999c893061ef8b5"
@@ -114,12 +116,13 @@ def executor_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, 
     session = SessionLocal()
     try:
         # B 表：按 payload 时间窗过滤（通过 A 表 due_date 关联）
-        b_rows: List[Tuple[str, Optional[float], Optional[int], Optional[int]]] = (
+        b_rows: List[Tuple[str, Optional[float], Optional[int], Optional[int], Optional[str]]] = (
             session.query(
                 ProjectTaskDetail.task_id,
                 ProjectTaskDetail.work_hour,
                 ProjectTaskDetail.business_type,
                 ProjectTaskDetail.task_flow_status_id,
+                ProjectTaskDetail.parent_task_id,
             )
             .join(
                 ProjectTask,
@@ -159,7 +162,7 @@ def executor_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, 
         )
 
         overdue_task_ids = {str(tid) for tid, _, _, _ in c_rows if tid is not None}
-        all_task_ids = {str(tid) for tid, _, _, _ in b_rows if tid is not None} | overdue_task_ids
+        all_task_ids = {str(tid) for tid, _, _, _, _ in b_rows if tid is not None} | overdue_task_ids
 
         # A 表用于补充展示字段：content / due_date（不参与统计口径）
         content_map: Dict[str, str] = {}
@@ -208,8 +211,10 @@ def executor_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, 
     breakdown: List[Dict[str, Any]] = []
 
     # 先输出 B 的行（按 B 表顺序），对 C 里的任务标记逾期并显示 C 的 work_hour
-    for task_id, wh, bt, tf in b_rows:
+    parent_task_id_map_b: Dict[str, str] = {}
+    for task_id, wh, bt, tf, parent_tid in b_rows:
         tid = str(task_id)
+        parent_task_id_map_b[tid] = str(parent_tid or "").strip()
         is_overdue = tid in overdue_task_ids
         task_count += 1
 
@@ -226,11 +231,12 @@ def executor_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, 
                 "is_overdue": is_overdue,
                 "business_type": bt if bt is not None else business_type_map_c.get(tid),
                 "task_flow_status_id": tf if tf is not None else task_flow_status_map_c.get(tid),
+                "parent_task_id": parent_task_id_map_b.get(tid, ""),
             }
         )
 
     # 再补上：B 中不存在但 C 中存在的逾期任务（保证逾期表不空）
-    b_task_ids = {str(tid) for tid, _, _, _ in b_rows if tid is not None}
+    b_task_ids = {str(tid) for tid, _, _, _, _ in b_rows if tid is not None}
     for tid in overdue_task_ids:
         if tid in b_task_ids:
             continue
@@ -245,6 +251,7 @@ def executor_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, 
                 "is_overdue": True,
                 "business_type": business_type_map_c.get(tid),
                 "task_flow_status_id": task_flow_status_map_c.get(tid),
+                "parent_task_id": parent_task_id_map_b.get(tid, ""),
             }
         )
 
@@ -442,3 +449,208 @@ def workdays_in_range_service(payload: Dict[str, Any]) -> Dict[str, Any]:
         )
     )
     return result
+
+
+def _to_character(value: Any, default: int = 0) -> int:
+    try:
+        if value is None:
+            return int(default)
+        return int(value)
+    except Exception:
+        return int(default)
+
+
+def _team_name_from_team_id(team_id_value: Any) -> str:
+    if team_id_value is None:
+        return "未分组"
+    val = str(team_id_value).strip()
+    if val == "0":
+        return "导航组"
+    if val == "1":
+        return "对接组"
+    return "未分组"
+
+
+def _member_role_label_from_user_character(character_value: Any) -> str:
+    c = _to_character(character_value, default=1)
+    if c == 0:
+        return "组长"
+    if c == 1:
+        return "软件开发工程师"
+    if c == 2:
+        return "软件应用工程师"
+    if c == 3:
+        return "应用工程师"
+    if c == 4:
+        return "算法工程师"
+    return "软件开发工程师"
+
+
+def team_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    团队维度季度工时聚合（单接口返回 team-detail 需要的数据）：
+    - rows：每个成员的工时明细聚合
+    - memberOptions：前端筛选下拉
+    - lastUpdatedAt：页面右上角“最后同步”
+    """
+    payload = payload or {}
+    team_id = str(payload.get("teamId") or payload.get("team_id") or "").strip()
+    project_id = str(payload.get("projectId") or payload.get("project_id") or "").strip()
+    start_raw = payload.get("start_time")
+    end_raw = payload.get("end_time")
+    exclude_character_zero = str(payload.get("exclude_character_zero", "true")).strip().lower() not in {"0", "false", "no"}
+    if team_id not in {"0", "1"}:
+        return {"success": False, "error": "invalid teamId", "data": {}}
+    if not project_id:
+        return {"success": False, "error": "missing projectId", "data": {}}
+
+    def _to_utc_dt(v: Any) -> Optional[datetime]:
+        s = str(v or "").strip()
+        if not s:
+            return None
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+        try:
+            dt = datetime.fromisoformat(s)
+        except Exception:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=SH_TZ).astimezone(timezone.utc)
+        else:
+            dt = dt.astimezone(timezone.utc)
+        return dt
+
+    start_dt = _to_utc_dt(start_raw)
+    end_dt = _to_utc_dt(end_raw)
+    if not start_dt or not end_dt:
+        return {"success": False, "error": "missing or invalid start_time/end_time", "data": {}}
+    if start_dt > end_dt:
+        return {"success": False, "error": "start_time must be <= end_time", "data": {}}
+
+    coeff_out = get_workhour_character_coefficients_service() or {}
+    coeff_map = coeff_out.get("workhour_character_coefficients") or {}
+    wd_out = workdays_in_range_service(
+        {
+            "start_time": start_dt.isoformat(),
+            "end_time": end_dt.isoformat(),
+            "compensatoryDays": 0,
+        }
+    ) or {}
+    quarter_expected_days = float(((wd_out.get("data") or {}).get("effective_workday_count")) or 0.0)
+
+    session = SessionLocal()
+    try:
+        members = (
+            session.query(DbUserCharacter)
+            .filter(DbUserCharacter.team_id == team_id)
+            .order_by(DbUserCharacter.user_id.asc())
+            .all()
+        )
+
+        rows: List[Dict[str, Any]] = []
+        member_options: List[Dict[str, Any]] = []
+        for m in members:
+            uid = str(getattr(m, "user_id", "") or "").strip()
+            if not uid:
+                continue
+            member_character = _to_character(getattr(m, "character", None), default=0)
+            if exclude_character_zero and member_character == 0:
+                continue
+            name = str(getattr(m, "name", "") or uid)
+            coefficient = float(coeff_map.get(str(member_character), 1.0) or 1.0)
+            expected_effective_hours = quarter_expected_days * coefficient
+
+            b_base = (
+                session.query(ProjectTaskDetail)
+                .join(
+                    ProjectTask,
+                    and_(
+                        ProjectTask.project_id == ProjectTaskDetail.project_id,
+                        ProjectTask.task_id == ProjectTaskDetail.task_id,
+                    ),
+                )
+                .filter(ProjectTaskDetail.query_user_id == uid)
+                .filter(ProjectTaskDetail.project_id == project_id)
+                .filter(ProjectTask.due_date != None)  # noqa: E711
+                .filter(ProjectTask.due_date >= start_dt)
+                .filter(ProjectTask.due_date <= end_dt)
+            )
+            scheduled_total = float(
+                b_base.with_entities(func.coalesce(func.sum(ProjectTaskDetail.work_hour), 0.0)).scalar() or 0.0
+            )
+            completed_total = float(
+                b_base.filter(ProjectTaskDetail.task_flow_status_id == 4)
+                .with_entities(func.coalesce(func.sum(ProjectTaskDetail.work_hour), 0.0))
+                .scalar()
+                or 0.0
+            )
+
+            c_base = (
+                session.query(ProjectTaskOverdueDetail)
+                .join(
+                    ProjectTask,
+                    and_(
+                        ProjectTask.project_id == ProjectTaskOverdueDetail.project_id,
+                        ProjectTask.task_id == ProjectTaskOverdueDetail.task_id,
+                    ),
+                )
+                .filter(ProjectTaskOverdueDetail.query_user_id == uid)
+                .filter(ProjectTaskOverdueDetail.project_id == project_id)
+            )
+            overdue_effective_total = float(
+                c_base.with_entities(func.coalesce(func.sum(ProjectTaskOverdueDetail.work_hour), 0.0)).scalar() or 0.0
+            )
+            overdue_completed_total = float(
+                c_base.filter(ProjectTaskOverdueDetail.task_flow_status_id == 4)
+                .with_entities(func.coalesce(func.sum(ProjectTaskOverdueDetail.work_hour), 0.0))
+                .scalar()
+                or 0.0
+            )
+
+            allocation_delta = scheduled_total - expected_effective_hours
+            completion_delta = completed_total - expected_effective_hours
+            rows.append(
+                {
+                    "userId": uid,
+                    "name": name,
+                    "role": _member_role_label_from_user_character(member_character),
+                    "quarterExpectedHours": round(expected_effective_hours, 2),
+                    "workdayCount": round(quarter_expected_days, 2),
+                    "character": member_character,
+                    "coefficient": coefficient,
+                    "scheduledHours": round(scheduled_total, 2),
+                    "completedHours": round(completed_total, 2),
+                    "overdueEffectiveHours": round(overdue_effective_total, 2),
+                    "overdueCompletedHours": round(overdue_completed_total, 2),
+                    "allocationDelta": round(allocation_delta, 2),
+                    "completionDelta": round(completion_delta, 2),
+                    "hours": round(scheduled_total, 2),
+                }
+            )
+            member_options.append(
+                {
+                    "id": uid,
+                    "name": name,
+                    "team": _team_name_from_team_id(getattr(m, "team_id", None)),
+                    "teamId": str(getattr(m, "team_id", "") or ""),
+                }
+            )
+
+        last_row = session.query(DbConfig).filter(DbConfig.type_ == "last_update_time").first()
+        last_updated_at = str(getattr(last_row, "value", "") or "")
+        return {
+            "success": True,
+            "data": {
+                "rows": rows,
+                "memberOptions": member_options,
+                "lastUpdatedAt": last_updated_at,
+                "teamId": team_id,
+                "projectId": project_id,
+                "timeRange": {
+                    "start_time": start_dt.isoformat(),
+                    "end_time": end_dt.isoformat(),
+                },
+            },
+        }
+    finally:
+        session.close()
