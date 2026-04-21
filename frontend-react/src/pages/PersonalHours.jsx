@@ -55,6 +55,10 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
   const [showBusyModal, setShowBusyModal] = useState(false);
   const [quickRangePreset, setQuickRangePreset] = useState('quarter_to_today');
   const [selectedTeam, setSelectedTeam] = useState('');
+  const [hourStatusMember, setHourStatusMember] = useState('ALL');
+  const [hourStatusAllocationSort, setHourStatusAllocationSort] = useState('none');
+  const [hourStatusCompletionSort, setHourStatusCompletionSort] = useState('none');
+  const [hourStatusRange, setHourStatusRange] = useState('quarter');
   const isAdmin = user?.role === ROLES.ADMIN;
   const isManager = user?.role === ROLES.MANAGER;
 
@@ -171,6 +175,15 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
     () => memberGroupOptions.find((group) => group.label === selectedTeam)?.options ?? [],
     [memberGroupOptions, selectedTeam],
   );
+  const hourStatusMemberOptions = useMemo(() => {
+    const base = (memberOptions || [])
+      .filter((option) => String(option?.id || '').trim() && String(option?.id || '').trim() !== 'ALL')
+      .map((option) => ({
+        id: String(option.id),
+        name: String(option.name || option.id),
+      }));
+    return [{ id: 'ALL', name: '全部成员' }, ...base];
+  }, [memberOptions]);
 
   useEffect(() => {
     if (!canViewAllPeople) return;
@@ -189,13 +202,23 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
 
   const scheduledDelta = dashboard.scheduledEffectiveHours + dashboard.quarterlyOverdueEffectiveHours - expectedEffectiveDays;
   const completedDelta = dashboard.completedEffectiveHours + dashboard.quarterlyOverdueCompletedHours - expectedEffectiveDays;
-  const filledWorkdayDays = useMemo(
-    () => (dashboard.taskDetails || []).reduce((sum, task) => {
-      const raw = Number(task.workday_duration_minutes);
+  const filledWorkdayDays = useMemo(() => {
+    const backendSum = Number(dashboard.currentQuarterWorkdayCosthourSum);
+    if (Number.isFinite(backendSum)) {
+      return backendSum;
+    }
+    return (dashboard.taskDetails || []).reduce((sum, task) => {
+      if (task?.quarterCategory !== '当前季度排期') {
+        return sum;
+      }
+      const raw = Number(
+        task.workday_costhour !== undefined && task.workday_costhour !== null
+          ? task.workday_costhour
+          : task.workday_duration_minutes
+      );
       return sum + (Number.isFinite(raw) ? raw : 0);
-    }, 0),
-    [dashboard.taskDetails],
-  );
+    }, 0);
+  }, [dashboard.currentQuarterWorkdayCosthourSum, dashboard.taskDetails]);
   const workdayFilledDelta = filledWorkdayDays - expectedWorkdayCount;
   const scheduledStatus = getDeltaStatus(scheduledDelta);
   const completedStatus = getDeltaStatus(completedDelta);
@@ -365,15 +388,22 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
     });
   }, [dashboard.taskDetails]);
   const hourComposition = useMemo(() => {
-    const rows = dashboard.taskDetails || [];
+    const backendSoftware = Number(dashboard.softwareDevHours);
+    const backendIssue = Number(dashboard.issueHandlingHours);
     let effectiveHours = 0;
     let costHours = 0;
-    rows.forEach((task) => {
-      const rawEffective = Number(task.hours || task.work_hour || 0);
-      const rawCost = Number(task.workday_duration_minutes || 0);
-      effectiveHours += Number.isFinite(rawEffective) ? rawEffective : 0;
-      costHours += Number.isFinite(rawCost) ? rawCost : 0;
-    });
+    if (Number.isFinite(backendSoftware) && Number.isFinite(backendIssue) && (backendSoftware >= 0) && (backendIssue >= 0)) {
+      effectiveHours = backendSoftware;
+      costHours = backendIssue;
+    } else {
+      const rows = dashboard.taskDetails || [];
+      rows.forEach((task) => {
+        const rawEffective = Number(task.hours || task.work_hour || 0);
+        const rawCost = Number(task.workday_costhour ?? task.workday_duration_minutes ?? 0);
+        effectiveHours += Number.isFinite(rawEffective) ? rawEffective : 0;
+        costHours += Number.isFinite(rawCost) ? rawCost : 0;
+      });
+    }
     const total = effectiveHours + costHours;
     const effectiveRatio = total > 0 ? Math.round((effectiveHours / total) * 100) : 0;
     const costRatio = total > 0 ? 100 - effectiveRatio : 0;
@@ -398,7 +428,7 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
       const month = `${Number(parts[1])}月`;
       // 与“工时数据”保持同月份口径：只累计已存在月份
       if (!bucket.has(month)) return;
-      const raw = Number(task.workday_duration_minutes || 0);
+      const raw = Number(task.workday_costhour ?? task.workday_duration_minutes ?? 0);
       if (Number.isFinite(raw)) {
         bucket.get(month).filled += raw;
       }
@@ -416,10 +446,10 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const minutePart = String(date.getMinutes()).padStart(2, '0');
     const seconds = String(date.getSeconds()).padStart(2, '0');
 
-    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+    return `${year}-${month}-${day}T${hours}:${minutePart}:${seconds}`;
   }
 
   function formatRawDays(value) {
@@ -595,7 +625,7 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
         .replace('季度逾期排期', '季度逾期');
       const workHours = typeof task.work_hour === 'number' ? formatRawDays(task.work_hour) : formatRawDays(task.hours);
       const link = task.link || (task.taskId ? `https://www.teambition.com/task/${encodeURIComponent(task.taskId)}` : '');
-      const wdRaw = task.workday_duration_minutes;
+      const wdRaw = task.workday_costhour ?? task.workday_duration_minutes;
       const wdNum = Number(wdRaw);
       const workdayCostHour = wdRaw === null || wdRaw === undefined || String(wdRaw).trim() === ''
         ? ''
@@ -896,18 +926,22 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
                 {formatRawDays(completedDelta)}天
               </div>
             </div>
-            <div className={`rounded-2xl border p-4 xl:border-l-4 xl:border-l-slate-300 ${workdayFilledStatus.bgClass}`}>
-              <div className="text-right text-sm text-slate-500">工作日耗时填写情况</div>
-              <div className={`mt-2 text-right text-3xl font-semibold ${workdayFilledStatus.textClass}`}>
-                {workdayFilledStatus.sign}
-                {formatRawDays(workdayFilledDelta)}天
+            <div className={`rounded-2xl border p-4 ${workdayFilledStatus.bgClass}`}>
+              <div className="text-sm text-slate-500">工作日耗时填写情况</div>
+              <div className="mt-2 flex min-h-[72px] items-center justify-end">
+                <div className={`text-right text-3xl font-semibold ${workdayFilledStatus.textClass}`}>
+                  {workdayFilledStatus.sign}
+                  {formatRawDays(workdayFilledDelta)}天
+                </div>
               </div>
             </div>
           </div>
         </div>
       </Card>
-      <div className="grid grid-cols-2 gap-5">
-        <Card className="flex h-full flex-col p-6">
+      <Card className="p-6">
+        <div className="text-lg font-semibold">工时分布总览</div>
+        <div className="mt-5 grid grid-cols-2 gap-5">
+        <div className="flex h-full flex-col rounded-3xl border border-slate-200 bg-white p-6">
           <div className="text-lg font-semibold">季度已排任务分布</div>
           <div className="mt-5 grid flex-1 grid-cols-2 gap-5">
             <div className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-4">
@@ -957,8 +991,8 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
               </div>
             </div>
           </div>
-        </Card>
-        <Card className="flex h-full flex-col p-6">
+        </div>
+        <div className="flex h-full flex-col rounded-3xl border border-slate-200 bg-white p-6">
           <div className="text-lg font-semibold">月度数据</div>
           <div className="mt-5 flex-1 rounded-3xl border border-slate-200 bg-slate-50 p-4">
             <div className="mb-3 text-sm font-semibold text-slate-700">工时数据</div>
@@ -1043,28 +1077,39 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
               ))}
             </div>
           </div>
-        </Card>
+        </div>
       </div>
-      <Card className="p-6">
-        <div className="grid grid-cols-2 gap-5">
+      <div className="mt-5 grid grid-cols-2 gap-5">
           <div className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-4">
-            <div className="text-sm font-semibold text-slate-700">有效工时 / 工作日耗时占比</div>
-            <div className="mt-4 flex flex-1 items-center gap-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div
-                className="h-40 w-40 rounded-full border border-slate-200"
-                style={{
-                  background: `conic-gradient(#14b8a6 0% ${hourComposition.effectiveRatio}%, #f97316 ${hourComposition.effectiveRatio}% 100%)`,
-                }}
-                title={`有效工时 ${hourComposition.effectiveRatio}% · 工作日耗时 ${hourComposition.costRatio}%`}
-              />
-              <div className="space-y-2 text-sm text-slate-600">
+            <div className="text-sm font-semibold text-slate-700">软件开发 / 问题处理占比</div>
+            <div className="mt-4 flex flex-1 flex-col rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="relative mx-auto flex h-56 w-full max-w-[520px] items-center justify-center">
+                <div
+                  className="h-40 w-40 rounded-full border border-slate-200"
+                  style={{
+                    background: `conic-gradient(#14b8a6 0% ${hourComposition.effectiveRatio}%, #f97316 ${hourComposition.effectiveRatio}% 100%)`,
+                  }}
+                  title={`软件开发 ${hourComposition.effectiveRatio}% · 问题处理 ${hourComposition.costRatio}%`}
+                />
+                <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 520 224" preserveAspectRatio="none">
+                  <line x1="180" y1="92" x2="84" y2="58" stroke="#94a3b8" strokeWidth="1.5" />
+                  <line x1="340" y1="132" x2="436" y2="170" stroke="#94a3b8" strokeWidth="1.5" />
+                </svg>
+                <div className="absolute left-4 top-20 text-xs text-slate-600">
+                  软件开发：{hourComposition.effectiveRatio}%（{formatRawDays(hourComposition.effectiveHours)}天）
+                </div>
+                <div className="absolute right-4 bottom-8 text-xs text-slate-600 text-right">
+                  问题处理：{hourComposition.costRatio}%（{formatRawDays(hourComposition.costHours)}天）
+                </div>
+              </div>
+              <div className="mt-2 flex items-center justify-center gap-6 text-xs text-slate-600">
                 <div className="flex items-center gap-2">
                   <span className="h-3 w-3 rounded-full bg-teal-500" />
-                  <span>有效工时：{hourComposition.effectiveRatio}%（{formatRawDays(hourComposition.effectiveHours)}天）</span>
+                  <span>软件开发</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="h-3 w-3 rounded-full bg-orange-500" />
-                  <span>工作日耗时：{hourComposition.costRatio}%（{formatRawDays(hourComposition.costHours)}天）</span>
+                  <span>问题处理</span>
                 </div>
               </div>
             </div>
@@ -1113,7 +1158,7 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
               </div>
             </div>
           </div>
-        </div>
+      </div>
       </Card>
       <Card className="p-6">
         <div className="flex items-center justify-between gap-4">
@@ -1308,9 +1353,9 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
                   </span>
                 </div>
                 <div className="text-right font-medium text-slate-700">
-                  {task.workday_duration_minutes === null || task.workday_duration_minutes === undefined || String(task.workday_duration_minutes).trim() === ''
+                  {task.workday_costhour === null || task.workday_costhour === undefined || String(task.workday_costhour).trim() === ''
                     ? '-'
-                    : `${formatRawDays(task.workday_duration_minutes)}天`}
+                    : `${formatRawDays(task.workday_costhour)}天`}
                 </div>
                 <div className="text-right font-medium text-slate-700">
                   {typeof task.work_hour === 'number' ? formatRawDays(task.work_hour) : formatRawDays(task.hours)}天

@@ -380,6 +380,9 @@ export function realQueryPersonalHours(_user, payload) {
 
       let quarterWorkHour = 0;
       let quarterOverdueHour = 0;
+      let currentQuarterWorkdayCosthourSum = 0;
+      let softwareDevHour = 0;
+      let issueHour = 0;
       const mergedTaskMap = new Map();
       const mergeBreakdownRows = (rows) => {
         for (const row of rows) {
@@ -406,7 +409,7 @@ export function realQueryPersonalHours(_user, payload) {
             hours: 0,
             due_time: String(row?.due_time || '').trim(),
             parent_task_id: String(row?.parent_task_id || '').trim(),
-            workday_duration_minutes: row?.workday_costhour ?? row?.workday_duration_minutes ?? null,
+            workday_costhour: row?.workday_costhour ?? row?.workday_duration_minutes ?? null,
             deadline: String(row?.due_time || '').trim() || String(endDate || '').slice(0, 10) || '',
             link: buildTaskLink(taskId),
           };
@@ -437,7 +440,7 @@ export function realQueryPersonalHours(_user, payload) {
             prev.parent_task_id = String(row.parent_task_id || '').trim();
           }
           if (row?.workday_costhour !== undefined || row?.workday_duration_minutes !== undefined) {
-            prev.workday_duration_minutes = row?.workday_costhour ?? row?.workday_duration_minutes ?? null;
+            prev.workday_costhour = row?.workday_costhour ?? row?.workday_duration_minutes ?? null;
           }
           prev.hours += Number.isFinite(hour) ? hour : 0;
           if (row?.is_overdue) {
@@ -461,6 +464,9 @@ export function realQueryPersonalHours(_user, payload) {
         const d = stats?.data || {};
         quarterWorkHour += Number(d.quarter_work_hour || 0);
         quarterOverdueHour += Number(d.quarter_overdue_work_hour || 0);
+        currentQuarterWorkdayCosthourSum += Number(d.current_quarter_workday_costhour_sum || 0);
+        softwareDevHour += Number(d.software_dev_work_hour || 0);
+        issueHour += Number(d.issue_work_hour || 0);
         mergeBreakdownRows(Array.isArray(d.breakdown) ? d.breakdown : []);
       } else {
         for (const executorId of executorIds) {
@@ -476,6 +482,9 @@ export function realQueryPersonalHours(_user, payload) {
           const d = stats?.data || {};
           quarterWorkHour += Number(d.quarter_work_hour || 0);
           quarterOverdueHour += Number(d.quarter_overdue_work_hour || 0);
+          currentQuarterWorkdayCosthourSum += Number(d.current_quarter_workday_costhour_sum || 0);
+          softwareDevHour += Number(d.software_dev_work_hour || 0);
+          issueHour += Number(d.issue_work_hour || 0);
           mergeBreakdownRows(Array.isArray(d.breakdown) ? d.breakdown : []);
         }
       }
@@ -512,6 +521,9 @@ export function realQueryPersonalHours(_user, payload) {
       dashboard.quarterlyPlannedEffectiveHours = quarterWorkHour;
       dashboard.quarterlyOverdueEffectiveHours = quarterOverdueHour;
       dashboard.quarterlyOverdueCompletedHours = overdueCompletedHours;
+      dashboard.currentQuarterWorkdayCosthourSum = currentQuarterWorkdayCosthourSum;
+      dashboard.softwareDevHours = softwareDevHour;
+      dashboard.issueHandlingHours = issueHour;
       dashboard.targetLabel = resolvedTargetLabel;
       dashboard.taskDetails = taskDetails;
       dashboard.taskDistribution = taskDistribution;

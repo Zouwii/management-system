@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { registerUser } from '../api/auth';
-import Card from '../components/Card';
 import { API_MODE, API_MODES } from '../constants/api';
 import { useAuthStore } from '../store/authStore';
 import { getDefaultHomePath } from '../utils/permission';
@@ -12,7 +10,6 @@ export default function LoginPage() {
   const login = useAuthStore((state) => state.login);
   const restoreSession = useAuthStore((state) => state.restoreSession);
   const isLoading = useAuthStore((state) => state.isLoading);
-  const [form, setForm] = useState({ account: '', password: '' });
   const [message, setMessage] = useState('');
   const isRealMode = API_MODE === API_MODES.REAL;
   const authError = useMemo(() => new URLSearchParams(location.search).get('auth_error') || '', [location.search]);
@@ -40,7 +37,7 @@ export default function LoginPage() {
   async function handleLogin() {
     try {
       setMessage('');
-      const user = await login(isRealMode ? {} : form);
+      const user = await login(isRealMode ? {} : { account: 'admin', password: '123456' });
       if (isRealMode) return;
       const fallbackPath = getDefaultHomePath(user);
       const nextPath = location.state?.from ?? user.homePath ?? fallbackPath;
@@ -50,108 +47,46 @@ export default function LoginPage() {
     }
   }
 
-  async function handleRegister() {
-    await registerUser(form);
-    setMessage('当前为 mock 环境，注册入口已预留，默认请使用 README 中的演示账号登录。');
-  }
-
-  function handleChange(field, value) {
-    setForm((prev) => ({ ...prev, [field]: value }));
-  }
-
-  async function handleSubmit(event) {
-    event.preventDefault();
-    await handleLogin();
-  }
-
-  async function handleRegisterClick(event) {
-    event.preventDefault();
-    await handleRegister();
-  }
-
   return (
-    <div className="mx-auto max-w-5xl">
-      <div className="grid min-h-[calc(100vh-3rem)] grid-cols-2 gap-6">
-        <Card className="flex flex-col justify-between overflow-hidden bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(240,249,255,0.92))] p-8">
-          <div>
-            <div className="text-sm font-semibold uppercase tracking-[0.16em] text-sky-600">本体开发部数据平台</div>
-            <div className="mt-4 text-4xl font-semibold text-slate-900">登录页</div>
-            <div className="mt-4 text-sm leading-7 text-slate-500">
-              建议采用角色权限 + 数据范围权限双层控制，解决员工端、主管端和管理员端的访问边界。
+    <div className="min-h-screen flex items-center justify-center bg-[radial-gradient(circle_at_top,#eef4fb_0%,#f7f9fc_38%,#eef2f7_100%)] px-6 py-10 text-slate-900">
+      <div className="relative w-[760px] overflow-hidden rounded-[40px] border border-white/70 bg-white/88 p-16 shadow-[0_30px_100px_rgba(15,23,42,0.12)] backdrop-blur">
+        <div className="absolute -top-24 -right-16 h-56 w-56 rounded-full bg-sky-100/70 blur-3xl" />
+        <div className="absolute -bottom-24 -left-16 h-56 w-56 rounded-full bg-indigo-100/70 blur-3xl" />
+
+        <div className="relative text-center">
+          <div className="mt-8 text-[44px] font-bold tracking-[-0.02em] leading-tight text-slate-900">
+            本体开发部数据管理平台
+          </div>
+
+          <div className="mt-5 text-lg text-slate-600">
+            数据驱动 · AI驱动 · 研发效能提升
+          </div>
+
+          <div className="mx-auto mt-8 h-px w-24 bg-gradient-to-r from-transparent via-slate-300 to-transparent" />
+
+          <div className="mt-10 text-[18px] font-semibold text-slate-800">
+            登录系统
+          </div>
+
+          {message ? (
+            <div className="mt-6 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600">
+              {message}
             </div>
+          ) : null}
+
+          <button
+            type="button"
+            disabled={isLoading}
+            onClick={handleLogin}
+            className="mt-12 h-16 w-full rounded-full bg-gradient-to-r from-slate-900 to-slate-700 text-lg font-semibold text-white shadow-[0_18px_30px_rgba(15,23,42,0.18)] transition hover:translate-y-[-1px] hover:shadow-[0_22px_36px_rgba(15,23,42,0.2)] disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            使用钉钉登录
+          </button>
+
+          <div className="mt-5 text-sm text-slate-400">
+            自动识别身份并进入系统
           </div>
-        </Card>
-        <Card className="bg-[linear-gradient(180deg,rgba(255,255,255,0.97),rgba(248,250,252,0.94))] p-8">
-          <div className="text-lg font-semibold text-slate-900">{isRealMode ? '钉钉登录' : '账号登录'}</div>
-          <div className="mt-1 text-sm text-slate-500">
-            {isRealMode ? '点击下方按钮，通过钉钉授权登录。' : '请输入账号和密码登录，注册入口已预留。'}
-          </div>
-          {isRealMode ? (
-            <div className="mt-6 space-y-4">
-              {message ? (
-                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600">
-                  {message}
-                </div>
-              ) : null}
-              <button
-                type="button"
-                disabled={isLoading}
-                onClick={handleLogin}
-                className="w-full rounded-2xl bg-gradient-to-r from-slate-900 to-sky-700 px-4 py-3 text-center font-medium text-white shadow-[0_18px_30px_-18px_rgba(2,132,199,0.85)]"
-              >
-                使用钉钉登录
-              </button>
-            </div>
-          ) : (
-            <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-              <div>
-                <div className="mb-2 text-sm text-slate-500">账号</div>
-                <input
-                  value={form.account}
-                  onChange={(event) => handleChange('account', event.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 shadow-inner"
-                  placeholder="请输入账号"
-                />
-              </div>
-              <div>
-                <div className="mb-2 text-sm text-slate-500">密码</div>
-                <input
-                  type="password"
-                  value={form.password}
-                  onChange={(event) => handleChange('password', event.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white/90 px-4 py-3 text-sm text-slate-700 outline-none placeholder:text-slate-400 shadow-inner"
-                  placeholder="请输入密码"
-                />
-              </div>
-              {message ? (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
-                  {message}
-                </div>
-              ) : null}
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="rounded-2xl bg-gradient-to-r from-slate-900 to-sky-700 px-4 py-3 text-center font-medium text-white shadow-[0_18px_30px_-18px_rgba(2,132,199,0.85)]"
-                >
-                  登录
-                </button>
-                <button
-                  type="button"
-                  onClick={handleRegisterClick}
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-center font-medium text-slate-700"
-                >
-                  注册
-                </button>
-              </div>
-            </form>
-          )}
-          <div className="mt-8 grid grid-cols-3 gap-4 text-sm">
-            <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4 text-emerald-800">可查看本人数据</div>
-            <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4 text-amber-800">可查看本人 + 所管小组 + 所属部门数据</div>
-            <div className="rounded-2xl border border-sky-100 bg-sky-50 p-4 text-sky-800">可管理全平台角色与范围</div>
-          </div>
-        </Card>
+        </div>
       </div>
     </div>
   );

@@ -16,7 +16,14 @@ from sqlalchemy import and_, func
 
 from db.engine import SessionLocal
 from db.orm import Config as DbConfig
-from db.orm import ProjectTask, ProjectTaskDetail, ProjectTaskOverdueDetail, UserCharacter as DbUserCharacter
+from db.orm import (
+    ProgramIssue,
+    ProgramIssueDetail,
+    ProjectTask,
+    ProjectTaskDetail,
+    ProjectTaskOverdueDetail,
+    UserCharacter as DbUserCharacter,
+)
 from services.project_task_service import query_project_tasks_service, query_user_tasks_service
 from services.config_service import get_workhour_character_coefficients_service
 from services.workhour_util import parse_workhour_from_task_dict
@@ -126,7 +133,7 @@ def executor_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, 
                 ProjectTaskDetail.task_flow_status_id,
                 ProjectTaskDetail.parent_task_id,
                 ProjectTaskDetail.task_nature,
-                ProjectTaskDetail.workday_duration_minutes,
+                ProjectTaskDetail.workday_costhour,
             )
             .join(
                 ProjectTask,
@@ -152,7 +159,7 @@ def executor_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, 
                 ProjectTaskOverdueDetail.business_type,
                 ProjectTaskOverdueDetail.task_flow_status_id,
                 ProjectTaskOverdueDetail.task_nature,
-                ProjectTaskOverdueDetail.workday_duration_minutes,
+                ProjectTaskOverdueDetail.workday_costhour,
             )
             .join(
                 ProjectTask,
@@ -164,6 +171,28 @@ def executor_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, 
             .filter(ProjectTaskOverdueDetail.project_id == project_id)
             .filter(ProjectTaskOverdueDetail.query_user_id == executor_id)
             .filter(ProjectTask.scenario_field_config_id == DEFAULT_SCENARIO_FIELD_CONFIG_ID)
+            .all()
+        )
+
+        # B2 表：问题处理明细（按 payload 时间窗过滤，基于 program_issue.due_date）
+        issue_rows: List[Tuple[str, Optional[float]]] = (
+            session.query(
+                ProgramIssueDetail.task_id,
+                ProgramIssueDetail.work_hour,
+            )
+            .join(
+                ProgramIssue,
+                and_(
+                    ProgramIssue.project_id == ProgramIssueDetail.project_id,
+                    ProgramIssue.task_id == ProgramIssueDetail.task_id,
+                ),
+            )
+            .filter(ProgramIssueDetail.project_id == project_id)
+            .filter(ProgramIssueDetail.query_user_id == executor_id)
+            .filter(ProgramIssue.scenario_field_config_id == DEFAULT_SCENARIO_FIELD_CONFIG_ID)
+            .filter(ProgramIssue.due_date != None)  # noqa: E711
+            .filter(ProgramIssue.due_date >= start_dt)
+            .filter(ProgramIssue.due_date <= end_dt)
             .all()
         )
 
@@ -217,6 +246,7 @@ def executor_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, 
             overdue_total += float(wh)
 
     total = 0.0
+    current_quarter_workday_costhour_sum = 0.0
     task_count = 0
     breakdown: List[Dict[str, Any]] = []
 
@@ -232,6 +262,15 @@ def executor_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, 
         if show_wh is not None and isinstance(show_wh, (int, float)) and show_wh == show_wh and not is_overdue:
             total += float(show_wh)
 
+        resolved_workday_costhour = wdm if wdm is not None else workday_costhour_map_c.get(tid)
+        if (
+            not is_overdue
+            and resolved_workday_costhour is not None
+            and isinstance(resolved_workday_costhour, (int, float))
+            and resolved_workday_costhour == resolved_workday_costhour
+        ):
+            current_quarter_workday_costhour_sum += float(resolved_workday_costhour)
+
         breakdown.append(
             {
                 "taskId": tid,
@@ -243,7 +282,7 @@ def executor_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, 
                 "task_flow_status_id": tf if tf is not None else task_flow_status_map_c.get(tid),
                 "parent_task_id": parent_task_id_map_b.get(tid, ""),
                 "task_nature": tn if tn is not None else task_nature_map_c.get(tid),
-                "workday_costhour": wdm if wdm is not None else workday_costhour_map_c.get(tid),
+                "workday_costhour": resolved_workday_costhour,
             }
         )
 
@@ -272,15 +311,31 @@ def executor_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, 
     total = round(total * 100) / 100
     overdue_total = round(overdue_total * 100) / 100
 
+    current_quarter_workday_costhour_sum = round(current_quarter_workday_costhour_sum * 100) / 100
+
+    issue_total = 0.0
+    issue_count = 0
+    for _task_id, wh in issue_rows:
+        issue_count += 1
+        if wh is not None and isinstance(wh, (int, float)) and wh == wh:
+            issue_total += float(wh)
+    issue_total = round(issue_total * 100) / 100
+    # 软件开发工时口径：仅当前季度排期（B表），不包含逾期（C表）。
+    software_dev_total = round(total * 100) / 100
+
     out = {
         "success": True,
         "data": {
             "quarter_work_hour": total,
+            "current_quarter_workday_costhour_sum": current_quarter_workday_costhour_sum,
             "quarter_overdue_work_hour": overdue_total,
+            "software_dev_work_hour": software_dev_total,
+            "issue_work_hour": issue_total,
             "executor_id": executor_id,
             "project_id": project_id,
             "task_count": task_count,
             "overdue_task_count": overdue_count,
+            "issue_task_count": issue_count,
             "breakdown": breakdown,
             "time_range": {
                 "start_time": start_dt.isoformat(),
@@ -312,9 +367,13 @@ def executor_all_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[s
             "success": True,
             "data": {
                 "quarter_work_hour": 0.0,
+                "current_quarter_workday_costhour_sum": 0.0,
                 "quarter_overdue_work_hour": 0.0,
+                "software_dev_work_hour": 0.0,
+                "issue_work_hour": 0.0,
                 "task_count": 0,
                 "overdue_task_count": 0,
+                "issue_task_count": 0,
                 "breakdown": [],
                 "executor_count": 0,
                 "executor_ids": [],
@@ -329,8 +388,12 @@ def executor_all_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[s
 
     merged: Dict[str, Dict[str, Any]] = {}
     quarter_total = 0.0
+    current_quarter_workday_costhour_sum = 0.0
     overdue_total = 0.0
+    software_dev_total = 0.0
+    issue_total = 0.0
     overdue_task_count = 0
+    issue_task_count = 0
 
     for executor_id in executor_ids:
         one = executor_quarter_workhours_db_service(
@@ -345,8 +408,12 @@ def executor_all_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[s
             return one
         data = one.get("data") or {}
         quarter_total += float(data.get("quarter_work_hour") or 0.0)
+        current_quarter_workday_costhour_sum += float(data.get("current_quarter_workday_costhour_sum") or 0.0)
         overdue_total += float(data.get("quarter_overdue_work_hour") or 0.0)
+        software_dev_total += float(data.get("software_dev_work_hour") or 0.0)
+        issue_total += float(data.get("issue_work_hour") or 0.0)
         overdue_task_count += int(data.get("overdue_task_count") or 0)
+        issue_task_count += int(data.get("issue_task_count") or 0)
         for row in (data.get("breakdown") or []):
             task_id = str((row or {}).get("taskId") or "").strip()
             if not task_id:
@@ -376,9 +443,13 @@ def executor_all_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[s
         "success": True,
         "data": {
             "quarter_work_hour": round(quarter_total * 100) / 100,
+            "current_quarter_workday_costhour_sum": round(current_quarter_workday_costhour_sum * 100) / 100,
             "quarter_overdue_work_hour": round(overdue_total * 100) / 100,
+            "software_dev_work_hour": round(software_dev_total * 100) / 100,
+            "issue_work_hour": round(issue_total * 100) / 100,
             "task_count": len(merged),
             "overdue_task_count": overdue_task_count,
+            "issue_task_count": issue_task_count,
             "breakdown": list(merged.values()),
             "executor_count": len(executor_ids),
             "executor_ids": executor_ids,

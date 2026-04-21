@@ -234,8 +234,8 @@ def _extract_task_nature(item: Dict[str, Any]) -> Optional[str]:
     return None
 
 
-def _extract_workday_duration_minutes(item: Dict[str, Any]) -> Optional[int]:
-    # 优先直接字段；语义：None=未填，0=否，>0=是且为分钟值
+def _extract_workday_costhour(item: Dict[str, Any]) -> Optional[int]:
+    # 优先直接字段；语义：None=未填，0=否，>0=是
     direct = (
         item.get("workday_duration_minutes")
         if isinstance(item, dict)
@@ -342,7 +342,7 @@ def _sync_one_detail_to_b_and_c(
         unique_id = None
     parent_id = str(item.get("parentTaskId") or item.get("parent_id") or "") or None
     task_nature = _extract_task_nature(item)
-    workday_duration_minutes = _extract_workday_duration_minutes(item)
+    workday_costhour = _extract_workday_costhour(item)
 
     if write_b:
         stmt = select(ProjectTaskDetail).where(
@@ -362,7 +362,7 @@ def _sync_one_detail_to_b_and_c(
             row.task_stage_id = str(item.get("taskStageId") or item.get("stageId") or "") or None
             row.unique_id = unique_id
             row.task_nature = task_nature
-            row.workday_duration_minutes = workday_duration_minutes
+            row.workday_costhour = workday_costhour
             row.is_overdue = is_overdue
             row.business_type = business_type
             row.task_flow_status_id = task_flow_status_id
@@ -383,7 +383,7 @@ def _sync_one_detail_to_b_and_c(
                     task_stage_id=str(item.get("taskStageId") or item.get("stageId") or "") or None,
                     unique_id=unique_id,
                     task_nature=task_nature,
-                    workday_duration_minutes=workday_duration_minutes,
+                    workday_costhour=workday_costhour,
                     is_overdue=is_overdue,
                     business_type=business_type,
                     task_flow_status_id=task_flow_status_id,
@@ -405,7 +405,7 @@ def _sync_one_detail_to_b_and_c(
                 row2.task_flow_status_id = task_flow_status_id
                 row2.parent_id = parent_id
                 row2.task_nature = task_nature
-                row2.workday_duration_minutes = workday_duration_minutes
+                row2.workday_costhour = workday_costhour
                 row2.custom_fields_json = cfs if cfs is not None else None
                 row2.raw_json = raw_blob
                 row2.fetched_at = now
@@ -420,7 +420,7 @@ def _sync_one_detail_to_b_and_c(
                         task_flow_status_id=task_flow_status_id,
                         parent_id=parent_id,
                         task_nature=task_nature,
-                        workday_duration_minutes=workday_duration_minutes,
+                        workday_costhour=workday_costhour,
                         custom_fields_json=cfs if cfs is not None else None,
                         raw_json=raw_blob,
                         fetched_at=now,
@@ -467,7 +467,7 @@ def _sync_one_issue_detail(
     scenario_id = str(item.get("scenarioFieldConfigId") or item.get("scenariofieldconfigId") or "")
     parent_id = str(item.get("parentTaskId") or item.get("parent_id") or "") or None
     task_nature = _extract_task_nature(item)
-    workday_duration_minutes = _extract_workday_duration_minutes(item)
+    workday_costhour = _extract_workday_costhour(item)
     stmt = select(ProgramIssueDetail).where(
         ProgramIssueDetail.task_id == task_id,
         ProgramIssueDetail.query_user_id == executor_id,
@@ -485,7 +485,7 @@ def _sync_one_issue_detail(
         row.unique_id = unique_id
         row.parent_id = parent_id
         row.task_nature = task_nature
-        row.workday_duration_minutes = workday_duration_minutes
+        row.workday_costhour = workday_costhour
         row.work_hour_field_id = field_id
         row.work_hour = wh
         row.business_type = business_type
@@ -517,7 +517,7 @@ def _sync_one_issue_detail(
                 unique_id=unique_id,
                 parent_id=parent_id,
                 task_nature=task_nature,
-                workday_duration_minutes=workday_duration_minutes,
+                workday_costhour=workday_costhour,
                 work_hour_field_id=field_id,
                 work_hour=wh,
                 business_type=business_type,
@@ -1212,7 +1212,7 @@ def _all_time_download_impl(payload: Dict[str, Any]) -> Dict[str, Any]:
             row.task_stage_id = str(item.get("taskStageId") or item.get("stageId") or "") or None
             row.unique_id = unique_id
             row.task_nature = _extract_task_nature(item)
-            row.workday_duration_minutes = _extract_workday_duration_minutes(item)
+            row.workday_costhour = _extract_workday_costhour(item)
             row.is_overdue = is_overdue
             row.business_type = business_type
             row.task_flow_status_id = task_flow_status_id
@@ -1233,7 +1233,7 @@ def _all_time_download_impl(payload: Dict[str, Any]) -> Dict[str, Any]:
                     task_stage_id=str(item.get("taskStageId") or item.get("stageId") or "") or None,
                     unique_id=unique_id,
                     task_nature=_extract_task_nature(item),
-                    workday_duration_minutes=_extract_workday_duration_minutes(item),
+                    workday_costhour=_extract_workday_costhour(item),
                     is_overdue=is_overdue,
                     business_type=business_type,
                     task_flow_status_id=task_flow_status_id,
@@ -1806,7 +1806,7 @@ def sync_project_details_in_time_range_service(payload: Dict[str, Any]) -> Dict[
                     row.task_stage_id = str(item.get("taskStageId") or item.get("stageId") or "") or None
                     row.unique_id = unique_id
                     row.task_nature = _extract_task_nature(item)
-                    row.workday_duration_minutes = _extract_workday_duration_minutes(item)
+                    row.workday_costhour = _extract_workday_costhour(item)
                     row.is_overdue = is_overdue
                     row.business_type = business_type
                     row.task_flow_status_id = task_flow_status_id
@@ -1827,7 +1827,7 @@ def sync_project_details_in_time_range_service(payload: Dict[str, Any]) -> Dict[
                             task_stage_id=str(item.get("taskStageId") or item.get("stageId") or "") or None,
                             unique_id=unique_id,
                             task_nature=_extract_task_nature(item),
-                            workday_duration_minutes=_extract_workday_duration_minutes(item),
+                            workday_costhour=_extract_workday_costhour(item),
                             is_overdue=is_overdue,
                             business_type=business_type,
                             task_flow_status_id=task_flow_status_id,

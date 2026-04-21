@@ -12,6 +12,7 @@ import threading
 import time as _time
 from datetime import datetime
 from datetime import timedelta
+from datetime import timezone
 
 from flask import Flask, abort, send_from_directory
 from flask_cors import CORS
@@ -104,6 +105,105 @@ def create_app() -> Flask:
 
         t = threading.Thread(target=_auto_calc_loop, daemon=True)
         t.start()
+
+    # 后台：北京时间每天 03:00 自动触发一次“全量更新”。
+    # 使用更新锁避免与手动更新并发冲突。
+    global _AUTO_FULL_UPDATE_THREAD_STARTED
+    if not globals().get("_AUTO_FULL_UPDATE_THREAD_STARTED"):
+        _AUTO_FULL_UPDATE_THREAD_STARTED = True
+
+        def _auto_full_update_loop():
+            from dingtalk_client import get_config_projectids, get_config_user_meta, get_config_userids
+            from services.task_sync_service import (
+                DEFAULT_UPDATE_LOCK_KEY,
+                _acquire_update_lock,
+                _release_update_lock,
+                full_update_service,
+            )
+
+            bj_tz = timezone(timedelta(hours=8))
+            last_trigger_date = ""
+
+            def _resolve_operator_user_id() -> str:
+                meta = get_config_user_meta() or {}
+                if isinstance(meta, dict):
+                    for _name, one in meta.items():
+                        if not isinstance(one, dict):
+                            continue
+                        try:
+                            ch = int(one.get("character", 1))
+                        except Exception:
+                            ch = 1
+                        if ch == 0:
+                            uid = str(one.get("userId") or "").strip()
+                            if uid:
+                                return uid
+
+                userids = get_config_userids() or {}
+                if isinstance(userids, dict) and userids:
+                    return str(next(iter(userids.values())) or "").strip()
+                return ""
+
+            while True:
+                try:
+                    now_bj = datetime.now(bj_tz)
+                    today = now_bj.strftime("%Y-%m-%d")
+
+                    # 每天北京时间 03:00 触发一次。
+                    if now_bj.hour == 3 and now_bj.minute == 0 and last_trigger_date != today:
+                        user_id = _resolve_operator_user_id()
+                        projectids = get_config_projectids() or {}
+                        project_id = ""
+                        if isinstance(projectids, dict) and projectids:
+                            project_id = str(next(iter(projectids.values())) or "").strip()
+
+                        if not user_id or not project_id:
+                            print(
+                                "[auto_full_update_loop] skipped: missing userId/projectId in ids config",
+                                {"userId": user_id, "projectId": project_id},
+                            )
+                            last_trigger_date = today
+                            _time.sleep(30)
+                            continue
+
+                        owner = "auto_full_update@{}".format(int(_time.time()))
+                        lock = _acquire_update_lock(DEFAULT_UPDATE_LOCK_KEY, owner)
+                        if not lock.get("ok"):
+                            print("[auto_full_update_loop] skipped: update lock occupied", lock.get("lock") or {})
+                            last_trigger_date = today
+                            _time.sleep(30)
+                            continue
+
+                        try:
+                            out = full_update_service(
+                                {
+                                    "userId": user_id,
+                                    "projectId": project_id,
+                                    "force_refresh": True,
+                                }
+                            )
+                            if out.get("success"):
+                                print(
+                                    "[auto_full_update_loop] success",
+                                    {
+                                        "date": today,
+                                        "projectId": project_id,
+                                        "userId": user_id,
+                                    },
+                                )
+                            else:
+                                print("[auto_full_update_loop] failed", out.get("error", "unknown error"))
+                        finally:
+                            _release_update_lock(DEFAULT_UPDATE_LOCK_KEY, owner)
+
+                        last_trigger_date = today
+                except Exception as e:
+                    print("[auto_full_update_loop] error:", repr(e))
+
+                _time.sleep(30)
+
+        t2 = threading.Thread(target=_auto_full_update_loop, daemon=True)
+        t2.start()
 
     @app.teardown_appcontext
     def _remove_db_session(_exc):

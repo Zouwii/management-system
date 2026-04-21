@@ -4,7 +4,6 @@ import Card from './Card';
 import SectionTitle from './SectionTitle';
 import ManagerLayout from '../layouts/ManagerLayout';
 import { ROUTE_PATHS } from '../constants/routes';
-import { ROLES } from '../constants/roles';
 import { useAuthStore } from '../store/authStore';
 import { formatDateTime } from '../utils/workHours';
 
@@ -57,15 +56,6 @@ function getRiskRowClass(level) {
   }
 
   return '';
-}
-
-function buildQuickLinks(teamName) {
-  return [
-    { label: '部门总览', to: ROUTE_PATHS.DEPARTMENT_OVERVIEW, active: false },
-    { label: '导航组', to: ROUTE_PATHS.NAV_TEAM_DETAIL, active: teamName === '导航组' },
-    { label: '对接组', to: ROUTE_PATHS.INTEGRATION_TEAM_DETAIL, active: teamName === '对接组' },
-    { label: '个人', to: ROUTE_PATHS.PERSONAL_HOURS, active: false },
-  ];
 }
 
 function getPerformanceBand(score) {
@@ -151,12 +141,10 @@ function getCurrentQuarterLabel() {
 export default function TeamDetailDashboard({
   title,
   desc,
-  teamName,
   fetcher,
   fallbackRows,
 }) {
   const user = useAuthStore((state) => state.user);
-  const isAdmin = user?.role === ROLES.ADMIN;
   const [searchParams] = useSearchParams();
   const initialExpectedParam = searchParams.get('expected');
   const initialExpectedView = ['quarter', 'current', 'last_quarter'].includes(initialExpectedParam)
@@ -386,7 +374,6 @@ export default function TeamDetailDashboard({
 
     return accumulator;
   }, []).slice(0, 4), [appliedQuarter, visibleHourRows, visiblePerformanceRows]);
-  const quickLinks = buildQuickLinks(teamName);
   const expectedConfig = expectedView === 'current'
     ? {
         label: '本季度至今天预期有效工时',
@@ -425,69 +412,67 @@ export default function TeamDetailDashboard({
           <div className="text-lg font-semibold">工时情况</div>
         </div>
         <div className="border-b border-slate-200 bg-white px-5 py-4">
-          <div className="grid gap-3">
-            <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_240px_auto]">
-              <select
-                value={hoursMemberFilter}
-                onChange={(event) => setHoursMemberFilter(event.target.value)}
-                className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none"
-              >
-                {memberOptions.map((member) => (
-                  <option key={member} value={member}>{member === '全部' ? '全部成员' : member}</option>
-                ))}
-              </select>
-              <select
-                value={expectedView}
-                onChange={(event) => setExpectedView(event.target.value)}
-                className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none"
-              >
-                <option value="quarter">本季度</option>
-                <option value="current">本季度至今天</option>
-                <option value="last_quarter">上季度</option>
-              </select>
-            </div>
-            <div className="grid gap-3 xl:grid-cols-[220px_180px_180px_auto]">
-              <select
-                value={hoursAbnormalFilter}
-                onChange={(event) => setHoursAbnormalFilter(event.target.value)}
-                className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none"
-              >
-                <option value="全部成员">全部成员</option>
-                <option value="只看异常成员">只看异常成员</option>
-                <option value="只看分配不足">只看分配不足</option>
-                <option value="只看完成不足">只看完成不足</option>
-              </select>
-            <select
-              value={allocationSort}
-              onChange={(event) => {
-                setAllocationSort(event.target.value);
-                if (event.target.value !== 'none') {
-                  setCompletionSort('none');
-                }
-              }}
-              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none"
-            >
-                <option value="none">分配差值默认</option>
-                <option value="asc">分配差值升序</option>
-                <option value="desc">分配差值降序</option>
-              </select>
-            <select
-              value={completionSort}
-              onChange={(event) => {
-                setCompletionSort(event.target.value);
-                if (event.target.value !== 'none') {
-                  setAllocationSort('none');
-                }
-              }}
-              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none"
-            >
-                <option value="none">完成差值默认</option>
-                <option value="asc">完成差值升序</option>
-                <option value="desc">完成差值降序</option>
-              </select>
-              <div className="inline-flex w-fit items-center justify-self-end rounded-2xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-500">
-                当前区间共 <span className="mx-1 font-medium text-slate-700">{formatRawDays(currentIntervalWorkdayCount)}</span> 个工作日
+          <div className="grid gap-3 xl:grid-cols-[repeat(4,minmax(0,1fr))_auto]">
+            <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+                <span className="whitespace-nowrap text-sm text-slate-500">成员</span>
+                <select
+                  value={hoursMemberFilter}
+                  onChange={(event) => setHoursMemberFilter(event.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+                >
+                  {memberOptions.map((member) => (
+                    <option key={member} value={member}>{member === '全部' ? '全部成员' : member}</option>
+                  ))}
+                </select>
               </div>
+            <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+                <span className="whitespace-nowrap text-sm text-slate-500">时间范围</span>
+                <select
+                  value={expectedView}
+                  onChange={(event) => setExpectedView(event.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+                >
+                  <option value="quarter">本季度</option>
+                  <option value="current">本季度至今天</option>
+                  <option value="last_quarter">上季度</option>
+                </select>
+            </div>
+            <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+                <span className="whitespace-nowrap text-sm text-slate-500">分配差值排序</span>
+                <select
+                  value={allocationSort}
+                  onChange={(event) => {
+                    setAllocationSort(event.target.value);
+                    if (event.target.value !== 'none') {
+                      setCompletionSort('none');
+                    }
+                  }}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+                >
+                  <option value="none">默认</option>
+                  <option value="asc">升序</option>
+                  <option value="desc">降序</option>
+                </select>
+            </div>
+            <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+                <span className="whitespace-nowrap text-sm text-slate-500">完成差值排序</span>
+                <select
+                  value={completionSort}
+                  onChange={(event) => {
+                    setCompletionSort(event.target.value);
+                    if (event.target.value !== 'none') {
+                      setAllocationSort('none');
+                    }
+                  }}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+                >
+                  <option value="none">默认</option>
+                  <option value="asc">升序</option>
+                  <option value="desc">降序</option>
+                </select>
+            </div>
+            <div className="inline-flex w-fit items-center justify-self-end rounded-2xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-500">
+              当前区间共 <span className="mx-1 font-medium text-slate-700">{formatRawDays(currentIntervalWorkdayCount)}</span> 个工作日
             </div>
           </div>
         </div>
