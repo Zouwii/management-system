@@ -104,15 +104,7 @@ export default function SideMenu({
           </div>
           {!collapsed ? (
             <div className="min-w-0">
-              <div
-                className="text-[15px] font-semibold leading-5 text-slate-900"
-                style={{
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden',
-                }}
-              >
+              <div className="text-[15px] font-semibold leading-5 text-slate-900 whitespace-nowrap max-[1400px]:whitespace-normal">
                 {title}
               </div>
               <div className="text-sm text-slate-500">{subtitle}</div>

@@ -2,7 +2,10 @@ import { httpRequest } from '../../client';
 
 let _cachedProjectId = '';
 let _cachedUserids = null;
+let _cachedUseridsKey = '';
 let _configWarmupPromise = null;
+const MEMBERS_CACHE_TTL_MS = 10 * 60 * 1000;
+const MEMBERS_CACHE_KEY_PREFIX = 'personal_hours_members_cache_v1';
 
 function appendQuery(path, params = {}) {
   const searchParams = new URLSearchParams();
@@ -34,15 +37,71 @@ async function fetchProjectId() {
   return _cachedProjectId;
 }
 
-async function fetchUserids() {
-  if (Array.isArray(_cachedUserids)) return _cachedUserids;
-  const res = await httpRequest('/dashboard/personal-hours/members');
-  const users = (res?.data || {}).memberOptions || [];
-  _cachedUserids = users.map((u) => ({
+function _buildMembersCacheKey(user = {}) {
+  const identity = String(user?.user_id || user?.userid || user?.name || 'anonymous').trim() || 'anonymous';
+  return `${MEMBERS_CACHE_KEY_PREFIX}:${identity}`;
+}
+
+function _normalizeMemberOptions(users = []) {
+  return users.map((u) => ({
     id: String(u.id || ''),
     name: String(u.name || ''),
     userId: String(u.userId || u.id || ''),
+    team: String(u.team || ''),
+    teamId: String(u.teamId || ''),
+    character: u.character === undefined || u.character === null || String(u.character).trim() === ''
+      ? null
+      : Number(u.character),
   }));
+}
+
+function _readMembersCache(user = {}) {
+  try {
+    if (typeof window === 'undefined' || !window.sessionStorage) return null;
+    const key = _buildMembersCacheKey(user);
+    const raw = window.sessionStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const savedAt = Number(parsed?.savedAt || 0);
+    const users = Array.isArray(parsed?.users) ? parsed.users : null;
+    if (!users || !savedAt) return null;
+    if ((Date.now() - savedAt) > MEMBERS_CACHE_TTL_MS) {
+      window.sessionStorage.removeItem(key);
+      return null;
+    }
+    return _normalizeMemberOptions(users);
+  } catch {
+    return null;
+  }
+}
+
+function _writeMembersCache(user = {}, users = []) {
+  try {
+    if (typeof window === 'undefined' || !window.sessionStorage) return;
+    const key = _buildMembersCacheKey(user);
+    window.sessionStorage.setItem(key, JSON.stringify({
+      savedAt: Date.now(),
+      users,
+    }));
+  } catch {
+    // ignore cache write failures (e.g. privacy mode/quota)
+  }
+}
+
+async function fetchUserids(user = {}) {
+  const key = _buildMembersCacheKey(user);
+  if (Array.isArray(_cachedUserids) && _cachedUseridsKey === key) return _cachedUserids;
+  const cached = _readMembersCache(user);
+  if (Array.isArray(cached) && cached.length > 0) {
+    _cachedUserids = cached;
+    _cachedUseridsKey = key;
+    return _cachedUserids;
+  }
+  const res = await httpRequest('/dashboard/personal-hours/members');
+  const users = (res?.data || {}).memberOptions || [];
+  _cachedUserids = _normalizeMemberOptions(users);
+  _cachedUseridsKey = key;
+  _writeMembersCache(user, users);
   return _cachedUserids;
 }
 
@@ -93,14 +152,14 @@ function resolveTargetLabelByUserids(target, userids) {
   return t;
 }
 
-async function warmupConfigCache() {
+async function warmupConfigCache(user = {}) {
   if (_cachedProjectId && Array.isArray(_cachedUserids)) {
     return;
   }
   if (_configWarmupPromise) {
     return _configWarmupPromise;
   }
-  _configWarmupPromise = Promise.all([fetchProjectId(), fetchUserids()])
+  _configWarmupPromise = Promise.all([fetchProjectId(), fetchUserids(user)])
     .then(() => undefined)
     .finally(() => {
       _configWarmupPromise = null;
@@ -136,6 +195,34 @@ function mapTaskFlowStatusLabel(v) {
   if (n === 4) return '已完成';
   if (n === 5) return '搁置';
   return '';
+}
+
+const TASK_NATURE_VALUE_ID_TO_CODE = {
+  '69d4d037c253ef42e9c31b3a': 0, // 自主型
+  '69d4d037c253ef42e9c31b39': 1, // 指派型
+  '69d4d037c253ef42e9c31b3b': 2, // 能力型
+};
+
+function mapTaskNatureCodeToLabel(v) {
+  const n = Number(v);
+  if (Number.isNaN(n)) return '无';
+  if (n === 0) return '自主型';
+  if (n === 1) return '指派型';
+  if (n === 2) return '能力型';
+  return '无';
+}
+
+function normalizeTaskNatureCode(v) {
+  if (v === null || v === undefined) return null;
+  const s = String(v).trim();
+  if (!s) return null;
+  if (Object.prototype.hasOwnProperty.call(TASK_NATURE_VALUE_ID_TO_CODE, s)) {
+    return TASK_NATURE_VALUE_ID_TO_CODE[s];
+  }
+  const n = Number(s);
+  if (Number.isNaN(n)) return null;
+  if (n === 0 || n === 1 || n === 2) return n;
+  return null;
 }
 
 function isUpdateBusyError(message) {
@@ -237,7 +324,7 @@ export function realFetchPersonalHours(_user, params = {}) {
   return Promise.resolve()
     .then(async () => {
       // 进入工时管理页时预热配置缓存，后续 query/update/fullUpdate 不再重复请求。
-      await warmupConfigCache();
+      await warmupConfigCache(_user || {});
       // 先拿初始化默认时间窗
       const base = await httpRequest(appendQuery('/dashboard/personal-hours', {
         target: params.target,
@@ -286,7 +373,7 @@ export function realQueryPersonalHours(_user, payload) {
       });
 
       const projectId = await fetchProjectId();
-      const userids = await fetchUserids();
+      const userids = await fetchUserids(user);
       const executorIds = resolveExecutorIdsByTarget(user, target, userids);
       const memberOptions = Array.isArray(base?.data?.memberOptions) ? base.data.memberOptions : [];
       const resolvedTargetLabel = resolveTargetLabelByUserids(target, memberOptions);
@@ -294,21 +381,7 @@ export function realQueryPersonalHours(_user, payload) {
       let quarterWorkHour = 0;
       let quarterOverdueHour = 0;
       const mergedTaskMap = new Map();
-
-      for (const executorId of executorIds) {
-        const stats = await httpRequest('/bt/stats/executor_quarter_workhours', {
-          method: 'POST',
-          body: JSON.stringify({
-            executorId,
-            projectId,
-            start_time: startTime,
-            end_time: endTime,
-          }),
-        });
-        const d = (stats?.data || {});
-        quarterWorkHour += Number(d.quarter_work_hour || 0);
-        quarterOverdueHour += Number(d.quarter_overdue_work_hour || 0);
-        const rows = Array.isArray(d.breakdown) ? d.breakdown : [];
+      const mergeBreakdownRows = (rows) => {
         for (const row of rows) {
           const taskId = String(row?.taskId || '').trim();
           if (!taskId) continue;
@@ -325,14 +398,18 @@ export function realQueryPersonalHours(_user, payload) {
             task_flow_status_id: row?.task_flow_status_id ?? null,
             name: taskName,
             type: mapBusinessTypeLabel(row?.business_type),
+            task_nature: row?.task_nature ?? null,
+            task_nature_code: normalizeTaskNatureCode(row?.task_nature),
+            taskNature: mapTaskNatureCodeToLabel(normalizeTaskNatureCode(row?.task_nature)),
             quarterCategory: row?.is_overdue ? '季度逾期排期' : '当前季度排期',
             status: mapTaskFlowStatusLabel(row?.task_flow_status_id),
             hours: 0,
             due_time: String(row?.due_time || '').trim(),
+            parent_task_id: String(row?.parent_task_id || '').trim(),
+            workday_duration_minutes: row?.workday_costhour ?? row?.workday_duration_minutes ?? null,
             deadline: String(row?.due_time || '').trim() || String(endDate || '').slice(0, 10) || '',
             link: buildTaskLink(taskId),
           };
-          // 每次合并都刷新展示字段，避免同 taskId 被空值覆盖导致前端名称为空。
           if (taskName) {
             prev.content = taskName;
             prev.text = taskName;
@@ -342,6 +419,12 @@ export function realQueryPersonalHours(_user, payload) {
             prev.business_type = row.business_type;
             prev.type = mapBusinessTypeLabel(row.business_type);
           }
+          if (row?.task_nature !== undefined && row?.task_nature !== null) {
+            const code = normalizeTaskNatureCode(row.task_nature);
+            prev.task_nature = row.task_nature;
+            prev.task_nature_code = code;
+            prev.taskNature = mapTaskNatureCodeToLabel(code);
+          }
           if (row?.task_flow_status_id !== undefined && row?.task_flow_status_id !== null) {
             prev.task_flow_status_id = row.task_flow_status_id;
             prev.status = mapTaskFlowStatusLabel(row.task_flow_status_id);
@@ -350,13 +433,50 @@ export function realQueryPersonalHours(_user, payload) {
             prev.due_time = String(row.due_time).trim();
             prev.deadline = String(row.due_time).trim();
           }
+          if (row?.parent_task_id !== undefined && row?.parent_task_id !== null) {
+            prev.parent_task_id = String(row.parent_task_id || '').trim();
+          }
+          if (row?.workday_costhour !== undefined || row?.workday_duration_minutes !== undefined) {
+            prev.workday_duration_minutes = row?.workday_costhour ?? row?.workday_duration_minutes ?? null;
+          }
           prev.hours += Number.isFinite(hour) ? hour : 0;
-          // 保留 is_overdue 原始字段给后续使用；季度归属/状态按当前需求先留空。
           if (row?.is_overdue) {
             prev.is_overdue = true;
             prev.quarterCategory = '季度逾期排期';
           }
           mergedTaskMap.set(taskId, prev);
+        }
+      };
+
+      if (target === 'ALL' && executorIds.length > 1) {
+        const stats = await httpRequest('/bt/stats/executor_all_quarter_workhours', {
+          method: 'POST',
+          body: JSON.stringify({
+            executorIds,
+            projectId,
+            start_time: startTime,
+            end_time: endTime,
+          }),
+        });
+        const d = stats?.data || {};
+        quarterWorkHour += Number(d.quarter_work_hour || 0);
+        quarterOverdueHour += Number(d.quarter_overdue_work_hour || 0);
+        mergeBreakdownRows(Array.isArray(d.breakdown) ? d.breakdown : []);
+      } else {
+        for (const executorId of executorIds) {
+          const stats = await httpRequest('/bt/stats/executor_quarter_workhours', {
+            method: 'POST',
+            body: JSON.stringify({
+              executorId,
+              projectId,
+              start_time: startTime,
+              end_time: endTime,
+            }),
+          });
+          const d = stats?.data || {};
+          quarterWorkHour += Number(d.quarter_work_hour || 0);
+          quarterOverdueHour += Number(d.quarter_overdue_work_hour || 0);
+          mergeBreakdownRows(Array.isArray(d.breakdown) ? d.breakdown : []);
         }
       }
 
@@ -428,7 +548,7 @@ export function realUpdatePersonalHours(_user, payload) {
     .then(async () => {
       await ensureNoGlobalUpdateLock();
       const projectId = await fetchProjectId();
-      const userids = await fetchUserids();
+      const userids = await fetchUserids(user);
       const executorIds = resolveExecutorIdsByTarget(user, target, userids);
       const resolvedTargetLabel = resolveTargetLabelByUserids(target, userids) || targetLabel;
       for (const executorId of executorIds) {
@@ -475,20 +595,23 @@ export function realFullUpdatePersonalHours(_user, payload) {
     .then(async () => {
       await ensureNoGlobalUpdateLock();
       const projectId = await fetchProjectId();
-      const userids = await fetchUserids();
+      const userids = await fetchUserids(user);
       const executorIds = resolveExecutorIdsByTarget(user, target, userids);
       const resolvedTargetLabel = resolveTargetLabelByUserids(target, userids) || targetLabel;
-      for (const executorId of executorIds) {
-        await httpRequest('/bt/full_update', {
-          method: 'POST',
-          body: JSON.stringify({
-            userId: executorId,
-            projectId,
-            maxResults: 500,
-            maxPages: 200,
-          }),
-        });
+      // 全量更新是全项目口径，不按人员分批触发；只需一次调用即可。
+      const requestUserId = String(user?.user_id || executorIds[0] || '').trim();
+      if (!requestUserId) {
+        throw new Error('missing userId');
       }
+      await httpRequest('/bt/full_update', {
+        method: 'POST',
+        body: JSON.stringify({
+          userId: requestUserId,
+          projectId,
+          maxResults: 500,
+          maxPages: 200,
+        }),
+      });
 
       await httpRequest('/bt/config/touch_last_update_time', { method: 'POST' });
       const tr = await fetchLastUpdateTime();
@@ -531,14 +654,37 @@ export function realSendAIChatSingleTask(_user, payload) {
   return httpRequest('/bt/ai/chat/single_task', {
     method: 'POST',
     body: JSON.stringify(payload),
-  });
+  }).catch(() => ({
+    code: 200,
+    error: '',
+    data: {
+      result: {
+        status: 'success',
+        result: `本地降级回复：已收到任务请求 - ${String(payload?.prompt || '').slice(0, 120)}`,
+      },
+    },
+  }));
 }
 
 export function realSendAIChatMultiTurn(_user, payload) {
   return httpRequest('/bt/ai/chat/multi_turn', {
     method: 'POST',
     body: JSON.stringify(payload),
-  });
+  }).catch(() => ({
+    code: 200,
+    error: '',
+    data: {
+      result: {
+        rounds: Array.isArray(payload?.prompts)
+          ? payload.prompts.map((p, idx) => ({
+            round: idx + 1,
+            prompt: p,
+            response: { result: `本地降级回复：${String(p || '').slice(0, 120)}` },
+          }))
+          : [],
+      },
+    },
+  }));
 }
 
 export function realSendAIChatSessionMessage(_user, payload) {
@@ -548,15 +694,38 @@ export function realSendAIChatSessionMessage(_user, payload) {
   });
 }
 
-export function realEndAIChatSession(_user, payload) {
-  return httpRequest('/bt/ai/chat/session_end', {
+export function realStartAIChatSession(_user, payload) {
+  return httpRequest('/bt/ai/chat/session_start', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
 }
 
+export function realEndAIChatSession(_user, payload) {
+  return httpRequest('/bt/ai/chat/session_end', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }).catch(() => ({
+    code: 200,
+    error: '',
+    data: {
+      conversationId: payload?.conversationId || '',
+      ended: false,
+      message: '本地降级：未连接后端会话接口',
+    },
+  }));
+}
+
 export function realFetchAIModels() {
-  return httpRequest('/bt/ai/models');
+  return httpRequest('/bt/ai/models').catch(() => ({
+    code: 200,
+    error: '',
+    data: {
+      models: [
+        { name: 'glm', description: '默认模型（本地降级）' },
+      ],
+    },
+  }));
 }
 
 export function realFetchPermissionMatrix() {

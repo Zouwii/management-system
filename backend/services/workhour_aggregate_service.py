@@ -116,13 +116,17 @@ def executor_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, 
     session = SessionLocal()
     try:
         # B 表：按 payload 时间窗过滤（通过 A 表 due_date 关联）
-        b_rows: List[Tuple[str, Optional[float], Optional[int], Optional[int], Optional[str]]] = (
+        b_rows: List[
+            Tuple[str, Optional[float], Optional[int], Optional[int], Optional[str], Optional[str], Optional[int]]
+        ] = (
             session.query(
                 ProjectTaskDetail.task_id,
                 ProjectTaskDetail.work_hour,
                 ProjectTaskDetail.business_type,
                 ProjectTaskDetail.task_flow_status_id,
                 ProjectTaskDetail.parent_task_id,
+                ProjectTaskDetail.task_nature,
+                ProjectTaskDetail.workday_duration_minutes,
             )
             .join(
                 ProjectTask,
@@ -141,12 +145,14 @@ def executor_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, 
         )
 
         # C 表：当前逾期快照口径（不按 payload 时间窗过滤）
-        c_rows: List[Tuple[str, Optional[float], Optional[int], Optional[int]]] = (
+        c_rows: List[Tuple[str, Optional[float], Optional[int], Optional[int], Optional[str], Optional[int]]] = (
             session.query(
                 ProjectTaskOverdueDetail.task_id,
                 ProjectTaskOverdueDetail.work_hour,
                 ProjectTaskOverdueDetail.business_type,
                 ProjectTaskOverdueDetail.task_flow_status_id,
+                ProjectTaskOverdueDetail.task_nature,
+                ProjectTaskOverdueDetail.workday_duration_minutes,
             )
             .join(
                 ProjectTask,
@@ -161,8 +167,8 @@ def executor_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, 
             .all()
         )
 
-        overdue_task_ids = {str(tid) for tid, _, _, _ in c_rows if tid is not None}
-        all_task_ids = {str(tid) for tid, _, _, _, _ in b_rows if tid is not None} | overdue_task_ids
+        overdue_task_ids = {str(tid) for tid, _, _, _, _, _ in c_rows if tid is not None}
+        all_task_ids = {str(tid) for tid, _, _, _, _, _, _ in b_rows if tid is not None} | overdue_task_ids
 
         # A 表用于补充展示字段：content / due_date（不参与统计口径）
         content_map: Dict[str, str] = {}
@@ -197,11 +203,15 @@ def executor_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, 
     overdue_hour_map: Dict[str, Optional[float]] = {}
     business_type_map_c: Dict[str, Optional[int]] = {}
     task_flow_status_map_c: Dict[str, Optional[int]] = {}
-    for task_id, wh, bt, tf in c_rows:
+    task_nature_map_c: Dict[str, Optional[str]] = {}
+    workday_costhour_map_c: Dict[str, Optional[int]] = {}
+    for task_id, wh, bt, tf, tn, wdm in c_rows:
         tid = str(task_id)
         overdue_hour_map[tid] = wh
         business_type_map_c[tid] = bt
         task_flow_status_map_c[tid] = tf
+        task_nature_map_c[tid] = tn
+        workday_costhour_map_c[tid] = wdm
         overdue_count += 1
         if wh is not None and isinstance(wh, (int, float)) and wh == wh:
             overdue_total += float(wh)
@@ -212,7 +222,7 @@ def executor_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, 
 
     # 先输出 B 的行（按 B 表顺序），对 C 里的任务标记逾期并显示 C 的 work_hour
     parent_task_id_map_b: Dict[str, str] = {}
-    for task_id, wh, bt, tf, parent_tid in b_rows:
+    for task_id, wh, bt, tf, parent_tid, tn, wdm in b_rows:
         tid = str(task_id)
         parent_task_id_map_b[tid] = str(parent_tid or "").strip()
         is_overdue = tid in overdue_task_ids
@@ -232,11 +242,13 @@ def executor_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, 
                 "business_type": bt if bt is not None else business_type_map_c.get(tid),
                 "task_flow_status_id": tf if tf is not None else task_flow_status_map_c.get(tid),
                 "parent_task_id": parent_task_id_map_b.get(tid, ""),
+                "task_nature": tn if tn is not None else task_nature_map_c.get(tid),
+                "workday_costhour": wdm if wdm is not None else workday_costhour_map_c.get(tid),
             }
         )
 
     # 再补上：B 中不存在但 C 中存在的逾期任务（保证逾期表不空）
-    b_task_ids = {str(tid) for tid, _, _, _, _ in b_rows if tid is not None}
+    b_task_ids = {str(tid) for tid, _, _, _, _, _, _ in b_rows if tid is not None}
     for tid in overdue_task_ids:
         if tid in b_task_ids:
             continue
@@ -252,6 +264,8 @@ def executor_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, 
                 "business_type": business_type_map_c.get(tid),
                 "task_flow_status_id": task_flow_status_map_c.get(tid),
                 "parent_task_id": parent_task_id_map_b.get(tid, ""),
+                "task_nature": task_nature_map_c.get(tid),
+                "workday_costhour": workday_costhour_map_c.get(tid),
             }
         )
 
@@ -281,6 +295,95 @@ def executor_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, 
         )
     )
     return out
+
+
+def executor_all_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    按执行者列表聚合季度工时（单次 HTTP），用于 target=ALL 场景减少前端并发请求数量。
+    """
+    payload = payload or {}
+    executor_ids_raw = payload.get("executorIds") or payload.get("executor_ids") or []
+    if not isinstance(executor_ids_raw, list):
+        return {"success": False, "error": "executorIds must be a list", "data": {}}
+    executor_ids = [str(x or "").strip() for x in executor_ids_raw if str(x or "").strip()]
+    executor_ids = list(dict.fromkeys(executor_ids))
+    if not executor_ids:
+        return {
+            "success": True,
+            "data": {
+                "quarter_work_hour": 0.0,
+                "quarter_overdue_work_hour": 0.0,
+                "task_count": 0,
+                "overdue_task_count": 0,
+                "breakdown": [],
+                "executor_count": 0,
+                "executor_ids": [],
+            },
+        }
+
+    project_id = str(payload.get("projectId") or payload.get("projectid") or "").strip()
+    start_time = payload.get("start_time")
+    end_time = payload.get("end_time")
+    if not project_id or not start_time or not end_time:
+        return {"success": False, "error": "missing projectId/start_time/end_time", "data": {}}
+
+    merged: Dict[str, Dict[str, Any]] = {}
+    quarter_total = 0.0
+    overdue_total = 0.0
+    overdue_task_count = 0
+
+    for executor_id in executor_ids:
+        one = executor_quarter_workhours_db_service(
+            {
+                "executorId": executor_id,
+                "projectId": project_id,
+                "start_time": start_time,
+                "end_time": end_time,
+            }
+        )
+        if not one.get("success"):
+            return one
+        data = one.get("data") or {}
+        quarter_total += float(data.get("quarter_work_hour") or 0.0)
+        overdue_total += float(data.get("quarter_overdue_work_hour") or 0.0)
+        overdue_task_count += int(data.get("overdue_task_count") or 0)
+        for row in (data.get("breakdown") or []):
+            task_id = str((row or {}).get("taskId") or "").strip()
+            if not task_id:
+                continue
+            raw_hour = (row or {}).get("work_hour")
+            hour = float(raw_hour) if isinstance(raw_hour, (int, float)) and raw_hour == raw_hour else 0.0
+            prev = merged.get(task_id)
+            if not prev:
+                prev = dict(row or {})
+                prev["work_hour"] = 0.0
+            prev["work_hour"] = float(prev.get("work_hour") or 0.0) + hour
+            if (row or {}).get("is_overdue"):
+                prev["is_overdue"] = True
+            if (row or {}).get("content"):
+                prev["content"] = row.get("content")
+            if (row or {}).get("due_time"):
+                prev["due_time"] = row.get("due_time")
+            if (row or {}).get("parent_task_id") is not None:
+                prev["parent_task_id"] = row.get("parent_task_id")
+            if (row or {}).get("business_type") is not None:
+                prev["business_type"] = row.get("business_type")
+            if (row or {}).get("task_flow_status_id") is not None:
+                prev["task_flow_status_id"] = row.get("task_flow_status_id")
+            merged[task_id] = prev
+
+    return {
+        "success": True,
+        "data": {
+            "quarter_work_hour": round(quarter_total * 100) / 100,
+            "quarter_overdue_work_hour": round(overdue_total * 100) / 100,
+            "task_count": len(merged),
+            "overdue_task_count": overdue_task_count,
+            "breakdown": list(merged.values()),
+            "executor_count": len(executor_ids),
+            "executor_ids": executor_ids,
+        },
+    }
 
 
 def workdays_in_range_service(payload: Dict[str, Any]) -> Dict[str, Any]:

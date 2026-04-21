@@ -1,2 +1,2 @@
-"""AI integration modules."""
+"""AI utilities."""
 

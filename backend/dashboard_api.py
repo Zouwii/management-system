@@ -78,6 +78,8 @@ def _load_user_character_members():
                     "character": _to_character(getattr(row, "character", None), default=0),
                     "team": _team_name_from_team_id(getattr(row, "team_id", None)),
                     "teamId": str(getattr(row, "team_id", "") or ""),
+                    "isNavLead": bool(getattr(row, "is_nav_lead", False)),
+                    "isServoLead": bool(getattr(row, "is_servo_lead", False)),
                 }
             )
         return members
@@ -129,13 +131,20 @@ def _load_current_user_scope(user_id: str, user_name: str = ""):
 def _filter_member_options_by_scope(member_options, current_scope):
     """
     工时管理下拉成员过滤规则：
-    1) 所有 character=0 的成员不展示
-    2) nav lead 仅看导航组（teamId=0）
-    3) servo lead 仅看对接组（teamId=1）
+    1) 仅隐藏 character=0 且同时为 nav+servo lead 的成员（双组管理员）
+    2) nav lead 查看范围仅导航组（teamId=0）
+    3) servo lead 查看范围仅对接组（teamId=1）
     """
     options = list(member_options or [])
-    # 先全局过滤 character=0
-    options = [m for m in options if _to_character(m.get("character"), default=0) != 0]
+    # 仅过滤双组管理员：character=0 且同时 isNavLead/isServoLead 为真
+    options = [
+        m for m in options
+        if not (
+            _to_character(m.get("character"), default=0) == 0
+            and bool(m.get("isNavLead"))
+            and bool(m.get("isServoLead"))
+        )
+    ]
 
     is_nav_lead = bool((current_scope or {}).get("isNavLead"))
     is_servo_lead = bool((current_scope or {}).get("isServoLead"))

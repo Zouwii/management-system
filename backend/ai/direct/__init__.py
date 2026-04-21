@@ -1,2 +1,0 @@
-"""Direct AI protocol implementations."""
-

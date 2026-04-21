@@ -1,0 +1,6 @@
+*
+!.gitignore
+!ai_session_map.json
+!claude-home/
+!claude-home/.gitkeep
+

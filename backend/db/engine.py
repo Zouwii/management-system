@@ -44,6 +44,8 @@ def _table_registry():
     from db.orm import (
         Config as DbConfig,
         NavPerfQuarterResult,
+        ProgramIssue,
+        ProgramIssueDetail,
         ProjectTask,
         ProjectTaskDetail,
         ProjectTaskOverdueDetail,
@@ -55,7 +57,9 @@ def _table_registry():
 
     main_tables = [
         ("project_tasks", ProjectTask.__table__),
+        ("program_issue", ProgramIssue.__table__),
         ("project_task_details", ProjectTaskDetail.__table__),
+        ("program_issue_detail", ProgramIssueDetail.__table__),
         ("project_task_overdue_details", ProjectTaskOverdueDetail.__table__),
         ("sync_runs", SyncRun.__table__),
         ("config", DbConfig.__table__),
@@ -136,6 +140,27 @@ def init_database() -> None:
                         "ALTER TABLE project_task_details ADD COLUMN parent_task_id VARCHAR(64)"
                     )
                 )
+        if "parent_id" not in cols_b:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE project_task_details ADD COLUMN parent_id VARCHAR(64)"
+                    )
+                )
+        if "task_nature" not in cols_b:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE project_task_details ADD COLUMN task_nature VARCHAR(128)"
+                    )
+                )
+        if "workday_duration_minutes" not in cols_b:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE project_task_details ADD COLUMN workday_duration_minutes INTEGER"
+                    )
+                )
 
         # C 表若不存在，create_all 理论上已创建；这里额外做一次兜底检查
         tables = set(inspector.get_table_names() or [])
@@ -155,6 +180,52 @@ def init_database() -> None:
                     conn.execute(
                         text(
                             "ALTER TABLE project_task_overdue_details ADD COLUMN task_flow_status_id INTEGER"
+                        )
+                    )
+            if "parent_id" not in cols_c:
+                with engine.begin() as conn:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE project_task_overdue_details ADD COLUMN parent_id VARCHAR(64)"
+                        )
+                    )
+            if "task_nature" not in cols_c:
+                with engine.begin() as conn:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE project_task_overdue_details ADD COLUMN task_nature VARCHAR(128)"
+                        )
+                    )
+            if "workday_duration_minutes" not in cols_c:
+                with engine.begin() as conn:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE project_task_overdue_details ADD COLUMN workday_duration_minutes INTEGER"
+                        )
+                    )
+
+        # B2 表字段补齐（program_issue_detail）
+        if "program_issue_detail" in tables:
+            cols_b2 = [c.get("name") for c in inspector.get_columns("program_issue_detail")]
+            if "parent_id" not in cols_b2:
+                with engine.begin() as conn:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE program_issue_detail ADD COLUMN parent_id VARCHAR(64)"
+                        )
+                    )
+            if "task_nature" not in cols_b2:
+                with engine.begin() as conn:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE program_issue_detail ADD COLUMN task_nature VARCHAR(128)"
+                        )
+                    )
+            if "workday_duration_minutes" not in cols_b2:
+                with engine.begin() as conn:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE program_issue_detail ADD COLUMN workday_duration_minutes INTEGER"
                         )
                     )
 

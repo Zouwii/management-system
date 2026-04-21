@@ -5,6 +5,7 @@ import {
   fetchAIModels,
   fetchAIInsightList,
   sendAIChatSessionMessage,
+  startAIChatSession,
 } from '../api/dashboard';
 import Card from '../components/Card';
 import SectionTitle from '../components/SectionTitle';
@@ -76,6 +77,10 @@ function createConversationId() {
   return `ai-chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function resolveOwnerKey(user) {
+  return String(user?.user_id || user?.userid || user?.name || 'anonymous');
+}
+
 function extractSessionReply(response) {
   const res = response?.data?.result;
   return String(
@@ -85,21 +90,9 @@ function extractSessionReply(response) {
   ).trim();
 }
 
-function buildModelSelectionPrompt(models) {
-  const list = Array.isArray(models) ? models : [];
-  if (!list.length) {
-    return '未获取到模型列表，默认使用 glm。';
-  }
-  const lines = list.map((item, idx) => {
-    const name = String(item?.name || '').trim() || `model-${idx + 1}`;
-    const desc = String(item?.description || '').trim();
-    return `${idx + 1}. ${name}${desc ? `（${desc}）` : ''}`;
-  });
-  return `请选择模型，回复数字即可：\n${lines.join('\n')}`;
-}
-
 export default function AIAnalysisPage() {
   const user = useAuthStore((state) => state.user);
+  const ownerKey = resolveOwnerKey(user);
   const [insights, setInsights] = useState(fallbackData);
   const [messages, setMessages] = useState([
     {
@@ -151,24 +144,32 @@ export default function AIAnalysisPage() {
         const models = Array.isArray(response?.data?.models) ? response.data.models : [];
         const fallback = models[0]?.name || 'glm';
         setAvailableModels(models);
-        setSelectedModel('');
-        setMessages([
-          {
-            id: 'assistant-model-select',
-            role: 'assistant',
-            content: buildModelSelectionPrompt(models.length ? models : [{ name: fallback }]),
-          },
-        ]);
+        setSelectedModel(fallback);
+        return startAIChatSession(user, { ownerKey }).then((startRes) => {
+          if (!active) return;
+          const welcome = extractSessionReply(startRes) || `AI 已就绪，当前模型：${fallback}。`;
+          const nextConversationId = String(startRes?.data?.conversationId || conversationId || '');
+          if (nextConversationId) {
+            setConversationId(nextConversationId);
+          }
+          setMessages([
+            {
+              id: 'assistant-ready',
+              role: 'assistant',
+              content: welcome,
+            },
+          ]);
+        });
       })
       .catch(() => {
         if (!active) return;
         setAvailableModels([{ name: 'glm', description: '默认模型' }]);
-        setSelectedModel('');
+        setSelectedModel('glm');
         setMessages([
           {
-            id: 'assistant-model-select-fallback',
+            id: 'assistant-ready-fallback',
             role: 'assistant',
-            content: buildModelSelectionPrompt([{ name: 'glm', description: '默认模型' }]),
+            content: 'AI 已就绪，当前模型：glm。请直接输入问题。',
           },
         ]);
       });
@@ -176,11 +177,11 @@ export default function AIAnalysisPage() {
     return () => {
       active = false;
     };
-  }, [user]);
+  }, [conversationId, ownerKey, user]);
 
   useEffect(() => () => {
-    endAIChatSession(user, { conversationId }).catch(() => {});
-  }, [conversationId, user]);
+    endAIChatSession(user, { ownerKey }).catch(() => {});
+  }, [conversationId, ownerKey, user]);
 
   const hourInsights = useMemo(
     () => insights
@@ -217,50 +218,19 @@ export default function AIAnalysisPage() {
     setChatError('');
     setChatSending(true);
 
-    if (!selectedModel) {
-      const choice = Number.parseInt(value, 10);
-      const chosen = Number.isFinite(choice) ? availableModels[choice - 1] : null;
-      if (!chosen) {
-        setMessages((current) => [
-          ...current,
-          {
-            id: `${Date.now()}-assistant-model-invalid`,
-            role: 'assistant',
-            content: '模型编号无效，请回复列表中的数字（例如：1）。',
-          },
-        ]);
-        setChatSending(false);
-        return;
-      }
-
-      const modelName = String(chosen.name || '').trim() || 'glm';
-      setSelectedModel(modelName);
-      setMessages((current) => [
-        ...current,
-        {
-          id: `${Date.now()}-assistant-model-selected`,
-          role: 'assistant',
-          content: `已选择模型：${modelName}。现在可以开始提问了。`,
-        },
-      ]);
-      setChatSending(false);
-      return;
-    }
-
     let aiReply = '';
     try {
-      const response = await sendAIChatSessionMessage(user, {
-        conversationId,
-        model: selectedModel,
-        prompt: value,
-        timeoutSeconds: 45,
-      });
+      const response = await sendAIChatSessionMessage(user, { prompt: value, ownerKey });
       aiReply = extractSessionReply(response);
+      const nextConversationId = String(response?.data?.conversationId || conversationId || '');
+      if (nextConversationId) {
+        setConversationId(nextConversationId);
+      }
       if (!aiReply) {
         aiReply = 'AI 暂未返回有效结果，请稍后重试。';
       }
     } catch (error) {
-      aiReply = '请求 AI 失败，请检查后端服务与 token 状态后重试。';
+      aiReply = '请求 AI 失败（可能超时），请重试或缩短问题后再试。';
       setChatError(error instanceof Error ? error.message : '请求 AI 失败');
     } finally {
       setChatSending(false);
@@ -450,18 +420,12 @@ export default function AIAnalysisPage() {
                     type="button"
                     className="rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
                     onClick={() => {
-                      endAIChatSession(user, { conversationId }).catch(() => {});
+                      endAIChatSession(user, { ownerKey }).catch(() => {});
                       const nextConversationId = createConversationId();
                       setConversationId(nextConversationId);
-                      setSelectedModel('');
+                      setSelectedModel(availableModels[0]?.name || 'glm');
                       setInput('');
-                      setMessages([
-                        {
-                          id: 'assistant-model-select-reset',
-                          role: 'assistant',
-                          content: buildModelSelectionPrompt(availableModels),
-                        },
-                      ]);
+                      setMessages([{ id: 'assistant-ready-reset', role: 'assistant', content: '正在重启 AI 会话...' }]);
                       setDraft({
                         title: '待生成任务单',
                         taskType: TASK_TYPES[1],

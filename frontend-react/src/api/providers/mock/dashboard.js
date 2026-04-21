@@ -566,6 +566,23 @@ export function mockSendAIChatSessionMessage(_user, payload) {
   }));
 }
 
+export function mockStartAIChatSession(_user, payload) {
+  const conversationId = String(payload?.conversationId || payload?.conversation_id || `mock-${Date.now()}`);
+  return request(() => ({
+    success: true,
+    conversation_id: conversationId,
+    result: {
+      type: 'result',
+      data: {
+        type: 'result',
+        result: '（Mock-会话启动）Welcome to Claude Code',
+        is_error: false,
+        duration_ms: 280,
+      },
+    },
+  }));
+}
+
 export function mockEndAIChatSession(_user, payload) {
   const conversationId = String(payload?.conversationId || payload?.conversation_id || '');
   return request(() => ({

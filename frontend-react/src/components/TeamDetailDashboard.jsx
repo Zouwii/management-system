@@ -415,34 +415,10 @@ export default function TeamDetailDashboard({
         desc={desc}
         right={(
           <div className="flex flex-wrap justify-end gap-3">
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm">组别：{teamName}</div>
             <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm">最后同步：{formatDateTime(lastUpdatedAt)}</div>
           </div>
         )}
       />
-
-      {isAdmin ? (
-        <Card className="p-6">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div>
-              <div className="text-lg font-semibold">筛选条件</div>
-            </div>
-            <div className="flex flex-wrap justify-end gap-2">
-              {quickLinks.map((item) => (
-                <Link
-                  key={item.label}
-                  to={item.to}
-                  className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
-                    item.active ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </div>
-          </div>
-        </Card>
-      ) : null}
 
       <Card className="overflow-hidden">
         <div className="border-b border-slate-200 bg-slate-50 px-5 py-5">
@@ -469,13 +445,6 @@ export default function TeamDetailDashboard({
                 <option value="current">本季度至今天</option>
                 <option value="last_quarter">上季度</option>
               </select>
-              <div className="flex items-center justify-end text-sm text-slate-500">
-                当前成员
-                {' '}
-                <span className="ml-1 font-semibold text-slate-900">{visibleHourRows.length}</span>
-                {' '}
-                人
-              </div>
             </div>
             <div className="grid gap-3 xl:grid-cols-[220px_180px_180px_auto]">
               <select
