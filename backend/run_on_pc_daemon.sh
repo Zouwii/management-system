@@ -116,7 +116,37 @@ install_deps() {
   poetry install --no-root
 }
 
+kill_port_process() {
+  local port="$1"
+  local pids=""
+  if command -v lsof >/dev/null 2>&1; then
+    pids="$(lsof -ti tcp:"${port}" 2>/dev/null || true)"
+  else
+    pids="$(ss -ltnp 2>/dev/null | awk -v p=":${port}" '$4 ~ p {print $NF}' | sed -n 's/.*pid=\([0-9]\+\).*/\1/p' || true)"
+  fi
+
+  if [ -z "${pids}" ]; then
+    echo "[tb_tool_bt] No process is using port ${port}."
+    return 0
+  fi
+
+  echo "[tb_tool_bt] Found process on port ${port}: ${pids}"
+  for pid in ${pids}; do
+    if [ -n "${pid}" ] && kill -0 "${pid}" >/dev/null 2>&1; then
+      echo "[tb_tool_bt] Killing pid ${pid} on port ${port}..."
+      kill "${pid}" >/dev/null 2>&1 || true
+      sleep 1
+      if kill -0 "${pid}" >/dev/null 2>&1; then
+        echo "[tb_tool_bt] Force killing pid ${pid}..."
+        kill -9 "${pid}" >/dev/null 2>&1 || true
+      fi
+    fi
+  done
+}
+
 start_daemon() {
+  kill_port_process "${APP_PORT}"
+
   if is_running; then
     echo "[tb_tool_bt] ${DAEMON_NAME} already running (pid $(cat "${PID_FILE}"))."
     return 0

@@ -20,6 +20,7 @@ import {
   formatDateTime,
   getDeltaStatus,
 } from '../utils/workHours';
+import { shouldHideMemberInSelector } from '../utils/memberVisibility';
 import { useAuthStore } from '../store/authStore';
 
 export default function PersonalHours({ forceCanViewAllPeople = null }) {
@@ -59,16 +60,48 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
   const [hourStatusAllocationSort, setHourStatusAllocationSort] = useState('none');
   const [hourStatusCompletionSort, setHourStatusCompletionSort] = useState('none');
   const [hourStatusRange, setHourStatusRange] = useState('quarter');
+  const latestQueryRequestIdRef = useRef(0);
   const isAdmin = user?.role === ROLES.ADMIN;
   const isManager = user?.role === ROLES.MANAGER;
 
   const normalizeMemberOptionsForViewer = (options = []) => {
     const list = Array.isArray(options) ? options : [];
-    if (!isManager) return list;
-    const currentUserId = String(user?.user_id || '').trim();
-    if (!currentUserId) return list;
-    return list.filter((option) => String(option?.id || option?.userId || '').trim() !== currentUserId);
+    return list.filter((option) => !shouldHideMemberInSelector(option));
   };
+
+  function pickConcreteTarget(options = [], preferred = '') {
+    const normalizedPreferred = String(preferred || '').trim();
+    const normalizedOptions = (Array.isArray(options) ? options : [])
+      .map((item) => String(item?.id || '').trim())
+      .filter(Boolean);
+    if (normalizedPreferred && normalizedPreferred !== 'ALL' && normalizedOptions.includes(normalizedPreferred)) {
+      return normalizedPreferred;
+    }
+    const firstNonAll = normalizedOptions.find((id) => id !== 'ALL');
+    if (firstNonAll) return firstNonAll;
+    return normalizedPreferred || normalizedOptions[0] || '';
+  }
+
+  function buildEmptyDashboardByRange(range) {
+    return {
+      ...fallbackDashboard,
+      defaultRange: {
+        startDate: range?.startDate || fallbackDashboard.defaultRange?.startDate || '',
+        endDate: range?.endDate || fallbackDashboard.defaultRange?.endDate || '',
+      },
+      scheduledEffectiveHours: 0,
+      completedEffectiveHours: 0,
+      quarterlyOverdueEffectiveHours: 0,
+      quarterlyOverdueCompletedHours: 0,
+      quarterlyPlannedEffectiveHours: 0,
+      quarterlyPlannedCompletedHours: 0,
+      currentQuarterWorkdayCosthourSum: 0,
+      softwareDevHours: 0,
+      issueHandlingHours: 0,
+      taskDistribution: [],
+      taskDetails: [],
+    };
+  }
 
   async function runInitialQuery(target) {
     const initialRange = buildQuarterRange(true);
@@ -93,23 +126,26 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
         const preferredTarget = availableTargets.has(targetFromUrl)
           ? targetFromUrl
           : (membersRes?.data?.selectedTarget ?? targetFromUrl);
-        const nextTarget = availableTargets.has(String(preferredTarget || ''))
-          ? String(preferredTarget || '')
-          : (nextMemberOptions[0]?.id ?? defaultTarget);
+        const nextTarget = pickConcreteTarget(
+          nextMemberOptions,
+          availableTargets.has(String(preferredTarget || ''))
+            ? String(preferredTarget || '')
+            : (nextMemberOptions[0]?.id ?? defaultTarget),
+        );
         setMemberOptions(nextMemberOptions);
-        // 先切换下拉选中，再发起工时查询，保证“跳转后先选人”。
+        // 下拉框保持“当前选中人”，但首屏数据统一按 ALL 预取，保证成员全集/聚合数据就绪。
         setSelectedTarget(nextTarget);
-        const { payload, response } = await runInitialQuery(nextTarget);
+        const { payload } = await runInitialQuery('ALL');
         if (!active) return;
-        setSourceTrend(response.data.trend ?? fallbackTrend);
-        setDashboard(response.data.dashboard ?? fallbackDashboard);
+        setSourceTrend([]);
+        setDashboard(buildEmptyDashboardByRange(payload));
         setDateRange({
           startDate: payload.startDate,
           endDate: payload.endDate,
         });
         setQuickRangePreset('quarter_to_today');
-        setLastUpdatedAt((response.data.dashboard ?? {}).lastUpdatedAt ?? '');
-        setCompensatoryDays((response.data.dashboard ?? {}).compensatoryDays ?? 0);
+        setLastUpdatedAt('');
+        setCompensatoryDays(0);
       } else {
         const { payload, response } = await runInitialQuery(defaultTarget);
         if (!active) return;
@@ -202,24 +238,17 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
 
   const scheduledDelta = dashboard.scheduledEffectiveHours + dashboard.quarterlyOverdueEffectiveHours - expectedEffectiveDays;
   const completedDelta = dashboard.completedEffectiveHours + dashboard.quarterlyOverdueCompletedHours - expectedEffectiveDays;
-  const filledWorkdayDays = useMemo(() => {
-    const backendSum = Number(dashboard.currentQuarterWorkdayCosthourSum);
-    if (Number.isFinite(backendSum)) {
-      return backendSum;
-    }
-    return (dashboard.taskDetails || []).reduce((sum, task) => {
-      if (task?.quarterCategory !== '当前季度排期') {
-        return sum;
-      }
-      const raw = Number(
-        task.workday_costhour !== undefined && task.workday_costhour !== null
-          ? task.workday_costhour
-          : task.workday_duration_minutes
-      );
-      return sum + (Number.isFinite(raw) ? raw : 0);
-    }, 0);
-  }, [dashboard.currentQuarterWorkdayCosthourSum, dashboard.taskDetails]);
-  const workdayFilledDelta = filledWorkdayDays - expectedWorkdayCount;
+  const softwareWorkdayCostHour = useMemo(() => {
+    const n = Number(dashboard.softwareDevHours);
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  }, [dashboard.softwareDevHours]);
+  const issueWorkdayCostHour = useMemo(() => {
+    const n = Number(dashboard.issueHandlingHours);
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  }, [dashboard.issueHandlingHours]);
+  const filledWorkdayDays = softwareWorkdayCostHour + issueWorkdayCostHour;
+  // 口径：总工作日 -（软件开发+问题处理）工作日耗时
+  const workdayFilledDelta = expectedWorkdayCount - filledWorkdayDays;
   const scheduledStatus = getDeltaStatus(scheduledDelta);
   const completedStatus = getDeltaStatus(completedDelta);
   const workdayFilledStatus = getDeltaStatus(workdayFilledDelta);
@@ -399,7 +428,7 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
       const rows = dashboard.taskDetails || [];
       rows.forEach((task) => {
         const rawEffective = Number(task.hours || task.work_hour || 0);
-        const rawCost = Number(task.workday_costhour ?? task.workday_duration_minutes ?? 0);
+        const rawCost = Number(task.workday_costhour ?? 0);
         effectiveHours += Number.isFinite(rawEffective) ? rawEffective : 0;
         costHours += Number.isFinite(rawCost) ? rawCost : 0;
       });
@@ -409,7 +438,83 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
     const costRatio = total > 0 ? 100 - effectiveRatio : 0;
     return { effectiveHours, costHours, effectiveRatio, costRatio };
   }, [dashboard.taskDetails]);
+  const hourCompositionGuides = useMemo(() => {
+    const viewBoxWidth = 520;
+    const viewBoxHeight = 224;
+    const cx = 260;
+    const cy = 112;
+    const radius = 80;
+    const outerRadius = 102;
+    const leftEndX = 150;
+    const rightEndX = 370;
+    const minTextGap = 18;
+
+    const polarToPoint = (angleDeg, distance) => {
+      const rad = (angleDeg * Math.PI) / 180;
+      return {
+        x: cx + Math.cos(rad) * distance,
+        y: cy + Math.sin(rad) * distance,
+      };
+    };
+
+    const clampY = (y) => Math.max(20, Math.min(viewBoxHeight - 20, y));
+    const effectiveSweep = (Number(hourComposition.effectiveRatio) / 100) * 360;
+    const costSweep = 360 - effectiveSweep;
+    const effectiveCenterAngle = -90 + (effectiveSweep / 2);
+    const costCenterAngle = -90 + effectiveSweep + (costSweep / 2);
+    const sideByAngle = (angleDeg) => (((Math.cos((angleDeg * Math.PI) / 180)) >= 0) ? 'right' : 'left');
+
+    const buildGuide = (angleDeg, side) => {
+      const start = polarToPoint(angleDeg, radius + 2);
+      const elbow = polarToPoint(angleDeg, outerRadius);
+      const endX = side === 'left' ? leftEndX : rightEndX;
+      const endY = clampY(elbow.y);
+      const textOffsetY = side === 'left' ? -10 : 12;
+      return {
+        start,
+        elbow: { x: elbow.x, y: endY },
+        end: { x: endX, y: endY },
+        textX: side === 'left' ? endX + 6 : endX - 6,
+        textY: clampY(endY + textOffsetY),
+        textAnchor: side === 'left' ? 'start' : 'end',
+      };
+    };
+
+    let effectiveSide = sideByAngle(effectiveCenterAngle);
+    let costSide = sideByAngle(costCenterAngle);
+    // 两个中心角落在同侧时，固定把两类放到左右两侧，避免文案/引导线打架。
+    if (effectiveSide === costSide) {
+      effectiveSide = 'left';
+      costSide = 'right';
+    }
+
+    const effectiveGuide = buildGuide(effectiveCenterAngle, effectiveSide);
+    const costGuide = buildGuide(costCenterAngle, costSide);
+
+    if (Math.abs(effectiveGuide.textY - costGuide.textY) < minTextGap) {
+      effectiveGuide.textY = clampY(effectiveGuide.textY - minTextGap / 2);
+      effectiveGuide.end.y = effectiveGuide.textY;
+      effectiveGuide.elbow.y = effectiveGuide.textY;
+      costGuide.textY = clampY(costGuide.textY + minTextGap / 2);
+      costGuide.end.y = costGuide.textY;
+      costGuide.elbow.y = costGuide.textY;
+    }
+
+    return { effectiveGuide, costGuide };
+  }, [hourComposition.effectiveRatio]);
   const monthlyWorkdayData = useMemo(() => {
+    const normalizeMonthLabel = (rawMonth) => {
+      const txt = String(rawMonth || '').trim();
+      if (!txt) return '';
+      if (txt.endsWith('月')) return `${Number(txt.replace('月', ''))}月`;
+      const hit = txt.match(/(\d{1,2})月/);
+      if (hit) return `${Number(hit[1])}月`;
+      const isoHit = txt.match(/^\d{4}-(\d{1,2})/);
+      if (isoHit) return `${Number(isoHit[1])}月`;
+      const plainHit = txt.match(/^(\d{1,2})$/);
+      if (plainHit) return `${Number(plainHit[1])}月`;
+      return '';
+    };
     const bucket = new Map(
       trend.map((item) => {
         const month = String(item.month || '').trim();
@@ -428,14 +533,21 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
       const month = `${Number(parts[1])}月`;
       // 与“工时数据”保持同月份口径：只累计已存在月份
       if (!bucket.has(month)) return;
-      const raw = Number(task.workday_costhour ?? task.workday_duration_minutes ?? 0);
+      const raw = Number(task.workday_costhour ?? 0);
       if (Number.isFinite(raw)) {
         bucket.get(month).filled += raw;
       }
     });
+    (Array.isArray(dashboard.issueMonthlyCostHours) ? dashboard.issueMonthlyCostHours : []).forEach((item) => {
+      const month = normalizeMonthLabel(item?.month);
+      if (!month || !bucket.has(month)) return;
+      const raw = Number(item?.hours || 0);
+      if (!Number.isFinite(raw)) return;
+      bucket.get(month).filled += raw;
+    });
     return Array.from(bucket.values())
       .sort((a, b) => Number(String(a.month).replace('月', '')) - Number(String(b.month).replace('月', '')));
-  }, [dashboard.taskDetails, trend]);
+  }, [dashboard.issueMonthlyCostHours, dashboard.taskDetails, trend]);
   const maxMonthlyWorkdayValue = Math.max(
     ...monthlyWorkdayData.flatMap((item) => [Number(item.expected || 0), Number(item.filled || 0)]),
     1,
@@ -512,7 +624,19 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
   }
 
   async function handleQuery(payload = { ...dateRange, compensatoryDays }) {
-    if (payload?.startDate && payload?.endDate && payload.endDate < payload.startDate) {
+    const requestId = ++latestQueryRequestIdRef.current;
+    const normalizedSelectedTarget = pickConcreteTarget(memberOptions, selectedTarget);
+    const normalizedPayloadTarget = String(payload?.target || '').trim();
+    const resolvedTarget = canViewAllPeople
+      ? (normalizedSelectedTarget || normalizedPayloadTarget || 'ALL')
+      : (normalizedPayloadTarget || normalizedSelectedTarget || user?.user_id || user?.name || '');
+    const queryPayload = {
+      ...payload,
+      target: resolvedTarget,
+      compensatoryDays: payload?.compensatoryDays ?? compensatoryDays,
+    };
+
+    if (queryPayload?.startDate && queryPayload?.endDate && queryPayload.endDate < queryPayload.startDate) {
       setActionMessage('终止时间不能早于起始时间。');
       return;
     }
@@ -520,7 +644,8 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
     setActionMessage('');
 
     try {
-      const response = await queryPersonalHours(user, payload);
+      const response = await queryPersonalHours(user, queryPayload);
+      if (requestId !== latestQueryRequestIdRef.current) return;
       setSourceTrend(response.data.trend ?? fallbackTrend);
       setDashboard(response.data.dashboard);
       setLastUpdatedAt((current) => response.data.dashboard.lastUpdatedAt ?? current);
@@ -528,7 +653,8 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
       const nextMemberOptions = normalizeMemberOptionsForViewer(response.data.memberOptions ?? memberOptions);
       setMemberOptions(nextMemberOptions);
       const availableTargets = new Set(nextMemberOptions.map((item) => String(item?.id || '')));
-      const rawNextTarget = response.data.selectedTarget ?? payload.target ?? selectedTarget;
+      // 查询后优先保持“本次查询目标”，避免被后端回退值（如 ALL）覆盖。
+      const rawNextTarget = queryPayload.target ?? selectedTarget;
       const nextTarget = availableTargets.has(String(rawNextTarget || ''))
         ? rawNextTarget
         : (nextMemberOptions[0]?.id ?? rawNextTarget);
@@ -536,7 +662,7 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
       if (canViewAllPeople && nextTarget) {
         setSearchParams({ target: nextTarget });
       }
-      setActionMessage(`已完成${response.data.dashboard.targetLabel ?? '当前对象'}的工时查询。`);
+      setActionMessage('');
     } catch (error) {
       if (isUpdateBusyError(error)) {
         showBusyHint();
@@ -625,7 +751,7 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
         .replace('季度逾期排期', '季度逾期');
       const workHours = typeof task.work_hour === 'number' ? formatRawDays(task.work_hour) : formatRawDays(task.hours);
       const link = task.link || (task.taskId ? `https://www.teambition.com/task/${encodeURIComponent(task.taskId)}` : '');
-      const wdRaw = task.workday_costhour ?? task.workday_duration_minutes;
+      const wdRaw = task.workday_costhour;
       const wdNum = Number(wdRaw);
       const workdayCostHour = wdRaw === null || wdRaw === undefined || String(wdRaw).trim() === ''
         ? ''
@@ -877,15 +1003,15 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
               <div className="rounded-2xl border border-cyan-100 bg-cyan-50/50 p-4">
                 <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-cyan-700">当前</div>
                 <div className="space-y-3">
-                  <StatCard title="当前已排总有效工时" value={`${formatRawDays(dashboard.scheduledEffectiveHours)}天`} sub="" />
-                  <StatCard title="当前已完成总有效工时" value={`${formatRawDays(dashboard.completedEffectiveHours)}天`} sub="" />
+                  <StatCard title="当前已排总有效工时" value={`${formatRawDays(dashboard.scheduledEffectiveHours)}天`} sub="" valueAlign="right" />
+                  <StatCard title="当前已完成总有效工时" value={`${formatRawDays(dashboard.completedEffectiveHours)}天`} sub="" valueAlign="right" />
                 </div>
               </div>
               <div className="rounded-2xl border border-amber-100 bg-amber-50/50 p-4">
                 <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-amber-700">季度逾期</div>
                 <div className="space-y-3">
-                  <StatCard title="季度逾期总有效工时" value={`${formatRawDays(dashboard.quarterlyOverdueEffectiveHours)}天`} sub="" />
-                  <StatCard title="季度逾期完成工时" value={`${formatRawDays(dashboard.quarterlyOverdueCompletedHours)}天`} sub="" />
+                  <StatCard title="季度逾期总有效工时" value={`${formatRawDays(dashboard.quarterlyOverdueEffectiveHours)}天`} sub="" valueAlign="right" />
+                  <StatCard title="季度逾期完成工时" value={`${formatRawDays(dashboard.quarterlyOverdueCompletedHours)}天`} sub="" valueAlign="right" />
                 </div>
               </div>
             </div>
@@ -895,11 +1021,15 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
             <div className="mt-4 grid grid-cols-1 gap-4">
               <div className="min-h-[160px] rounded-2xl border border-slate-200 bg-slate-50 p-5">
                 <div className="text-xs font-semibold uppercase tracking-[0.12em] text-orange-700">总工作日</div>
-                <div className="mt-3 text-4xl font-semibold text-slate-900">{formatRawDays(expectedWorkdayCount)}天</div>
+                <div className="mt-3 flex min-h-[96px] items-center justify-end">
+                  <div className="text-right text-3xl font-semibold text-slate-900">{formatRawDays(expectedWorkdayCount)}天</div>
+                </div>
               </div>
               <div className="min-h-[160px] rounded-2xl border border-orange-100 bg-orange-50 p-5">
                 <div className="text-xs font-semibold uppercase tracking-[0.12em] text-orange-700">已填工作日</div>
-                <div className="mt-3 text-4xl font-semibold text-slate-900">{formatRawDays(filledWorkdayDays)}天</div>
+                <div className="mt-3 flex min-h-[96px] items-center justify-end">
+                  <div className="text-right text-3xl font-semibold text-slate-900">{formatRawDays(filledWorkdayDays)}天</div>
+                </div>
               </div>
             </div>
           </div>
@@ -914,16 +1044,20 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
           <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-3">
             <div className={`rounded-2xl border p-4 ${scheduledStatus.bgClass}`}>
               <div className="text-sm text-slate-500">任务分配情况</div>
-              <div className={`mt-2 text-right text-3xl font-semibold ${scheduledStatus.textClass}`}>
-                {scheduledStatus.sign}
-                {formatRawDays(scheduledDelta)}天
+              <div className="mt-2 flex min-h-[72px] items-center justify-end">
+                <div className={`text-right text-3xl font-semibold ${scheduledStatus.textClass}`}>
+                  {scheduledStatus.sign}
+                  {formatRawDays(scheduledDelta)}天
+                </div>
               </div>
             </div>
             <div className={`rounded-2xl border p-4 ${completedStatus.bgClass}`}>
               <div className="text-sm text-slate-500">任务完成情况</div>
-              <div className={`mt-2 text-right text-3xl font-semibold ${completedStatus.textClass}`}>
-                {completedStatus.sign}
-                {formatRawDays(completedDelta)}天
+              <div className="mt-2 flex min-h-[72px] items-center justify-end">
+                <div className={`text-right text-3xl font-semibold ${completedStatus.textClass}`}>
+                  {completedStatus.sign}
+                  {formatRawDays(completedDelta)}天
+                </div>
               </div>
             </div>
             <div className={`rounded-2xl border p-4 ${workdayFilledStatus.bgClass}`}>
@@ -1092,13 +1226,39 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
                   title={`软件开发 ${hourComposition.effectiveRatio}% · 问题处理 ${hourComposition.costRatio}%`}
                 />
                 <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 520 224" preserveAspectRatio="none">
-                  <line x1="180" y1="92" x2="84" y2="58" stroke="#94a3b8" strokeWidth="1.5" />
-                  <line x1="340" y1="132" x2="436" y2="170" stroke="#94a3b8" strokeWidth="1.5" />
+                  <polyline
+                    points={`${hourCompositionGuides.effectiveGuide.start.x},${hourCompositionGuides.effectiveGuide.start.y} ${hourCompositionGuides.effectiveGuide.elbow.x},${hourCompositionGuides.effectiveGuide.elbow.y} ${hourCompositionGuides.effectiveGuide.end.x},${hourCompositionGuides.effectiveGuide.end.y}`}
+                    fill="none"
+                    stroke="#94a3b8"
+                    strokeWidth="1.5"
+                  />
+                  <polyline
+                    points={`${hourCompositionGuides.costGuide.start.x},${hourCompositionGuides.costGuide.start.y} ${hourCompositionGuides.costGuide.elbow.x},${hourCompositionGuides.costGuide.elbow.y} ${hourCompositionGuides.costGuide.end.x},${hourCompositionGuides.costGuide.end.y}`}
+                    fill="none"
+                    stroke="#94a3b8"
+                    strokeWidth="1.5"
+                  />
                 </svg>
-                <div className="absolute left-4 top-20 text-xs text-slate-600">
+                <div
+                  className="pointer-events-none absolute text-xs text-slate-600"
+                  style={{
+                    left: `${(hourCompositionGuides.effectiveGuide.textX / 520) * 100}%`,
+                    top: `${(hourCompositionGuides.effectiveGuide.textY / 224) * 100}%`,
+                    transform: 'translateY(-50%)',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
                   软件开发：{hourComposition.effectiveRatio}%（{formatRawDays(hourComposition.effectiveHours)}天）
                 </div>
-                <div className="absolute right-4 bottom-8 text-xs text-slate-600 text-right">
+                <div
+                  className="pointer-events-none absolute text-xs text-slate-600"
+                  style={{
+                    left: `${(hourCompositionGuides.costGuide.textX / 520) * 100}%`,
+                    top: `${(hourCompositionGuides.costGuide.textY / 224) * 100}%`,
+                    transform: 'translate(-100%, -50%)',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
                   问题处理：{hourComposition.costRatio}%（{formatRawDays(hourComposition.costHours)}天）
                 </div>
               </div>

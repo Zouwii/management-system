@@ -10,6 +10,7 @@
     "何华": { "userId": "2739002424650905", "character": 2 ,"team_id": 0 , "is_nav_lead": false, "is_servo_lead": false},
     "郑世玉": { "userId": "265352386036276420", "character": 3 ,"team_id": 0 , "is_nav_lead": false, "is_servo_lead": false},
     "朱庆涛": { "userId": "166232264526164934", "character": 3 ,"team_id": 0 , "is_nav_lead": false, "is_servo_lead": false},
+    "陈文斌": { "userId": "312542394537803309", "character": 3 ,"team_id": 0 , "is_nav_lead": false, "is_servo_lead": false},
     "沈旭东": { "userId": "234765171227529303", "character": 0 ,"team_id": 1 , "is_nav_lead": false, "is_servo_lead": true},
     "刁怀锐": { "userId": "303367406120974289", "character": 4,"team_id": 1 , "is_nav_lead": false, "is_servo_lead": false},
     "李赫": { "userId": "011168364322856029", "character": 1 ,"team_id": 1 , "is_nav_lead": false, "is_servo_lead": false},

@@ -46,9 +46,13 @@ fi
 
 cd "${FRONTEND_DIR}"
 
-if [ ! -d node_modules ]; then
-  echo "[tb_tool_bt] node_modules not found in frontend-react, running: npm install"
-  npm install
+if [ ! -d node_modules ] || [ ! -x "node_modules/.bin/vite" ]; then
+  echo "[tb_tool_bt] frontend dependencies missing/incomplete, running install"
+  if [ -f package-lock.json ]; then
+    npm ci
+  else
+    npm install
+  fi
 fi
 
 echo "[tb_tool_bt] Building frontend mode=${MODE} (VITE_API_MODE=${FRONTEND_API_MODE})"

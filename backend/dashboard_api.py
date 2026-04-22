@@ -12,6 +12,7 @@ from services.config_service import (
 )
 from services.task_sync_service import sync_project_details_in_time_range_service
 from services.workhour_aggregate_service import team_quarter_workhours_db_service, workdays_in_range_service
+from services.member_visibility import should_hide_member_in_selector
 from dingtalk_client import get_config_projectids, get_config_user_meta, get_config_userids
 
 
@@ -136,15 +137,8 @@ def _filter_member_options_by_scope(member_options, current_scope):
     3) servo lead 查看范围仅对接组（teamId=1）
     """
     options = list(member_options or [])
-    # 仅过滤双组管理员：character=0 且同时 isNavLead/isServoLead 为真
-    options = [
-        m for m in options
-        if not (
-            _to_character(m.get("character"), default=0) == 0
-            and bool(m.get("isNavLead"))
-            and bool(m.get("isServoLead"))
-        )
-    ]
+    # 仅过滤双组管理员（统一走共享规则）。
+    options = [m for m in options if not should_hide_member_in_selector(m)]
 
     is_nav_lead = bool((current_scope or {}).get("isNavLead"))
     is_servo_lead = bool((current_scope or {}).get("isServoLead"))

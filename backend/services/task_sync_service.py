@@ -234,27 +234,21 @@ def _extract_task_nature(item: Dict[str, Any]) -> Optional[str]:
     return None
 
 
-def _extract_workday_costhour(item: Dict[str, Any]) -> Optional[int]:
+def _extract_workday_costhour(item: Dict[str, Any]) -> Optional[float]:
     # 优先直接字段；语义：None=未填，0=否，>0=是
-    direct = (
-        item.get("workday_duration_minutes")
-        if isinstance(item, dict)
-        else None
-    )
-    if direct is None and isinstance(item, dict):
-        direct = item.get("workdayDurationMinutes")
-    if direct is None and isinstance(item, dict):
+    direct = None
+    if isinstance(item, dict):
         direct = item.get("workday_costhour")
     if direct is not None:
         try:
-            return int(float(direct))
+            return float(direct)
         except (TypeError, ValueError):
             pass
 
     cfs = item.get("customFields") or item.get("customfields") or []
     if not isinstance(cfs, list):
         return None
-    num_candidate: Optional[int] = None
+    num_candidate: Optional[float] = None
     flag_candidate: Optional[int] = None
     for cf in cfs:
         if not isinstance(cf, dict):
@@ -264,7 +258,6 @@ def _extract_workday_costhour(item: Dict[str, Any]) -> Optional[int]:
             WORKDAY_DURATION_CUSTOMFIELD_ID,
             WORKDAY_FLAG_CUSTOMFIELD_ID,
             "workday_costhour",
-            "workday_duration_minutes",
         }:
             continue
         value = cf.get("value")
@@ -289,7 +282,7 @@ def _extract_workday_costhour(item: Dict[str, Any]) -> Optional[int]:
                 flag_candidate = 1
             continue
         try:
-            num_candidate = int(float(candidate))
+            num_candidate = float(candidate)
         except (TypeError, ValueError):
             continue
     if num_candidate is not None:

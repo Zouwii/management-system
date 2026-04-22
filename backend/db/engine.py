@@ -111,6 +111,29 @@ def init_database() -> None:
         from sqlalchemy import inspect, text
 
         inspector = inspect(engine)
+        dialect_name = engine.dialect.name
+
+        def _ensure_workday_costhour_float(table_name: str) -> None:
+            with engine.begin() as conn:
+                try:
+                    if dialect_name.startswith("mysql"):
+                        conn.execute(
+                            text(
+                                f"ALTER TABLE {table_name} MODIFY COLUMN workday_costhour FLOAT"
+                            )
+                        )
+                    elif dialect_name.startswith("postgresql"):
+                        conn.execute(
+                            text(
+                                f"ALTER TABLE {table_name} ALTER COLUMN workday_costhour TYPE DOUBLE PRECISION"
+                            )
+                        )
+                    elif dialect_name.startswith("sqlite"):
+                        # SQLite 动态类型，历史整型值可直接按浮点读写，无需强制改列类型。
+                        pass
+                except Exception:
+                    # 不阻断启动，保持历史数据库可兼容启动。
+                    pass
         cols_b = [c.get("name") for c in inspector.get_columns("project_task_details")]
         if "is_overdue" not in cols_b:
             with engine.begin() as conn:
@@ -154,13 +177,40 @@ def init_database() -> None:
                         "ALTER TABLE project_task_details ADD COLUMN task_nature VARCHAR(128)"
                     )
                 )
-        if "workday_duration_minutes" not in cols_b:
+        if "workday_costhour" not in cols_b:
             with engine.begin() as conn:
                 conn.execute(
                     text(
-                        "ALTER TABLE project_task_details ADD COLUMN workday_duration_minutes INTEGER"
+                        "ALTER TABLE project_task_details ADD COLUMN workday_costhour FLOAT"
                     )
                 )
+                if "workday_duration_minutes" in cols_b:
+                    conn.execute(
+                        text(
+                            "UPDATE project_task_details "
+                            "SET workday_costhour = workday_duration_minutes "
+                            "WHERE workday_costhour IS NULL AND workday_duration_minutes IS NOT NULL"
+                        )
+                    )
+                    try:
+                        conn.execute(text("ALTER TABLE project_task_details DROP COLUMN workday_duration_minutes"))
+                    except Exception:
+                        pass
+        elif "workday_duration_minutes" in cols_b:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "UPDATE project_task_details "
+                        "SET workday_costhour = workday_duration_minutes "
+                        "WHERE workday_costhour IS NULL AND workday_duration_minutes IS NOT NULL"
+                    )
+                )
+                try:
+                    conn.execute(text("ALTER TABLE project_task_details DROP COLUMN workday_duration_minutes"))
+                except Exception:
+                    pass
+        if "workday_costhour" in cols_b:
+            _ensure_workday_costhour_float("project_task_details")
 
         # C 表若不存在，create_all 理论上已创建；这里额外做一次兜底检查
         tables = set(inspector.get_table_names() or [])
@@ -196,13 +246,40 @@ def init_database() -> None:
                             "ALTER TABLE project_task_overdue_details ADD COLUMN task_nature VARCHAR(128)"
                         )
                     )
-            if "workday_duration_minutes" not in cols_c:
+            if "workday_costhour" not in cols_c:
                 with engine.begin() as conn:
                     conn.execute(
                         text(
-                            "ALTER TABLE project_task_overdue_details ADD COLUMN workday_duration_minutes INTEGER"
+                            "ALTER TABLE project_task_overdue_details ADD COLUMN workday_costhour FLOAT"
                         )
                     )
+                    if "workday_duration_minutes" in cols_c:
+                        conn.execute(
+                            text(
+                                "UPDATE project_task_overdue_details "
+                                "SET workday_costhour = workday_duration_minutes "
+                                "WHERE workday_costhour IS NULL AND workday_duration_minutes IS NOT NULL"
+                            )
+                        )
+                        try:
+                            conn.execute(text("ALTER TABLE project_task_overdue_details DROP COLUMN workday_duration_minutes"))
+                        except Exception:
+                            pass
+            elif "workday_duration_minutes" in cols_c:
+                with engine.begin() as conn:
+                    conn.execute(
+                        text(
+                            "UPDATE project_task_overdue_details "
+                            "SET workday_costhour = workday_duration_minutes "
+                            "WHERE workday_costhour IS NULL AND workday_duration_minutes IS NOT NULL"
+                        )
+                    )
+                    try:
+                        conn.execute(text("ALTER TABLE project_task_overdue_details DROP COLUMN workday_duration_minutes"))
+                    except Exception:
+                        pass
+            if "workday_costhour" in cols_c:
+                _ensure_workday_costhour_float("project_task_overdue_details")
 
         # B2 表字段补齐（program_issue_detail）
         if "program_issue_detail" in tables:
@@ -221,13 +298,41 @@ def init_database() -> None:
                             "ALTER TABLE program_issue_detail ADD COLUMN task_nature VARCHAR(128)"
                         )
                     )
-            if "workday_duration_minutes" not in cols_b2:
+            if "workday_costhour" not in cols_b2:
                 with engine.begin() as conn:
                     conn.execute(
                         text(
-                            "ALTER TABLE program_issue_detail ADD COLUMN workday_duration_minutes INTEGER"
+                            "ALTER TABLE program_issue_detail ADD COLUMN workday_costhour FLOAT"
                         )
                     )
+                    # 旧数据迁移：若历史字段有值，回填到新字段。
+                    if "workday_duration_minutes" in cols_b2:
+                        conn.execute(
+                            text(
+                                "UPDATE program_issue_detail "
+                                "SET workday_costhour = workday_duration_minutes "
+                                "WHERE workday_costhour IS NULL AND workday_duration_minutes IS NOT NULL"
+                            )
+                        )
+                        try:
+                            conn.execute(text("ALTER TABLE program_issue_detail DROP COLUMN workday_duration_minutes"))
+                        except Exception:
+                            pass
+            elif "workday_duration_minutes" in cols_b2:
+                with engine.begin() as conn:
+                    conn.execute(
+                        text(
+                            "UPDATE program_issue_detail "
+                            "SET workday_costhour = workday_duration_minutes "
+                            "WHERE workday_costhour IS NULL AND workday_duration_minutes IS NOT NULL"
+                        )
+                    )
+                    try:
+                        conn.execute(text("ALTER TABLE program_issue_detail DROP COLUMN workday_duration_minutes"))
+                    except Exception:
+                        pass
+            if "workday_costhour" in cols_b2:
+                _ensure_workday_costhour_float("program_issue_detail")
 
         # user_character 表字段补齐（无迁移环境下避免缺列导致启动失败）
         try:
