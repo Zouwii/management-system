@@ -949,12 +949,22 @@ def full_update_service(payload: Dict[str, Any]) -> Dict[str, Any]:
         return {"success": False, "error": bc_out.get("error", "sync B/C failed"), "data": bc_out.get("data") or {}}
     _zhr_temp_log_elapsed("full_update", "total", _t_all, {"projectId": project_id, "userId": user_id})
 
+    # 全量更新成功后统一刷新 last_update_time，
+    # 让页面右上角“最后同步”能感知到自动/手动全量更新。
+    from services.config_service import touch_last_update_time_service
+
+    touched = touch_last_update_time_service() or {}
+    last_update_time = ""
+    if touched.get("success"):
+        last_update_time = str(touched.get("last_update_time") or "")
+
     return {
         "success": True,
         "data": {
             "updated_end_time": upd.get("end_time"),
             "startDue": start_due,
             "endDue": end_due,
+            "last_update_time": last_update_time,
             "wiped": {"b_deleted": int(wiped_b or 0), "b2_deleted": int(wiped_b2 or 0), "c_deleted": int(wiped_c or 0)},
             "syncA": a_out.get("data") or {},
             "syncBC": bc_out.get("data") or {},
