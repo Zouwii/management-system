@@ -247,8 +247,8 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
     return Number.isFinite(n) && n >= 0 ? n : 0;
   }, [dashboard.issueHandlingHours]);
   const filledWorkdayDays = softwareWorkdayCostHour + issueWorkdayCostHour;
-  // 口径：总工作日 -（软件开发+问题处理）工作日耗时
-  const workdayFilledDelta = expectedWorkdayCount - filledWorkdayDays;
+  // 口径：已填工作日 - 总工作日
+  const workdayFilledDelta = filledWorkdayDays - expectedWorkdayCount;
   const scheduledStatus = getDeltaStatus(scheduledDelta);
   const completedStatus = getDeltaStatus(completedDelta);
   const workdayFilledStatus = getDeltaStatus(workdayFilledDelta);
