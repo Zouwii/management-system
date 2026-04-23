@@ -761,6 +761,13 @@ export function realFetchAIModels() {
   }));
 }
 
+export function realFetchAITtydSession(_user, payload = {}) {
+  return httpRequest('/bt/ai/ttyd/session', {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+  });
+}
+
 export function realFetchPermissionMatrix() {
   return httpRequest('/dashboard/permission-matrix');
 }

@@ -11,17 +11,9 @@ import sys
 from pathlib import Path
 
 DEFAULT_BASE_URL = "http://one-api.server22.jz"
-DEFAULT_MODEL = "glm-5.1"
+DEFAULT_MODEL = "MiniMax-M2.7-highspeed"
 DEFAULT_CONFIG_PATH = Path(__file__).resolve().parent / "config.json"
-DEFAULT_PROMPT = "分析当前后端项目结构，查出接口问题"
-DEFAULT_CLAUDE_FLAGS = [
-    "--no-tui",
-    "--quiet",
-    "--no-logo",
-    "--no-progress",
-    "--skip-permissions",
-    "--auto-trust",
-]
+DEFAULT_CLAUDE_FLAGS = []
 
 
 def _load_config(path: Path) -> dict:
@@ -80,10 +72,7 @@ def main() -> int:
     if passthrough and passthrough[0] == "--":
         passthrough = passthrough[1:]
 
-    if passthrough:
-        cmd = ["claude", "--bare", *passthrough]
-    else:
-        cmd = ["claude", DEFAULT_PROMPT, "--bare", *DEFAULT_CLAUDE_FLAGS]
+    cmd = ["claude", "--bare", *DEFAULT_CLAUDE_FLAGS, *passthrough]
     try:
         completed = subprocess.run(cmd, env=env)
         return int(completed.returncode)

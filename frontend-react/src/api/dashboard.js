@@ -19,6 +19,7 @@ import {
   mockStartAIChatSession,
   mockEndAIChatSession,
   mockFetchAIModels,
+  mockFetchAITtydSession,
 } from './providers/mock/dashboard';
 import {
   realFetchAIInsightList,
@@ -40,6 +41,7 @@ import {
   realStartAIChatSession,
   realEndAIChatSession,
   realFetchAIModels,
+  realFetchAITtydSession,
 } from './providers/real/dashboard';
 
 export const fetchDepartmentOverview = createApiSwitch(mockFetchDepartmentOverview, realFetchDepartmentOverview);
@@ -60,4 +62,5 @@ export const sendAIChatSessionMessage = createApiSwitch(mockSendAIChatSessionMes
 export const startAIChatSession = createApiSwitch(mockStartAIChatSession, realStartAIChatSession);
 export const endAIChatSession = createApiSwitch(mockEndAIChatSession, realEndAIChatSession);
 export const fetchAIModels = createApiSwitch(mockFetchAIModels, realFetchAIModels);
+export const fetchAITtydSession = createApiSwitch(mockFetchAITtydSession, realFetchAITtydSession);
 export const fetchPermissionMatrix = createApiSwitch(mockFetchPermissionMatrix, realFetchPermissionMatrix);
