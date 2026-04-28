@@ -32,7 +32,8 @@ rm -rf \
   "${STAGE_DIR}/backend/.venv" \
   "${STAGE_DIR}/backend/__pycache__" \
   "${STAGE_DIR}/backend/.pytest_cache" \
-  "${STAGE_DIR}/backend/data"
+  "${STAGE_DIR}/backend/data" \
+  "${STAGE_DIR}/backend/runtime"
 
 find "${STAGE_DIR}" -type d -name "__pycache__" -prune -exec rm -rf {} + || true
 find "${STAGE_DIR}" -type d -name ".mypy_cache" -prune -exec rm -rf {} + || true

@@ -23,6 +23,7 @@ DAEMON_NAME="${DAEMON_NAME:-tb_tool_bt_daemon}"
 RUNTIME_DIR="${RUNTIME_DIR:-$(pwd)/runtime}"
 PID_FILE="${PID_FILE:-${RUNTIME_DIR}/${DAEMON_NAME}.pid}"
 LOG_FILE="${LOG_FILE:-${RUNTIME_DIR}/${DAEMON_NAME}.log}"
+USE_POETRY=0
 
 mkdir -p "${RUNTIME_DIR}"
 
@@ -43,11 +44,15 @@ ensure_prerequisites() {
     exit 1
   fi
 
-  if ! command -v poetry >/dev/null 2>&1; then
-    echo "[tb_tool_bt] ERROR: poetry not found"
-    echo "[tb_tool_bt] Install: curl -sSL https://install.python-poetry.org | python3 -"
-    echo "[tb_tool_bt] Then: export PATH=\"\$HOME/.local/bin:\$PATH\""
-    exit 1
+  # Poetry 通常安装在 ~/.local/bin，守护进程/非交互 shell 下 PATH 里可能没有。
+  export PATH="$HOME/.local/bin:$PATH"
+
+  if command -v poetry >/dev/null 2>&1; then
+    USE_POETRY=1
+    echo "[tb_tool_bt] using poetry runtime"
+  else
+    USE_POETRY=0
+    echo "[tb_tool_bt] poetry not found, fallback to .venv + requirements.txt"
   fi
 }
 
@@ -112,8 +117,15 @@ SQL
 }
 
 install_deps() {
-  echo "[tb_tool_bt] Installing deps (poetry install --no-root)"
-  poetry install --no-root
+  if [ "${USE_POETRY}" = "1" ]; then
+    echo "[tb_tool_bt] Installing deps (poetry install --no-root)"
+    poetry install --no-root
+  else
+    echo "[tb_tool_bt] Installing deps (.venv + pip install -r requirements.txt)"
+    python3 -m venv .venv
+    ./.venv/bin/python -m pip install --upgrade pip
+    ./.venv/bin/python -m pip install -r requirements.txt
+  fi
 }
 
 kill_port_process() {
@@ -163,7 +175,11 @@ start_daemon() {
 
   echo "[tb_tool_bt] Starting daemon on listen http://${APP_HOST}:${APP_PORT}"
   echo "[tb_tool_bt] Access URL: http://${APP_PUBLIC_HOST}:${APP_PORT}"
-  nohup poetry run python app.py >> "${LOG_FILE}" 2>&1 &
+  if [ "${USE_POETRY}" = "1" ]; then
+    nohup poetry run python app.py >> "${LOG_FILE}" 2>&1 &
+  else
+    nohup ./.venv/bin/python app.py >> "${LOG_FILE}" 2>&1 &
+  fi
   echo $! > "${PID_FILE}"
   sleep 1
 
