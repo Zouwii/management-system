@@ -1,49 +1,98 @@
-# AI 最小目录
+# AI 使用说明（ttyd-only）
 
-当前目录只保留 Claude 子进程启动能力，不再提供独立 token API。
+当前后端 AI 只保留 **ttyd 终端模式**。旧 PTY 聊天链路已移除。
 
-## 使用方式
+## 目录结构
 
-在 `backend` 目录下执行：
+- `config.json`：Claude 网关配置（`api_key` / `base_url` / `model`）
+- `start_claude_jz.py`：本地直启 Claude 的入口脚本（调试用）
+- `AI_MULTI_USER_DESIGN.md`：多用户架构设计文档
+
+## 调用链路
+
+1. 前端调用 `POST /bt/ai/ttyd/session`
+2. 后端按 `ownerKey` 创建或复用 ttyd 子进程
+3. ttyd 执行 `backend/easy_start_claude_jz` 启动 Claude CLI
+4. 后端返回 `embedUrl`，前端通过 `iframe` 直连终端
+
+## 多用户隔离规则
+
+- 以 `ownerKey` 作为会话隔离键
+- 每个 `ownerKey` 对应一个活跃 ttyd 会话（进程 + 端口）
+- 相同 `ownerKey` 重入优先复用会话，不同 `ownerKey` 互相隔离
+
+## 接口
+
+### 1) 创建/获取 ttyd 会话
+
+- `POST /bt/ai/ttyd/session`
+
+请求示例：
+
+```json
+{
+  "ownerKey": "user-001",
+  "model": "MiniMax-M2.7"
+}
+```
+
+响应关键字段：
+
+- `embedUrl`：前端 `iframe` 地址
+- `ownerKey`：后端最终解析出的用户标识
+- `model`：当前会话模型
+- `port`：ttyd 监听端口
+- `pid`：ttyd 进程号
+
+### 2) 结束会话（兼容接口名）
+
+- `POST /bt/ai/chat/session_end`
+
+请求示例：
+
+```json
+{
+  "ownerKey": "user-001"
+}
+```
+
+## 配置项
+
+### `ai/config.json`
+
+```json
+{
+  "api_key": "sk-xxx",
+  "base_url": "http://one-api.server22.jz",
+  "model": "MiniMax-M2.7"
+}
+```
+
+### 环境变量
+
+- `AI_TTYD_BASE_URL`：ttyd 对外地址模板，默认 `http://127.0.0.1:{port}/`
+- `AI_TTYD_PORT_BASE`：端口起始值，默认 `8800`
+- `AI_TTYD_PORT_SPAN`：端口池跨度，默认 `400`
+
+## 本地调试
+
+在 `backend` 目录执行：
 
 ```bash
 python3 ai/start_claude_jz.py
 ```
 
-该脚本会读取 `ai/config.json` 中的 `api_key/base_url/model`，并以 `claude --bare` 方式启动。
+用途：
 
-## AI 页面接入 ttyd
+- 验证 `ai/config.json` 是否可用
+- 验证当前环境能否找到 `claude` 命令
 
-后端已提供签名会话接口：
+## 常见问题
 
-- `POST /api/bt/ai/ttyd/session`
-
-返回字段：
-
-- `embedUrl`: 前端可直接用于 `iframe` 的地址（已附带 `ownerKey/model`）
-- `port`: 当前 owner 对应 ttyd 端口
-
-### 必配环境变量
-
-- `AI_TTYD_BASE_URL`：ttyd 对外地址模板，默认 `http://127.0.0.1:{port}/`（支持 `{port}` 占位）
-- `AI_TTYD_PORT_BASE`：ttyd 端口起始值，默认 `8800`
-- `AI_TTYD_PORT_SPAN`：端口范围，默认 `400`
-
-可选：
-
-- `AI_TTYD_TOKEN_TTL_SECONDS`：保留字段（当前实现未使用）
-
-### Nginx 反代建议（示意）
-
-```nginx
-location /ai/ttyd/ {
-    proxy_pass http://127.0.0.1:7681/;
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection "upgrade";
-    proxy_set_header Host $host;
-}
-```
-
-生产建议在反代层做鉴权，并将 `AI_TTYD_BASE_URL` 配置为反代后的 HTTPS 地址。
+- `ttyd command not found in PATH`
+  - 确认机器已安装 `ttyd`，且服务启动环境 `PATH` 可见
+- ``claude` command not found in PATH`
+  - 确认 `claude` 已安装，并在后端进程继承的 `PATH` 中
+- 页面黑屏或反复重连
+  - 优先检查 `AI_TTYD_BASE_URL`、端口占用、防火墙与反向代理配置
 

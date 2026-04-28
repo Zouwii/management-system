@@ -42,6 +42,10 @@ def _table_registry():
     """
     # 延迟导入以避免循环
     from db.orm import (
+        AiCacheSpace,
+        AiConversationMemory,
+        AiConversationMessage,
+        AiUserCacheMap,
         Config as DbConfig,
         NavPerfQuarterResult,
         ProgramIssue,
@@ -65,6 +69,10 @@ def _table_registry():
         ("config", DbConfig.__table__),
         ("update_locks", UpdateLock.__table__),
         ("user_character", DbUserCharacter.__table__),
+        ("ai_user_cache_map", AiUserCacheMap.__table__),
+        ("ai_cache_space", AiCacheSpace.__table__),
+        ("ai_conversation_message", AiConversationMessage.__table__),
+        ("ai_conversation_memory", AiConversationMemory.__table__),
     ]
     perf_tables = [
         ("nav_perf_quarter_result", NavPerfQuarterResult.__table__),

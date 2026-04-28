@@ -270,6 +270,75 @@ class UpdateLock(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
 
 
+class AiUserCacheMap(Base):
+    """用户到 AI cache 空间映射（owner_key -> cache_id）。"""
+
+    __tablename__ = "ai_user_cache_map"
+    __table_args__ = (
+        UniqueConstraint("owner_key", name="uq_ai_user_cache_owner"),
+        UniqueConstraint("cache_id", name="uq_ai_user_cache_cache_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    owner_key: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    cache_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    status: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.now)
+
+
+class AiCacheSpace(Base):
+    """AI cache 空间运行态。"""
+
+    __tablename__ = "ai_cache_space"
+
+    cache_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    cache_dir: Mapped[str] = mapped_column(String(512), nullable=False)
+    active_pid: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    active_port: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+    model: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    last_access_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    meta_json: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.now)
+
+
+class AiConversationMessage(Base):
+    """近端全量消息表。"""
+
+    __tablename__ = "ai_conversation_message"
+    __table_args__ = (
+        UniqueConstraint("conversation_id", "seq_no", name="uq_ai_conv_seq"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    owner_key: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    conversation_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    seq_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    role: Mapped[str] = mapped_column(String(16), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    token_estimate: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.now, index=True)
+
+
+class AiConversationMemory(Base):
+    """长期核心记忆表。"""
+
+    __tablename__ = "ai_conversation_memory"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    owner_key: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    conversation_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    memory_type: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    summary: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    facts_json: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    source_msg_from: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    source_msg_to: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.now, index=True)
+
+
 class UserCharacter(Base):
     """
     用户维度的 character 配置表（供你之后手动填充）

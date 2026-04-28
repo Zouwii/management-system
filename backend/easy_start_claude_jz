@@ -1,0 +1,5 @@
+#!/bin/bash
+export ANTHROPIC_API_KEY="sk-n0S0p7CgwTcEHdUYLEccKlkxDwwGr2nMxvIbzdqhz1RiwyRv"
+export ANTHROPIC_BASE_URL="http://one-api.server22.jz"
+export ANTHROPIC_MODEL="MiniMax-M2.7"
+claude "$@"

@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   createAITaskTicket,
-  endAIChatSession,
   fetchAITtydSession,
   fetchAIModels,
   fetchAIInsightList,
   sendAIChatSessionMessage,
-  startAIChatSession,
 } from '../api/dashboard';
 import Card from '../components/Card';
 import SectionTitle from '../components/SectionTitle';
@@ -122,7 +120,6 @@ export default function AIAnalysisPage() {
   const [conversationId, setConversationId] = useState(() => createConversationId());
   const [availableModels, setAvailableModels] = useState([]);
   const [selectedModel, setSelectedModel] = useState('');
-  const [chatViewMode, setChatViewMode] = useState('chat');
   const [ttydUrl, setTtydUrl] = useState('');
   const [ttydError, setTtydError] = useState('');
 
@@ -149,21 +146,13 @@ export default function AIAnalysisPage() {
         const fallback = models[0]?.name || 'glm';
         setAvailableModels(models);
         setSelectedModel(fallback);
-        return startAIChatSession(user, { ownerKey }).then((startRes) => {
-          if (!active) return;
-          const welcome = extractSessionReply(startRes) || `AI 已就绪，当前模型：${fallback}。`;
-          const nextConversationId = String(startRes?.data?.conversationId || conversationId || '');
-          if (nextConversationId) {
-            setConversationId(nextConversationId);
-          }
-          setMessages([
-            {
-              id: 'assistant-ready',
-              role: 'assistant',
-              content: welcome,
-            },
-          ]);
-        });
+        setMessages([
+          {
+            id: 'assistant-ready',
+            role: 'assistant',
+            content: `AI 已就绪，当前模型：${fallback}。`,
+          },
+        ]);
       })
       .catch(() => {
         if (!active) return;
@@ -181,10 +170,6 @@ export default function AIAnalysisPage() {
     return () => {
       active = false;
     };
-  }, [conversationId, ownerKey, user]);
-
-  useEffect(() => () => {
-    endAIChatSession(user, { ownerKey }).catch(() => {});
   }, [conversationId, ownerKey, user]);
 
   const hourInsights = useMemo(
@@ -223,7 +208,6 @@ export default function AIAnalysisPage() {
         }
         setTtydUrl(url);
         setTtydError('');
-        setChatViewMode((prev) => (prev === 'chat' ? 'ttyd' : prev));
       })
       .catch((err) => {
         if (!active) return;
@@ -395,128 +379,24 @@ export default function AIAnalysisPage() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-lg font-semibold text-slate-900">AI 对话</div>
-                  <div className="mt-1 text-sm text-slate-500">
-                    {chatViewMode === 'ttyd'
-                      ? '终端模式：直接在 ttyd 子窗口里与 AI 交互。'
-                      : '先和 AI 确认任务背景，再决定是否生成任务单。'}
-                  </div>
+                  <div className="mt-1 text-sm text-slate-500">终端模式：直接在 ttyd 子窗口里与 AI 交互。</div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
-                      chatViewMode === 'chat'
-                        ? 'border border-slate-200 bg-white text-slate-900'
-                        : 'border border-slate-200 bg-slate-50 text-slate-500 hover:text-slate-700'
-                    }`}
-                    onClick={() => setChatViewMode('chat')}
-                  >
-                    聊天模式
-                  </button>
-                  <button
-                    type="button"
-                    className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
-                      chatViewMode === 'ttyd'
-                        ? 'border border-sky-100 bg-sky-50 text-sky-700'
-                        : 'border border-slate-200 bg-slate-50 text-slate-500 hover:text-slate-700'
-                    }`}
-                    onClick={() => setChatViewMode('ttyd')}
-                    title={ttydUrl ? '切换到 ttyd 终端模式' : (ttydError || 'ttyd 未就绪')}
-                  >
-                    ttyd模式
-                  </button>
-                </div>
+                <span className="rounded-full border border-sky-100 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">ttyd模式</span>
               </div>
 
-              {chatViewMode === 'ttyd' ? (
-                <div className="mt-5 h-[560px] rounded-[28px] border border-slate-200 bg-black p-2">
-                  {ttydUrl ? (
-                    <iframe
-                      title="AI ttyd terminal"
-                      src={ttydUrl}
-                      className="h-full w-full rounded-[22px] border-0 bg-black"
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center rounded-[22px] border border-slate-800 bg-slate-950 px-4 text-sm text-slate-300">
-                      {ttydError || 'ttyd 会话未就绪，请检查后端 AI_TTYD_BASE_URL / AI_TTYD_PORT_BASE 配置。'}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <>
-                  <div
-                    className="mt-5 h-[420px] space-y-3 overflow-y-auto rounded-[28px] border border-slate-200 bg-white p-4"
-                    style={{ scrollbarWidth: 'thin' }}
-                  >
-                    {messages.map((message) => (
-                      <div
-                        key={message.id}
-                        className={`max-w-[88%] rounded-3xl px-4 py-3 text-sm leading-6 ${
-                          message.role === 'user'
-                            ? 'ml-auto bg-slate-900 text-white'
-                            : 'border border-slate-200 bg-slate-50 text-slate-700'
-                        }`}
-                      >
-                        {message.content}
-                      </div>
-                    ))}
+              <div className="mt-5 h-[560px] rounded-[28px] border border-slate-200 bg-black p-2">
+                {ttydUrl ? (
+                  <iframe
+                    title="AI ttyd terminal"
+                    src={ttydUrl}
+                    className="h-full w-full rounded-[22px] border-0 bg-black"
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center rounded-[22px] border border-slate-800 bg-slate-950 px-4 text-sm text-slate-300">
+                    {ttydError || 'ttyd 会话未就绪，请检查后端 AI_TTYD_BASE_URL / AI_TTYD_PORT_BASE 配置。'}
                   </div>
-
-                  <div className="mt-4 rounded-[28px] border border-slate-200 bg-white p-4">
-                    <textarea
-                      className="min-h-[120px] max-h-[280px] w-full resize-y bg-transparent text-sm leading-6 text-slate-700 outline-none"
-                      value={input}
-                      onChange={(event) => setInput(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter' && !event.shiftKey) {
-                          event.preventDefault();
-                          handleSend();
-                        }
-                      }}
-                      placeholder="例如：我需要创建一个多段虚拟规划算法实车测试任务，需要产出测试说明、结果结论，并评估实际有效工时。"
-                    />
-                    {chatError ? (
-                      <div className="mt-2 text-xs text-rose-500">
-                        AI 调用失败：{chatError}
-                      </div>
-                    ) : null}
-                    <div className="mt-4 flex flex-wrap gap-3">
-                      <button
-                        type="button"
-                        className="rounded-full bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-                        onClick={handleSend}
-                        disabled={chatSending || !input.trim()}
-                      >
-                        {chatSending ? '发送中...' : '发送给 AI'}
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
-                        onClick={() => {
-                          endAIChatSession(user, { ownerKey }).catch(() => {});
-                          const nextConversationId = createConversationId();
-                          setConversationId(nextConversationId);
-                          setSelectedModel(availableModels[0]?.name || 'glm');
-                          setInput('');
-                          setMessages([{ id: 'assistant-ready-reset', role: 'assistant', content: '正在重启 AI 会话...' }]);
-                          setDraft({
-                            title: '待生成任务单',
-                            taskType: TASK_TYPES[1],
-                            workType: WORK_TYPES[0],
-                            requirementDesc: '左侧和 AI 确认任务背景后，这里会生成需求描述。',
-                            outputs: ['待生成任务产出'],
-                            participationLevel: PARTICIPATION_LEVELS[0],
-                          });
-                          setConfirmed(false);
-                          setCreateResult(null);
-                        }}
-                      >
-                        重置对话
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )}
+                )}
+              </div>
             </Card>
 
             <div className="space-y-4">
