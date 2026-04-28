@@ -8,12 +8,12 @@
 - `start_claude_jz.py`：本地直启 Claude 的入口脚本（调试用）
 - `AI_MULTI_USER_DESIGN.md`：多用户架构设计文档
 
-## 调用链路
+## 推荐调用链路（用户目录隔离）
 
-1. 前端调用 `POST /bt/ai/ttyd/session`
-2. 后端按 `ownerKey` 创建或复用 ttyd 子进程
-3. ttyd 执行 `backend/easy_start_claude_jz` 启动 Claude CLI
-4. 后端返回 `embedUrl`，前端通过 `iframe` 直连终端
+1. 调用 `GET/POST /bt/ai/cache/current` 获取当前用户目录信息
+2. 再调用 `POST /bt/ai/ttyd/session` 创建或复用终端会话
+3. 前端用返回的 `embedUrl` 通过 `iframe` 直连终端
+4. 启动脚本按 `ownerKey` 自动切到用户专属目录并加载共享 skills
 
 ## 多用户隔离规则
 
@@ -40,11 +40,44 @@
 
 - `embedUrl`：前端 `iframe` 地址
 - `ownerKey`：后端最终解析出的用户标识
+- `ownerSafe`：用户安全目录名（sha256 截断）
+- `userRoot`：用户根目录
+- `workspaceDir`：用户工作区目录
 - `model`：当前会话模型
 - `port`：ttyd 监听端口
 - `pid`：ttyd 进程号
 
-### 2) 结束会话（兼容接口名）
+### 2) 获取当前用户缓存空间
+
+- `GET /bt/ai/cache/current`
+- `POST /bt/ai/cache/current`
+
+说明：
+
+- 可不传参数，后端会基于登录会话解析当前用户
+- 也可在 `POST` body 传 `ownerKey` 显式指定
+
+请求示例（POST）：
+
+```json
+{
+  "ownerKey": "user-001"
+}
+```
+
+响应示例：
+
+```json
+{
+  "ownerKey": "user-001",
+  "ownerSafe": "9f2a1c...",
+  "userRoot": "/abs/path/to/backend/runtime/users/9f2a1c...",
+  "workspaceDir": "/abs/path/to/backend/runtime/users/9f2a1c.../workspaces/default",
+  "sharedClaudeDir": "/abs/path/to/backend/runtime/shared/.claude"
+}
+```
+
+### 3) 结束会话（兼容接口名）
 
 - `POST /bt/ai/chat/session_end`
 
@@ -86,6 +119,14 @@ python3 ai/start_claude_jz.py
 
 - 验证 `ai/config.json` 是否可用
 - 验证当前环境能否找到 `claude` 命令
+- 验证用户隔离目录是否创建在 `backend/runtime/users/*`
+
+## skills 开发与发布
+
+- 共享 skills 目录：`backend/runtime/shared/.claude/skills`
+- 每个用户会话启动时会把共享 skills 合并到：
+  - `backend/runtime/users/<ownerSafe>/.claude/skills`
+- 你本地调试完 skill 后，发布时只需同步共享 skills 目录到服务器同路径
 
 ## 常见问题
 

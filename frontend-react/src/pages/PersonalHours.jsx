@@ -135,7 +135,7 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
         setMemberOptions(nextMemberOptions);
         // 下拉框保持“当前选中人”，但首屏数据统一按 ALL 预取，保证成员全集/聚合数据就绪。
         setSelectedTarget(nextTarget);
-        const { payload } = await runInitialQuery('ALL');
+        const { payload, response } = await runInitialQuery('ALL');
         if (!active) return;
         setSourceTrend([]);
         setDashboard(buildEmptyDashboardByRange(payload));
@@ -144,7 +144,7 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
           endDate: payload.endDate,
         });
         setQuickRangePreset('quarter_to_today');
-        setLastUpdatedAt('');
+        setLastUpdatedAt(response?.data?.dashboard?.lastUpdatedAt ?? '');
         setCompensatoryDays(0);
       } else {
         const { payload, response } = await runInitialQuery(defaultTarget);

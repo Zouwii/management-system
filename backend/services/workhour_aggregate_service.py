@@ -5,7 +5,6 @@
 from __future__ import annotations
 
 import os
-import time
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
@@ -89,7 +88,6 @@ def executor_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, 
     说明：按 project_id + executor_id（query_user_id）统计，不再 join A 表。
     """
     payload = payload or {}
-    t_all = time.perf_counter()
     executor_id = str(payload.get("executorId") or payload.get("executorid") or "").strip()
     project_id = str(payload.get("projectId") or payload.get("projectid") or "").strip()
     start_raw = payload.get("start_time")
@@ -121,9 +119,68 @@ def executor_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, 
     if start_dt > end_dt:
         return {"success": False, "error": "start_time must be <= end_time", "data": {}}
 
-    t_query = time.perf_counter()
+    print(
+        "[executor_quarter_workhours] request executor_id={} project_id={} start_utc={} end_utc={}".format(
+            executor_id,
+            project_id,
+            start_dt.isoformat(),
+            end_dt.isoformat(),
+        )
+    )
+
     session = SessionLocal()
     try:
+        # 诊断：基于 B 表自身字段统计过滤去向
+        b_join_total = (
+            session.query(func.count())
+            .select_from(ProjectTaskDetail)
+            .filter(ProjectTaskDetail.project_id == project_id)
+            .filter(ProjectTaskDetail.query_user_id == executor_id)
+            .scalar()
+            or 0
+        )
+        b_not_dev = (
+            session.query(func.count())
+            .select_from(ProjectTaskDetail)
+            .filter(ProjectTaskDetail.project_id == project_id)
+            .filter(ProjectTaskDetail.query_user_id == executor_id)
+            .filter(ProjectTaskDetail.scenario_field_config_id != DEFAULT_SCENARIO_FIELD_CONFIG_ID)
+            .scalar()
+            or 0
+        )
+        b_due_null = (
+            session.query(func.count())
+            .select_from(ProjectTaskDetail)
+            .filter(ProjectTaskDetail.project_id == project_id)
+            .filter(ProjectTaskDetail.query_user_id == executor_id)
+            .filter(ProjectTaskDetail.scenario_field_config_id == DEFAULT_SCENARIO_FIELD_CONFIG_ID)
+            .filter(ProjectTaskDetail.due_date == None)  # noqa: E711
+            .scalar()
+            or 0
+        )
+        b_due_before = (
+            session.query(func.count())
+            .select_from(ProjectTaskDetail)
+            .filter(ProjectTaskDetail.project_id == project_id)
+            .filter(ProjectTaskDetail.query_user_id == executor_id)
+            .filter(ProjectTaskDetail.scenario_field_config_id == DEFAULT_SCENARIO_FIELD_CONFIG_ID)
+            .filter(ProjectTaskDetail.due_date != None)  # noqa: E711
+            .filter(ProjectTaskDetail.due_date < start_dt)
+            .scalar()
+            or 0
+        )
+        b_due_after = (
+            session.query(func.count())
+            .select_from(ProjectTaskDetail)
+            .filter(ProjectTaskDetail.project_id == project_id)
+            .filter(ProjectTaskDetail.query_user_id == executor_id)
+            .filter(ProjectTaskDetail.scenario_field_config_id == DEFAULT_SCENARIO_FIELD_CONFIG_ID)
+            .filter(ProjectTaskDetail.due_date != None)  # noqa: E711
+            .filter(ProjectTaskDetail.due_date > end_dt)
+            .scalar()
+            or 0
+        )
+
         # B 表：按 payload 时间窗过滤（通过 A 表 due_date 关联）
         b_rows: List[
             Tuple[str, Optional[float], Optional[int], Optional[int], Optional[str], Optional[str], Optional[float]]
@@ -137,20 +194,23 @@ def executor_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, 
                 ProjectTaskDetail.task_nature,
                 ProjectTaskDetail.workday_costhour,
             )
-            .join(
-                ProjectTask,
-                and_(
-                    ProjectTask.project_id == ProjectTaskDetail.project_id,
-                    ProjectTask.task_id == ProjectTaskDetail.task_id,
-                ),
-            )
             .filter(ProjectTaskDetail.project_id == project_id)
             .filter(ProjectTaskDetail.query_user_id == executor_id)
-            .filter(ProjectTask.scenario_field_config_id == DEFAULT_SCENARIO_FIELD_CONFIG_ID)
-            .filter(ProjectTask.due_date != None)  # noqa: E711
-            .filter(ProjectTask.due_date >= start_dt)
-            .filter(ProjectTask.due_date <= end_dt)
+            .filter(ProjectTaskDetail.scenario_field_config_id == DEFAULT_SCENARIO_FIELD_CONFIG_ID)
+            .filter(ProjectTaskDetail.due_date != None)  # noqa: E711
+            .filter(ProjectTaskDetail.due_date >= start_dt)
+            .filter(ProjectTaskDetail.due_date <= end_dt)
             .all()
+        )
+        print(
+            "[executor_quarter_workhours] b_filter join_total={} in_window={} filtered_not_dev={} filtered_due_null={} filtered_due_before={} filtered_due_after={}".format(
+                int(b_join_total),
+                len(b_rows),
+                int(b_not_dev),
+                int(b_due_null),
+                int(b_due_before),
+                int(b_due_after),
+            )
         )
 
         # C 表：当前逾期快照口径（不按 payload 时间窗过滤）
@@ -163,17 +223,15 @@ def executor_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, 
                 ProjectTaskOverdueDetail.task_nature,
                 ProjectTaskOverdueDetail.workday_costhour,
             )
-            .join(
-                ProjectTask,
-                and_(
-                    ProjectTask.project_id == ProjectTaskOverdueDetail.project_id,
-                    ProjectTask.task_id == ProjectTaskOverdueDetail.task_id,
-                ),
-            )
             .filter(ProjectTaskOverdueDetail.project_id == project_id)
             .filter(ProjectTaskOverdueDetail.query_user_id == executor_id)
-            .filter(ProjectTask.scenario_field_config_id == DEFAULT_SCENARIO_FIELD_CONFIG_ID)
+            .filter(ProjectTaskOverdueDetail.scenario_field_config_id == DEFAULT_SCENARIO_FIELD_CONFIG_ID)
             .all()
+        )
+        print(
+            "[executor_quarter_workhours] c_snapshot_count={} (not filtered by start/end)".format(
+                len(c_rows)
+            )
         )
 
         # B2 表：问题处理明细（按 payload 时间窗过滤，基于 program_issue.due_date）
@@ -199,36 +257,51 @@ def executor_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, 
             .filter(ProgramIssue.due_date <= end_dt)
             .all()
         )
+        print(
+            "[executor_quarter_workhours] issue_in_window_count={}".format(
+                len(issue_rows)
+            )
+        )
 
         overdue_task_ids = {str(tid) for tid, _, _, _, _, _ in c_rows if tid is not None}
-        all_task_ids = {str(tid) for tid, _, _, _, _, _, _ in b_rows if tid is not None} | overdue_task_ids
 
-        # A 表用于补充展示字段：content / due_date（不参与统计口径）
+        # B/C 已冗余 content/due_date，不再依赖 A 映射展示
+        b_meta_rows = (
+            session.query(ProjectTaskDetail.task_id, ProjectTaskDetail.content, ProjectTaskDetail.due_date)
+            .filter(ProjectTaskDetail.project_id == project_id)
+            .filter(ProjectTaskDetail.query_user_id == executor_id)
+            .filter(ProjectTaskDetail.scenario_field_config_id == DEFAULT_SCENARIO_FIELD_CONFIG_ID)
+            .all()
+        )
+        c_meta_rows = (
+            session.query(ProjectTaskOverdueDetail.task_id, ProjectTaskOverdueDetail.content, ProjectTaskOverdueDetail.due_date)
+            .filter(ProjectTaskOverdueDetail.project_id == project_id)
+            .filter(ProjectTaskOverdueDetail.query_user_id == executor_id)
+            .filter(ProjectTaskOverdueDetail.scenario_field_config_id == DEFAULT_SCENARIO_FIELD_CONFIG_ID)
+            .all()
+        )
         content_map: Dict[str, str] = {}
         due_map: Dict[str, str] = {}
-        if all_task_ids:
-            a_rows = (
-                session.query(ProjectTask.task_id, ProjectTask.content, ProjectTask.due_date)
-                .filter(ProjectTask.project_id == project_id)
-                .filter(ProjectTask.task_id.in_(list(all_task_ids)))
-                .all()
+        for tid, content, due_date in list(b_meta_rows) + list(c_meta_rows):
+            if tid is None:
+                continue
+            key = str(tid)
+            if key not in content_map:
+                content_map[key] = str(content or "")
+            if key not in due_map and due_date is not None:
+                try:
+                    due_map[key] = due_date.astimezone(timezone.utc).isoformat()
+                except Exception:
+                    due_map[key] = str(due_date)
+        print(
+            "[executor_quarter_workhours] self_mapping from_b={} from_c={} merged_keys={}".format(
+                len(b_meta_rows),
+                len(c_meta_rows),
+                len(content_map),
             )
-            for tid, content, due_date in a_rows:
-                if tid is not None:
-                    content_map[str(tid)] = str(content or "")
-                    if due_date is not None:
-                        try:
-                            due_map[str(tid)] = due_date.astimezone(timezone.utc).isoformat()
-                        except Exception:
-                            due_map[str(tid)] = str(due_date)
+        )
     finally:
         session.close()
-    print(
-        "ZHR TEMP [stats_executor_quarter] db_query cost_ms={} extra={}".format(
-            round((time.perf_counter() - t_query) * 1000, 2),
-            {"executorId": executor_id, "projectId": project_id, "b_count": len(b_rows), "c_count": len(c_rows)},
-        )
-    )
 
     # 计算汇总 + 生成明细并集（B+C）
     overdue_total = 0.0
@@ -371,9 +444,11 @@ def executor_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, 
         },
     }
     print(
-        "ZHR TEMP [stats_executor_quarter] total cost_ms={} extra={}".format(
-            round((time.perf_counter() - t_all) * 1000, 2),
-            {"executorId": executor_id, "projectId": project_id, "task_count": task_count, "overdue_task_count": overdue_count},
+        "[executor_quarter_workhours] result task_count={} overdue_task_count={} quarter_work_hour={} quarter_overdue_work_hour={}".format(
+            int(out["data"].get("task_count") or 0),
+            int(out["data"].get("overdue_task_count") or 0),
+            float(out["data"].get("quarter_work_hour") or 0.0),
+            float(out["data"].get("quarter_overdue_work_hour") or 0.0),
         )
     )
     return out
@@ -516,15 +591,6 @@ def workdays_in_range_service(payload: Dict[str, Any]) -> Dict[str, Any]:
     仅使用 payload.start/end（不再回退 config）。
     """
     payload = payload or {}
-    start_raw_input = payload.get("startDate") or payload.get("start_time") or ""
-    end_raw_input = payload.get("endDate") or payload.get("end_time") or ""
-    print(
-        "ZHR TEMP [workdays] request start_raw={} end_raw={} compensatoryDays={}".format(
-            start_raw_input,
-            end_raw_input,
-            payload.get("compensatoryDays"),
-        )
-    )
     start_raw = payload.get("startDate") or payload.get("start_time") or ""
     end_raw = payload.get("endDate") or payload.get("end_time") or ""
 
@@ -548,20 +614,8 @@ def workdays_in_range_service(payload: Dict[str, Any]) -> Dict[str, Any]:
     start_dt = _to_utc_dt(start_raw)
     end_dt = _to_utc_dt(end_raw)
     if not start_dt or not end_dt:
-        print(
-            "ZHR TEMP [workdays] invalid_range start_dt={} end_dt={}".format(
-                start_dt,
-                end_dt,
-            )
-        )
         return {"success": False, "error": "invalid start/end time", "data": {}}
     if start_dt > end_dt:
-        print(
-            "ZHR TEMP [workdays] invalid_order start_dt={} end_dt={}".format(
-                start_dt.isoformat(),
-                end_dt.isoformat(),
-            )
-        )
         return {"success": False, "error": "start_time must be <= end_time", "data": {}}
 
     holiday_raw = payload.get("statutoryHolidays") or []
@@ -654,20 +708,6 @@ def workdays_in_range_service(payload: Dict[str, Any]) -> Dict[str, Any]:
             "month_day": dict(monthly_workdays),
         },
     }
-    print(
-        "ZHR TEMP [workdays] result utc_start={} utc_end={} sh_start={} sh_end={} workday_count={} effective_workday_count={} holiday_count={} weekend_count={} compensatory_days={} calendar_source={}".format(
-            start_dt.isoformat(),
-            end_dt.isoformat(),
-            start_local.isoformat(),
-            end_local.isoformat(),
-            result["data"]["workday_count"],
-            result["data"]["effective_workday_count"],
-            result["data"]["holiday_count"],
-            result["data"]["weekend_count"],
-            result["data"]["compensatory_days"],
-            result["data"]["calendar_source"],
-        )
-    )
     return result
 
 

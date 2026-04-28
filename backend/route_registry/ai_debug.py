@@ -1,14 +1,13 @@
 """AI ttyd session routes."""
 
+import hashlib
 import json
 import os
-import hashlib
 import signal
+import socket
 import subprocess
 import threading
 import time
-import socket
-from datetime import datetime
 from pathlib import Path
 
 from flask import request, session
@@ -16,9 +15,9 @@ from flask import request, session
 _AI_CONFIG_PATH = Path(__file__).resolve().parent.parent / "ai" / "config.json"
 _EASY_START_JZ_SCRIPT = Path(__file__).resolve().parent.parent / "easy_start_claude_jz"
 _RUNTIME_DIR = Path(__file__).resolve().parent.parent / "runtime"
-_CLAUDE_HOME = _RUNTIME_DIR / "claude-home"
+_SHARED_CLAUDE_DIR = _RUNTIME_DIR / "shared" / ".claude"
+_USERS_ROOT = _RUNTIME_DIR / "users"
 _LOG_FILE = _RUNTIME_DIR / "logs" / "ai_debug_subprocess.log"
-_AI_CACHE_SPACES_DIR = Path(__file__).resolve().parent.parent / "ai" / "cache" / "spaces"
 _DEFAULT_OWNER_KEY = "anonymous"
 _DEFAULT_TTYD_PORT_BASE = 8800
 _DEFAULT_TTYD_PORT_SPAN = 400
@@ -28,8 +27,10 @@ _TTYD_LOCK = threading.Lock()
 
 def _ensure_dirs() -> None:
     (_RUNTIME_DIR / "logs").mkdir(parents=True, exist_ok=True)
-    _CLAUDE_HOME.mkdir(parents=True, exist_ok=True)
-    _AI_CACHE_SPACES_DIR.mkdir(parents=True, exist_ok=True)
+    _SHARED_CLAUDE_DIR.mkdir(parents=True, exist_ok=True)
+    (_SHARED_CLAUDE_DIR / "skills").mkdir(parents=True, exist_ok=True)
+    (_SHARED_CLAUDE_DIR / "plugins").mkdir(parents=True, exist_ok=True)
+    _USERS_ROOT.mkdir(parents=True, exist_ok=True)
 
 
 def _append_log(entry: dict) -> None:
@@ -47,31 +48,9 @@ def _load_ai_config() -> dict:
         return {}
 
 
-def _make_env() -> dict:
-    cfg = _load_ai_config()
-    model = str(cfg.get("model") or "glm-5.1").strip() or "glm-5.1"
-    api_key = str(cfg.get("api_key") or "").strip()
-    base_url = str(cfg.get("base_url") or "").strip()
-    if not api_key:
-        raise RuntimeError("missing ai/config.json api_key")
-
-    env = os.environ.copy()
-    real_home = str(os.environ.get("HOME") or "").strip()
-    env["ANTHROPIC_API_KEY"] = api_key
-    env["ANTHROPIC_BASE_URL"] = base_url
-    env["ANTHROPIC_MODEL"] = model
-    env["HOME"] = str(_CLAUDE_HOME)
-    # 某些启动链路下 PATH 不含 nvm / local bin，导致找不到 claude。
-    path_items = [p for p in str(env.get("PATH") or "").split(":") if p]
-    for candidate in (
-        f"{real_home}/.nvm/versions/node/v20.20.2/bin" if real_home else "",
-        f"{real_home}/.local/bin" if real_home else "",
-    ):
-        c = str(candidate or "").strip()
-        if c and c not in path_items:
-            path_items.append(c)
-    env["PATH"] = ":".join(path_items)
-    return {"env": env, "model": model, "base_url": base_url}
+def _safe_owner_key(owner_key: str) -> str:
+    raw = str(owner_key or "").strip() or _DEFAULT_OWNER_KEY
+    return hashlib.sha256(raw.encode("utf-8", errors="ignore")).hexdigest()[:24]
 
 
 def _resolve_owner_key(payload: dict) -> str:
@@ -87,108 +66,61 @@ def _resolve_owner_key(payload: dict) -> str:
     return _DEFAULT_OWNER_KEY
 
 
-def _safe_owner_key(owner_key: str) -> str:
-    raw = str(owner_key or "").strip() or _DEFAULT_OWNER_KEY
-    return hashlib.sha256(raw.encode("utf-8", errors="ignore")).hexdigest()[:24]
+def _resolve_owner_name() -> str:
+    auth_user = session.get("auth_user") or {}
+    if isinstance(auth_user, dict):
+        for k in ("name", "nick", "nickname", "user_name"):
+            val = str(auth_user.get(k) or "").strip()
+            if val:
+                return val
+    return ""
 
 
-def _ensure_owner_cache_binding(owner_key: str) -> dict:
-    from sqlalchemy.exc import IntegrityError
-
-    from db.engine import SessionLocal
-    from db.orm import AiCacheSpace, AiUserCacheMap
-
-    safe_owner = _safe_owner_key(owner_key)
-    cache_id = f"cache_{safe_owner}"
-    cache_dir = _AI_CACHE_SPACES_DIR / cache_id
-    cache_dir.mkdir(parents=True, exist_ok=True)
-    now = datetime.now()
-    db = SessionLocal()
-    try:
-        mapping = db.query(AiUserCacheMap).filter(AiUserCacheMap.owner_key == owner_key).first()
-        if not mapping:
-            mapping = AiUserCacheMap(
-                owner_key=owner_key,
-                cache_id=cache_id,
-                status=1,
-                created_at=now,
-                updated_at=now,
-            )
-            db.add(mapping)
-            try:
-                db.flush()
-            except IntegrityError:
-                db.rollback()
-                mapping = db.query(AiUserCacheMap).filter(AiUserCacheMap.owner_key == owner_key).first()
-        if mapping:
-            cache_id = str(mapping.cache_id or cache_id)
-            mapping.updated_at = now
-        space = db.query(AiCacheSpace).filter(AiCacheSpace.cache_id == cache_id).first()
-        if not space:
-            space = AiCacheSpace(
-                cache_id=cache_id,
-                cache_dir=str(_AI_CACHE_SPACES_DIR / cache_id),
-                created_at=now,
-                updated_at=now,
-                last_access_at=now,
-            )
-            db.add(space)
-        else:
-            space.updated_at = now
-            space.last_access_at = now
-        db.commit()
-        resolved_dir = Path(str(space.cache_dir))
-        resolved_dir.mkdir(parents=True, exist_ok=True)
-        return {"cache_id": cache_id, "cache_dir": str(resolved_dir)}
-    finally:
-        db.close()
+def _user_workspace(owner_key: str) -> dict:
+    safe = _safe_owner_key(owner_key)
+    user_root = _USERS_ROOT / safe
+    claude_dir = user_root / ".claude"
+    workspace_dir = user_root / "workspaces" / "default"
+    return {
+        "owner_safe": safe,
+        "user_root": str(user_root),
+        "claude_dir": str(claude_dir),
+        "workspace_dir": str(workspace_dir),
+        "shared_claude_dir": str(_SHARED_CLAUDE_DIR),
+    }
 
 
-def _touch_cache_space(cache_id: str, *, pid: int | None = None, port: int | None = None, model: str | None = None) -> None:
-    from db.engine import SessionLocal
-    from db.orm import AiCacheSpace
+def _make_env(owner_key: str, owner_name: str, model: str) -> dict:
+    cfg = _load_ai_config()
+    api_key = str(cfg.get("api_key") or "").strip()
+    base_url = str(cfg.get("base_url") or "").strip()
+    if not api_key:
+        raise RuntimeError("missing ai/config.json api_key")
 
-    now = datetime.now()
-    db = SessionLocal()
-    try:
-        space = db.query(AiCacheSpace).filter(AiCacheSpace.cache_id == cache_id).first()
-        if not space:
-            return
-        if pid is not None:
-            space.active_pid = int(pid)
-        if port is not None:
-            space.active_port = int(port)
-        if model is not None:
-            space.model = str(model)
-        space.last_access_at = now
-        space.updated_at = now
-        db.commit()
-    finally:
-        db.close()
-
-
-def _mark_cache_space_stopped(cache_id: str) -> None:
-    from db.engine import SessionLocal
-    from db.orm import AiCacheSpace
-
-    now = datetime.now()
-    db = SessionLocal()
-    try:
-        space = db.query(AiCacheSpace).filter(AiCacheSpace.cache_id == cache_id).first()
-        if not space:
-            return
-        space.active_pid = None
-        space.active_port = None
-        space.updated_at = now
-        space.last_access_at = now
-        db.commit()
-    finally:
-        db.close()
+    env = os.environ.copy()
+    real_home = str(os.environ.get("HOME") or "").strip()
+    env["ANTHROPIC_API_KEY"] = api_key
+    env["ANTHROPIC_BASE_URL"] = base_url
+    env["ANTHROPIC_MODEL"] = model
+    env["AI_OWNER_KEY"] = owner_key
+    env["AI_OWNER_NAME"] = owner_name
+    env["AI_USERS_ROOT"] = str(_USERS_ROOT)
+    env["AI_SHARED_CLAUDE_DIR"] = str(_SHARED_CLAUDE_DIR)
+    env["AI_SAFE_OWNER"] = _safe_owner_key(owner_key)
+    path_items = [p for p in str(env.get("PATH") or "").split(":") if p]
+    for candidate in (
+        f"{real_home}/.nvm/versions/node/v20.20.2/bin" if real_home else "",
+        f"{real_home}/.local/bin" if real_home else "",
+    ):
+        c = str(candidate or "").strip()
+        if c and c not in path_items:
+            path_items.append(c)
+    env["PATH"] = ":".join(path_items)
+    return env
 
 
 def _normalize_owner_for_port(owner_key: str) -> int:
     seed = owner_key.encode("utf-8", errors="ignore")
-    # 稳定映射：同一 ownerKey 固定端口。
     return sum(seed) % _DEFAULT_TTYD_PORT_SPAN
 
 
@@ -253,7 +185,6 @@ def _build_ttyd_embed_url(port: int, owner_key: str, model: str) -> str:
     tpl = str(os.getenv("AI_TTYD_BASE_URL") or "").strip()
     if not tpl:
         tpl = "http://127.0.0.1:{port}/"
-    # 兼容历史误配："{port/}" 也按 "{port}/" 处理。
     tpl = tpl.replace("{port/}", "{port}/")
     if "{port}" in tpl:
         url = tpl.replace("{port}", str(port))
@@ -263,36 +194,16 @@ def _build_ttyd_embed_url(port: int, owner_key: str, model: str) -> str:
     return f"{url}{joiner}ownerKey={owner_key}&model={model}"
 
 
-def _ensure_ttyd_session(owner_key: str, model: str) -> dict:
+def _ensure_ttyd_session(owner_key: str, owner_name: str, model: str) -> dict:
     with _TTYD_LOCK:
         existing = _TTYD_SESSIONS.get(owner_key)
         if existing and existing["proc"].poll() is None:
-            cache_id = str(existing.get("cache_id") or "")
-            if cache_id:
-                try:
-                    _touch_cache_space(cache_id, pid=existing["proc"].pid, port=existing.get("port"), model=model)
-                except Exception:
-                    pass
             return existing
         if existing:
             _terminate_ttyd_locked(existing)
-            old_cache_id = str(existing.get("cache_id") or "")
-            if old_cache_id:
-                try:
-                    _mark_cache_space_stopped(old_cache_id)
-                except Exception:
-                    pass
             _TTYD_SESSIONS.pop(owner_key, None)
 
-        resolved = _make_env()
-        resolved_env = dict(resolved["env"])
-        resolved_env["ANTHROPIC_MODEL"] = model
-        cache_binding = _ensure_owner_cache_binding(owner_key)
-        cache_id = str(cache_binding.get("cache_id") or "")
-        cache_dir = str(cache_binding.get("cache_dir") or "")
-        resolved_env["AI_OWNER_KEY"] = owner_key
-        resolved_env["AI_CACHE_ID"] = cache_id
-        resolved_env["AI_CACHE_DIR"] = cache_dir
+        resolved_env = _make_env(owner_key=owner_key, owner_name=owner_name, model=model)
         port = _resolve_ttyd_port(owner_key)
         cmd = [
             "ttyd",
@@ -324,30 +235,25 @@ def _ensure_ttyd_session(owner_key: str, model: str) -> dict:
                 pass
             raise RuntimeError(f"failed to start ttyd: {err.strip() or 'unknown error'}")
 
+        ws = _user_workspace(owner_key)
         state = {
             "owner_key": owner_key,
-            "cache_id": cache_id,
-            "cache_dir": cache_dir,
+            "owner_safe": ws["owner_safe"],
             "model": model,
             "port": port,
             "proc": proc,
             "created_at": int(time.time()),
         }
         _TTYD_SESSIONS[owner_key] = state
-        try:
-            _touch_cache_space(cache_id, pid=proc.pid, port=port, model=model)
-        except Exception:
-            pass
         _append_log(
             {
                 "ts": int(time.time()),
                 "phase": "ttyd_session_start",
                 "owner_key": owner_key,
-                "cache_id": cache_id,
+                "owner_safe": ws["owner_safe"],
                 "model": model,
                 "port": port,
                 "pid": proc.pid,
-                "cmd": cmd,
             }
         )
         return state
@@ -366,18 +272,11 @@ def register(bp, ok, fail):
             ttyd_state = _TTYD_SESSIONS.pop(owner_key, None)
             if ttyd_state:
                 _terminate_ttyd_locked(ttyd_state)
-                cache_id = str(ttyd_state.get("cache_id") or "")
-                if cache_id:
-                    try:
-                        _mark_cache_space_stopped(cache_id)
-                    except Exception:
-                        pass
                 _append_log(
                     {
                         "ts": int(time.time()),
                         "phase": "ttyd_session_end",
                         "owner_key": owner_key,
-                        "cache_id": ttyd_state.get("cache_id"),
                         "port": ttyd_state.get("port"),
                     }
                 )
@@ -386,12 +285,14 @@ def register(bp, ok, fail):
     def _handle_ttyd_session():
         payload = request.get_json(silent=True) or {}
         owner_key = _resolve_owner_key(payload)
+        owner_name = _resolve_owner_name()
         cfg = _load_ai_config()
         model = str(payload.get("model") or cfg.get("model") or "glm-5.1").strip() or "glm-5.1"
         try:
-            state = _ensure_ttyd_session(owner_key=owner_key, model=model)
+            state = _ensure_ttyd_session(owner_key=owner_key, owner_name=owner_name, model=model)
         except Exception as exc:
             return fail(str(exc), code=500, data={})
+        ws = _user_workspace(owner_key)
         embed_url = _build_ttyd_embed_url(
             port=int(state.get("port") or _owner_ttyd_port(owner_key)),
             owner_key=owner_key,
@@ -401,10 +302,26 @@ def register(bp, ok, fail):
             {
                 "embedUrl": embed_url,
                 "ownerKey": owner_key,
-                "cacheId": str(state.get("cache_id") or ""),
+                "ownerSafe": ws["owner_safe"],
+                "userRoot": ws["user_root"],
+                "workspaceDir": ws["workspace_dir"],
                 "model": model,
                 "port": int(state.get("port") or 0),
                 "pid": int(state.get("proc").pid) if state.get("proc") else 0,
+            }
+        )
+
+    def _handle_cache_current():
+        payload = request.get_json(silent=True) or {}
+        owner_key = _resolve_owner_key(payload)
+        ws = _user_workspace(owner_key)
+        return ok(
+            {
+                "ownerKey": owner_key,
+                "ownerSafe": ws["owner_safe"],
+                "userRoot": ws["user_root"],
+                "workspaceDir": ws["workspace_dir"],
+                "sharedClaudeDir": ws["shared_claude_dir"],
             }
         )
 
@@ -423,4 +340,8 @@ def register(bp, ok, fail):
     @bp.route("/ai/ttyd/session", methods=["POST"])
     def ai_ttyd_session():
         return _handle_ttyd_session()
+
+    @bp.route("/ai/cache/current", methods=["GET", "POST"])
+    def ai_cache_current():
+        return _handle_cache_current()
 

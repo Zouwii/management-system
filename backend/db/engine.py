@@ -42,10 +42,6 @@ def _table_registry():
     """
     # 延迟导入以避免循环
     from db.orm import (
-        AiCacheSpace,
-        AiConversationMemory,
-        AiConversationMessage,
-        AiUserCacheMap,
         Config as DbConfig,
         NavPerfQuarterResult,
         ProgramIssue,
@@ -53,6 +49,7 @@ def _table_registry():
         ProjectTask,
         ProjectTaskDetail,
         ProjectTaskOverdueDetail,
+        SyncFailure,
         ServoPerfQuarterResult,
         SyncRun,
         UpdateLock,
@@ -66,13 +63,10 @@ def _table_registry():
         ("program_issue_detail", ProgramIssueDetail.__table__),
         ("project_task_overdue_details", ProjectTaskOverdueDetail.__table__),
         ("sync_runs", SyncRun.__table__),
+        ("sync_failures", SyncFailure.__table__),
         ("config", DbConfig.__table__),
         ("update_locks", UpdateLock.__table__),
         ("user_character", DbUserCharacter.__table__),
-        ("ai_user_cache_map", AiUserCacheMap.__table__),
-        ("ai_cache_space", AiCacheSpace.__table__),
-        ("ai_conversation_message", AiConversationMessage.__table__),
-        ("ai_conversation_memory", AiConversationMemory.__table__),
     ]
     perf_tables = [
         ("nav_perf_quarter_result", NavPerfQuarterResult.__table__),
@@ -171,6 +165,27 @@ def init_database() -> None:
                         "ALTER TABLE project_task_details ADD COLUMN parent_task_id VARCHAR(64)"
                     )
                 )
+        if "scenario_field_config_id" not in cols_b:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE project_task_details ADD COLUMN scenario_field_config_id VARCHAR(64)"
+                    )
+                )
+        if "content" not in cols_b:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE project_task_details ADD COLUMN content TEXT"
+                    )
+                )
+        if "due_date" not in cols_b:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE project_task_details ADD COLUMN due_date DATETIME"
+                    )
+                )
         if "parent_id" not in cols_b:
             with engine.begin() as conn:
                 conn.execute(
@@ -231,6 +246,27 @@ def init_database() -> None:
                     conn.execute(
                         text(
                             "ALTER TABLE project_task_overdue_details ADD COLUMN business_type INTEGER"
+                        )
+                    )
+            if "scenario_field_config_id" not in cols_c:
+                with engine.begin() as conn:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE project_task_overdue_details ADD COLUMN scenario_field_config_id VARCHAR(64)"
+                        )
+                    )
+            if "content" not in cols_c:
+                with engine.begin() as conn:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE project_task_overdue_details ADD COLUMN content TEXT"
+                        )
+                    )
+            if "due_date" not in cols_c:
+                with engine.begin() as conn:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE project_task_overdue_details ADD COLUMN due_date DATETIME"
                         )
                     )
             if "task_flow_status_id" not in cols_c:
