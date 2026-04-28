@@ -1,37 +1,36 @@
-"""AI interactive routes (compat + /ai/interactive/*)."""
+"""AI ttyd session routes."""
 
+import hashlib
 import json
 import os
-import pty
-import re
-import select
 import signal
+import socket
 import subprocess
 import threading
 import time
 from pathlib import Path
 
-from flask import request
+from flask import request, session
 
 _AI_CONFIG_PATH = Path(__file__).resolve().parent.parent / "ai" / "config.json"
-_START_SCRIPT = Path(__file__).resolve().parent.parent / "ai" / "start_claude_interactive.py"
+_EASY_START_JZ_SCRIPT = Path(__file__).resolve().parent.parent / "easy_start_claude_jz"
 _RUNTIME_DIR = Path(__file__).resolve().parent.parent / "runtime"
-_CLAUDE_HOME = _RUNTIME_DIR / "claude-home"
+_SHARED_CLAUDE_DIR = _RUNTIME_DIR / "shared" / ".claude"
+_USERS_ROOT = _RUNTIME_DIR / "users"
 _LOG_FILE = _RUNTIME_DIR / "logs" / "ai_debug_subprocess.log"
-_ANSI_RE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
-_CURSOR_RIGHT_RE = re.compile(r"\x1b\[(\d*)C")
-_ESC_SIMPLE_RE = re.compile(r"\x1b[0-9=><]")
-_OSC_RE = re.compile(r"\x1b\].*?(?:\x07|\x1b\\)", re.DOTALL)
-_SPINNER_ONLY_RE = re.compile(r"^[\s\-\.\*\u2736\u2722\u273b\u273d\u2800-\u28ff]+$")
-_DEFAULT_TIMEOUT_SECONDS = 15
 _DEFAULT_OWNER_KEY = "anonymous"
-_SESSIONS = {}
-_SESSION_LOCK = threading.Lock()
+_DEFAULT_TTYD_PORT_BASE = 8800
+_DEFAULT_TTYD_PORT_SPAN = 400
+_TTYD_SESSIONS = {}
+_TTYD_LOCK = threading.Lock()
 
 
 def _ensure_dirs() -> None:
     (_RUNTIME_DIR / "logs").mkdir(parents=True, exist_ok=True)
-    _CLAUDE_HOME.mkdir(parents=True, exist_ok=True)
+    _SHARED_CLAUDE_DIR.mkdir(parents=True, exist_ok=True)
+    (_SHARED_CLAUDE_DIR / "skills").mkdir(parents=True, exist_ok=True)
+    (_SHARED_CLAUDE_DIR / "plugins").mkdir(parents=True, exist_ok=True)
+    _USERS_ROOT.mkdir(parents=True, exist_ok=True)
 
 
 def _append_log(entry: dict) -> None:
@@ -49,221 +48,215 @@ def _load_ai_config() -> dict:
         return {}
 
 
-def _strip_ansi(text: str) -> str:
-    source = str(text or "")
-    source = _OSC_RE.sub("", source)
-    # 把 ANSI 的光标右移转换为空格，避免 "Welcome to" 变成 "Welcometo"
-    source = _CURSOR_RIGHT_RE.sub(lambda m: " " * max(int(m.group(1) or "1"), 1), source)
-    source = _ESC_SIMPLE_RE.sub("", source)
-    return _ANSI_RE.sub("", source).replace("\r", "").strip()
+def _safe_owner_key(owner_key: str) -> str:
+    raw = str(owner_key or "").strip() or _DEFAULT_OWNER_KEY
+    return hashlib.sha256(raw.encode("utf-8", errors="ignore")).hexdigest()[:24]
 
 
-def _filter_terminal_noise(text: str) -> str:
-    lines = [ln.rstrip() for ln in str(text or "").splitlines()]
-    kept = []
-    for line in lines:
-        s = line.strip()
-        if not s:
-            if kept and kept[-1] != "":
-                kept.append("")
-            continue
-        low = s.lower()
-        if "hashing" in low:
-            continue
-        if "herding" in low:
-            continue
-        if "esc to interrupt" in low:
-            continue
-        if "failed to install anthropic marketplace" in low:
-            continue
-        if _SPINNER_ONLY_RE.match(s):
-            continue
-        if "claude code" in low and any(ch in s for ch in ("⠂", "⠐", "✶", "✢", "✻", "✽")):
-            continue
-        kept.append(s)
-    while kept and kept[-1] == "":
-        kept.pop()
-    return "\n".join(kept).strip()
+def _resolve_owner_key(payload: dict) -> str:
+    direct = str((payload or {}).get("ownerKey") or "").strip()
+    if direct:
+        return direct
+    auth_user = session.get("auth_user") or {}
+    if isinstance(auth_user, dict):
+        for k in ("user_id", "userid", "name"):
+            val = str(auth_user.get(k) or "").strip()
+            if val:
+                return val
+    return _DEFAULT_OWNER_KEY
 
 
-def _extract_zhr_block(text: str) -> str:
-    # 只接受“标记独占一行”的格式，避免匹配到解释性句子：
-    # 例如“以 #zhr_start 开头，以 #zhr_end 为结尾”
-    lines = [ln.strip() for ln in str(text or "").splitlines()]
-    blocks = []
-    collecting = False
-    buf = []
-    for ln in lines:
-        low = ln.lower()
-        if low in ("#zhr_start", "#zhr_begin"):
-            collecting = True
-            buf = []
-            continue
-        if collecting and low == "#zhr_end":
-            blocks.append("\n".join(buf))
-            collecting = False
-            buf = []
-            continue
-        if collecting:
-            buf.append(ln)
-    if not blocks:
-        return ""
-    body = blocks[-1]
-    body_lines = [ln.strip() for ln in str(body or "").splitlines()]
-    # 过滤掉块内常见终端状态噪声
-    cleaned = []
-    for ln in body_lines:
-        if not ln:
-            continue
-        low = ln.lower()
-        if "thinking" in low or "tokens" in low:
-            continue
-        if _SPINNER_ONLY_RE.match(ln):
-            continue
-        cleaned.append(ln)
-    return "\n".join(cleaned).strip()
+def _resolve_owner_name() -> str:
+    auth_user = session.get("auth_user") or {}
+    if isinstance(auth_user, dict):
+        for k in ("name", "nick", "nickname", "user_name"):
+            val = str(auth_user.get(k) or "").strip()
+            if val:
+                return val
+    return ""
 
 
-def _make_env() -> dict:
+def _user_workspace(owner_key: str) -> dict:
+    safe = _safe_owner_key(owner_key)
+    user_root = _USERS_ROOT / safe
+    claude_dir = user_root / ".claude"
+    workspace_dir = user_root / "workspaces" / "default"
+    return {
+        "owner_safe": safe,
+        "user_root": str(user_root),
+        "claude_dir": str(claude_dir),
+        "workspace_dir": str(workspace_dir),
+        "shared_claude_dir": str(_SHARED_CLAUDE_DIR),
+    }
+
+
+def _make_env(owner_key: str, owner_name: str, model: str) -> dict:
     cfg = _load_ai_config()
-    model = str(cfg.get("model") or "glm-5.1").strip() or "glm-5.1"
     api_key = str(cfg.get("api_key") or "").strip()
     base_url = str(cfg.get("base_url") or "").strip()
     if not api_key:
         raise RuntimeError("missing ai/config.json api_key")
 
     env = os.environ.copy()
+    real_home = str(os.environ.get("HOME") or "").strip()
     env["ANTHROPIC_API_KEY"] = api_key
     env["ANTHROPIC_BASE_URL"] = base_url
     env["ANTHROPIC_MODEL"] = model
-    env["HOME"] = str(_CLAUDE_HOME)
-    return {"env": env, "model": model, "base_url": base_url}
+    env["AI_OWNER_KEY"] = owner_key
+    env["AI_OWNER_NAME"] = owner_name
+    env["AI_USERS_ROOT"] = str(_USERS_ROOT)
+    env["AI_SHARED_CLAUDE_DIR"] = str(_SHARED_CLAUDE_DIR)
+    env["AI_SAFE_OWNER"] = _safe_owner_key(owner_key)
+    path_items = [p for p in str(env.get("PATH") or "").split(":") if p]
+    for candidate in (
+        f"{real_home}/.nvm/versions/node/v20.20.2/bin" if real_home else "",
+        f"{real_home}/.local/bin" if real_home else "",
+    ):
+        c = str(candidate or "").strip()
+        if c and c not in path_items:
+            path_items.append(c)
+    env["PATH"] = ":".join(path_items)
+    return env
 
-def _read_pty_output(master_fd: int, wait_seconds: float, idle_break_seconds: float) -> str:
-    chunks = []
-    started = time.time()
-    last_data_at = None
-    while True:
-        now = time.time()
-        if (now - started) >= wait_seconds:
-            break
-        timeout = min(0.2, max(0.05, wait_seconds - (now - started)))
-        ready, _, _ = select.select([master_fd], [], [], timeout)
-        if not ready:
-            if last_data_at and (time.time() - last_data_at) >= idle_break_seconds:
-                break
-            continue
+
+def _normalize_owner_for_port(owner_key: str) -> int:
+    seed = owner_key.encode("utf-8", errors="ignore")
+    return sum(seed) % _DEFAULT_TTYD_PORT_SPAN
+
+
+def _owner_ttyd_port(owner_key: str) -> int:
+    base_raw = str(os.getenv("AI_TTYD_PORT_BASE", str(_DEFAULT_TTYD_PORT_BASE))).strip()
+    span_raw = str(os.getenv("AI_TTYD_PORT_SPAN", str(_DEFAULT_TTYD_PORT_SPAN))).strip()
+    try:
+        base = int(base_raw)
+    except Exception:
+        base = _DEFAULT_TTYD_PORT_BASE
+    try:
+        span = max(int(span_raw), 50)
+    except Exception:
+        span = _DEFAULT_TTYD_PORT_SPAN
+    return int(base + (_normalize_owner_for_port(owner_key) % span))
+
+
+def _is_port_available(host: str, port: int) -> bool:
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        sock.bind((host, int(port)))
+        return True
+    except OSError:
+        return False
+    finally:
         try:
-            data = os.read(master_fd, 4096)
-        except OSError:
-            break
-        if not data:
-            break
-        chunks.append(data)
-        last_data_at = time.time()
-    return b"".join(chunks).decode("utf-8", errors="replace")
+            sock.close()
+        except Exception:
+            pass
 
 
-def _terminate_session_locked(session: dict) -> None:
-    proc = session.get("proc")
-    master_fd = session.get("master_fd")
+def _resolve_ttyd_port(owner_key: str) -> int:
+    base_raw = str(os.getenv("AI_TTYD_PORT_BASE", str(_DEFAULT_TTYD_PORT_BASE))).strip()
+    span_raw = str(os.getenv("AI_TTYD_PORT_SPAN", str(_DEFAULT_TTYD_PORT_SPAN))).strip()
+    try:
+        base = int(base_raw)
+    except Exception:
+        base = _DEFAULT_TTYD_PORT_BASE
+    try:
+        span = max(int(span_raw), 50)
+    except Exception:
+        span = _DEFAULT_TTYD_PORT_SPAN
+    preferred = _owner_ttyd_port(owner_key)
+    for i in range(span):
+        candidate = int(base + ((preferred - base + i) % span))
+        if _is_port_available("127.0.0.1", candidate):
+            return candidate
+    return preferred
+
+
+def _terminate_ttyd_locked(state: dict) -> None:
+    proc = state.get("proc")
     if proc is not None and proc.poll() is None:
         try:
             os.killpg(proc.pid, signal.SIGTERM)
         except Exception:
             pass
-    if master_fd is not None:
-        try:
-            os.close(master_fd)
-        except Exception:
-            pass
 
 
-def _normalize_owner_key(payload: dict) -> str:
-    key = str((payload or {}).get("ownerKey") or "").strip()
-    return key or _DEFAULT_OWNER_KEY
+def _build_ttyd_embed_url(port: int, owner_key: str, model: str) -> str:
+    tpl = str(os.getenv("AI_TTYD_BASE_URL") or "").strip()
+    if not tpl:
+        tpl = "http://127.0.0.1:{port}/"
+    tpl = tpl.replace("{port/}", "{port}/")
+    if "{port}" in tpl:
+        url = tpl.replace("{port}", str(port))
+    else:
+        url = tpl
+    joiner = "&" if "?" in url else "?"
+    return f"{url}{joiner}ownerKey={owner_key}&model={model}"
 
 
-def _ensure_session(owner_key: str, startup_timeout: int) -> dict:
-    with _SESSION_LOCK:
-        existing = _SESSIONS.get(owner_key)
+def _ensure_ttyd_session(owner_key: str, owner_name: str, model: str) -> dict:
+    with _TTYD_LOCK:
+        existing = _TTYD_SESSIONS.get(owner_key)
         if existing and existing["proc"].poll() is None:
             return existing
         if existing:
-            _terminate_session_locked(existing)
-            _SESSIONS.pop(owner_key, None)
+            _terminate_ttyd_locked(existing)
+            _TTYD_SESSIONS.pop(owner_key, None)
 
-        resolved = _make_env()
-        cmd = ["python3", str(_START_SCRIPT)]
-        master_fd, slave_fd = pty.openpty()
+        resolved_env = _make_env(owner_key=owner_key, owner_name=owner_name, model=model)
+        port = _resolve_ttyd_port(owner_key)
+        cmd = [
+            "ttyd",
+            "-i",
+            "127.0.0.1",
+            "-p",
+            str(port),
+            "bash",
+            str(_EASY_START_JZ_SCRIPT),
+        ]
         try:
             proc = subprocess.Popen(
                 cmd,
-                stdin=slave_fd,
-                stdout=slave_fd,
-                stderr=slave_fd,
-                env=resolved["env"],
-                text=False,
+                env=resolved_env,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
                 start_new_session=True,
             )
-        finally:
+        except FileNotFoundError as exc:
+            raise RuntimeError("ttyd command not found in PATH") from exc
+
+        time.sleep(0.3)
+        if proc.poll() is not None:
+            err = ""
             try:
-                os.close(slave_fd)
+                _out, err = proc.communicate(timeout=0.2)
             except Exception:
                 pass
-        session = {
+            raise RuntimeError(f"failed to start ttyd: {err.strip() or 'unknown error'}")
+
+        ws = _user_workspace(owner_key)
+        state = {
             "owner_key": owner_key,
+            "owner_safe": ws["owner_safe"],
+            "model": model,
+            "port": port,
             "proc": proc,
-            "master_fd": master_fd,
-            "model": resolved["model"],
-            "base_url": resolved["base_url"],
-            "lock": threading.Lock(),
             "created_at": int(time.time()),
         }
-        _SESSIONS[owner_key] = session
+        _TTYD_SESSIONS[owner_key] = state
         _append_log(
             {
                 "ts": int(time.time()),
-                "phase": "session_start",
+                "phase": "ttyd_session_start",
                 "owner_key": owner_key,
+                "owner_safe": ws["owner_safe"],
+                "model": model,
+                "port": port,
                 "pid": proc.pid,
-                "cmd": cmd,
-                "model": resolved["model"],
-                "base_url": resolved["base_url"],
             }
         )
-    # 在会话锁外读欢迎内容，避免阻塞其他会话管理
-    with session["lock"]:
-        startup_raw = _read_pty_output(
-            session["master_fd"],
-            wait_seconds=max(float(startup_timeout), 3.0),
-            idle_break_seconds=0.8,
-        )
-        # 首次启动会出现主题选择向导，这里自动选择 Dark mode，避免阻塞后续交互。
-        if "Choose the text style" in startup_raw:
-            try:
-                os.write(session["master_fd"], b"2\n")
-            except OSError:
-                pass
-            startup_raw += _read_pty_output(
-                session["master_fd"],
-                wait_seconds=2.0,
-                idle_break_seconds=0.6,
-            )
-    session["startup_raw"] = startup_raw
-    return session
-
-
-def _session_response(text: str, raw: str, session: dict) -> dict:
-    return {
-        "result": {"type": "result", "data": {"result": text}},
-        "debug": {
-            "model": session.get("model"),
-            "base_url": session.get("base_url"),
-            "log_file": str(_LOG_FILE),
-            "raw_terminal_output": raw[:4000],
-        },
-    }
+        return state
 
 
 def register(bp, ok, fail):
@@ -272,100 +265,65 @@ def register(bp, ok, fail):
         model = str(cfg.get("model") or "glm-5.1").strip() or "glm-5.1"
         return ok({"models": [{"name": model, "description": "default model"}]})
 
-    def _handle_session_message():
-        payload = request.get_json(silent=True) or {}
-        owner_key = _normalize_owner_key(payload)
-        prompt = str(payload.get("prompt") or payload.get("content") or "").strip()
-        if not prompt:
-            return fail("prompt is required", code=400, data={})
-        timeout_seconds = max(int(payload.get("timeoutSeconds") or payload.get("timeout") or _DEFAULT_TIMEOUT_SECONDS), 3)
-        try:
-            session = _ensure_session(owner_key=owner_key, startup_timeout=3)
-        except Exception as exc:
-            return fail(str(exc), code=500, data={})
-
-        with session["lock"]:
-            proc = session["proc"]
-            if proc.poll() is not None:
-                return fail("claude session exited unexpectedly", code=500, data={})
-            try:
-                # TTY 交互下多数程序以 CR(\r) 作为 Enter，避免仅 LF(\n) 导致输入不提交。
-                payload_bytes = (prompt + "\r").encode("utf-8", errors="replace")
-                written = os.write(session["master_fd"], payload_bytes)
-                _append_log(
-                    {
-                        "ts": int(time.time()),
-                        "phase": "session_write_ok",
-                        "owner_key": owner_key,
-                        "prompt_len": len(prompt),
-                        "bytes_to_write": len(payload_bytes),
-                        "bytes_written": int(written),
-                    }
-                )
-                _append_log(
-                    {
-                        "ts": int(time.time()),
-                        "phase": "session_proc_poll_after_write",
-                        "owner_key": owner_key,
-                        "proc_alive": proc.poll() is None,
-                        "proc_returncode": proc.returncode,
-                    }
-                )
-            except OSError as exc:
-                return fail(f"write prompt failed: {exc}", code=500, data={})
-            raw = _read_pty_output(
-                session["master_fd"],
-                wait_seconds=float(timeout_seconds),
-                idle_break_seconds=1.1,
-            )
-        clean = _strip_ansi(raw)
-        tagged = _extract_zhr_block(clean)
-        display = tagged or _filter_terminal_noise(clean)
-        _append_log(
-            {
-                "ts": int(time.time()),
-                "phase": "session_message",
-                "owner_key": owner_key,
-                "prompt_len": len(prompt),
-                "output_len": len(raw),
-                "zhr_block_hit": bool(tagged),
-                "output_preview": display[:600],
-            }
-        )
-        if not raw:
-            return fail("no output after prompt", code=500, data={})
-        return ok(_session_response(display or clean or raw, raw, session))
-
-    def _handle_session_start():
-        payload = request.get_json(silent=True) or {}
-        owner_key = _normalize_owner_key(payload)
-        timeout_seconds = max(int(payload.get("timeoutSeconds") or payload.get("timeout") or 8), 3)
-        try:
-            session = _ensure_session(owner_key=owner_key, startup_timeout=timeout_seconds)
-        except Exception as exc:
-            return fail(str(exc), code=500, data={})
-        raw = str(session.get("startup_raw") or "")
-        clean = _strip_ansi(raw)
-        tagged = _extract_zhr_block(clean)
-        display = tagged or _filter_terminal_noise(clean)
-        return ok(_session_response(display or clean or raw, raw, session))
-
     def _handle_session_end():
         payload = request.get_json(silent=True) or {}
-        owner_key = _normalize_owner_key(payload)
-        with _SESSION_LOCK:
-            session = _SESSIONS.pop(owner_key, None)
-        if session:
-            with session["lock"]:
-                _terminate_session_locked(session)
-            _append_log(
-                {
-                    "ts": int(time.time()),
-                    "phase": "session_end",
-                    "owner_key": owner_key,
-                }
-            )
+        owner_key = _resolve_owner_key(payload)
+        with _TTYD_LOCK:
+            ttyd_state = _TTYD_SESSIONS.pop(owner_key, None)
+            if ttyd_state:
+                _terminate_ttyd_locked(ttyd_state)
+                _append_log(
+                    {
+                        "ts": int(time.time()),
+                        "phase": "ttyd_session_end",
+                        "owner_key": owner_key,
+                        "port": ttyd_state.get("port"),
+                    }
+                )
         return ok({"ended": True, "ownerKey": owner_key})
+
+    def _handle_ttyd_session():
+        payload = request.get_json(silent=True) or {}
+        owner_key = _resolve_owner_key(payload)
+        owner_name = _resolve_owner_name()
+        cfg = _load_ai_config()
+        model = str(payload.get("model") or cfg.get("model") or "glm-5.1").strip() or "glm-5.1"
+        try:
+            state = _ensure_ttyd_session(owner_key=owner_key, owner_name=owner_name, model=model)
+        except Exception as exc:
+            return fail(str(exc), code=500, data={})
+        ws = _user_workspace(owner_key)
+        embed_url = _build_ttyd_embed_url(
+            port=int(state.get("port") or _owner_ttyd_port(owner_key)),
+            owner_key=owner_key,
+            model=model,
+        )
+        return ok(
+            {
+                "embedUrl": embed_url,
+                "ownerKey": owner_key,
+                "ownerSafe": ws["owner_safe"],
+                "userRoot": ws["user_root"],
+                "workspaceDir": ws["workspace_dir"],
+                "model": model,
+                "port": int(state.get("port") or 0),
+                "pid": int(state.get("proc").pid) if state.get("proc") else 0,
+            }
+        )
+
+    def _handle_cache_current():
+        payload = request.get_json(silent=True) or {}
+        owner_key = _resolve_owner_key(payload)
+        ws = _user_workspace(owner_key)
+        return ok(
+            {
+                "ownerKey": owner_key,
+                "ownerSafe": ws["owner_safe"],
+                "userRoot": ws["user_root"],
+                "workspaceDir": ws["workspace_dir"],
+                "sharedClaudeDir": ws["shared_claude_dir"],
+            }
+        )
 
     @bp.route("/ai/models", methods=["GET"])
     def ai_models():
@@ -375,31 +333,15 @@ def register(bp, ok, fail):
     def ai_interactive_models():
         return _handle_models()
 
-    @bp.route("/ai/chat/session_message", methods=["POST"])
-    def ai_chat_session_message():
-        return _handle_session_message()
-
-    @bp.route("/ai/interactive/message", methods=["POST"])
-    def ai_interactive_message():
-        return _handle_session_message()
-
-    @bp.route("/ai/chat/session_start", methods=["POST"])
-    def ai_chat_session_start():
-        return _handle_session_start()
-
-    @bp.route("/ai/interactive/start", methods=["POST"])
-    def ai_interactive_start():
-        return _handle_session_start()
-
-    @bp.route("/ai/chat/session_message_stream", methods=["POST"])
-    def ai_chat_session_message_stream():
-        return fail("not implemented", code=501, data={})
-
     @bp.route("/ai/chat/session_end", methods=["POST"])
     def ai_chat_session_end():
         return _handle_session_end()
 
-    @bp.route("/ai/interactive/end", methods=["POST"])
-    def ai_interactive_end():
-        return _handle_session_end()
+    @bp.route("/ai/ttyd/session", methods=["POST"])
+    def ai_ttyd_session():
+        return _handle_ttyd_session()
+
+    @bp.route("/ai/cache/current", methods=["GET", "POST"])
+    def ai_cache_current():
+        return _handle_cache_current()
 

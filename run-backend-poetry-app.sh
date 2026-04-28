@@ -73,7 +73,11 @@ fi
 
 export FLASK_RUN_HOST="${APP_HOST}"
 export FLASK_RUN_PORT="${APP_PORT}"
+export AI_TTYD_BASE_URL="${AI_TTYD_BASE_URL:-http://127.0.0.1:{port}/}"
+export AI_TTYD_PORT_BASE="${AI_TTYD_PORT_BASE:-8800}"
+export AI_TTYD_PORT_SPAN="${AI_TTYD_PORT_SPAN:-400}"
 
 echo "[tb_tool_bt] Starting backend: http://${APP_HOST}:${APP_PORT} (frontend mode=${MODE})"
+echo "[tb_tool_bt] AI ttyd base: ${AI_TTYD_BASE_URL} (base=${AI_TTYD_PORT_BASE}, span=${AI_TTYD_PORT_SPAN})"
 exec poetry run python app.py
 

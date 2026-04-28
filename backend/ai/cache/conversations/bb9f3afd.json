@@ -1,0 +1,68 @@
+{
+  "conversation_id": "bb9f3afd",
+  "created_at": "2026-04-23T11:37:41.199967",
+  "updated_at": "2026-04-23T11:44:36.592260",
+  "messages": [
+    {
+      "role": "user",
+      "content": "你好",
+      "timestamp": "2026-04-23T11:44:36.587321"
+    },
+    {
+      "role": "assistant",
+      "content": "你好！有什么可以帮你的吗？",
+      "timestamp": "2026-04-23T11:44:36.587637"
+    },
+    {
+      "role": "user",
+      "content": "你现在在什么路径下",
+      "timestamp": "2026-04-23T11:44:36.588330"
+    },
+    {
+      "role": "assistant",
+      "content": "我当前在 /home/zhr/zhr_ws/src/management-system/backend 目录下。",
+      "timestamp": "2026-04-23T11:44:36.589082"
+    },
+    {
+      "role": "user",
+      "content": "你能看到jz_claude_skills吗",
+      "timestamp": "2026-04-23T11:44:36.589731"
+    },
+    {
+      "role": "assistant",
+      "content": "是的，在 /home/zhr/zhr_ws/src/jz-claude-skills/ 目录下...",
+      "timestamp": "2026-04-23T11:44:36.590010"
+    },
+    {
+      "role": "user",
+      "content": "我想你去学习skills，然后告诉我我怎么调用",
+      "timestamp": "2026-04-23T11:44:36.590354"
+    },
+    {
+      "role": "assistant",
+      "content": "jz-claude-skills 包含 4 个技能...",
+      "timestamp": "2026-04-23T11:44:36.590820"
+    },
+    {
+      "role": "user",
+      "content": "帮我查下钉钉文档 关键词是到点自学习",
+      "timestamp": "2026-04-23T11:44:36.591163"
+    },
+    {
+      "role": "assistant",
+      "content": "找到 52 篇相关文档...",
+      "timestamp": "2026-04-23T11:44:36.591502"
+    },
+    {
+      "role": "user",
+      "content": "现在是这样的，我和你的对话，我希望在ai文件夹下面建立缓存。下次我进来，就可以进行读取",
+      "timestamp": "2026-04-23T11:44:36.591811"
+    },
+    {
+      "role": "assistant",
+      "content": "已创建缓存机制...",
+      "timestamp": "2026-04-23T11:44:36.592256"
+    }
+  ],
+  "metadata": {}
+}

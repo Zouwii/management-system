@@ -36,3 +36,8 @@ backend/.env
 backend/.env.*
 
 tar/
+.package_stage/
+
+# Frontend build artifacts emitted into backend static directory (mode A: source-only repo)
+backend/static/react/assets/
+backend/static/react/index.html

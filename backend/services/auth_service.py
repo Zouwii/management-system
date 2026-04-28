@@ -154,30 +154,13 @@ def _get_user_character_row(external_ids: Tuple[str, ...]):
 
     session = SessionLocal()
     try:
-        print("ZHR TEMP [auth] user_character lookup candidates={}".format(
-            [str(x or "").strip() for x in external_ids]
-        ))
         for uid in external_ids:
             uid = str(uid or "").strip()
             if not uid:
-                print("ZHR TEMP [auth] user_character skip empty candidate")
                 continue
-            print("ZHR TEMP [auth] user_character query user_id={}".format(uid))
             row = session.query(DbUserCharacter).filter(DbUserCharacter.user_id == uid).first()
             if row:
-                print(
-                    "ZHR TEMP [auth] user_character hit user_id={} name={} character={} team_id={} is_nav_lead={} is_servo_lead={}".format(
-                        getattr(row, "user_id", ""),
-                        getattr(row, "name", ""),
-                        getattr(row, "character", ""),
-                        getattr(row, "team_id", ""),
-                        getattr(row, "is_nav_lead", ""),
-                        getattr(row, "is_servo_lead", ""),
-                    )
-                )
                 return row
-            print("ZHR TEMP [auth] user_character miss user_id={}".format(uid))
-        print("ZHR TEMP [auth] user_character no match for all candidates")
         return None
     finally:
         session.close()
@@ -242,21 +225,6 @@ def resolve_user_profile(dingtalk_user: Dict[str, Any]) -> Dict[str, Any]:
     is_servo_lead = bool(getattr(c_row, "is_servo_lead", False)) if c_row else False
     derived = _derive_role_and_access(character, is_nav_lead, is_servo_lead)
     role = str(derived.get("role") or "employee")
-
-    print(
-        "ZHR TEMP [auth] decision user_id={} union_id={} open_id={} c_row_found={} raw_character={} defaulted={} final_character={} is_nav_lead={} is_servo_lead={} role={}".format(
-            user_id,
-            union_id,
-            open_id,
-            bool(c_row),
-            raw_character,
-            character_defaulted,
-            character,
-            is_nav_lead,
-            is_servo_lead,
-            role,
-        )
-    )
 
     base: Dict[str, Any] = {
         "role": role,

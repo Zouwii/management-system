@@ -1,0 +1,80 @@
+#!/bin/bash
+set -euo pipefail
+
+# ====================== 固定配置（和旧脚本完全一致，保证能联网） ======================
+export ANTHROPIC_API_KEY="sk-n0S0p7CgwTcEHdUYLEccKlkxDwwGr2nMxvIbzdqhz1RiwyRv"
+export ANTHROPIC_BASE_URL="http://one-api.server22.jz"
+unset ANTHROPIC_AUTH_TOKEN || true
+
+# ====================== 兜底 PATH（保证 claude 命令能找到） ======================
+REAL_HOME="${HOME:-$HOME}"
+if [ -n "${REAL_HOME}" ]; then
+  for p in \
+    "${REAL_HOME}/.nvm/versions/node/v20.20.2/bin" \
+    "${REAL_HOME}/.nvm/versions/node/v20.20.1/bin" \
+    "${REAL_HOME}/.nvm/versions/node/v20.20.0/bin" \
+    "${REAL_HOME}/.local/bin"
+  do
+    if [ -d "${p}" ] && [[ ":${PATH}:" != *":${p}:"* ]]; then
+      PATH="${PATH}:${p}"
+    fi
+  done
+fi
+export PATH
+
+# ====================== 用户隔离标识（生成独立目录） ======================
+OWNER_KEY="${AI_OWNER_KEY:-anonymous}"
+SAFE_OWNER="$(printf '%s' "${OWNER_KEY}" | sha256sum | awk '{print $1}' | cut -c1-24)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# 🔥 关键：工作目录（自动创建 + 自动切换，不改HOME！）
+WORKSPACE_DIR="${SCRIPT_DIR}/runtime/users/${SAFE_OWNER}/workspaces/default"
+mkdir -p "${WORKSPACE_DIR}"
+
+# ====================== 模型选择功能 ======================
+pick_and_apply_account() {
+  local default_num=3
+  echo "请选择模型（直接回车默认）："
+  echo "1) claude  2) kimi  3) minimax  4) step  5) mimo  6) glm  7) deepseek"
+  read -r -p "选择模型 [${default_num}]: " choice
+  choice="${choice:-${default_num}}"
+
+  local selected_model="MiniMax-M2.7-highspeed"
+  choose_sub_model() {
+    local title="$1"
+    shift
+    local models=("$@")
+    local default_sub=1
+    echo "${title}"
+    local i=1
+    for m in "${models[@]}"; do echo "  $i) $m"; i=$((i+1)); done
+    read -r -p "子型号 [1]: " sub_choice
+    sub_choice="${sub_choice:-1}"
+    selected_model="${models[$((sub_choice-1))]}"
+  }
+
+  case "${choice}" in
+    2) choose_sub_model "kimi 型号：" "kimi-for-coding" "kimi-k2.5" ;;
+    3) choose_sub_model "minimax 型号：" "MiniMax-M2.7-highspeed" "MiniMax-M2.7" ;;
+    5) choose_sub_model "mimo 型号：" "mimo-v2.5-pro" "mimo-v2.5" ;;
+    6) choose_sub_model "glm 型号：" "glm-5.1" "glm-5-turbo" ;;
+    7) choose_sub_model "deepseek 型号：" "deepseek-v4-pro" "deepseek-v4-flash" ;;
+  esac
+
+  export ANTHROPIC_MODEL="${selected_model}"
+  CLAUDE_EXTRA_ARGS=(--model "${selected_model}")
+}
+
+# 执行模型选择
+pick_and_apply_account
+
+# ====================== 🔥 自动切换到用户独立工作目录 ======================
+cd "${WORKSPACE_DIR}"
+echo "================================================"
+echo "工作区已切换到: ${WORKSPACE_DIR}"
+echo "当前网关: ${ANTHROPIC_BASE_URL}"
+echo "当前模型: ${ANTHROPIC_MODEL}"
+echo "================================================"
+
+# ====================== 启动 claude ======================
+exec claude "${CLAUDE_EXTRA_ARGS[@]}" "$@"

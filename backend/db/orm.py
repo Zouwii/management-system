@@ -117,6 +117,9 @@ class ProjectTaskDetail(Base):
     project_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     task_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     query_user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    scenario_field_config_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    due_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
 
     work_hour_field_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     work_hour: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -208,6 +211,9 @@ class ProjectTaskOverdueDetail(Base):
     project_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     task_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     query_user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    scenario_field_config_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    due_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
 
     work_hour: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     # 业务类型：0=产品，1=研发，2=订单
@@ -235,6 +241,23 @@ class SyncRun(Base):
     finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     row_count: Mapped[int] = mapped_column(Integer, default=0)
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+
+class SyncFailure(Base):
+    """同步失败明细表：用于追踪最终失败的 task/executor/error。"""
+
+    __tablename__ = "sync_failures"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    sync_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    project_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    phase: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    task_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    executor_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    retry_round: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    meta_json: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.now)
 
 
 class Config(Base):
