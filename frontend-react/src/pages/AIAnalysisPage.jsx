@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   createAITaskTicket,
+  confirmAITaskAssistantDraft,
+  createAITaskAssistantConversation,
   fetchAITtydSession,
   fetchAIModels,
   fetchAIInsightList,
-  sendAIChatSessionMessage,
+  sendAITaskAssistantMessage,
 } from '../api/dashboard';
 import Card from '../components/Card';
 import SectionTitle from '../components/SectionTitle';
@@ -16,90 +18,30 @@ const PARTICIPATION_LEVELS = [0.2, 0.5, 1, 1.5, 2, 2.5, 3];
 const TASK_TYPES = ['方案设计任务', '开发实现任务', '系统联调任务'];
 const WORK_TYPES = ['指派型', '自主型', '能力建设型'];
 
-function getTaskType(input) {
-  if (input.includes('联调') || input.includes('协同') || input.includes('验证')) {
-    return '系统联调任务';
-  }
-
-  if (input.includes('方案') || input.includes('设计') || input.includes('架构')) {
-    return '方案设计任务';
-  }
-
-  return '开发实现任务';
-}
-
-function getWorkType(input) {
-  if (input.includes('学习') || input.includes('调研') || input.includes('分享') || input.includes('PoC') || input.includes('Demo')) {
-    return '能力建设型';
-  }
-
-  if (input.includes('优化') || input.includes('重构') || input.includes('复盘') || input.includes('补齐') || input.includes('脚本')) {
-    return '自主型';
-  }
-
-  return '指派型';
-}
-
-function getParticipationLevel(input) {
-  const score = Math.min(Math.max(Math.ceil((input.length || 18) / 18), 1), PARTICIPATION_LEVELS.length) - 1;
-  return PARTICIPATION_LEVELS[score];
-}
-
-function buildAssistantReply(input, insights) {
-  const normalizedInput = input.trim();
-  const matchedInsights = insights
-    .filter(() => normalizedInput.includes('工时') || normalizedInput.includes('绩效') || normalizedInput.length > 0)
-    .slice(0, 2);
-
-  const requirementDesc = normalizedInput || '补充任务背景后，AI 会自动整理需求描述。';
-  const outputs = matchedInsights.length > 0
-    ? matchedInsights.map((item) => `${item.title}对应的交付物整理`)
-    : ['形成需求分析说明', '输出实施方案', '补充风险与验证记录'];
-  const taskType = getTaskType(normalizedInput);
-  const workType = getWorkType(normalizedInput);
-  const participationLevel = getParticipationLevel(normalizedInput);
-
+function normalizeDraft(nextDraft, fallback) {
+  const draft = nextDraft && typeof nextDraft === 'object' ? nextDraft : {};
   return {
-    summary: matchedInsights.length > 0
-      ? matchedInsights.map((item) => item.content).join(' ')
-      : '已根据当前对话整理任务背景，建议先补齐需求描述、任务产出和参与度评估。',
-    requirementDesc,
-    outputs,
-    taskType,
-    workType,
-    participationLevel,
-    title: `${(normalizedInput.split(/[，。；,\n]/)[0] || 'AI生成').slice(0, 18)}任务单`,
+    title: String(draft.title || fallback.title || '待生成任务单'),
+    taskType: TASK_TYPES.includes(draft.taskType) ? draft.taskType : fallback.taskType,
+    workType: WORK_TYPES.includes(draft.workType) ? draft.workType : fallback.workType,
+    requirementDesc: String(draft.requirementDesc || fallback.requirementDesc || ''),
+    outputs: Array.isArray(draft.outputs) && draft.outputs.length > 0 ? draft.outputs : fallback.outputs,
+    participationLevel: PARTICIPATION_LEVELS.includes(Number(draft.participationLevel))
+      ? Number(draft.participationLevel)
+      : fallback.participationLevel,
+    missingFields: Array.isArray(draft.missingFields) ? draft.missingFields : [],
+    confidence: Number(draft.confidence || 0),
   };
-}
-
-function createConversationId() {
-  return `ai-chat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function resolveOwnerKey(user) {
   return String(user?.user_id || user?.userid || user?.name || 'anonymous');
 }
 
-function extractSessionReply(response) {
-  const res = response?.data?.result;
-  return String(
-    res?.data?.result
-    || res?.result
-    || '',
-  ).trim();
-}
-
 export default function AIAnalysisPage() {
   const user = useAuthStore((state) => state.user);
   const ownerKey = resolveOwnerKey(user);
   const [insights, setInsights] = useState(fallbackData);
-  const [messages, setMessages] = useState([
-    {
-      id: 'assistant-default',
-      role: 'assistant',
-      content: '请描述任务背景和需要 AI 帮你补齐的内容。我会整理需求描述、任务产出、任务类型和参与度评估。',
-    },
-  ]);
   const [draft, setDraft] = useState({
     title: '待生成任务单',
     taskType: TASK_TYPES[1],
@@ -108,20 +50,21 @@ export default function AIAnalysisPage() {
     outputs: ['待生成任务产出'],
     participationLevel: PARTICIPATION_LEVELS[0],
   });
-  const [input, setInput] = useState('');
   const [confirmed, setConfirmed] = useState(false);
   const [creating, setCreating] = useState(false);
   const [createResult, setCreateResult] = useState(null);
   const [analysisStatus, setAnalysisStatus] = useState('未分析');
   const [analysisBusy, setAnalysisBusy] = useState(false);
   const [analysisInput, setAnalysisInput] = useState('');
-  const [chatSending, setChatSending] = useState(false);
-  const [chatError, setChatError] = useState('');
-  const [conversationId, setConversationId] = useState(() => createConversationId());
-  const [availableModels, setAvailableModels] = useState([]);
   const [selectedModel, setSelectedModel] = useState('');
   const [ttydUrl, setTtydUrl] = useState('');
   const [ttydError, setTtydError] = useState('');
+  const [assistantConversation, setAssistantConversation] = useState(null);
+  const [assistantMessages, setAssistantMessages] = useState([]);
+  const [assistantInput, setAssistantInput] = useState('');
+  const [assistantBusy, setAssistantBusy] = useState(false);
+  const [assistantError, setAssistantError] = useState('');
+  const [savedDraft, setSavedDraft] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -144,33 +87,44 @@ export default function AIAnalysisPage() {
         if (!active) return;
         const models = Array.isArray(response?.data?.models) ? response.data.models : [];
         const fallback = models[0]?.name || 'glm';
-        setAvailableModels(models);
         setSelectedModel(fallback);
-        setMessages([
-          {
-            id: 'assistant-ready',
-            role: 'assistant',
-            content: `AI 已就绪，当前模型：${fallback}。`,
-          },
-        ]);
       })
       .catch(() => {
         if (!active) return;
-        setAvailableModels([{ name: 'glm', description: '默认模型' }]);
         setSelectedModel('glm');
-        setMessages([
-          {
-            id: 'assistant-ready-fallback',
-            role: 'assistant',
-            content: 'AI 已就绪，当前模型：glm。请直接输入问题。',
-          },
-        ]);
       });
 
     return () => {
       active = false;
     };
-  }, [conversationId, ownerKey, user]);
+  }, [ownerKey, user]);
+
+  useEffect(() => {
+    let active = true;
+    setAssistantBusy(true);
+    setAssistantError('');
+    createAITaskAssistantConversation(user)
+      .then((response) => {
+        if (!active) return;
+        const conversation = response?.data || {};
+        setAssistantConversation(conversation);
+        setAssistantMessages(Array.isArray(conversation.messages) ? conversation.messages : []);
+        if (conversation.draft) {
+          setDraft((current) => normalizeDraft(conversation.draft, current));
+        }
+      })
+      .catch((err) => {
+        if (!active) return;
+        setAssistantError(err instanceof Error ? err.message : 'AI 任务助手会话初始化失败');
+      })
+      .finally(() => {
+        if (active) setAssistantBusy(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [ownerKey, user]);
 
   const hourInsights = useMemo(
     () => insights
@@ -178,7 +132,7 @@ export default function AIAnalysisPage() {
       .map((item) => ({
         ...item,
         content: analysisInput
-          ? `${item.content} 当前分析基于对话重点：“${analysisInput.slice(0, 36)}${analysisInput.length > 36 ? '...' : ''}”。`
+          ? `${item.content} 当前分析基于草稿重点：“${analysisInput.slice(0, 36)}${analysisInput.length > 36 ? '...' : ''}”。`
           : item.content,
       })),
     [analysisInput, insights],
@@ -189,7 +143,7 @@ export default function AIAnalysisPage() {
       .map((item) => ({
         ...item,
         content: analysisInput
-          ? `${item.content} 当前判断已结合本次对话里的任务背景和目标产出。`
+          ? `${item.content} 当前判断已结合当前草稿里的任务背景和目标产出。`
           : item.content,
       })),
     [analysisInput, insights],
@@ -219,56 +173,49 @@ export default function AIAnalysisPage() {
     };
   }, [ownerKey, selectedModel, user]);
 
-  const handleSend = async () => {
-    const value = input.trim();
-    if (!value || chatSending) {
-      return;
-    }
+  const handleSendAssistantMessage = async (event) => {
+    event.preventDefault();
+    const content = assistantInput.trim();
+    const conversationId = assistantConversation?.id;
+    if (!content || !conversationId || assistantBusy) return;
 
-    const userMessage = { id: `${Date.now()}-user`, role: 'user', content: value };
-    setMessages((current) => [...current, userMessage]);
-    setInput('');
-    setChatError('');
-    setChatSending(true);
-
-    let aiReply = '';
+    setAssistantBusy(true);
+    setAssistantError('');
     try {
-      const response = await sendAIChatSessionMessage(user, { prompt: value, ownerKey });
-      aiReply = extractSessionReply(response);
-      const nextConversationId = String(response?.data?.conversationId || conversationId || '');
-      if (nextConversationId) {
-        setConversationId(nextConversationId);
+      const response = await sendAITaskAssistantMessage(user, conversationId, content);
+      const conversation = response?.data || {};
+      setAssistantConversation(conversation);
+      setAssistantMessages(Array.isArray(conversation.messages) ? conversation.messages : []);
+      if (conversation.draft) {
+        setDraft((current) => normalizeDraft(conversation.draft, current));
+        setConfirmed(false);
+        setSavedDraft(null);
       }
-      if (!aiReply) {
-        aiReply = 'AI 暂未返回有效结果，请稍后重试。';
-      }
-    } catch (error) {
-      aiReply = '请求 AI 失败（可能超时），请重试或缩短问题后再试。';
-      setChatError(error instanceof Error ? error.message : '请求 AI 失败');
+      setAssistantInput('');
+    } catch (err) {
+      setAssistantError(err instanceof Error ? err.message : '发送失败');
     } finally {
-      setChatSending(false);
+      setAssistantBusy(false);
     }
-
-    const reply = buildAssistantReply(value, insights);
-    setMessages((current) => [
-      ...current,
-      { id: `${Date.now()}-assistant`, role: 'assistant', content: aiReply },
-    ]);
-    setDraft(reply);
-    setConfirmed(false);
-    setCreateResult(null);
   };
 
-  const handleConfirmDraft = () => {
-    setConfirmed(true);
-    setMessages((current) => [
-      ...current,
-      {
-        id: `${Date.now()}-confirm`,
-        role: 'assistant',
-        content: '已确认当前任务草稿，可以继续创建 Teambition 任务单。',
-      },
-    ]);
+  const handleConfirmDraft = async () => {
+    const conversationId = assistantConversation?.id;
+    if (!conversationId) {
+      setAssistantError('AI 会话还未初始化，暂时不能保存草稿');
+      return;
+    }
+    setCreating(true);
+    setAssistantError('');
+    try {
+      const response = await confirmAITaskAssistantDraft(user, conversationId, draft);
+      setSavedDraft(response?.data || null);
+      setConfirmed(true);
+    } catch (err) {
+      setAssistantError(err instanceof Error ? err.message : '保存临时草稿失败');
+    } finally {
+      setCreating(false);
+    }
   };
 
   const handleCreateTicket = async () => {
@@ -291,14 +238,17 @@ export default function AIAnalysisPage() {
   };
 
   const handleAnalyze = () => {
-    const lastUserMessage = [...messages].reverse().find((message) => message.role === 'user')?.content ?? '';
+    const draftContext = [draft.title, draft.requirementDesc, ...draft.outputs]
+      .map((item) => String(item || '').trim())
+      .filter(Boolean)
+      .join(' ');
     setAnalysisBusy(true);
     setAnalysisStatus('分析中...');
 
     window.setTimeout(() => {
-      setAnalysisInput(lastUserMessage);
+      setAnalysisInput(draftContext);
       setAnalysisBusy(false);
-      setAnalysisStatus(lastUserMessage ? '已基于当前对话更新' : '已按默认样例更新');
+      setAnalysisStatus(draftContext ? '已基于当前草稿更新' : '已按默认样例更新');
     }, 320);
   };
 
@@ -306,7 +256,7 @@ export default function AIAnalysisPage() {
     <EmployeeLayout>
       <SectionTitle
         title="AI助理"
-        desc="通过左侧对话确认任务背景，右侧同步生成 AI 分析、需求描述、任务产出、任务类型和参与度评估。"
+        desc="登录后读取当前用户任务，通过对话生成临时任务草稿，确认后再创建正式任务单。"
         right={<div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm">AI 工作台</div>}
       />
 
@@ -367,10 +317,10 @@ export default function AIAnalysisPage() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <div className="text-lg font-semibold text-slate-900">AI创建任务单</div>
-              <div className="mt-1 text-sm text-slate-500">通过左侧对话确认任务背景，右侧生成任务字段，确认后可调用 Teambition 接口创建任务。</div>
+              <div className="mt-1 text-sm text-slate-500">系统先读取你的历史任务，再通过对话生成草稿；确认后先保存临时文件，后续可转正式任务单。</div>
             </div>
             <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
-              {confirmed ? '已确认草稿' : '待确认草稿'}
+              {confirmed ? '已保存临时草稿' : '待保存草稿'}
             </span>
           </div>
 
@@ -379,12 +329,68 @@ export default function AIAnalysisPage() {
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-lg font-semibold text-slate-900">AI 对话</div>
-                  <div className="mt-1 text-sm text-slate-500">终端模式：直接在 ttyd 子窗口里与 AI 交互。</div>
+                  <div className="mt-1 text-sm text-slate-500">先读取数据库任务，再引导你补充新任务描述。</div>
                 </div>
-                <span className="rounded-full border border-sky-100 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">ttyd模式</span>
+                <span className="rounded-full border border-sky-100 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
+                  {assistantConversation?.status === 'confirmed' ? '已确认' : '草稿中'}
+                </span>
               </div>
 
-              <div className="mt-5 h-[560px] rounded-[28px] border border-slate-200 bg-black p-2">
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="text-sm font-semibold text-slate-900">任务上下文</div>
+                <div className="mt-2 text-sm leading-6 text-slate-600">
+                  {assistantConversation?.contextSummary || (assistantBusy ? '正在读取当前用户任务...' : '等待初始化')}
+                </div>
+                {assistantConversation?.contextMetrics ? (
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
+                    <div className="rounded-xl bg-slate-50 px-3 py-2">任务：{assistantConversation.contextMetrics.taskCount}</div>
+                    <div className="rounded-xl bg-slate-50 px-3 py-2">未完成：{assistantConversation.contextMetrics.unfinishedTaskCount}</div>
+                    <div className="rounded-xl bg-slate-50 px-3 py-2">已完成：{assistantConversation.contextMetrics.completedTaskCount}</div>
+                    <div className="rounded-xl bg-slate-50 px-3 py-2">逾期：{assistantConversation.contextMetrics.overdueTaskCount}</div>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="mt-4 flex min-h-[300px] flex-1 flex-col rounded-2xl border border-slate-200 bg-white">
+                <div className="flex-1 space-y-3 overflow-y-auto p-4">
+                  {assistantMessages.map((message, index) => (
+                    <div
+                      key={`${message.role}-${index}`}
+                      className={`rounded-2xl px-4 py-3 text-sm leading-6 ${
+                        message.role === 'user'
+                          ? 'ml-8 bg-slate-900 text-white'
+                          : 'mr-8 border border-slate-200 bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      {message.content}
+                    </div>
+                  ))}
+                  {assistantError ? (
+                    <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                      {assistantError}
+                    </div>
+                  ) : null}
+                </div>
+                <form className="border-t border-slate-200 p-3" onSubmit={handleSendAssistantMessage}>
+                  <textarea
+                    className="h-24 w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-slate-400"
+                    value={assistantInput}
+                    onChange={(event) => setAssistantInput(event.target.value)}
+                    placeholder="简单描述你想创建的任务，例如：帮我安排下周客户回访联调，产出联调记录和问题清单。"
+                  />
+                  <div className="mt-3 flex justify-end">
+                    <button
+                      type="submit"
+                      className="rounded-full bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={assistantBusy || !assistantInput.trim() || !assistantConversation?.id}
+                    >
+                      {assistantBusy ? '处理中...' : '发送并生成草稿'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              <div className="mt-4 h-[260px] rounded-[28px] border border-slate-200 bg-black p-2">
                 {ttydUrl ? (
                   <iframe
                     title="AI ttyd terminal"
@@ -403,6 +409,9 @@ export default function AIAnalysisPage() {
               <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
                 <div className="text-sm font-medium text-slate-500">任务标题</div>
                 <div className="mt-2 text-xl font-semibold text-slate-900">{draft.title}</div>
+                {draft.confidence ? (
+                  <div className="mt-2 text-xs text-slate-500">草稿置信度：{Math.round(draft.confidence * 100)}%</div>
+                ) : null}
               </div>
 
               <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
@@ -410,7 +419,11 @@ export default function AIAnalysisPage() {
                 <select
                   className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-slate-300"
                   value={draft.taskType}
-                  onChange={(event) => setDraft((current) => ({ ...current, taskType: event.target.value }))}
+                  onChange={(event) => {
+                    setConfirmed(false);
+                    setSavedDraft(null);
+                    setDraft((current) => ({ ...current, taskType: event.target.value }));
+                  }}
                 >
                   {TASK_TYPES.map((item) => (
                     <option key={item} value={item}>{item}</option>
@@ -423,7 +436,11 @@ export default function AIAnalysisPage() {
                 <select
                   className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-slate-300"
                   value={draft.workType}
-                  onChange={(event) => setDraft((current) => ({ ...current, workType: event.target.value }))}
+                  onChange={(event) => {
+                    setConfirmed(false);
+                    setSavedDraft(null);
+                    setDraft((current) => ({ ...current, workType: event.target.value }));
+                  }}
                 >
                   {WORK_TYPES.map((item) => (
                     <option key={item} value={item}>{item}</option>
@@ -451,9 +468,13 @@ export default function AIAnalysisPage() {
                 <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
                   <div className="text-sm font-medium text-slate-500">参与度评估（人天）</div>
                   <select
-                    className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-slate-300"
-                    value={draft.participationLevel}
-                    onChange={(event) => setDraft((current) => ({ ...current, participationLevel: Number(event.target.value) }))}
+                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-slate-300"
+                  value={draft.participationLevel}
+                    onChange={(event) => {
+                      setConfirmed(false);
+                      setSavedDraft(null);
+                      setDraft((current) => ({ ...current, participationLevel: Number(event.target.value) }));
+                    }}
                   >
                     {PARTICIPATION_LEVELS.map((item) => (
                       <option key={item} value={item}>{item} 人天</option>
@@ -467,10 +488,11 @@ export default function AIAnalysisPage() {
                   <div className="mt-4 space-y-3">
                     <button
                       type="button"
-                      className="w-full rounded-full bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
+                      className="w-full rounded-full bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
                       onClick={handleConfirmDraft}
+                      disabled={creating || !assistantConversation?.id}
                     >
-                      确认当前草稿
+                      {creating ? '保存中...' : '保存临时草稿'}
                     </button>
                     <button
                       type="button"
@@ -483,6 +505,13 @@ export default function AIAnalysisPage() {
                   </div>
                 </div>
               </div>
+
+              {savedDraft ? (
+                <div className="rounded-[28px] border border-sky-100 bg-sky-50 p-5 text-sm text-sky-800">
+                  <div className="font-semibold">{savedDraft.message || '已保存临时任务草稿'}</div>
+                  <div className="mt-2 break-all">临时文件：{savedDraft.tempDraftPath}</div>
+                </div>
+              ) : null}
 
               {createResult ? (
                 <div className="rounded-[28px] border border-emerald-100 bg-emerald-50 p-5 text-sm text-emerald-800">

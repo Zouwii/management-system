@@ -765,3 +765,36 @@ def integration_team_detail():
         return _fail(result.get("error", "team quarter aggregate failed"), code=400, data=result.get("data") or {})
     return _ok(result.get("data") or {})
 
+
+@dashboard_bp.route("/ai-task-ticket", methods=["POST"])
+def ai_task_ticket():
+    user = _require_login()
+    if not user:
+        return _fail("unauthenticated", code=401, data={})
+
+    from services.ai_mission_service import ai_create_mission_service
+
+    payload = request.get_json(silent=True) or {}
+    user_id = str((user or {}).get("user_id") or (user or {}).get("userid") or "").strip()
+    if user_id:
+        payload.setdefault("userId", user_id)
+        payload.setdefault("executorId", user_id)
+
+    result = ai_create_mission_service(payload)
+    if not result.get("success"):
+        status_code = int(((result.get("data") or {}).get("status_code")) or 400)
+        return _fail(result.get("error", "create mission failed"), code=status_code, data=result)
+
+    data = result.get("data") or {}
+    task_id = str(data.get("taskId") or "")
+    return _ok(
+        {
+            "success": True,
+            "taskId": task_id,
+            "taskUrl": str(data.get("taskUrl") or ""),
+            "message": "已创建任务单{}".format("：{}".format(task_id) if task_id else ""),
+            "requestPayload": data.get("requestPayload") or {},
+            "raw": data.get("dingtalk") or {},
+        }
+    )
+

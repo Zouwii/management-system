@@ -19,6 +19,7 @@ from .updates import register as register_updates
 from .projects import register as register_projects
 from .config_routes import register as register_config
 from .ai_debug import register as register_ai_debug
+from .ai_mission import register as register_ai_mission
 from .db_sync import register as register_db_sync
 from .perf import register as register_perf
 from .stats import register as register_stats
@@ -31,6 +32,7 @@ def register_all_routes(bp, ok, fail):
     register_projects(bp, ok, fail)
     register_config(bp, ok, fail)
     register_ai_debug(bp, ok, fail)
+    register_ai_mission(bp, ok, fail)
     register_db_sync(bp, ok, fail)
     register_perf(bp, ok, fail)
     register_stats(bp, ok, fail)

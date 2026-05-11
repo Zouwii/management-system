@@ -54,7 +54,6 @@ flowchart LR
 入口：
 
 - `POST /bt/ai/ttyd/session`
-- 兼容接口：`/bt/ai/chat/session_start|session_message|session_end`
 
 逻辑：
 
@@ -225,7 +224,7 @@ stateDiagram-v2
 
 ### 9.2 迁移步骤
 
-1. 发布支持新路径的 `cache_manager`
+1. 发布支持新用户目录结构的运行时管理逻辑
 2. 首次访问 `default` 时将旧 `conversations/` 迁入 `users/default/`
 3. 观察稳定后将旧路径标记废弃
 
@@ -255,7 +254,7 @@ stateDiagram-v2
 
 ### Phase 1（本周）
 
-- `cache_manager` 支持 `owner_key` 分目录
+- 用户目录与工作区按 `owner_key` 隔离
 - 增加原子写与 `schema_version`
 - 接入 `last_access_at` 更新
 

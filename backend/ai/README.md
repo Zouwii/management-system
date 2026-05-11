@@ -10,10 +10,9 @@
 
 ## 推荐调用链路（用户目录隔离）
 
-1. 调用 `GET/POST /bt/ai/cache/current` 获取当前用户目录信息
-2. 再调用 `POST /bt/ai/ttyd/session` 创建或复用终端会话
-3. 前端用返回的 `embedUrl` 通过 `iframe` 直连终端
-4. 启动脚本按 `ownerKey` 自动切到用户专属目录并加载共享 skills
+1. 调用 `POST /bt/ai/ttyd/session` 创建或复用终端会话
+2. 前端用返回的 `embedUrl` 通过 `iframe` 直连终端
+3. 启动脚本按 `ownerKey` 自动切到用户专属目录并加载共享 skills
 
 ## 多用户隔离规则
 
@@ -46,48 +45,6 @@
 - `model`：当前会话模型
 - `port`：ttyd 监听端口
 - `pid`：ttyd 进程号
-
-### 2) 获取当前用户缓存空间
-
-- `GET /bt/ai/cache/current`
-- `POST /bt/ai/cache/current`
-
-说明：
-
-- 可不传参数，后端会基于登录会话解析当前用户
-- 也可在 `POST` body 传 `ownerKey` 显式指定
-
-请求示例（POST）：
-
-```json
-{
-  "ownerKey": "user-001"
-}
-```
-
-响应示例：
-
-```json
-{
-  "ownerKey": "user-001",
-  "ownerSafe": "9f2a1c...",
-  "userRoot": "/abs/path/to/backend/runtime/users/9f2a1c...",
-  "workspaceDir": "/abs/path/to/backend/runtime/users/9f2a1c.../workspaces/default",
-  "sharedClaudeDir": "/abs/path/to/backend/runtime/shared/.claude"
-}
-```
-
-### 3) 结束会话（兼容接口名）
-
-- `POST /bt/ai/chat/session_end`
-
-请求示例：
-
-```json
-{
-  "ownerKey": "user-001"
-}
-```
 
 ## 配置项
 

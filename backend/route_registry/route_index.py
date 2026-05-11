@@ -114,6 +114,55 @@ API_BT_ROUTE_INDEX: List[Dict[str, str]] = [
         "handler": "route_registry.projects.query_task_details",
         "service": "services.project_task_service.query_user_tasks_service",
     },
+    # ai mission
+    {
+        "module": "ai_mission",
+        "method": "POST",
+        "path": "/api/bt/ai/task-assistant/conversations",
+        "desc": "AI 任务助手：创建当前登录用户会话并读取该用户任务上下文",
+        "handler": "route_registry.ai_mission.ai_task_assistant_create_conversation",
+        "service": "services.ai_task_assistant_service.create_task_assistant_conversation",
+    },
+    {
+        "module": "ai_mission",
+        "method": "GET",
+        "path": "/api/bt/ai/task-assistant/conversations/<conversation_id>",
+        "desc": "AI 任务助手：读取当前登录用户自己的会话",
+        "handler": "route_registry.ai_mission.ai_task_assistant_get_conversation",
+        "service": "services.ai_task_assistant_service.get_task_assistant_conversation",
+    },
+    {
+        "module": "ai_mission",
+        "method": "POST",
+        "path": "/api/bt/ai/task-assistant/conversations/<conversation_id>/messages",
+        "desc": "AI 任务助手：通过用户描述生成或完善任务草稿",
+        "handler": "route_registry.ai_mission.ai_task_assistant_send_message",
+        "service": "services.ai_task_assistant_service.send_task_assistant_message",
+    },
+    {
+        "module": "ai_mission",
+        "method": "POST",
+        "path": "/api/bt/ai/task-assistant/conversations/<conversation_id>/draft/confirm",
+        "desc": "AI 任务助手：保存临时任务草稿文件",
+        "handler": "route_registry.ai_mission.ai_task_assistant_confirm_draft",
+        "service": "services.ai_task_assistant_service.save_task_assistant_draft",
+    },
+    {
+        "module": "ai_mission",
+        "method": "POST",
+        "path": "/api/bt/ai/create_mission/payload",
+        "desc": "AI 创建任务单：只生成钉钉 create payload，不真正创建任务",
+        "handler": "route_registry.ai_mission.ai_create_mission_payload",
+        "service": "services.ai_mission_service.build_ai_mission_create_payload",
+    },
+    {
+        "module": "ai_mission",
+        "method": "POST",
+        "path": "/api/bt/ai/create_mission",
+        "desc": "AI 创建任务单：按本体开发部软件开发模板调用钉钉创建任务接口",
+        "handler": "route_registry.ai_mission.ai_create_mission",
+        "service": "services.ai_mission_service.ai_create_mission_service",
+    },
     # config
     {
         "module": "config",
@@ -297,6 +346,14 @@ API_DASHBOARD_ROUTE_INDEX: List[Dict[str, str]] = [
         "desc": "员工工时页：更新/全量更新入口（当前前端已直连 /api/bt/*）",
         "handler": "dashboard_api.personal_hours_update",
         "service": "services.task_sync_service.sync_project_details_in_time_range_service",
+    },
+    {
+        "module": "dashboard",
+        "method": "POST",
+        "path": "/api/dashboard/ai-task-ticket",
+        "desc": "AI 创建任务单：前端确认草稿后创建 TB/钉钉任务",
+        "handler": "dashboard_api.ai_task_ticket",
+        "service": "services.ai_mission_service.ai_create_mission_service",
     },
 ]
 

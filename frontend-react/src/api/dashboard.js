@@ -13,13 +13,11 @@ import {
   mockQueryPersonalHours,
   mockUpdatePersonalHours,
   mockUpdatePersonalHours as mockFullUpdatePersonalHours,
-  mockSendAIChatSingleTask,
-  mockSendAIChatMultiTurn,
-  mockSendAIChatSessionMessage,
-  mockStartAIChatSession,
-  mockEndAIChatSession,
   mockFetchAIModels,
   mockFetchAITtydSession,
+  mockCreateAITaskAssistantConversation,
+  mockSendAITaskAssistantMessage,
+  mockConfirmAITaskAssistantDraft,
 } from './providers/mock/dashboard';
 import {
   realFetchAIInsightList,
@@ -35,13 +33,11 @@ import {
   realQueryPersonalHours,
   realUpdatePersonalHours,
   realFullUpdatePersonalHours,
-  realSendAIChatSingleTask,
-  realSendAIChatMultiTurn,
-  realSendAIChatSessionMessage,
-  realStartAIChatSession,
-  realEndAIChatSession,
   realFetchAIModels,
   realFetchAITtydSession,
+  realCreateAITaskAssistantConversation,
+  realSendAITaskAssistantMessage,
+  realConfirmAITaskAssistantDraft,
 } from './providers/real/dashboard';
 
 export const fetchDepartmentOverview = createApiSwitch(mockFetchDepartmentOverview, realFetchDepartmentOverview);
@@ -56,11 +52,18 @@ export const fullUpdatePersonalHours = createApiSwitch(mockFullUpdatePersonalHou
 export const fetchPerformanceHistory = createApiSwitch(mockFetchPerformanceHistory, realFetchPerformanceHistory);
 export const fetchAIInsightList = createApiSwitch(mockFetchAIInsightList, realFetchAIInsightList);
 export const createAITaskTicket = createApiSwitch(mockCreateAITaskTicket, realCreateAITaskTicket);
-export const sendAIChatSingleTask = createApiSwitch(mockSendAIChatSingleTask, realSendAIChatSingleTask);
-export const sendAIChatMultiTurn = createApiSwitch(mockSendAIChatMultiTurn, realSendAIChatMultiTurn);
-export const sendAIChatSessionMessage = createApiSwitch(mockSendAIChatSessionMessage, realSendAIChatSessionMessage);
-export const startAIChatSession = createApiSwitch(mockStartAIChatSession, realStartAIChatSession);
-export const endAIChatSession = createApiSwitch(mockEndAIChatSession, realEndAIChatSession);
 export const fetchAIModels = createApiSwitch(mockFetchAIModels, realFetchAIModels);
 export const fetchAITtydSession = createApiSwitch(mockFetchAITtydSession, realFetchAITtydSession);
+export const createAITaskAssistantConversation = createApiSwitch(
+  mockCreateAITaskAssistantConversation,
+  realCreateAITaskAssistantConversation,
+);
+export const sendAITaskAssistantMessage = createApiSwitch(
+  mockSendAITaskAssistantMessage,
+  realSendAITaskAssistantMessage,
+);
+export const confirmAITaskAssistantDraft = createApiSwitch(
+  mockConfirmAITaskAssistantDraft,
+  realConfirmAITaskAssistantDraft,
+);
 export const fetchPermissionMatrix = createApiSwitch(mockFetchPermissionMatrix, realFetchPermissionMatrix);

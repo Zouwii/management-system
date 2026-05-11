@@ -683,72 +683,6 @@ export function realCreateAITaskTicket(_user, payload) {
   });
 }
 
-export function realSendAIChatSingleTask(_user, payload) {
-  return httpRequest('/bt/ai/chat/single_task', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  }).catch(() => ({
-    code: 200,
-    error: '',
-    data: {
-      result: {
-        status: 'success',
-        result: `本地降级回复：已收到任务请求 - ${String(payload?.prompt || '').slice(0, 120)}`,
-      },
-    },
-  }));
-}
-
-export function realSendAIChatMultiTurn(_user, payload) {
-  return httpRequest('/bt/ai/chat/multi_turn', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  }).catch(() => ({
-    code: 200,
-    error: '',
-    data: {
-      result: {
-        rounds: Array.isArray(payload?.prompts)
-          ? payload.prompts.map((p, idx) => ({
-            round: idx + 1,
-            prompt: p,
-            response: { result: `本地降级回复：${String(p || '').slice(0, 120)}` },
-          }))
-          : [],
-      },
-    },
-  }));
-}
-
-export function realSendAIChatSessionMessage(_user, payload) {
-  return httpRequest('/bt/ai/chat/session_message', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
-}
-
-export function realStartAIChatSession(_user, payload) {
-  return httpRequest('/bt/ai/chat/session_start', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  });
-}
-
-export function realEndAIChatSession(_user, payload) {
-  return httpRequest('/bt/ai/chat/session_end', {
-    method: 'POST',
-    body: JSON.stringify(payload),
-  }).catch(() => ({
-    code: 200,
-    error: '',
-    data: {
-      conversationId: payload?.conversationId || '',
-      ended: false,
-      message: '本地降级：未连接后端会话接口',
-    },
-  }));
-}
-
 export function realFetchAIModels() {
   return httpRequest('/bt/ai/models').catch(() => ({
     code: 200,
@@ -765,6 +699,27 @@ export function realFetchAITtydSession(_user, payload = {}) {
   return httpRequest('/bt/ai/ttyd/session', {
     method: 'POST',
     body: JSON.stringify(payload || {}),
+  });
+}
+
+export function realCreateAITaskAssistantConversation() {
+  return httpRequest('/bt/ai/task-assistant/conversations', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+export function realSendAITaskAssistantMessage(_user, conversationId, content) {
+  return httpRequest(`/bt/ai/task-assistant/conversations/${encodeURIComponent(conversationId)}/messages`, {
+    method: 'POST',
+    body: JSON.stringify({ content }),
+  });
+}
+
+export function realConfirmAITaskAssistantDraft(_user, conversationId, draft) {
+  return httpRequest(`/bt/ai/task-assistant/conversations/${encodeURIComponent(conversationId)}/draft/confirm`, {
+    method: 'POST',
+    body: JSON.stringify({ draft }),
   });
 }
 

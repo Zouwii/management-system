@@ -12,6 +12,8 @@ from pathlib import Path
 
 from flask import request, session
 
+from services.ai_task_assistant_service import build_claude_context_markdown
+
 _AI_CONFIG_PATH = Path(__file__).resolve().parent.parent / "ai" / "config.json"
 _EASY_START_JZ_SCRIPT = Path(__file__).resolve().parent.parent / "easy_start_claude_jz"
 _RUNTIME_DIR = Path(__file__).resolve().parent.parent / "runtime"
@@ -88,6 +90,36 @@ def _user_workspace(owner_key: str) -> dict:
         "workspace_dir": str(workspace_dir),
         "shared_claude_dir": str(_SHARED_CLAUDE_DIR),
     }
+
+
+def _write_workspace_context(owner_key: str, auth_user: dict) -> None:
+    ws = _user_workspace(owner_key)
+    workspace_dir = Path(ws["workspace_dir"])
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        task_context = build_claude_context_markdown(auth_user if isinstance(auth_user, dict) else {})
+    except Exception as exc:
+        task_context = (
+            "# 当前用户任务上下文\n\n"
+            "系统暂时未能读取数据库任务上下文。请先通过对话收集用户输入，再生成结构化任务草稿。\n\n"
+            f"读取失败原因：{exc}\n"
+        )
+    (workspace_dir / "AI_TASK_CONTEXT.md").write_text(task_context, encoding="utf-8")
+    (workspace_dir / "CLAUDE.md").write_text(
+        "\n".join(
+            [
+                "# AI 任务助手工作区",
+                "",
+                "你是当前系统中的任务创建助手。",
+                "",
+                "请先阅读 `AI_TASK_CONTEXT.md`，理解当前登录用户的历史任务、任务压力和常见工作类型。",
+                "当用户描述新任务时，先通过简短问题补齐关键信息，再输出结构化任务草稿。",
+                "用户明确确认前，不要创建真实 Teambition 任务。",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
 
 
 def _make_env(owner_key: str, owner_name: str, model: str) -> dict:
@@ -194,7 +226,7 @@ def _build_ttyd_embed_url(port: int, owner_key: str, model: str) -> str:
     return f"{url}{joiner}ownerKey={owner_key}&model={model}"
 
 
-def _ensure_ttyd_session(owner_key: str, owner_name: str, model: str) -> dict:
+def _ensure_ttyd_session(owner_key: str, owner_name: str, model: str, auth_user: dict = None) -> dict:
     with _TTYD_LOCK:
         existing = _TTYD_SESSIONS.get(owner_key)
         if existing and existing["proc"].poll() is None:
@@ -204,6 +236,7 @@ def _ensure_ttyd_session(owner_key: str, owner_name: str, model: str) -> dict:
             _TTYD_SESSIONS.pop(owner_key, None)
 
         resolved_env = _make_env(owner_key=owner_key, owner_name=owner_name, model=model)
+        _write_workspace_context(owner_key, auth_user or {})
         port = _resolve_ttyd_port(owner_key)
         cmd = [
             "ttyd",
@@ -265,31 +298,15 @@ def register(bp, ok, fail):
         model = str(cfg.get("model") or "glm-5.1").strip() or "glm-5.1"
         return ok({"models": [{"name": model, "description": "default model"}]})
 
-    def _handle_session_end():
-        payload = request.get_json(silent=True) or {}
-        owner_key = _resolve_owner_key(payload)
-        with _TTYD_LOCK:
-            ttyd_state = _TTYD_SESSIONS.pop(owner_key, None)
-            if ttyd_state:
-                _terminate_ttyd_locked(ttyd_state)
-                _append_log(
-                    {
-                        "ts": int(time.time()),
-                        "phase": "ttyd_session_end",
-                        "owner_key": owner_key,
-                        "port": ttyd_state.get("port"),
-                    }
-                )
-        return ok({"ended": True, "ownerKey": owner_key})
-
     def _handle_ttyd_session():
         payload = request.get_json(silent=True) or {}
         owner_key = _resolve_owner_key(payload)
         owner_name = _resolve_owner_name()
+        auth_user = session.get("auth_user") or {}
         cfg = _load_ai_config()
         model = str(payload.get("model") or cfg.get("model") or "glm-5.1").strip() or "glm-5.1"
         try:
-            state = _ensure_ttyd_session(owner_key=owner_key, owner_name=owner_name, model=model)
+            state = _ensure_ttyd_session(owner_key=owner_key, owner_name=owner_name, model=model, auth_user=auth_user)
         except Exception as exc:
             return fail(str(exc), code=500, data={})
         ws = _user_workspace(owner_key)
@@ -311,20 +328,6 @@ def register(bp, ok, fail):
             }
         )
 
-    def _handle_cache_current():
-        payload = request.get_json(silent=True) or {}
-        owner_key = _resolve_owner_key(payload)
-        ws = _user_workspace(owner_key)
-        return ok(
-            {
-                "ownerKey": owner_key,
-                "ownerSafe": ws["owner_safe"],
-                "userRoot": ws["user_root"],
-                "workspaceDir": ws["workspace_dir"],
-                "sharedClaudeDir": ws["shared_claude_dir"],
-            }
-        )
-
     @bp.route("/ai/models", methods=["GET"])
     def ai_models():
         return _handle_models()
@@ -333,15 +336,7 @@ def register(bp, ok, fail):
     def ai_interactive_models():
         return _handle_models()
 
-    @bp.route("/ai/chat/session_end", methods=["POST"])
-    def ai_chat_session_end():
-        return _handle_session_end()
-
     @bp.route("/ai/ttyd/session", methods=["POST"])
     def ai_ttyd_session():
         return _handle_ttyd_session()
-
-    @bp.route("/ai/cache/current", methods=["GET", "POST"])
-    def ai_cache_current():
-        return _handle_cache_current()
 
