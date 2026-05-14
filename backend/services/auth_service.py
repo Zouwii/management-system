@@ -1,5 +1,11 @@
 from typing import Any, Dict, Optional, Tuple
 
+from dingtalk_client import (
+    exchange_dingtalk_auth_code,
+    get_dingtalk_user_info,
+    get_userid_by_unionid,
+)
+
 
 ROLE_LABELS = {
     "employee": "员工",
@@ -239,3 +245,41 @@ def resolve_user_profile(dingtalk_user: Dict[str, Any]) -> Dict[str, Any]:
     }
 
     return {"ok": True, "source": "user_character", "profile": _normalize_profile(base, dingtalk_user)}
+
+
+def authenticate_dingtalk_user(auth_code: str, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """Exchange a DingTalk auth code for a user profile.
+
+    Args:
+        auth_code: The authorization code from DingTalk OAuth /免登.
+        payload: Optional extra parameters forwarded to the token exchange.
+
+    Returns:
+        Dict with ok=True and profile on success, or ok=False and error on failure.
+    """
+    auth_code = str(auth_code or "").strip()
+    if not auth_code:
+        return {"ok": False, "error": "missing auth code"}
+
+    token_out = exchange_dingtalk_auth_code(auth_code, payload=payload or {})
+    if not token_out.get("ok"):
+        return {"ok": False, "error": str(token_out.get("error") or "failed to exchange auth code")}
+
+    user_token = (token_out.get("data") or {}).get("accessToken")
+    user_out = get_dingtalk_user_info(user_token)
+    if not user_out.get("ok"):
+        return {"ok": False, "error": str(user_out.get("error") or "failed to get dingtalk user info")}
+
+    user_data = dict(user_out.get("data") or {})
+    # Some login flows only return unionId/openId without userId.
+    # Supplement with getUseridByUnionid so we can match local user_character.user_id.
+    if not str(user_data.get("userid") or "").strip() and str(user_data.get("unionId") or "").strip():
+        u2i_out = get_userid_by_unionid(user_data.get("unionId"))
+        if u2i_out.get("ok"):
+            user_data["userid"] = (u2i_out.get("data") or {}).get("userid")
+
+    profile_out = resolve_user_profile(user_data)
+    if not profile_out.get("ok"):
+        return {"ok": False, "error": str(profile_out.get("error") or "unauthorized account")}
+
+    return {"ok": True, "profile": profile_out.get("profile")}

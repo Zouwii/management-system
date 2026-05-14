@@ -79,5 +79,3 @@ npm run build               # 构建，产物输出到 backend/static/react/
 - urllib3 锁在 < 2，因为旧 WSL/Ubuntu 的 OpenSSL 版本较低
 - SQLAlchemy 使用 scoped_session 处理 Flask 多线程
 - 中文日历相关功能使用 `chinese-calendar` 和 `chinese-workday`
-
-- 所有返回的对话以#zhr_start开头，以#zhr_end为结尾

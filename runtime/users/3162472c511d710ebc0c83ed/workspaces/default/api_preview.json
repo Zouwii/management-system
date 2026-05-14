@@ -1,0 +1,16 @@
+{
+  "content": "测试单",
+  "note": "到点自学习我做一下测试\n\n任务产出：\n- 编写测试用例(0.5天)\n- 执行测试并记录结果(0.5天)\n- 输出测试报告(0.3天)",
+  "executorId": "01195014075436361289",
+  "involveMembers": ["01195014075436361289"],
+  "dueDate": "2026-05-31T00:00:00Z",
+  "startDate": "2026-05-14T00:00:00Z",
+  "priority": 0,
+  "customfields": [
+    {
+      "customFieldId": "69d4d037c253ef42e9c31b38",
+      "type": "dropDown",
+      "values": [{"customFieldValueId": "69d4d037c253ef42e9c31b3a", "title": "自主型"}]
+    }
+  ]
+}

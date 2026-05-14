@@ -10,10 +10,12 @@ from services.project_task_service import (
     search_project_tasks_service,
 )
 from services.task_detail_extract_service import extract_task_detail_custom_fields_service
-from services.task_sync_service import (
+from services.sync_lock import (
     _acquire_update_lock,
     _release_update_lock,
     DEFAULT_UPDATE_LOCK_KEY,
+)
+from services.task_sync_service import (
     normal_incremental_update_service,
     sync_project_details_in_time_range_service,
     sync_project_tasks_to_db,

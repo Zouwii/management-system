@@ -702,24 +702,24 @@ export function realFetchAITtydSession(_user, payload = {}) {
   });
 }
 
-export function realCreateAITaskAssistantConversation() {
-  return httpRequest('/bt/ai/task-assistant/conversations', {
+export function realInitTbcreateWorkspace(_user, payload = {}) {
+  const ownerKey = String(payload?.ownerKey || _user?.user_id || _user?.userid || _user?.name || 'anonymous');
+  return httpRequest('/bt/ai/tbcreate/workspace/init', {
     method: 'POST',
-    body: JSON.stringify({}),
+    body: JSON.stringify({ ownerKey }),
   });
 }
 
-export function realSendAITaskAssistantMessage(_user, conversationId, content) {
-  return httpRequest(`/bt/ai/task-assistant/conversations/${encodeURIComponent(conversationId)}/messages`, {
-    method: 'POST',
-    body: JSON.stringify({ content }),
-  });
+export function realFetchTbcreateDraft(_user, payload = {}) {
+  const ownerKey = String(payload?.ownerKey || _user?.user_id || _user?.userid || _user?.name || 'anonymous');
+  return httpRequest(`/bt/ai/tbcreate/draft/current?ownerKey=${encodeURIComponent(ownerKey)}`);
 }
 
-export function realConfirmAITaskAssistantDraft(_user, conversationId, draft) {
-  return httpRequest(`/bt/ai/task-assistant/conversations/${encodeURIComponent(conversationId)}/draft/confirm`, {
+export function realSaveTbcreateDraft(_user, payload = {}) {
+  const ownerKey = String(payload?.ownerKey || _user?.user_id || _user?.userid || _user?.name || 'anonymous');
+  return httpRequest('/bt/ai/tbcreate/draft/save', {
     method: 'POST',
-    body: JSON.stringify({ draft }),
+    body: JSON.stringify({ ownerKey, draft: payload.draft }),
   });
 }
 

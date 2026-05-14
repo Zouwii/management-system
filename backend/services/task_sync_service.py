@@ -52,89 +52,15 @@ DEFAULT_TASK_FLOW_STATUS_MAPPING = {
     "64785656c6215fd933a96634": 5,  # 搁置
 }
 
-DEFAULT_UPDATE_LOCK_TTL_SEC = 60 * 30
-DEFAULT_UPDATE_LOCK_KEY = "workhour_update:all"
+from services.sync_lock import (
+    acquire_update_lock as _acquire_update_lock,
+    get_update_lock_status as _get_update_lock_status,
+    release_update_lock as _release_update_lock,
+    DEFAULT_UPDATE_LOCK_KEY,
+    DEFAULT_UPDATE_LOCK_TTL_SEC,
+)
+
 DEFAULT_DB_COMMIT_BATCH_SIZE = 100
-
-
-def _acquire_update_lock(lock_key: str, owner: str, ttl_sec: int = DEFAULT_UPDATE_LOCK_TTL_SEC) -> Dict[str, Any]:
-    now = datetime.now(timezone.utc)
-    expires = now + timedelta(seconds=max(int(ttl_sec or 0), 1))
-    sess = SessionLocal()
-    try:
-        row = sess.query(UpdateLock).filter(UpdateLock.lock_key == str(lock_key)).first()
-        if row:
-            row_exp = _cmp_dt_utc(getattr(row, "expires_at", None))
-            if row_exp and row_exp > now and str(getattr(row, "owner", "") or "") != str(owner):
-                return {
-                    "ok": False,
-                    "error": "update is in progress by another user",
-                    "lock": {
-                        "lock_key": str(lock_key),
-                        "owner": str(getattr(row, "owner", "") or ""),
-                        "expires_at": row_exp.isoformat(),
-                    },
-                }
-            row.owner = str(owner)
-            row.locked_at = now
-            row.expires_at = expires
-        else:
-            sess.add(
-                UpdateLock(
-                    lock_key=str(lock_key),
-                    owner=str(owner),
-                    locked_at=now,
-                    expires_at=expires,
-                )
-            )
-        sess.commit()
-        return {"ok": True, "lock": {"lock_key": str(lock_key), "owner": str(owner), "expires_at": expires.isoformat()}}
-    except Exception as e:
-        sess.rollback()
-        return {"ok": False, "error": str(e), "lock": {"lock_key": str(lock_key), "owner": str(owner)}}
-    finally:
-        sess.close()
-
-
-def _release_update_lock(lock_key: str, owner: str) -> None:
-    sess = SessionLocal()
-    try:
-        row = sess.query(UpdateLock).filter(UpdateLock.lock_key == str(lock_key)).first()
-        if row and str(getattr(row, "owner", "") or "") == str(owner):
-            sess.delete(row)
-            sess.commit()
-    except Exception:
-        sess.rollback()
-    finally:
-        sess.close()
-
-
-def _get_update_lock_status(lock_key: str = DEFAULT_UPDATE_LOCK_KEY) -> Dict[str, Any]:
-    now = datetime.now(timezone.utc)
-    sess = SessionLocal()
-    try:
-        row = sess.query(UpdateLock).filter(UpdateLock.lock_key == str(lock_key)).first()
-        if not row:
-            return {"locked": False, "lock": {}}
-        row_exp = _cmp_dt_utc(getattr(row, "expires_at", None))
-        if row_exp and row_exp > now:
-            return {
-                "locked": True,
-                "lock": {
-                    "lock_key": str(lock_key),
-                    "owner": str(getattr(row, "owner", "") or ""),
-                    "expires_at": row_exp.isoformat(),
-                },
-            }
-        # 锁已过期：清理脏锁，避免阻塞后续操作
-        sess.delete(row)
-        sess.commit()
-        return {"locked": False, "lock": {}}
-    except Exception as e:
-        sess.rollback()
-        return {"locked": False, "error": str(e), "lock": {}}
-    finally:
-        sess.close()
 
 
 def _parse_iso_dt(s: Optional[str]) -> Optional[datetime]:

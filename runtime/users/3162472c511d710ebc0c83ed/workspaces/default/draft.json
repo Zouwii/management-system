@@ -1,0 +1,9 @@
+{
+  "title": "测试单",
+  "workType": "自主型",
+  "requirementDesc": "到点自学习我做一下测试",
+  "outputs": ["编写测试用例(0.5天)", "执行测试并记录结果(0.5天)", "输出测试报告(0.3天)"],
+  "participationLevel": 1.3,
+  "dueDate": "2026-05-31T00:00:00Z",
+  "startDate": "2026-05-14T00:00:00Z"
+}

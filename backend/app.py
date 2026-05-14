@@ -18,7 +18,7 @@ from flask import Flask, abort, send_from_directory
 from flask_cors import CORS
 
 from api import api_bp
-from dashboard_api import dashboard_bp
+from route_registry.dashboard import dashboard_bp
 from db import SessionLocal, init_db
 from db.config import env_bt
 

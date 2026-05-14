@@ -15,9 +15,9 @@ import {
   mockUpdatePersonalHours as mockFullUpdatePersonalHours,
   mockFetchAIModels,
   mockFetchAITtydSession,
-  mockCreateAITaskAssistantConversation,
-  mockSendAITaskAssistantMessage,
-  mockConfirmAITaskAssistantDraft,
+  mockInitTbcreateWorkspace,
+  mockFetchTbcreateDraft,
+  mockSaveTbcreateDraft,
 } from './providers/mock/dashboard';
 import {
   realFetchAIInsightList,
@@ -35,9 +35,9 @@ import {
   realFullUpdatePersonalHours,
   realFetchAIModels,
   realFetchAITtydSession,
-  realCreateAITaskAssistantConversation,
-  realSendAITaskAssistantMessage,
-  realConfirmAITaskAssistantDraft,
+  realInitTbcreateWorkspace,
+  realFetchTbcreateDraft,
+  realSaveTbcreateDraft,
 } from './providers/real/dashboard';
 
 export const fetchDepartmentOverview = createApiSwitch(mockFetchDepartmentOverview, realFetchDepartmentOverview);
@@ -54,16 +54,16 @@ export const fetchAIInsightList = createApiSwitch(mockFetchAIInsightList, realFe
 export const createAITaskTicket = createApiSwitch(mockCreateAITaskTicket, realCreateAITaskTicket);
 export const fetchAIModels = createApiSwitch(mockFetchAIModels, realFetchAIModels);
 export const fetchAITtydSession = createApiSwitch(mockFetchAITtydSession, realFetchAITtydSession);
-export const createAITaskAssistantConversation = createApiSwitch(
-  mockCreateAITaskAssistantConversation,
-  realCreateAITaskAssistantConversation,
+export const initTbcreateWorkspace = createApiSwitch(
+  mockInitTbcreateWorkspace,
+  realInitTbcreateWorkspace,
 );
-export const sendAITaskAssistantMessage = createApiSwitch(
-  mockSendAITaskAssistantMessage,
-  realSendAITaskAssistantMessage,
+export const fetchTbcreateDraft = createApiSwitch(
+  mockFetchTbcreateDraft,
+  realFetchTbcreateDraft,
 );
-export const confirmAITaskAssistantDraft = createApiSwitch(
-  mockConfirmAITaskAssistantDraft,
-  realConfirmAITaskAssistantDraft,
+export const saveTbcreateDraft = createApiSwitch(
+  mockSaveTbcreateDraft,
+  realSaveTbcreateDraft,
 );
 export const fetchPermissionMatrix = createApiSwitch(mockFetchPermissionMatrix, realFetchPermissionMatrix);

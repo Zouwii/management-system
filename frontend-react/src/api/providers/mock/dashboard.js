@@ -523,87 +523,30 @@ export function mockFetchAITtydSession(_user, payload = {}) {
   }));
 }
 
-export function mockCreateAITaskAssistantConversation(user) {
-  const name = user?.name || '当前用户';
+export function mockInitTbcreateWorkspace(_user, _payload = {}) {
   return request(() => ({
-    id: `mock-${Date.now()}`,
-    user: {
-      userId: user?.user_id || user?.userid || '',
-      name,
-    },
-    contextSummary: `已读取 ${name} 的示例任务上下文：未完成 6 个，逾期 1 个，常见任务为开发实现和联调。`,
-    contextMetrics: {
-      taskCount: 12,
-      completedTaskCount: 6,
-      unfinishedTaskCount: 6,
-      overdueTaskCount: 1,
-      scheduledHours: 32,
-    },
-    messages: [
-      {
-        role: 'assistant',
-        content: `我已经读取了 ${name} 的任务上下文。你可以描述一个新任务，我会生成临时草稿。`,
-        createdAt: new Date().toISOString(),
-      },
-    ],
-    draft: {
-      title: '待生成任务单',
-      taskType: '开发实现任务',
-      workType: '指派型',
-      requirementDesc: '',
-      outputs: [],
-      participationLevel: 1,
-      missingFields: ['title', 'requirementDesc', 'outputs'],
-      confidence: 0.2,
-    },
-    status: 'collecting',
+    ok: true,
+    workspaceDir: '(mock)',
+    ownerSafe: '(mock)',
+    files: { claudeMd: 'CLAUDE.md', taskContext: 'AI_TASK_CONTEXT.md', rules: 'TASK_TICKET_RULES.md' },
+    taskCount: 12,
   }));
 }
 
-export function mockSendAITaskAssistantMessage(_user, conversationId, content) {
-  const text = String(content || '').trim();
-  const title = text.replace(/^(帮我|请|麻烦|需要)/, '').split(/[，。,.\n]/)[0].slice(0, 24) || '新建任务草稿';
-  const taskType = /联调|验证|对接/.test(text)
-    ? '系统联调任务'
-    : /方案|设计|规划|评审/.test(text)
-      ? '方案设计任务'
-      : '开发实现任务';
-  const workType = /学习|调研|分享|能力/.test(text)
-    ? '能力建设型'
-    : /主动|优化|重构|改进/.test(text)
-      ? '自主型'
-      : '指派型';
-  const draft = {
-    title,
-    taskType,
-    workType,
-    requirementDesc: text,
-    outputs: taskType === '系统联调任务' ? ['联调记录', '问题闭环清单'] : ['功能实现代码', '自测记录'],
-    participationLevel: /复杂|完整|重构/.test(text) ? 2 : 1,
-    missingFields: [],
-    confidence: 0.86,
-  };
+export function mockFetchTbcreateDraft(_user, _payload = {}) {
   return request(() => ({
-    id: conversationId,
-    contextSummary: '已读取示例任务上下文。',
-    messages: [
-      { role: 'assistant', content: '我已经读取了你的任务上下文。你可以描述一个新任务，我会生成临时草稿。' },
-      { role: 'user', content: text },
-      { role: 'assistant', content: '草稿已生成。建议先保存为临时草稿，确认后再创建正式任务单。' },
-    ],
-    draft,
-    status: 'drafted',
+    title: '示例任务标题',
+    workType: '指派型',
+    requirementDesc: '这是一个模拟的任务需求描述。在真实环境中，Claude 会将 draft.json 写入工作区，后端读取后返回给前端。',
+    outputs: ['实现地图编辑功能(1.0天)', '编写单元测试(0.5天)'],
+    participationLevel: 1.5,
+    dueDate: new Date(Date.now() + 14 * 864e5).toISOString(),
+    startDate: new Date().toISOString(),
   }));
 }
 
-export function mockConfirmAITaskAssistantDraft(_user, conversationId, draft) {
-  return request(() => ({
-    success: true,
-    conversationId,
-    draft,
-    tempDraftPath: `runtime/ai_task_assistant/mock/${conversationId}.json`,
-    message: '已保存临时任务草稿',
-  }));
+export function mockSaveTbcreateDraft(_user, _payload = {}) {
+  return request(() => ({ saved: true, savedAt: new Date().toISOString() }));
 }
 
 export function mockFetchPermissionMatrix() {
