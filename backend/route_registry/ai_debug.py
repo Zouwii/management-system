@@ -12,7 +12,7 @@ from pathlib import Path
 
 from flask import request, session
 
-from services.ai_task_assistant_service import build_claude_context_markdown
+from services.ai_task_context_service import write_user_task_context_markdown
 
 _AI_CONFIG_PATH = Path(__file__).resolve().parent.parent / "ai" / "config.json"
 _EASY_START_JZ_SCRIPT = Path(__file__).resolve().parent.parent / "easy_start_claude_jz"
@@ -97,7 +97,11 @@ def _write_workspace_context(owner_key: str, auth_user: dict) -> None:
     workspace_dir = Path(ws["workspace_dir"])
     workspace_dir.mkdir(parents=True, exist_ok=True)
     try:
-        task_context = build_claude_context_markdown(auth_user if isinstance(auth_user, dict) else {})
+        prepared = write_user_task_context_markdown(
+            auth_user if isinstance(auth_user, dict) else {},
+            workspace_dir=workspace_dir,
+        )
+        task_context = str(prepared.get("markdown") or "")
     except Exception as exc:
         task_context = (
             "# 当前用户任务上下文\n\n"
@@ -339,4 +343,3 @@ def register(bp, ok, fail):
     @bp.route("/ai/ttyd/session", methods=["POST"])
     def ai_ttyd_session():
         return _handle_ttyd_session()
-

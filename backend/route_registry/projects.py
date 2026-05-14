@@ -2,13 +2,14 @@
 
 import time
 
-from flask import request
+from flask import request, session
 
 from services.project_task_service import (
     query_project_tasks_service,
     query_user_tasks_service,
     search_project_tasks_service,
 )
+from services.task_detail_extract_service import extract_task_detail_custom_fields_service
 from services.task_sync_service import (
     _acquire_update_lock,
     _release_update_lock,
@@ -20,6 +21,10 @@ from services.task_sync_service import (
 
 
 def register(bp, ok, fail):
+    def _require_login():
+        user = session.get("auth_user")
+        return user if isinstance(user, dict) else None
+
     @bp.route("/project/tasks/search", methods=["POST"])
     def search_project_tasks():
         try:
@@ -94,5 +99,29 @@ def register(bp, ok, fail):
                 code=int(status_code),
                 data=result,
             )
+        except Exception as e:
+            return fail(str(e), code=500, data={})
+
+    @bp.route("/query_task_detail_custom_fields", methods=["POST"])
+    def query_task_detail_custom_fields():
+        try:
+            user = _require_login()
+            if not user:
+                return fail("unauthenticated", code=401, data={})
+            payload = request.get_json(silent=True) or {}
+            task_id = str(payload.get("taskId") or payload.get("task_id") or "").strip()
+            project_id = str(payload.get("projectId") or payload.get("project_id") or "").strip()
+            user_id = str(user.get("user_id") or user.get("userid") or "").strip()
+            if not task_id:
+                return fail("missing taskId", code=400, data={})
+            result = extract_task_detail_custom_fields_service(
+                user_id=user_id,
+                task_id=task_id,
+                project_id=project_id or None,
+            )
+            if result.get("success"):
+                return ok(result)
+            status_code = 404 if result.get("error") == "task detail not found" else 400
+            return fail(result.get("error", "extract task detail custom fields failed"), code=status_code, data=result)
         except Exception as e:
             return fail(str(e), code=500, data={})

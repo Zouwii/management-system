@@ -11,15 +11,16 @@ import hashlib
 import json
 import re
 import uuid
-from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
-from sqlalchemy import desc
-
-from db.engine import SessionLocal
-from db.orm import ProjectTaskDetail
+from services.ai_task_context_service import (
+    load_user_task_context as _load_user_task_context,
+    render_user_task_context_markdown,
+    resolve_user_identity,
+    write_user_task_context_markdown,
+)
 
 
 PARTICIPATION_LEVELS = [0.2, 0.5, 1, 1.5, 2, 2.5, 3]
@@ -37,24 +38,6 @@ def _clean_str(value: Any) -> str:
     return str(value or "").strip()
 
 
-def _safe_owner_key(owner_key: str) -> str:
-    raw = _clean_str(owner_key) or "anonymous"
-    return hashlib.sha256(raw.encode("utf-8", errors="ignore")).hexdigest()[:24]
-
-
-def resolve_user_identity(auth_user: Dict[str, Any]) -> Dict[str, str]:
-    user = auth_user if isinstance(auth_user, dict) else {}
-    user_id = _clean_str(user.get("user_id") or user.get("userid") or user.get("id"))
-    name = _clean_str(user.get("name") or user.get("nick") or user.get("nickname") or user.get("user_name"))
-    owner_key = user_id or name or "anonymous"
-    return {
-        "userId": user_id,
-        "name": name,
-        "ownerKey": owner_key,
-        "ownerSafe": _safe_owner_key(owner_key),
-    }
-
-
 def _user_root(identity: Dict[str, str]) -> Path:
     root = _RUNTIME_DIR / "users" / identity["ownerSafe"]
     (root / "conversations").mkdir(parents=True, exist_ok=True)
@@ -70,131 +53,12 @@ def _draft_path(identity: Dict[str, str], conversation_id: str) -> Path:
     return _user_root(identity) / "drafts" / f"{conversation_id}.json"
 
 
-def _serialize_dt(value: Any) -> str:
-    if value is None:
-        return ""
-    if hasattr(value, "isoformat"):
-        try:
-            return value.isoformat()
-        except Exception:
-            return _clean_str(value)
-    return _clean_str(value)
-
-
-def _task_status_label(status_id: Any, is_overdue: bool) -> str:
-    try:
-        status = int(status_id)
-    except Exception:
-        status = -1
-    if status == 4:
-        return "已完成"
-    if is_overdue:
-        return "逾期"
-    if status == 0:
-        return "创建中"
-    if status == 1:
-        return "未完成"
-    if status == 2:
-        return "待评审"
-    if status == 3:
-        return "评审中"
-    if status == 5:
-        return "搁置"
-    return "进行中"
-
-
-def _normalize_task(row: ProjectTaskDetail) -> Dict[str, Any]:
-    return {
-        "taskId": _clean_str(row.task_id),
-        "projectId": _clean_str(row.project_id),
-        "title": _clean_str(row.content) or _clean_str(row.task_id),
-        "dueDate": _serialize_dt(row.due_date),
-        "workHour": float(row.work_hour or 0),
-        "workdayCostHour": float(row.workday_costhour or 0),
-        "taskNature": _clean_str(row.task_nature),
-        "statusId": row.task_flow_status_id,
-        "status": _task_status_label(row.task_flow_status_id, bool(row.is_overdue)),
-        "isOverdue": bool(row.is_overdue),
-        "businessType": row.business_type,
-    }
-
-
 def load_user_task_context(auth_user: Dict[str, Any], limit: int = 80) -> Dict[str, Any]:
-    identity = resolve_user_identity(auth_user)
-    user_id = identity["userId"]
-    tasks: List[Dict[str, Any]] = []
-    if user_id:
-        session = SessionLocal()
-        try:
-            rows = (
-                session.query(ProjectTaskDetail)
-                .filter(ProjectTaskDetail.query_user_id == user_id)
-                .order_by(desc(ProjectTaskDetail.fetched_at), desc(ProjectTaskDetail.due_date))
-                .limit(int(limit))
-                .all()
-            )
-            tasks = [_normalize_task(row) for row in rows]
-        finally:
-            session.close()
-
-    metrics = {
-        "taskCount": len(tasks),
-        "completedTaskCount": sum(1 for item in tasks if item["status"] == "已完成"),
-        "unfinishedTaskCount": sum(1 for item in tasks if item["status"] != "已完成"),
-        "overdueTaskCount": sum(1 for item in tasks if item["isOverdue"]),
-        "scheduledHours": round(sum(float(item.get("workHour") or 0) for item in tasks), 2),
-    }
-    top_types = Counter(item["taskNature"] or "未标注" for item in tasks).most_common(3)
-    recent_titles = [item["title"] for item in tasks[:8] if item["title"]]
-
-    if not tasks:
-        summary = "暂未从数据库读取到该用户的任务记录。助手会先按用户输入生成草稿，并提示补充必要信息。"
-    else:
-        type_text = "、".join(f"{name} {count} 个" for name, count in top_types)
-        summary = (
-            f"已读取最近 {metrics['taskCount']} 条任务：未完成 {metrics['unfinishedTaskCount']} 个，"
-            f"已完成 {metrics['completedTaskCount']} 个，逾期 {metrics['overdueTaskCount']} 个。"
-            f"常见任务性质：{type_text or '暂无'}。"
-        )
-
-    return {
-        "identity": identity,
-        "summary": summary,
-        "metrics": metrics,
-        "recentTasks": recent_titles,
-        "tasks": tasks,
-    }
+    return _load_user_task_context(auth_user, limit=limit)
 
 
 def build_claude_context_markdown(auth_user: Dict[str, Any]) -> str:
-    context = load_user_task_context(auth_user)
-    identity = context["identity"]
-    lines = [
-        "# 当前用户任务上下文",
-        "",
-        f"- 用户：{identity.get('name') or identity.get('userId') or 'anonymous'}",
-        f"- 用户 ID：{identity.get('userId') or 'unknown'}",
-        f"- 摘要：{context['summary']}",
-        "",
-        "## 指标",
-    ]
-    for key, value in context["metrics"].items():
-        lines.append(f"- {key}: {value}")
-    lines.extend(["", "## 最近任务"])
-    for task in context["tasks"][:20]:
-        due = task.get("dueDate") or "无截止时间"
-        lines.append(f"- [{task.get('status')}] {task.get('title')}；截止：{due}")
-    lines.extend(
-        [
-            "",
-            "## 工作方式",
-            "- 先基于上面的任务背景理解用户工作内容。",
-            "- 用户输入新任务描述后，最多追问 1-3 个关键问题。",
-            "- 信息足够时输出结构化任务草稿：title、taskType、workType、requirementDesc、outputs、participationLevel、missingFields。",
-            "- 用户确认前不要创建真实 Teambition 任务。",
-        ]
-    )
-    return "\n".join(lines) + "\n"
+    return render_user_task_context_markdown(_load_user_task_context(auth_user))
 
 
 def _empty_draft() -> Dict[str, Any]:
@@ -221,7 +85,8 @@ def _load_json(path: Path) -> Dict[str, Any]:
 
 
 def create_task_assistant_conversation(auth_user: Dict[str, Any]) -> Dict[str, Any]:
-    context = load_user_task_context(auth_user)
+    prepared = write_user_task_context_markdown(auth_user)
+    context = prepared.get("context") or load_user_task_context(auth_user)
     identity = context["identity"]
     conversation_id = uuid.uuid4().hex[:16]
     now = _now_iso()
@@ -242,6 +107,9 @@ def create_task_assistant_conversation(auth_user: Dict[str, Any]) -> Dict[str, A
         "status": "collecting",
         "createdAt": now,
         "updatedAt": now,
+        "contextMarkdownPath": prepared.get("contextMarkdownPath", ""),
+        "claudeMarkdownPath": prepared.get("claudeMarkdownPath", ""),
+        "workspaceDir": prepared.get("workspaceDir", ""),
     }
     _save_json(_conversation_path(identity, conversation_id), conversation)
     return conversation
@@ -403,4 +271,3 @@ def save_task_assistant_draft(auth_user: Dict[str, Any], conversation_id: str, d
         "tempDraftPath": str(path),
         "message": "已保存临时任务草稿",
     }
-

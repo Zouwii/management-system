@@ -32,8 +32,10 @@ from dingtalk_client import get_valid_access_token
 DEFAULT_SCENARIO_FIELD_CONFIG_ID = "647854bcd999c893061ef8b5"  # 软件开发
 ISSUE_SCENARIO_FIELD_CONFIG_ID = "665ee4b95b46f34b3e0463a8"  # 问题处理
 DEFAULT_WORKHOUR_FIELD_ID = "64c8cad8485fb3987a5521b8"
-OVERDUE_TAG_ID = "6527846cb6be8066fe331fd0"
+OVERDUE_TAG_ID = "6527846cb6be8066fe331fd0"                   #季度逾期
 TASK_NATURE_CUSTOMFIELD_ID = "69d4d037c253ef42e9c31b38"
+REQUIREMENT_DESC_CUSTOMFIELD_ID = "686273700d15b3f835491a2e"  #需求描述
+TASK_OUTPUT_CUSTOMFIELD_ID = "6862737e3b781c68b3181925"       #任务产出
 WORKDAY_DURATION_CUSTOMFIELD_ID = "665ee4b95b46f34b3e04634f"
 WORKDAY_FLAG_CUSTOMFIELD_ID = "667a65e618aebd88f98d4896"
 DEFAULT_BUSINESS_TYPE_TAG_MAPPING = {
@@ -288,6 +290,57 @@ def _extract_task_nature(item: Dict[str, Any]) -> Optional[str]:
                     return t
         break
     return None
+
+
+def _custom_fields_list(item_or_fields: Any) -> List[Dict[str, Any]]:
+    if isinstance(item_or_fields, list):
+        return [cf for cf in item_or_fields if isinstance(cf, dict)]
+    if isinstance(item_or_fields, dict):
+        fields = item_or_fields.get("customFields") or item_or_fields.get("customfields") or []
+        if isinstance(fields, list):
+            return [cf for cf in fields if isinstance(cf, dict)]
+    return []
+
+
+def _extract_custom_field_value_titles(item_or_fields: Any, custom_field_id: str) -> List[str]:
+    out: List[str] = []
+    for cf in _custom_fields_list(item_or_fields):
+        cfid = str(cf.get("customFieldId") or cf.get("customfieldId") or "").strip()
+        if cfid != str(custom_field_id):
+            continue
+        values = cf.get("value")
+        nodes: List[Any]
+        if isinstance(values, list):
+            nodes = values
+        elif values is None:
+            nodes = []
+        else:
+            nodes = [values]
+        for node in nodes:
+            if isinstance(node, dict):
+                title = str(
+                    node.get("title")
+                    or node.get("value")
+                    or node.get("metaString")
+                    or node.get("text")
+                    or node.get("customFieldValueId")
+                    or ""
+                ).strip()
+            else:
+                title = str(node or "").strip()
+            if title:
+                out.append(title)
+        break
+    return out
+
+
+def _extract_requirement_desc(item_or_fields: Any) -> str:
+    titles = _extract_custom_field_value_titles(item_or_fields, REQUIREMENT_DESC_CUSTOMFIELD_ID)
+    return titles[0] if titles else ""
+
+
+def _extract_task_outputs(item_or_fields: Any) -> List[str]:
+    return _extract_custom_field_value_titles(item_or_fields, TASK_OUTPUT_CUSTOMFIELD_ID)
 
 
 def _extract_workday_costhour(item: Dict[str, Any]) -> Optional[float]:

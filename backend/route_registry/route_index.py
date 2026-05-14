@@ -114,6 +114,14 @@ API_BT_ROUTE_INDEX: List[Dict[str, str]] = [
         "handler": "route_registry.projects.query_task_details",
         "service": "services.project_task_service.query_user_tasks_service",
     },
+    {
+        "module": "projects",
+        "method": "POST",
+        "path": "/api/bt/query_task_detail_custom_fields",
+        "desc": "读取 project_task_details 中指定 taskId 的 custom_fields_json 并拆解需求描述/任务产出",
+        "handler": "route_registry.projects.query_task_detail_custom_fields",
+        "service": "services.task_detail_extract_service.extract_task_detail_custom_fields_service",
+    },
     # ai mission
     {
         "module": "ai_mission",
@@ -363,4 +371,3 @@ def get_all_route_index() -> Dict[str, List[Dict[str, str]]]:
         "api_bt": API_BT_ROUTE_INDEX,
         "api_dashboard": API_DASHBOARD_ROUTE_INDEX,
     }
-
