@@ -35,6 +35,11 @@ rm -rf \
   "${STAGE_DIR}/backend/data" \
   "${STAGE_DIR}/backend/runtime"
 
+# 保留 shared claude 配置（skills / accounts / plugins 等）
+# runtime/ 其余部分（用户工作区、日志）由系统自动重建
+mkdir -p "${STAGE_DIR}/backend/runtime/shared/.claude"
+cp -r "${SCRIPT_DIR}/backend/runtime/shared/.claude/"* "${STAGE_DIR}/backend/runtime/shared/.claude/"
+
 find "${STAGE_DIR}" -type d -name "__pycache__" -prune -exec rm -rf {} + || true
 find "${STAGE_DIR}" -type d -name ".mypy_cache" -prune -exec rm -rf {} + || true
 find "${STAGE_DIR}" -type d -name ".ruff_cache" -prune -exec rm -rf {} + || true

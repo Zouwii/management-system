@@ -221,7 +221,7 @@ def resolve_ttyd_port(owner_key: str) -> int:
     preferred = owner_ttyd_port(owner_key)
     for i in range(span):
         candidate = int(base + ((preferred - base + i) % span))
-        if _is_port_available("127.0.0.1", candidate):
+        if _is_port_available("0.0.0.0", candidate):
             return candidate
     return preferred
 
@@ -287,8 +287,9 @@ def ensure_ttyd_session(
         port = resolve_ttyd_port(owner_key)
         cmd = [
             "ttyd",
+            "-W",
             "-i",
-            "127.0.0.1",
+            "0.0.0.0",
             "-p",
             str(port),
             "bash",
