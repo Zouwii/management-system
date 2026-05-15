@@ -549,6 +549,10 @@ export function mockSaveTbcreateDraft(_user, _payload = {}) {
   return request(() => ({ saved: true, savedAt: new Date().toISOString() }));
 }
 
+export function mockFetchTbcreateTasks(_user, _payload = {}) {
+  return request(() => []);
+}
+
 export function mockFetchPermissionMatrix() {
   return request(() => Object.values(mockAccounts).map((account) => {
     const user = mockUsers[account.userKey];

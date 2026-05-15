@@ -13,6 +13,7 @@ Usage:
 from ai.tbcreate.routes import register as _register_tbcreate
 from ai.mission.routes import register as _register_mission
 from ai.terminal.routes import register as _register_terminal
+from ai.teambition.routes import register as _register_teambition
 
 
 def register_all_routes(bp, ok, fail):
@@ -26,3 +27,4 @@ def register_all_routes(bp, ok, fail):
     _register_tbcreate(bp, ok, fail)
     _register_mission(bp, ok, fail)
     _register_terminal(bp, ok, fail)
+    _register_teambition(bp, ok, fail)

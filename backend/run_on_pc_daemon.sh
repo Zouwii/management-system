@@ -172,6 +172,8 @@ start_daemon() {
 
   export FLASK_RUN_HOST="${APP_HOST}"
   export FLASK_RUN_PORT="${APP_PORT}"
+  export AI_FLASK_BASE_URL="http://127.0.0.1:${APP_PORT}"
+  export AI_TTYD_BASE_URL="http://${APP_PUBLIC_HOST}:{port}/"
 
   echo "[tb_tool_bt] Starting daemon on listen http://${APP_HOST}:${APP_PORT}"
   echo "[tb_tool_bt] Access URL: http://${APP_PUBLIC_HOST}:${APP_PORT}"

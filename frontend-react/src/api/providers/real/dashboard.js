@@ -677,7 +677,7 @@ export function realFetchAIInsightList() {
 }
 
 export function realCreateAITaskTicket(_user, payload) {
-  return httpRequest('/dashboard/ai-task-ticket', {
+  return httpRequest('/bt/ai/create_teambition', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
@@ -721,6 +721,11 @@ export function realSaveTbcreateDraft(_user, payload = {}) {
     method: 'POST',
     body: JSON.stringify({ ownerKey, draft: payload.draft }),
   });
+}
+
+export function realFetchTbcreateTasks(_user, _payload = {}) {
+  const ownerKey = String(_payload?.ownerKey || _user?.user_id || _user?.userid || _user?.name || 'anonymous');
+  return httpRequest(`/bt/ai/tbcreate/tasks?ownerKey=${encodeURIComponent(ownerKey)}`);
 }
 
 export function realFetchPermissionMatrix() {

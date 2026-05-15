@@ -153,6 +153,13 @@ def make_env(owner_key: str, owner_name: str, model: str) -> dict:
     env["AI_USERS_ROOT"] = str(_USERS_ROOT)
     env["AI_SHARED_CLAUDE_DIR"] = str(_SHARED_CLAUDE_DIR)
     env["AI_SAFE_OWNER"] = safe_owner_key(owner_key)
+    # Flask backend URL for internal curl (e.g. /draft/notify)
+    # 优先使用外部显式设置的 AI_FLASK_BASE_URL，再尝试从 FLASK_RUN_PORT 推导
+    ai_flask_base_url = str(os.getenv("AI_FLASK_BASE_URL") or "").strip()
+    if not ai_flask_base_url:
+        flask_port = str(os.getenv("FLASK_RUN_PORT", "5001")).strip() or "5001"
+        ai_flask_base_url = f"http://127.0.0.1:{flask_port}"
+    env["AI_FLASK_BASE_URL"] = ai_flask_base_url
     # Ensure claude/node binary paths are on PATH
     path_items = [p for p in str(env.get("PATH") or "").split(":") if p]
     for candidate in (
@@ -236,7 +243,7 @@ def _terminate_ttyd_locked(state: dict) -> None:
             pass
 
 
-def build_ttyd_embed_url(port: int, owner_key: str, model: str) -> str:
+def build_ttyd_embed_url(port: int, owner_key: str, model: str, skill: str = "") -> str:
     """Build the iframe embed URL for a ttyd session.
 
     Uses AI_TTYD_BASE_URL env var template, falling back to http://127.0.0.1:{port}/.
@@ -250,11 +257,15 @@ def build_ttyd_embed_url(port: int, owner_key: str, model: str) -> str:
     else:
         url = tpl
     joiner = "&" if "?" in url else "?"
-    return f"{url}{joiner}ownerKey={owner_key}&model={model}"
+    parts = [f"{joiner}ownerKey={owner_key}&model={model}"]
+    skill_trigger = str(skill or "").strip()
+    if skill_trigger:
+        parts.append(f"&skill={skill_trigger}")
+    return url + "".join(parts)
 
 
 def ensure_ttyd_session(
-    owner_key: str, owner_name: str, model: str, auth_user: dict = None
+    owner_key: str, owner_name: str, model: str, auth_user: dict = None, skill: str = ""
 ) -> dict:
     """Create or reuse a ttyd + claude session for the given owner_key.
 
@@ -267,6 +278,7 @@ def ensure_ttyd_session(
         owner_name: Display name for the session.
         model: AI model name to pass to the launcher.
         auth_user: Optional authenticated user dict for workspace context.
+        skill: Skill trigger phrase (e.g. "创建tb单"). Passed as initial prompt to Claude.
 
     Returns:
         Dict with owner_key, owner_safe, model, port, proc, created_at.
@@ -295,6 +307,9 @@ def ensure_ttyd_session(
             "bash",
             str(_EASY_START_JZ_SCRIPT),
         ]
+        skill_trigger = str(skill or "").strip()
+        if skill_trigger:
+            cmd.append(skill_trigger)
         try:
             proc = subprocess.Popen(
                 cmd,
@@ -321,6 +336,7 @@ def ensure_ttyd_session(
             "owner_key": owner_key,
             "owner_safe": ws["owner_safe"],
             "model": model,
+            "skill": skill_trigger,
             "port": port,
             "proc": proc,
             "created_at": int(time.time()),
@@ -333,6 +349,7 @@ def ensure_ttyd_session(
                 "owner_key": owner_key,
                 "owner_safe": ws["owner_safe"],
                 "model": model,
+                "skill": skill_trigger,
                 "port": port,
                 "pid": proc.pid,
             }

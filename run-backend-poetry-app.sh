@@ -7,6 +7,18 @@ FRONTEND_DIR="${SCRIPT_DIR}/frontend-react"
 
 APP_HOST="${APP_HOST:-0.0.0.0}"
 APP_PORT="${APP_PORT:-5001}"
+
+# 杀掉旧进程，等待端口释放
+OLD_PID=$(lsof -ti :"$APP_PORT" 2>/dev/null || true)
+if [ -n "$OLD_PID" ]; then
+  echo "[tb_tool_bt] Killing old process PID=$OLD_PID on port $APP_PORT"
+  kill "$OLD_PID" 2>/dev/null || true
+  for i in $(seq 1 10); do
+    if ! lsof -ti :"$APP_PORT" >/dev/null 2>&1; then break; fi
+    sleep 1
+  done
+fi
+
 MODE_ARG="${1:-mode=1}"
 
 # mode=1(默认): real 登录页（钉钉）

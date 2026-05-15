@@ -185,12 +185,12 @@ def _task_status_label(status_id: Any, is_overdue: bool) -> str:
     return "进行中"
 
 
-def load_user_task_context(auth_user: Dict[str, Any], limit: int = 80) -> Dict[str, Any]:
+def load_user_task_context(auth_user: Dict[str, Any], limit: int = 5000) -> Dict[str, Any]:
     """Read the current user's task rows from DB and build a context snapshot.
 
     Args:
         auth_user: Authenticated user dict (must contain user_id).
-        limit: Maximum number of task rows to fetch (default 80).
+        limit: Maximum number of task rows to fetch (default 5000).
 
     Returns:
         A dict with identity, summary, metrics, recentTasks, and task tree structures.
@@ -248,7 +248,7 @@ def load_user_task_context(auth_user: Dict[str, Any], limit: int = 80) -> Dict[s
     else:
         type_text = "、".join(f"{name} {count} 个" for name, count in top_types)
         summary = (
-            f"已读取最近 {metrics['taskCount']} 条任务：未完成 {metrics['unfinishedTaskCount']} 个，"
+            f"已读取 {metrics['taskCount']} 条任务：未完成 {metrics['unfinishedTaskCount']} 个，"
             f"已完成 {metrics['completedTaskCount']} 个，逾期 {metrics['overdueTaskCount']} 个。"
             f"常见任务性质：{type_text or '暂无'}。"
         )
@@ -356,21 +356,21 @@ def render_user_task_context_markdown(context: Dict[str, Any]) -> str:
 
     lines.extend(["", "## 最近任务"])
     if tasks:
-        for task in tasks[:40]:
+        for task in tasks:
             lines.extend(_render_task_lines(task, task_index))
     else:
         lines.append("- 无任务记录")
 
     lines.extend(["", "## 父子任务关系"])
     if roots:
-        for task in roots[:40]:
+        for task in roots:
             lines.extend(_render_task_tree(task, children_by_parent, task_index))
     else:
         lines.append("- 未找到可作为根节点的任务")
 
     if orphans:
         lines.extend(["", "## 孤立子任务"])
-        for task in orphans[:20]:
+        for task in orphans:
             lines.append(f"- {task.get('title') or task.get('taskId')}")
             if task.get("parentTaskId"):
                 lines.append(f"  - parentTaskId: {task.get('parentTaskId')}")
@@ -419,10 +419,33 @@ def write_user_task_context_markdown(
             [
                 "# AI 任务助手工作区",
                 "",
-                "你是当前系统中的任务创建助手。",
+                "你是当前系统中的任务创建助手，职责是引导用户一步步创建 Teambition 任务草稿。",
                 "",
-                "请先阅读 `AI_TASK_CONTEXT.md`，理解当前登录用户的历史任务、任务压力、常见工作类型，以及父子任务关系。",
-                "用户描述新任务时，先通过简短问题补齐关键信息，再输出结构化任务草稿。",
+                "## 启动行为",
+                "",
+                "会话开始后，先打招呼介绍自己的身份，然后展示以下选项等待用户输入数字：",
+                "",
+                "```",
+                "输入模式：1、tb单创建模式 2、正常对话模式",
+                "```",
+                "",
+                "**不要替用户做选择**，只展示选项等待用户回复数字。",
+                "",
+                "## tb单创建模式",
+                "",
+                "当用户选择模式 1 后，先阅读 `AI_TASK_CONTEXT.md` 了解当前登录用户的历史任务、任务压力、常见工作类型和父子任务关系。",
+                "然后严格按照一问一答的方式收集信息，每次只问一个问题，等用户回答后再问下一个。严禁一次问多个问题。",
+                "",
+                "收集顺序：",
+                "1. **任务标题** — '请描述一下这个任务的标题（控制在 18 字以内）'",
+                "2. **有效工时类型** — 用编号列出三个选项让用户回复数字：指派型/自主型/能力型",
+                "3. **任务背景** — '这个任务的背景是什么？为什么会做这个任务？'",
+                "4. **工作内容和目标** — 用户描述后先规范化展示，让用户确认后再进入下一步",
+                "5. **任务产出** — 根据需求描述和历史任务自动生成建议的产出清单（含预估天数），让用户确认或调整",
+                "6. **起止时间** — '任务的开始日期是哪天？截止日期默认是月底，你可以修改。'",
+                "",
+                "用户明确确认前，不要创建真实 Teambition 任务。",
+                "",
                 "用户明确确认前，不要创建真实 Teambition 任务。",
                 "",
             ]

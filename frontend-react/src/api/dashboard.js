@@ -18,6 +18,7 @@ import {
   mockInitTbcreateWorkspace,
   mockFetchTbcreateDraft,
   mockSaveTbcreateDraft,
+  mockFetchTbcreateTasks,
 } from './providers/mock/dashboard';
 import {
   realFetchAIInsightList,
@@ -38,6 +39,7 @@ import {
   realInitTbcreateWorkspace,
   realFetchTbcreateDraft,
   realSaveTbcreateDraft,
+  realFetchTbcreateTasks,
 } from './providers/real/dashboard';
 
 export const fetchDepartmentOverview = createApiSwitch(mockFetchDepartmentOverview, realFetchDepartmentOverview);
@@ -65,5 +67,9 @@ export const fetchTbcreateDraft = createApiSwitch(
 export const saveTbcreateDraft = createApiSwitch(
   mockSaveTbcreateDraft,
   realSaveTbcreateDraft,
+);
+export const fetchTbcreateTasks = createApiSwitch(
+  mockFetchTbcreateTasks,
+  realFetchTbcreateTasks,
 );
 export const fetchPermissionMatrix = createApiSwitch(mockFetchPermissionMatrix, realFetchPermissionMatrix);

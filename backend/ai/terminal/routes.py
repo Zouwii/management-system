@@ -40,7 +40,7 @@ def register(bp, ok, fail):
     def ai_ttyd_session():
         """Create or reuse a ttyd terminal session for the current user.
 
-        Request body (optional): {"ownerKey": "...", "model": "..."}
+        Request body (optional): {"ownerKey": "...", "model": "...", "skill": "创建tb单"}
         Returns embedUrl, ownerKey, ownerSafe, userRoot, workspaceDir, model, port, pid.
         """
         payload = request.get_json(silent=True) or {}
@@ -49,9 +49,11 @@ def register(bp, ok, fail):
         owner_name = resolve_owner_name(auth_user)
         cfg = load_ai_config()
         model = str(payload.get("model") or cfg.get("model") or "glm-5.1").strip() or "glm-5.1"
+        skill = str(payload.get("skill") or "").strip()
         try:
             state = ensure_ttyd_session(
-                owner_key=owner_key, owner_name=owner_name, model=model, auth_user=auth_user,
+                owner_key=owner_key, owner_name=owner_name, model=model,
+                auth_user=auth_user, skill=skill,
             )
         except Exception as exc:
             return fail(str(exc), code=500, data={})
@@ -60,6 +62,7 @@ def register(bp, ok, fail):
             port=int(state.get("port") or owner_ttyd_port(owner_key)),
             owner_key=owner_key,
             model=model,
+            skill=skill,
         )
         return ok(
             {
@@ -69,6 +72,7 @@ def register(bp, ok, fail):
                 "userRoot": ws["user_root"],
                 "workspaceDir": ws["workspace_dir"],
                 "model": model,
+                "skill": skill,
                 "port": int(state.get("port") or 0),
                 "pid": int(state.get("proc").pid) if state.get("proc") else 0,
             }

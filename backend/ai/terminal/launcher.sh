@@ -101,7 +101,7 @@ echo "当前网关: ${ANTHROPIC_BASE_URL:-未设置}"
 echo "当前模型: ${ANTHROPIC_MODEL:-未设置}"
 echo "================================================"
 echo ""
-echo "💡 输入「创建tb单」「创建钉钉单」「创建任务」开始创建任务草稿"
+echo "💡 输入模式：1、tb单创建模式 2、正常对话模式"
 echo ""
 
 exec claude "${CLAUDE_EXTRA_ARGS[@]}" "$@"
