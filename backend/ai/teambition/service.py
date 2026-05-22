@@ -123,12 +123,13 @@ def build_payload(draft: Dict[str, Any], template: Optional[Dict[str, Any]] = No
             "value": [{"title": work_type}],
         })
 
-    # 3) Outputs — 手动编号
+    # 3) Outputs
     outputs = draft.get("outputs") or []
     if isinstance(outputs, list) and outputs:
         valid = [_str(o) for o in outputs if _str(o)]
         if valid:
-            numbered = "".join(f"{i+1}. {item}" for i, item in enumerate(valid))
+            cleaned = [item.rstrip() for item in valid]
+            numbered = "\n".join(f"{i+1}. {item}" for i, item in enumerate(cleaned))
             customfields.append({
                 "customfieldName": "任务产出",
                 "customfieldId": CUSTOMFIELD_OUTPUTS,

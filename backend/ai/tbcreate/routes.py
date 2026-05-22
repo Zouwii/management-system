@@ -17,7 +17,6 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 from flask import request, session, Response, stream_with_context
-from sqlalchemy import func
 
 from ai.tbcreate.workspace import init_workspace
 from ai.terminal.session import resolve_owner_key, user_workspace
@@ -87,10 +86,13 @@ def register(bp, ok, fail):
 
     @bp.route("/ai/tbcreate/tasks", methods=["GET"])
     def ai_tbcreate_tasks():
-        """Return tasks that are used as parent by other tasks (direct DB query).
+        """Return tasks eligible as parent — tasks whose task_id appears as
+        another task's parent_task_id in project_task_details.
 
-        Finds all parent_task_id values in ProjectTaskDetail for the current
-        user that appear at least once, then looks up each parent's title.
+        Steps:
+          1. Collect distinct parent_task_id values.
+          2. Look up those task_ids, return taskId + content.
+          3. Skip rows with empty content.
         """
         auth_user = session.get("auth_user") or {}
         if not isinstance(auth_user, dict):
@@ -103,44 +105,40 @@ def register(bp, ok, fail):
 
         db_session = SessionLocal()
         try:
-            # Step 1: find parent_task_ids with at least 1 child for this user
-            rows = (
-                db_session.query(
-                    ProjectTaskDetail.parent_task_id,
-                    func.count(ProjectTaskDetail.id).label("child_count"),
-                )
+            # Step 1: collect distinct parent_task_id values
+            parent_rows = (
+                db_session.query(ProjectTaskDetail.parent_task_id)
                 .filter(
                     ProjectTaskDetail.query_user_id == user_id,
                     ProjectTaskDetail.parent_task_id.isnot(None),
                     ProjectTaskDetail.parent_task_id != "",
                 )
-                .group_by(ProjectTaskDetail.parent_task_id)
-                .having(func.count(ProjectTaskDetail.id) >= 1)
+                .distinct()
                 .all()
             )
-            parent_ids = [r.parent_task_id for r in rows]
+            parent_ids = [r.parent_task_id for r in parent_rows]
+            if not parent_ids:
+                return ok([])
 
-            # Step 2: look up titles of those parent tasks
-            title_map = {}
-            if parent_ids:
-                parent_tasks = (
-                    db_session.query(
-                        ProjectTaskDetail.task_id,
-                        ProjectTaskDetail.content,
-                    )
-                    .filter(
-                        ProjectTaskDetail.task_id.in_(parent_ids),
-                        ProjectTaskDetail.query_user_id == user_id,
-                    )
-                    .all()
+            # Step 2: look up task content, skip empty
+            detail_rows = (
+                db_session.query(
+                    ProjectTaskDetail.task_id,
+                    ProjectTaskDetail.content,
                 )
-                title_map = {t.task_id: (t.content or t.task_id) for t in parent_tasks}
+                .filter(
+                    ProjectTaskDetail.task_id.in_(parent_ids),
+                    ProjectTaskDetail.query_user_id == user_id,
+                )
+                .all()
+            )
+            items = []
+            for row in detail_rows:
+                title = (row.content or "").strip()
+                if title:
+                    items.append({"taskId": row.task_id, "title": title})
 
-            items = [
-                {"taskId": pid, "title": title_map.get(pid) or pid}
-                for pid in parent_ids
-            ]
-            items.sort(key=lambda x: (x["title"] or "").lower())
+            items.sort(key=lambda x: x["title"].lower())
             return ok(items)
         finally:
             db_session.close()
