@@ -109,4 +109,3 @@ def _current_quarter_utc_range(expected_mode: str = "quarter"):
 # Import route modules so they register on dashboard_bp
 from route_registry.dashboard import personal_hours  # noqa: E402, F401
 from route_registry.dashboard import team_detail     # noqa: E402, F401
-from route_registry.dashboard import ai_task         # noqa: E402, F401

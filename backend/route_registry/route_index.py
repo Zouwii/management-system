@@ -147,23 +147,6 @@ API_BT_ROUTE_INDEX: List[Dict[str, str]] = [
         "handler": "ai.tbcreate.routes.ai_tbcreate_draft_save",
         "service": "ai.tbcreate.routes (writes draft dict to workspace/draft.json)",
     },
-    # AI mission
-    {
-        "module": "ai.mission",
-        "method": "POST",
-        "path": "/api/bt/ai/create_mission/payload",
-        "desc": "AI 创建任务单：只生成钉钉 create payload，不真正创建任务",
-        "handler": "ai.mission.routes.ai_create_mission_payload",
-        "service": "ai.mission.service.build_ai_mission_create_payload",
-    },
-    {
-        "module": "ai.mission",
-        "method": "POST",
-        "path": "/api/bt/ai/create_mission",
-        "desc": "AI 创建任务单：按本体开发部软件开发模板调用钉钉创建任务接口",
-        "handler": "ai.mission.routes.ai_create_mission",
-        "service": "ai.mission.service.ai_create_mission_service",
-    },
     # config
     {
         "module": "config",
@@ -347,14 +330,6 @@ API_DASHBOARD_ROUTE_INDEX: List[Dict[str, str]] = [
         "desc": "员工工时页：更新/全量更新入口（当前前端已直连 /api/bt/*）",
         "handler": "route_registry.dashboard.personal_hours.personal_hours_update",
         "service": "services.task_sync_service.sync_project_details_in_time_range_service",
-    },
-    {
-        "module": "dashboard",
-        "method": "POST",
-        "path": "/api/dashboard/ai-task-ticket",
-        "desc": "AI 创建任务单：前端确认草稿后创建 TB/钉钉任务",
-        "handler": "route_registry.dashboard.ai_task.ai_task_ticket",
-        "service": "ai.mission.service.ai_create_mission_service",
     },
 ]
 
