@@ -493,6 +493,34 @@ export function mockCreateAITaskTicket(_user, payload) {
   }));
 }
 
+export function mockSyncKnowledgeBase() {
+  return request(() => ({
+    workspaceId: 'mock',
+    syncedCount: 0,
+    failedCount: 0,
+    durationSec: 0,
+  }));
+}
+
+export function mockFetchAIKnowledgeTtydSession(_user, payload = {}) {
+  const ownerKey = String(payload?.ownerKey || _user?.user_id || _user?.userid || _user?.name || 'anonymous');
+  const model = String(payload?.model || 'glm');
+  const base = String(import.meta.env.VITE_AI_TTYD_URL || '').trim() || 'http://localhost:7681';
+  const query = new URLSearchParams({
+    ownerKey: `${ownerKey}__kb`,
+    model,
+    expiresAt: String(Math.floor(Date.now() / 1000) + 120),
+    sig: 'mock-signature',
+  });
+  return request(() => ({
+    embedUrl: `${base}${base.includes('?') ? '&' : '?'}${query.toString()}`,
+    ownerKey: `${ownerKey}__kb`,
+    model,
+    expiresAt: Math.floor(Date.now() / 1000) + 120,
+    ttlSeconds: 120,
+  }));
+}
+
 export function mockFetchAIModels() {
   return request(() => ({
     success: true,

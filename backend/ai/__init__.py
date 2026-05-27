@@ -4,6 +4,7 @@ Sub-modules:
   tbcreate/         - Teambition task creation (ttyd Claude CLI → draft.json → polling)
   teambition/       - Teambition task ticket creation (draft → DingTalk API)
   terminal/         - Interactive AI terminal (ttyd + Claude CLI)
+  knowledge/        - Knowledge base document browsing & download (DingTalk wiki API → SQLite)
 
 Usage:
   from ai import register_all_routes
@@ -13,6 +14,7 @@ Usage:
 from ai.tbcreate.routes import register as _register_tbcreate
 from ai.terminal.routes import register as _register_terminal
 from ai.teambition.routes import register as _register_teambition
+from ai.knowledge.routes import register as _register_knowledge
 
 
 def register_all_routes(bp, ok, fail):
@@ -26,3 +28,4 @@ def register_all_routes(bp, ok, fail):
     _register_tbcreate(bp, ok, fail)
     _register_terminal(bp, ok, fail)
     _register_teambition(bp, ok, fail)
+    _register_knowledge(bp, ok, fail)

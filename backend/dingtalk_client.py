@@ -204,6 +204,35 @@ def get_userid_by_unionid(unionid: str) -> Dict[str, Any]:
     return {"ok": True, "data": data}
 
 
+def get_unionid_by_userid(userid: str) -> Dict[str, Any]:
+    """用 userId 换取钉钉 unionId（应用级 token）。
+
+    POST https://oapi.dingtalk.com/topapi/v2/user/get
+    """
+    uid = str(userid or "").strip()
+    if not uid:
+        return {"ok": False, "error": "missing userid"}
+
+    token_result = get_valid_access_token({})
+    if not token_result.get("ok"):
+        return {"ok": False, "error": token_result.get("error", "failed to get access_token")}
+    access_token = token_result["access_token"]
+
+    try:
+        resp = requests.post(
+            f"https://oapi.dingtalk.com/topapi/v2/user/get?access_token={access_token}",
+            json={"userid": uid},
+            timeout=30,
+        )
+        data = resp.json()
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+    if int(data.get("errcode", -1)) != 0:
+        return {"ok": False, "error": f"get user failed: {data}"}
+    return {"ok": True, "data": data.get("result", {})}
+
+
 def _save_config_json(cfg: Dict[str, Any]) -> None:
     """把配置写回同目录 `config.json`。"""
     cfg_path = Path(__file__).with_name("config.json")

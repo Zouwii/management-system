@@ -8,9 +8,12 @@ import {
   fetchAIModels,
   fetchAIInsightList,
   fetchTbcreateTasks,
+  syncKnowledgeBase,
+  fetchAIKnowledgeTtydSession,
 } from '../api/dashboard';
 import Card from '../components/Card';
 import SectionTitle from '../components/SectionTitle';
+import CollapsibleSection from '../components/CollapsibleSection';
 import EmployeeLayout from '../layouts/EmployeeLayout';
 import { aiInsightList as fallbackData } from '../mock/platformData';
 import { useAuthStore } from '../store/authStore';
@@ -63,6 +66,11 @@ export default function AIAnalysisPage() {
   const [draftSyncing, setDraftSyncing] = useState(false);
   const [taskList, setTaskList] = useState([]);
   const [parentSelectorOpen, setParentSelectorOpen] = useState(false);
+  const [syncBusy, setSyncBusy] = useState(false);
+
+  // ── AI问答助手 ttyd ──
+  const [kbTtydUrl, setKbTtydUrl] = useState('');
+  const [kbTtydError, setKbTtydError] = useState('');
 
   // Load AI insights on mount
   useEffect(() => {
@@ -89,21 +97,19 @@ export default function AIAnalysisPage() {
     return () => { active = false; };
   }, [ownerKey, user]);
 
-  // Init workspace, then create ttyd session
+  // Init workspace, then create ttyd session (任务创建)
   useEffect(() => {
     let active = true;
 
     async function initAndConnect() {
-      // Step 1: initialize workspace (write context files)
       try {
         await initTbcreateWorkspace(user, { ownerKey });
       } catch {
-        // Workspace init failure is non-fatal; ttyd session will fallback-init
+        // non-fatal
       }
 
       if (!active) return;
 
-      // Step 2: create ttyd session (starts Claude CLI in the workspace)
       try {
         const res = await fetchAITtydSession(user, { ownerKey, model: selectedModel || 'glm' });
         if (!active) return;
@@ -126,6 +132,34 @@ export default function AIAnalysisPage() {
       initAndConnect();
     }
 
+    return () => { active = false; };
+  }, [ownerKey, selectedModel, user]);
+
+  // Init knowledge Q&A ttyd session
+  useEffect(() => {
+    let active = true;
+
+    async function initKbTtyd() {
+      if (!selectedModel) return;
+      try {
+        const res = await fetchAIKnowledgeTtydSession(user, { ownerKey, model: selectedModel });
+        if (!active) return;
+        const url = String(res?.data?.embedUrl || '').trim();
+        if (!url) {
+          setKbTtydUrl('');
+          setKbTtydError('后端未返回知识库 ttyd 地址。');
+          return;
+        }
+        setKbTtydUrl(url);
+        setKbTtydError('');
+      } catch (err) {
+        if (!active) return;
+        setKbTtydUrl('');
+        setKbTtydError(err instanceof Error ? err.message : '知识库 ttyd 会话初始化失败');
+      }
+    }
+
+    initKbTtyd();
     return () => { active = false; };
   }, [ownerKey, selectedModel, user]);
 
@@ -191,7 +225,7 @@ export default function AIAnalysisPage() {
   // Auto-save draft to backend when user edits fields (debounced 1s)
   useEffect(() => {
     if (!draft.title && draft.requirementDesc === 'Claude 正在等待你的输入。请在左侧终端中描述你的新任务。') {
-      return; // Skip initial empty state
+      return;
     }
     const timer = window.setTimeout(() => {
       saveTbcreateDraft(user, { ownerKey, draft }).catch(() => {});
@@ -236,7 +270,6 @@ export default function AIAnalysisPage() {
         parentTaskId: draft.parentTaskId || undefined,
       });
       const result = response.data || {};
-      // 从 taskUrl 提取 taskId 作为后备
       if (!result.taskId && result.taskUrl) {
         const match = String(result.taskUrl).match(/\/task\/([^/?#]+)/);
         if (match) result.taskId = match[1];
@@ -260,6 +293,22 @@ export default function AIAnalysisPage() {
       setAnalysisBusy(false);
       setAnalysisStatus(draftContext ? '已基于当前草稿更新' : '已按默认样例更新');
     }, 320);
+  };
+
+  const handleSyncKnowledge = async () => {
+    setSyncBusy(true);
+    try {
+      const res = await syncKnowledgeBase();
+      if (res.code === 200) {
+        alert(`同步完成：${res.data.syncedCount} 篇文档，耗时 ${res.data.durationSec}s`);
+      } else {
+        alert(`同步失败：${res.error || '未知错误'}`);
+      }
+    } catch (e) {
+      alert(`同步请求失败：${e.message}`);
+    } finally {
+      setSyncBusy(false);
+    }
   };
 
   // ── 产出天数校验 ─────────────────────────────────────────
@@ -295,18 +344,16 @@ export default function AIAnalysisPage() {
     <EmployeeLayout>
       <SectionTitle
         title="AI助理"
-        desc="左侧终端与 Claude 自然对话，Claude 写入 draft.json，右侧手动同步草稿。确认后创建正式任务单。"
+        desc="AI 工作台：任务分析、任务创建、知识库问答"
         right={<div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm">AI 工作台</div>}
       />
 
-      <div className="space-y-5">
-        {/* AI Analysis Section */}
-        <Card className="p-5">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-lg font-semibold text-slate-900">AI任务分析栏</div>
-              <div className="mt-1 text-sm text-slate-500">根据工时和绩效两条线，给出与当前任务背景相关的执行建议。</div>
-            </div>
+      <div className="space-y-4">
+        {/* ═══════ AI 任务分析栏 ═══════ */}
+        <CollapsibleSection
+          title="AI任务分析栏"
+          subtitle="根据工时和绩效给出执行建议"
+          extra={
             <div className="flex items-center gap-3">
               <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">{analysisStatus}</div>
               <button
@@ -317,10 +364,18 @@ export default function AIAnalysisPage() {
               >
                 {analysisBusy ? '分析中...' : '开始分析'}
               </button>
+              <button
+                type="button"
+                className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={handleSyncKnowledge}
+                disabled={syncBusy}
+              >
+                {syncBusy ? '同步中...' : '同步知识库'}
+              </button>
             </div>
-          </div>
-
-          <div className="mt-5 grid gap-5 xl:grid-cols-2">
+          }
+        >
+          <div className="mt-2 grid gap-5 xl:grid-cols-2">
             <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-base font-semibold text-slate-900">根据工时进行分析</div>
@@ -351,17 +406,14 @@ export default function AIAnalysisPage() {
               </div>
             </div>
           </div>
-        </Card>
+        </CollapsibleSection>
 
-        {/* AI Task Creation Section */}
-        <Card className="p-6">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <div className="text-lg font-semibold text-slate-900">AI创建任务单</div>
-            </div>
-          </div>
-
-          <div className="mt-6 grid gap-5 xl:grid-cols-[minmax(320px,0.88fr)_minmax(0,1.12fr)]">
+        {/* ═══════ AI 创建任务单 ═══════ */}
+        <CollapsibleSection
+          title="AI创建任务单"
+          subtitle="与 Claude 对话创建任务草稿，确认后生成 Teambition 任务单"
+        >
+          <div className="mt-4 grid gap-5 xl:grid-cols-[minmax(320px,0.88fr)_minmax(0,1.12fr)]">
             {/* Left panel: ttyd terminal */}
             <Card className="flex min-h-[760px] flex-col border-slate-200 bg-slate-50 p-5 shadow-none">
               <div className="flex items-center justify-between gap-3">
@@ -400,7 +452,6 @@ export default function AIAnalysisPage() {
                 />
               </div>
 
-              {/* 父任务 — 移到标题下方 */}
               <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
                 <div className="text-sm font-medium text-slate-500">父任务（可选）</div>
                 <div className="relative mt-2">
@@ -441,7 +492,6 @@ export default function AIAnalysisPage() {
                 </div>
               </div>
 
-              {/* 起止时间 — 独立一行，横向排列 */}
               <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
                 <div className="text-sm font-medium text-slate-500">起止时间</div>
                 <div className="mt-3 grid grid-cols-2 gap-3">
@@ -518,7 +568,6 @@ export default function AIAnalysisPage() {
                 </div>
               </div>
 
-              {/* 底行：组合block(有效工时+参与度) | 操作 */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
                   <div className="text-sm font-medium text-slate-500">有效工时类型</div>
@@ -580,7 +629,27 @@ export default function AIAnalysisPage() {
               </div>
             </div>
           </div>
-        </Card>
+        </CollapsibleSection>
+
+        {/* ═══════ AI 问答助手 ═══════ */}
+        <CollapsibleSection
+          title="AI问答助手"
+          subtitle="基于知识库文档回答你的问题"
+        >
+          <div className="mt-2 flex min-h-[600px] flex-col rounded-[28px] border border-slate-200 bg-black p-2">
+            {kbTtydUrl ? (
+              <iframe
+                title="AI knowledge base Q&A terminal"
+                src={kbTtydUrl}
+                className="h-full w-full min-h-[580px] rounded-[22px] border-0 bg-black"
+              />
+            ) : (
+              <div className="flex h-full min-h-[580px] items-center justify-center rounded-[22px] border border-slate-800 bg-slate-950 px-4 text-sm text-slate-300">
+                {kbTtydError || '知识库 ttyd 会话未就绪，请检查后端配置。'}
+              </div>
+            )}
+          </div>
+        </CollapsibleSection>
       </div>
     </EmployeeLayout>
   );

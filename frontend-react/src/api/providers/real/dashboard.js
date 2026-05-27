@@ -731,3 +731,17 @@ export function realFetchTbcreateTasks(_user, _payload = {}) {
 export function realFetchPermissionMatrix() {
   return httpRequest('/dashboard/permission-matrix');
 }
+
+export function realSyncKnowledgeBase() {
+  return httpRequest('/bt/ai/knowledge/sync', {
+    method: 'POST',
+    body: JSON.stringify({ workspace_id: '1oam4Sk7BMLXxn8K' }),
+  });
+}
+
+export function realFetchAIKnowledgeTtydSession(_user, payload = {}) {
+  return httpRequest('/bt/ai/knowledge/ttyd/session', {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+  });
+}

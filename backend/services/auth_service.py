@@ -282,4 +282,27 @@ def authenticate_dingtalk_user(auth_code: str, payload: Optional[Dict[str, Any]]
     if not profile_out.get("ok"):
         return {"ok": False, "error": str(profile_out.get("error") or "unauthorized account")}
 
+    # 回填 unionId 到 user_character，后续 AI 分析等场景直接查表
+    _save_union_id_to_user_character(user_data)
+
     return {"ok": True, "profile": profile_out.get("profile")}
+
+
+def _save_union_id_to_user_character(user_data: Dict[str, Any]) -> None:
+    """登录时将 dingtalk 返回的 unionId 写入 user_character 表。"""
+    user_id = str(user_data.get("userid") or "").strip()
+    union_id = str(user_data.get("unionId") or "").strip()
+    if not user_id or not union_id:
+        return
+
+    from db.engine import SessionLocal
+    from db.orm import UserCharacter as DbUserCharacter
+
+    session = SessionLocal()
+    try:
+        row = session.query(DbUserCharacter).filter(DbUserCharacter.user_id == user_id).first()
+        if row and not row.union_id:
+            row.union_id = union_id
+            session.commit()
+    finally:
+        session.close()

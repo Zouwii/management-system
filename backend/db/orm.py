@@ -317,6 +317,9 @@ class UserCharacter(Base):
     is_nav_lead: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_servo_lead: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
+    # 钉钉 unionId（OAuth 登录后回填，用于知识库 API 调用等场景）
+    union_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, default=None)
+
 
 class _PerfQuarterResultMixin:
     """nav/servo 两张绩效表共享的列定义。"""

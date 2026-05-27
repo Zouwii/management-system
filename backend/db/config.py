@@ -74,3 +74,23 @@ elif (env_bt("USE_MYSQL") or "").lower() in ("1", "true", "yes"):
     )
 else:
     PERF_DATABASE_URI = DEFAULT_PERF_SQLITE_URI
+
+# ── pgvector (PostgreSQL) — embedding vector storage ─────────────
+
+def _pgvector_uri_from_env() -> str:
+    host = os.getenv("PGVECTOR_HOST", "127.0.0.1")
+    port = os.getenv("PGVECTOR_PORT", "5432")
+    user = os.getenv("PGVECTOR_USER", "tb")
+    password = os.getenv("PGVECTOR_PASSWORD", "")
+    name = os.getenv("PGVECTOR_DB", "kb_vectors")
+    return (
+        f"postgresql+psycopg2://{quote_plus(user)}:{quote_plus(password)}"
+        f"@{host}:{port}/{name}"
+    )
+
+
+_pgv_explicit = (os.getenv("PGVECTOR_DATABASE_URI") or "").strip()
+if _pgv_explicit:
+    PGVECTOR_DATABASE_URI = _pgv_explicit
+else:
+    PGVECTOR_DATABASE_URI = _pgvector_uri_from_env()

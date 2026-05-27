@@ -55,6 +55,7 @@ def _table_registry():
         UpdateLock,
         UserCharacter as DbUserCharacter,
     )
+    from ai.knowledge.models import KbDocument, KbChunk
 
     main_tables = [
         ("project_tasks", ProjectTask.__table__),
@@ -67,6 +68,9 @@ def _table_registry():
         ("config", DbConfig.__table__),
         ("update_locks", UpdateLock.__table__),
         ("user_character", DbUserCharacter.__table__),
+        # knowledge base
+        ("kb_documents", KbDocument.__table__),
+        ("kb_chunks", KbChunk.__table__),
     ]
     perf_tables = [
         ("nav_perf_quarter_result", NavPerfQuarterResult.__table__),
@@ -396,6 +400,10 @@ def init_database() -> None:
                             "ALTER TABLE user_character ADD COLUMN is_servo_lead BOOLEAN NOT NULL DEFAULT 0"
                         )
                     )
+                if "union_id" not in cols_user:
+                    conn.execute(
+                        text("ALTER TABLE user_character ADD COLUMN union_id VARCHAR(128)")
+                    )
         except Exception:
             # 不阻断服务启动；由上层业务容错或你手工执行迁移
             pass
@@ -496,6 +504,13 @@ def init_database() -> None:
     except Exception as e:
         # 初始化失败不应阻断服务启动；便于你排查 DB 权限/环境配置问题
         print("[init_db] config init failed:", repr(e))
+        pass
+
+    # ── knowledge base FTS index ───────────────────────────────
+    try:
+        from ai.knowledge.models import create_kb_fts
+        create_kb_fts(engine)
+    except Exception:
         pass
 
 

@@ -1,0 +1,19 @@
+version: "3.8"
+
+services:
+  # PostgreSQL + pgvector — embedding vector storage for RAG
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: tb-pgvector
+    ports:
+      - "${PGVECTOR_PORT:-5432}:5432"
+    environment:
+      POSTGRES_DB: ${PGVECTOR_DB:-kb_vectors}
+      POSTGRES_USER: ${PGVECTOR_USER:-tb}
+      POSTGRES_PASSWORD: ${PGVECTOR_PASSWORD:-tb123456}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  pgdata:
