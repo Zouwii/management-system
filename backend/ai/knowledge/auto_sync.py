@@ -1,0 +1,236 @@
+"""Full knowledge-base update pipeline: sync -> rechunk -> embed.
+
+Called by:
+  - Daemon thread in app.py on a schedule (default: 04:00 BJT)
+  - HTTP endpoint POST /ai/knowledge/full-update
+"""
+
+from __future__ import annotations
+
+import logging
+import time
+from typing import Any, Dict, List
+
+from ai.knowledge.chunker import chunk_document
+from ai.knowledge.embedder import embed_chunks
+from ai.knowledge.models import KbDocument, KbChunk
+from ai.knowledge.routes import _sync_workspace
+from ai.knowledge.service import DingTalkKnowledgeClient, get_known_workspaces
+from db.engine import SessionLocal
+
+logger = logging.getLogger(__name__)
+
+
+def _resolve_union_id() -> str:
+    """Resolve a union_id for automated operations (non-request context)."""
+    from db.orm import UserCharacter as DbUserCharacter
+
+    db = SessionLocal()
+    try:
+        row = (
+            db.query(DbUserCharacter)
+            .filter(
+                DbUserCharacter.union_id.isnot(None),
+                DbUserCharacter.union_id != "",
+            )
+            .first()
+        )
+        if row and row.union_id:
+            return row.union_id
+    finally:
+        db.close()
+    return ""
+
+
+def _sync_all_workspaces(client: DingTalkKnowledgeClient) -> dict:
+    """Sync all known workspaces. Returns aggregated results with changedIds."""
+    known = get_known_workspaces()
+
+    ws_list = client.list_workspaces()
+    if not ws_list.get("ok"):
+        return {"error": ws_list.get("error", "failed to list workspaces")}
+
+    workspaces_to_sync: List[Dict[str, str]] = []
+    for w in ws_list["data"]:
+        ws_id = w.get("workspaceId", "")
+        if ws_id in known:
+            workspaces_to_sync.append(
+                {
+                    "workspaceId": ws_id,
+                    "rootNodeId": w.get("rootNodeId", ""),
+                    "name": w.get("name", ws_id),
+                }
+            )
+
+    workspaces_to_sync.sort(key=lambda x: known.get(x["workspaceId"], 999))
+
+    total_synced = 0
+    total_changed = 0
+    total_failed = 0
+    all_changed_ids: List[str] = []
+    results: List[dict] = []
+
+    for ws in workspaces_to_sync:
+        ws_id = ws["workspaceId"]
+        root_id = ws["rootNodeId"]
+        ws_name = ws["name"]
+        if not root_id:
+            logger.warning("auto_sync: workspace %s has no rootNodeId, skipped", ws_id)
+            continue
+
+        ws_started = time.time()
+        r = _sync_workspace(client, ws_id, root_id)
+        ws_elapsed = round(time.time() - ws_started, 1)
+        ws_changed = r.get("syncedIds", [])
+        all_changed_ids.extend(ws_changed)
+        results.append(
+            {
+                "workspaceId": ws_id,
+                "name": ws_name,
+                "syncedCount": r["syncedCount"],
+                "changedCount": r.get("changedCount", 0),
+                "failedCount": r["failedCount"],
+                "errors": r["errors"],
+                "durationSec": ws_elapsed,
+            }
+        )
+        total_synced += r["syncedCount"]
+        total_changed += r.get("changedCount", 0)
+        total_failed += r["failedCount"]
+        logger.info(
+            "auto_sync: workspace=%s synced=%d changed=%d failed=%d elapsed=%.1fs",
+            ws_name, r["syncedCount"], r.get("changedCount", 0), r["failedCount"], ws_elapsed,
+        )
+
+    return {
+        "ok": True,
+        "totalSynced": total_synced,
+        "totalChanged": total_changed,
+        "totalFailed": total_failed,
+        "changedIds": all_changed_ids,
+        "workspaces": results,
+    }
+
+
+def _rechunk_documents(doc_ids: List[str]) -> dict:
+    """Re-chunk specific documents (drop old chunks, create new ones).
+
+    Only processes the given doc_ids. Skips FTS rebuild since MySQL
+    FULLTEXT indexes auto-maintain on row changes.
+    """
+    if not doc_ids:
+        return {"ok": True, "chunkedDocs": 0, "totalChunks": 0, "skipped": True}
+
+    db = SessionLocal()
+    try:
+        total_chunks = 0
+        docs = db.query(KbDocument).filter(
+            KbDocument.doc_id.in_(doc_ids),
+            KbDocument.content != "",
+        ).all()
+        for doc in docs:
+            db.query(KbChunk).filter(KbChunk.doc_id == doc.doc_id).delete()
+            chunks = chunk_document(doc.doc_id, doc.title, doc.content, doc.node_type)
+            for c in chunks:
+                db.add(
+                    KbChunk(
+                        doc_id=c["doc_id"],
+                        chunk_index=c["chunk_index"],
+                        content=c["content"],
+                        token_count=c["token_count"],
+                    )
+                )
+            total_chunks += len(chunks)
+        db.commit()
+        logger.info("auto_sync: rechunked %d docs -> %d chunks", len(docs), total_chunks)
+        return {"ok": True, "chunkedDocs": len(docs), "totalChunks": total_chunks}
+    except Exception as e:
+        db.rollback()
+        logger.exception("auto_sync: rechunk failed")
+        return {"ok": False, "error": str(e)}
+    finally:
+        db.close()
+
+
+def sync_all_and_embed(union_id: str = "") -> dict:
+    """Run the full pipeline: sync all KBs -> rechunk -> embed.
+
+    Only rechunks documents whose content actually changed during sync.
+    Embedding is already incremental (skips chunks with existing vectors).
+
+    When called from an HTTP endpoint, pass union_id explicitly.
+    When called from the daemon thread (no request context), leave empty
+    and it will be resolved from the database.
+    """
+    if not union_id:
+        union_id = _resolve_union_id()
+    if not union_id:
+        logger.error("auto_sync: cannot resolve union_id, abort")
+        return {"ok": False, "error": "cannot resolve union_id"}
+
+    started = time.time()
+    overall: Dict[str, Any] = {}
+
+    def _log(msg: str) -> None:
+        ts = time.strftime("%H:%M:%S")
+        line = f"[sync-embed {ts}] {msg}"
+        logger.info(line)
+        print(line, flush=True)
+
+    # Phase 1: sync all workspaces
+    _log("phase 1/3 — syncing all knowledge bases...")
+    client = DingTalkKnowledgeClient(union_id)
+    phase1_start = time.time()
+    sync_result = _sync_all_workspaces(client)
+    overall["sync"] = sync_result
+    phase1_elapsed = round(time.time() - phase1_start, 1)
+    if not sync_result.get("ok"):
+        _log(f"sync FAILED after {phase1_elapsed}s: {sync_result.get('error', 'unknown')}")
+        overall["ok"] = False
+        overall["error"] = sync_result.get("error", "sync failed")
+        overall["durationSec"] = round(time.time() - started, 1)
+        return overall
+
+    changed_ids = sync_result.get("changedIds", [])
+    _log(
+        f"phase 1 done ({phase1_elapsed}s) — "
+        f"total={sync_result['totalSynced']} changed={len(changed_ids)} failed={sync_result['totalFailed']}"
+    )
+
+    # Phase 2: rechunk only the documents that actually changed
+    _log(f"phase 2/3 — rechunking {len(changed_ids)} changed documents...")
+    phase2_start = time.time()
+    rechunk_result = _rechunk_documents(changed_ids)
+    overall["rechunk"] = rechunk_result
+    phase2_elapsed = round(time.time() - phase2_start, 1)
+    _log(
+        f"phase 2 done ({phase2_elapsed}s) — "
+        f"docs={rechunk_result.get('chunkedDocs', 0)} chunks={rechunk_result.get('totalChunks', 0)}"
+    )
+
+    # Phase 3: embed all chunks (idempotent — skips already-embedded)
+    _log("phase 3/3 — embedding all chunks...")
+    phase3_start = time.time()
+    try:
+        embed_result = embed_chunks(limit=0)
+        overall["embed"] = {
+            "ok": True,
+            "chunkTotal": embed_result.get("chunk_total", 0),
+            "embedded": embed_result.get("embedded", 0),
+            "skipped": embed_result.get("skipped", 0),
+            "errors": embed_result.get("errors", 0),
+        }
+        phase3_elapsed = round(time.time() - phase3_start, 1)
+        _log(
+            f"phase 3 done ({phase3_elapsed}s) — "
+            f"total={embed_result.get('chunk_total', 0)} new={embed_result.get('embedded', 0)} "
+            f"skipped={embed_result.get('skipped', 0)} errors={embed_result.get('errors', 0)}"
+        )
+    except Exception as e:
+        logger.exception("auto_sync: embed phase failed")
+        overall["embed"] = {"ok": False, "error": str(e)}
+
+    overall["ok"] = True
+    overall["durationSec"] = round(time.time() - started, 1)
+    _log(f"pipeline done — total {overall['durationSec']}s (sync={phase1_elapsed}s rechunk={phase2_elapsed}s)")
+    return overall

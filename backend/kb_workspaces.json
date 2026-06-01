@@ -1,0 +1,114 @@
+{
+  "kb_workspaces": {
+    "本体开发部": {
+      "workspace_id": "1oam4Sk7BMLXxn8K",
+      "enabled": true,
+      "priority": 0
+    },
+    "研发共享文档": {
+      "workspace_id": "By8jQSbJyWLAL30M",
+      "enabled": false,
+      "priority": 1
+    },
+    "研发体系文档【JZ-TOTAL】": {
+      "workspace_id": "yq8ZkS3KYJW4enaX",
+      "enabled": false,
+      "priority": 2
+    },
+    "研发体系全员文档库": {
+      "workspace_id": "9Bv51SJGoKxPBjv3",
+      "enabled": false,
+      "priority": 3
+    },
+    "研发共享文档（非公开）": {
+      "workspace_id": "X1v4RS7ybR4GeZ8P",
+      "enabled": false,
+      "priority": 4
+    },
+    "产品专项知识库（2023上半年-2025年）": {
+      "workspace_id": "5zaVASrJnl5bDo8y",
+      "enabled": false,
+      "priority": 5
+    },
+    "研发专项知识库（2023上半年-2026年）": {
+      "workspace_id": "9Bv51SWzXGOJOzv3",
+      "enabled": false,
+      "priority": 6
+    },
+    "订单专项知识库（2022-2025）": {
+      "workspace_id": "bJvOOSLN3yLzGgvK",
+      "enabled": false,
+      "priority": 7
+    },
+    "产品信息门户": {
+      "workspace_id": "OQ0xySKEGYKEG48B",
+      "enabled": false,
+      "priority": 8
+    },
+    "订单项目信息门户": {
+      "workspace_id": "MJ0pDSwlOEkMqQ0E",
+      "enabled": false,
+      "priority": 9
+    },
+    "基线开发部": {
+      "workspace_id": "xPar2SAKPb4KZbaV",
+      "enabled": false,
+      "priority": 99
+    },
+    "嵌入式和硬件驱动": {
+      "workspace_id": "xPar2SD23VJ5p3aV",
+      "enabled": false,
+      "priority": 99
+    },
+    "云端软件": {
+      "workspace_id": "xwaNdSBPjVRJb20O",
+      "enabled": false,
+      "priority": 99
+    },
+    "WMS": {
+      "workspace_id": "lovW2SAVbKrnkGab",
+      "enabled": false,
+      "priority": 99
+    },
+    "GroupMap": {
+      "workspace_id": "p48ggS5M2Vrygb87",
+      "enabled": false,
+      "priority": 99
+    },
+    "产品技术组【掘金池】": {
+      "workspace_id": "QXvd5SmeeEKJex0Z",
+      "enabled": false,
+      "priority": 99
+    },
+    "硬件产品": {
+      "workspace_id": "9r09jSZd9rWYMW8A",
+      "enabled": false,
+      "priority": 99
+    },
+    "IT & 运维": {
+      "workspace_id": "Gma31SO2ojY7NJ0n",
+      "enabled": false,
+      "priority": 99
+    },
+    "〔电气〕研发栈": {
+      "workspace_id": "nV06pSopwOEmXyaB",
+      "enabled": false,
+      "priority": 99
+    },
+    "〔电气〕叉车组": {
+      "workspace_id": "OQ0xySez6RVgAD8B",
+      "enabled": false,
+      "priority": 99
+    },
+    "〔电气〕订单组": {
+      "workspace_id": "618oRSR15L2oV30L",
+      "enabled": false,
+      "priority": 99
+    },
+    "本体测试": {
+      "workspace_id": "nb9XJB84VP27DXyA",
+      "enabled": false,
+      "priority": 99
+    }
+  }
+}

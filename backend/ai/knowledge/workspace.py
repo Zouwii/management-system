@@ -32,7 +32,7 @@ def _claude_md_template() -> str:
             "使用以下 curl 命令搜索本地切片索引：",
             "",
             "```bash",
-            "curl -s -X POST ${AI_FLASK_BASE_URL:-http://127.0.0.1:5001}/api/bt/ai/knowledge/chunks/search \\",
+            "curl -s --connect-timeout 10 -X POST ${AI_FLASK_BASE_URL:-http://127.0.0.1:5002}/api/bt/ai/knowledge/chunks/search \\",
             '  -H "Content-Type: application/json" \\',
             '  -d \'{"query": "<关键词>", "top_k": 8}\'',
             "```",
@@ -77,13 +77,15 @@ def _claude_md_template() -> str:
     )
 
 
-def init_knowledge_workspace(owner_key: str) -> Dict[str, Any]:
+def init_knowledge_workspace(owner_key: str, auth_user: Dict[str, Any] = None) -> Dict[str, Any]:
     """Prepare the user's workspace with knowledge base Q&A context.
 
-    Creates the workspace directory and writes CLAUDE.md with Q&A instructions.
+    Creates the workspace directory, writes CLAUDE.md, and grants bash permissions
+    so Claude doesn't ask for approval on every curl/search command.
 
     Args:
         owner_key: Unique user key for filesystem isolation.
+        auth_user: User auth info (unused, but required to match caller signature).
 
     Returns:
         Dict with ok, workspaceDir, ownerSafe.
@@ -91,6 +93,8 @@ def init_knowledge_workspace(owner_key: str) -> Dict[str, Any]:
     ws = user_workspace(owner_key)
     workspace_dir = Path(ws["workspace_dir"])
     workspace_dir.mkdir(parents=True, exist_ok=True)
+    claude_dir = Path(ws["claude_dir"])
+    claude_dir.mkdir(parents=True, exist_ok=True)
 
     # Write CLAUDE.md with knowledge Q&A instructions
     (workspace_dir / "CLAUDE.md").write_text(_claude_md_template(), encoding="utf-8")

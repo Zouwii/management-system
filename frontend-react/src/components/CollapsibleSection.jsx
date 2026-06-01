@@ -6,15 +6,22 @@ export default function CollapsibleSection({
   defaultOpen = true,
   children,
   extra,
+  onToggle,
 }) {
   const [open, setOpen] = useState(defaultOpen);
+
+  function handleToggle() {
+    const next = !open;
+    setOpen(next);
+    if (onToggle) onToggle(next);
+  }
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white">
       {/* header */}
       <button
         type="button"
-        onClick={() => setOpen((prev) => !prev)}
+        onClick={handleToggle}
         className="flex w-full items-center justify-between px-5 py-4 text-left transition hover:bg-slate-50"
       >
         <div className="flex items-center gap-3">

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import {
   createAITaskTicket,
   fetchTbcreateDraft,
@@ -10,6 +10,8 @@ import {
   fetchTbcreateTasks,
   syncKnowledgeBase,
   fetchAIKnowledgeTtydSession,
+  createKnowledgeChatSession,
+  analyzeDashboard,
 } from '../api/dashboard';
 import Card from '../components/Card';
 import SectionTitle from '../components/SectionTitle';
@@ -67,10 +69,44 @@ export default function AIAnalysisPage() {
   const [taskList, setTaskList] = useState([]);
   const [parentSelectorOpen, setParentSelectorOpen] = useState(false);
   const [syncBusy, setSyncBusy] = useState(false);
+  const [dashboardResult, setDashboardResult] = useState(null);
+  const [dashboardError, setDashboardError] = useState('');
+  const [expandedKeyword, setExpandedKeyword] = useState(null);
 
   // ── AI问答助手 ttyd ──
   const [kbTtydUrl, setKbTtydUrl] = useState('');
   const [kbTtydError, setKbTtydError] = useState('');
+  const [kbTtydStarted, setKbTtydStarted] = useState(false);
+
+  // ── 任务创建 ttyd 懒加载 ──
+  const [tbTtydStarted, setTbTtydStarted] = useState(false);
+
+  const startTbTtyd = useCallback(async () => {
+    if (tbTtydStarted) return;
+    setTbTtydStarted(true);
+    try { await initTbcreateWorkspace(user, { ownerKey }); } catch {}
+    try {
+      const res = await fetchAITtydSession(user, { ownerKey, model: selectedModel || 'glm' });
+      const url = String(res?.data?.embedUrl || '').trim();
+      if (url) { setTtydUrl(url); setTtydError(''); }
+      else { setTtydError('后端未返回 ttyd 地址'); }
+    } catch (err) {
+      setTtydError(err instanceof Error ? err.message : 'ttyd 初始化失败');
+    }
+  }, [ownerKey, selectedModel, user, tbTtydStarted]);
+
+  const startKbTtyd = useCallback(async () => {
+    if (kbTtydStarted || !selectedModel) return;
+    setKbTtydStarted(true);
+    try {
+      const res = await fetchAIKnowledgeTtydSession(user, { ownerKey, model: selectedModel });
+      const url = String(res?.data?.embedUrl || '').trim();
+      if (url) { setKbTtydUrl(url); setKbTtydError(''); }
+      else { setKbTtydError('后端未返回知识库 ttyd 地址'); }
+    } catch (err) {
+      setKbTtydError(err instanceof Error ? err.message : '知识库 ttyd 初始化失败');
+    }
+  }, [ownerKey, selectedModel, user, kbTtydStarted]);
 
   // Load AI insights on mount
   useEffect(() => {
@@ -97,71 +133,7 @@ export default function AIAnalysisPage() {
     return () => { active = false; };
   }, [ownerKey, user]);
 
-  // Init workspace, then create ttyd session (任务创建)
-  useEffect(() => {
-    let active = true;
-
-    async function initAndConnect() {
-      try {
-        await initTbcreateWorkspace(user, { ownerKey });
-      } catch {
-        // non-fatal
-      }
-
-      if (!active) return;
-
-      try {
-        const res = await fetchAITtydSession(user, { ownerKey, model: selectedModel || 'glm' });
-        if (!active) return;
-        const url = String(res?.data?.embedUrl || '').trim();
-        if (!url) {
-          setTtydUrl('');
-          setTtydError('后端未返回 ttyd 地址，请检查 AI_TTYD_BASE_URL 配置。');
-          return;
-        }
-        setTtydUrl(url);
-        setTtydError('');
-      } catch (err) {
-        if (!active) return;
-        setTtydUrl('');
-        setTtydError(err instanceof Error ? err.message : 'ttyd 会话初始化失败');
-      }
-    }
-
-    if (selectedModel) {
-      initAndConnect();
-    }
-
-    return () => { active = false; };
-  }, [ownerKey, selectedModel, user]);
-
-  // Init knowledge Q&A ttyd session
-  useEffect(() => {
-    let active = true;
-
-    async function initKbTtyd() {
-      if (!selectedModel) return;
-      try {
-        const res = await fetchAIKnowledgeTtydSession(user, { ownerKey, model: selectedModel });
-        if (!active) return;
-        const url = String(res?.data?.embedUrl || '').trim();
-        if (!url) {
-          setKbTtydUrl('');
-          setKbTtydError('后端未返回知识库 ttyd 地址。');
-          return;
-        }
-        setKbTtydUrl(url);
-        setKbTtydError('');
-      } catch (err) {
-        if (!active) return;
-        setKbTtydUrl('');
-        setKbTtydError(err instanceof Error ? err.message : '知识库 ttyd 会话初始化失败');
-      }
-    }
-
-    initKbTtyd();
-    return () => { active = false; };
-  }, [ownerKey, selectedModel, user]);
+  // ttyd sessions are now lazy-started via onToggle on each CollapsibleSection.
 
   // Fetch all tasks for parent task selector
   useEffect(() => {
@@ -280,27 +252,43 @@ export default function AIAnalysisPage() {
     }
   };
 
-  const handleAnalyze = () => {
-    const draftContext = [draft.title, draft.requirementDesc, ...draft.outputs]
-      .map((item) => String(item || '').trim())
-      .filter(Boolean)
-      .join(' ');
+  const handleAnalyze = useCallback(async () => {
     setAnalysisBusy(true);
     setAnalysisStatus('分析中...');
-
-    window.setTimeout(() => {
-      setAnalysisInput(draftContext);
+    setDashboardResult(null);
+    setDashboardError('');
+    try {
+      const res = await analyzeDashboard({ owner_key: ownerKey });
+      if (res.code === 200) {
+        setDashboardResult(res.data);
+        setAnalysisStatus(`分析完成（${res.data.meta?.taskCount || 0} 个任务）`);
+      } else {
+        setDashboardError(res.error || '分析失败');
+        setAnalysisStatus('分析失败');
+      }
+    } catch (e) {
+      setDashboardError(e.message || '分析请求失败');
+      setAnalysisStatus('分析失败');
+    } finally {
       setAnalysisBusy(false);
-      setAnalysisStatus(draftContext ? '已基于当前草稿更新' : '已按默认样例更新');
-    }, 320);
-  };
+    }
+  }, [ownerKey]);
 
   const handleSyncKnowledge = async () => {
     setSyncBusy(true);
     try {
       const res = await syncKnowledgeBase();
       if (res.code === 200) {
-        alert(`同步完成：${res.data.syncedCount} 篇文档，耗时 ${res.data.durationSec}s`);
+        const d = res.data;
+        const sync = d.sync || {};
+        const embed = d.embed || {};
+        alert(
+          `同步完成！\n` +
+          `文档同步：${sync.totalSynced || d.totalSynced || '?'} 篇（变更 ${d.totalChanged || sync.totalSynced || '?'}）\n` +
+          `切片重建：${d.rechunk?.chunkedDocs || '?'} 篇文档 → ${d.rechunk?.totalChunks || '?'} 个切片\n` +
+          `向量生成：${embed.embedded || '?'} 个新向量（跳过 ${embed.skipped || '?'}）\n` +
+          `总耗时：${d.durationSec || '?'}s`
+        );
       } else {
         alert(`同步失败：${res.error || '未知错误'}`);
       }
@@ -310,6 +298,53 @@ export default function AIAnalysisPage() {
       setSyncBusy(false);
     }
   };
+
+  // ── SSE 知识库对话 ──
+  const [chatSessionId, setChatSessionId] = useState('');
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatInput, setChatInput] = useState('');
+  const [chatBusy, setChatBusy] = useState(false);
+  const chatEsRef = useRef(null);
+
+  useEffect(() => {
+    let active = true;
+    createKnowledgeChatSession()
+      .then((res) => { if (active) setChatSessionId(res?.data?.sessionId || ''); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
+  useEffect(() => () => { if (chatEsRef.current) { chatEsRef.current.close(); } }, []);
+
+  const handleChatSend = useCallback(() => {
+    const q = chatInput.trim();
+    if (!q || chatBusy) return;
+    setChatInput('');
+    setChatBusy(true);
+    setChatMessages((prev) => [...prev, { role: 'user', content: q }]);
+    if (chatEsRef.current) { chatEsRef.current.close(); }
+    const params = new URLSearchParams({ q });
+    if (chatSessionId) params.set('session_id', chatSessionId);
+    const es = new EventSource(`/api/bt/ai/knowledge/chat?${params.toString()}`);
+    chatEsRef.current = es;
+    let content = '';
+    setChatMessages((prev) => [...prev, { role: 'assistant', content: '', citations: null }]);
+    es.addEventListener('message', (e) => {
+      let d;
+      try { d = JSON.parse(e.data); } catch { return; }
+      if (d.type === 'citation' && d.sources) {
+        setChatMessages((prev) => { const n = [...prev]; const i = n.length-1; if (n[i]?.role === 'assistant') n[i] = {...n[i], citations: d.sources}; return n; });
+      } else if (d.type === 'text' && d.content) {
+        content += d.content;
+        setChatMessages((prev) => { const n = [...prev]; const i = n.length-1; if (n[i]?.role === 'assistant') n[i] = {...n[i], content}; return n; });
+      }
+    });
+    es.addEventListener('done', () => { es.close(); chatEsRef.current = null; setChatBusy(false); });
+    es.onerror = () => { es.close(); chatEsRef.current = null; setChatBusy(false); };
+  }, [chatInput, chatBusy, chatSessionId]);
+
+  const handleChatKeyDown = useCallback((e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleChatSend(); }
+  }, [handleChatSend]);
 
   // ── 产出天数校验 ─────────────────────────────────────────
   const outputDays = useMemo(() => {
@@ -351,6 +386,7 @@ export default function AIAnalysisPage() {
       <div className="space-y-4">
         {/* ═══════ AI 任务分析栏 ═══════ */}
         <CollapsibleSection
+          defaultOpen={false}
           title="AI任务分析栏"
           subtitle="根据工时和绩效给出执行建议"
           extra={
@@ -381,13 +417,141 @@ export default function AIAnalysisPage() {
                 <div className="text-base font-semibold text-slate-900">根据工时进行分析</div>
                 <span className="rounded-full border border-cyan-100 bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-700">工时</span>
               </div>
-              <div className="mt-4 space-y-3">
-                {hourInsights.map((item) => (
-                  <div key={item.title} className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
-                    <div className="text-sm font-semibold text-slate-900">{item.title}</div>
-                    <div className="mt-2 text-sm leading-6 text-slate-600">{item.content}</div>
+              <div className="mt-4">
+                {analysisBusy && (
+                  <div className="flex items-center justify-center gap-3 py-8 text-sm text-slate-500">
+                    <svg className="h-5 w-5 animate-spin text-sky-500" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    AI 正在分析任务数据...
                   </div>
-                ))}
+                )}
+                {dashboardError && (
+                  <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{dashboardError}</div>
+                )}
+                {!analysisBusy && !dashboardResult && (
+                  <div className="py-8 text-center text-sm text-slate-400">
+                    点击右上角"开始分析"按钮，AI 将拉取任务数据进行多维度分析
+                  </div>
+                )}
+                {dashboardResult?.modules && (
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {/* 1. 需求雷达 */}
+                    <div className="rounded-xl border border-slate-200 bg-white border-l-4 border-l-sky-400 p-3">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <svg className="h-4 w-4 text-sky-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                        <span className="text-xs font-semibold text-slate-800">需求雷达</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {(dashboardResult.modules.requirement_radar?.keywords || []).slice(0, 6).map((kw, i) => (
+                          <span key={i} className="rounded-full bg-sky-50 text-sky-700 px-2 py-0.5 text-[11px] font-medium cursor-pointer hover:bg-sky-100"
+                            onClick={() => setExpandedKeyword(expandedKeyword === i ? null : i)}>
+                            {kw.word}
+                          </span>
+                        ))}
+                      </div>
+                      {expandedKeyword !== null && (() => {
+                        const kw = (dashboardResult.modules.requirement_radar?.keywords || [])[expandedKeyword];
+                        return kw ? (
+                          <div className="mt-2 rounded-lg border border-sky-100 bg-sky-50/50 p-2 text-[11px] space-y-1">
+                            <div className="font-medium text-sky-800">一词三建议 · {kw.word}</div>
+                            <div>横向补位：{kw.suggestions?.horizontal || '-'}</div>
+                            <div>质量升维：{kw.suggestions?.quality || '-'}</div>
+                            <div>前瞻实验：{kw.suggestions?.forward || '-'}</div>
+                          </div>
+                        ) : null;
+                      })()}
+                    </div>
+
+                    {/* 2. 技术债审计师 */}
+                    <div className="rounded-xl border border-slate-200 bg-white border-l-4 border-l-amber-400 p-3">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <svg className="h-4 w-4 text-amber-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <span className="text-xs font-semibold text-slate-800">技术债审计师</span>
+                      </div>
+                      {(dashboardResult.modules.tech_debt_auditor?.gaps || []).slice(0, 2).map((g, i) => (
+                        <div key={i} className="rounded-lg border border-amber-100 bg-amber-50/50 p-2 mb-1.5 text-[11px]">
+                          <div className="flex justify-between mb-0.5">
+                            <span className="font-medium text-slate-700 truncate max-w-[60%]">{g.task}</span>
+                            <span className="text-amber-600 font-bold">价值{g.value_score}/10</span>
+                          </div>
+                          <div className="text-slate-500">{g.action}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* 3. 绩效平衡仪 */}
+                    <div className="rounded-xl border border-slate-200 bg-white border-l-4 border-l-emerald-400 p-3">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <svg className="h-4 w-4 text-emerald-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg>
+                        <span className="text-xs font-semibold text-slate-800">绩效平衡仪</span>
+                      </div>
+                      {(() => {
+                        const pb = dashboardResult.modules.performance_balancer?.ratio || {};
+                        const a = pb.assigned || 0, au = pb.autonomous || 0, c = pb.capability || 0;
+                        const t = a + au + c || 1;
+                        return (
+                          <div>
+                            <div className="flex h-5 rounded-full overflow-hidden mb-1">
+                              <div style={{width: `${(a/t)*100}%`}} className="bg-sky-400 flex items-center justify-center text-[9px] text-white font-medium">指派{a}%</div>
+                              <div style={{width: `${(au/t)*100}%`}} className="bg-violet-400 flex items-center justify-center text-[9px] text-white font-medium">自主{au}%</div>
+                              <div style={{width: `${(c/t)*100}%`}} className="bg-rose-400 flex items-center justify-center text-[9px] text-white font-medium">能力{c}%</div>
+                            </div>
+                            <div className="text-[10px] text-slate-400">理想 6:3:1 · {dashboardResult.modules.performance_balancer?.status || '-'}</div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    {/* 4. 成长助推器 */}
+                    <div className="rounded-xl border border-slate-200 bg-white border-l-4 border-l-violet-400 p-3">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <svg className="h-4 w-4 text-violet-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347" /></svg>
+                        <span className="text-xs font-semibold text-slate-800">成长助推器</span>
+                      </div>
+                      {(dashboardResult.modules.growth_booster?.learnings || []).slice(0, 2).map((l, i) => (
+                        <div key={i} className="rounded-lg border border-violet-100 bg-violet-50/50 p-2 mb-1.5 text-[11px]">
+                          <div className="font-medium text-slate-700">{l.pain_point}</div>
+                          <div className="text-violet-600">{l.ai_tech}</div>
+                          <div className="text-violet-700 bg-white rounded px-1.5 py-0.5 mt-1 font-medium">产出: {l.output_required}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* 5. 效能转化器 */}
+                    <div className="rounded-xl border border-slate-200 bg-white border-l-4 border-l-rose-400 p-3">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <svg className="h-4 w-4 text-rose-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" /></svg>
+                        <span className="text-xs font-semibold text-slate-800">效能转化器</span>
+                      </div>
+                      {(dashboardResult.modules.efficiency_transformer?.tools || []).slice(0, 2).map((t, i) => (
+                        <div key={i} className="rounded-lg border border-rose-100 bg-rose-50/50 p-2 mb-1.5 text-[11px]">
+                          <div className="font-medium text-slate-700">{t.scenario}</div>
+                          <div className="flex justify-between text-slate-500 mt-0.5">
+                            <span className="text-rose-600 font-medium">{t.tool_suggestion}</span>
+                            <span>提效{t.expected_efficiency}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* 6. 风险预警机 */}
+                    <div className="rounded-xl border border-slate-200 bg-white border-l-4 border-l-orange-400 p-3">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <svg className="h-4 w-4 text-orange-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008z" /></svg>
+                        <span className="text-xs font-semibold text-slate-800">风险预警机</span>
+                      </div>
+                      {(dashboardResult.modules.risk_warning_engine?.alerts || []).map((a, i) => (
+                        <div key={i} className={`rounded-lg px-2.5 py-1.5 text-[11px] font-medium mb-1 ${
+                          a.level === 'red' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
+                        }`}>
+                          {a.description}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -410,8 +574,10 @@ export default function AIAnalysisPage() {
 
         {/* ═══════ AI 创建任务单 ═══════ */}
         <CollapsibleSection
+          defaultOpen={false}
           title="AI创建任务单"
           subtitle="与 Claude 对话创建任务草稿，确认后生成 Teambition 任务单"
+          onToggle={(open) => { if (open) startTbTtyd(); }}
         >
           <div className="mt-4 grid gap-5 xl:grid-cols-[minmax(320px,0.88fr)_minmax(0,1.12fr)]">
             {/* Left panel: ttyd terminal */}
@@ -633,8 +799,10 @@ export default function AIAnalysisPage() {
 
         {/* ═══════ AI 问答助手 ═══════ */}
         <CollapsibleSection
+          defaultOpen={false}
           title="AI问答助手"
           subtitle="基于知识库文档回答你的问题"
+          onToggle={(open) => { if (open) startKbTtyd(); }}
         >
           <div className="mt-2 flex min-h-[600px] flex-col rounded-[28px] border border-slate-200 bg-black p-2">
             {kbTtydUrl ? (
@@ -648,6 +816,51 @@ export default function AIAnalysisPage() {
                 {kbTtydError || '知识库 ttyd 会话未就绪，请检查后端配置。'}
               </div>
             )}
+          </div>
+        </CollapsibleSection>
+
+        {/* ═══════ SSE 知识库对话 ═══════ */}
+        <CollapsibleSection
+          defaultOpen={false}
+          title="SSE 知识库对话"
+          subtitle="基于混合检索 + LLM 流式返回的轻量级问答"
+        >
+          <div className="mt-2 flex flex-col rounded-[28px] border border-slate-200 bg-white" style={{ minHeight: 480 }}>
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3" style={{ maxHeight: 380 }}>
+              {chatMessages.length === 0 && (
+                <div className="flex items-center justify-center h-32 text-sm text-slate-400">
+                  在下方输入问题，AI 将基于知识库内容回答
+                </div>
+              )}
+              {chatMessages.map((msg, idx) => (
+                <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-6 ${
+                    msg.role === 'user' ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-700 border border-slate-100'
+                  }`}>
+                    <div className="whitespace-pre-wrap">{msg.content || (msg.role === 'assistant' && chatBusy && idx === chatMessages.length - 1 ? '思考中...' : '')}</div>
+                    {msg.citations && msg.citations.length > 0 && (
+                      <div className="mt-2 pt-2 border-t border-slate-200">
+                        <div className="text-xs font-medium text-slate-400 mb-1">参考来源：</div>
+                        {msg.citations.map((c, ci) => (
+                          <div key={ci} className="text-xs text-slate-400 truncate">{c.source} ({c.score.toFixed(3)})</div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="border-t border-slate-100 px-5 py-3">
+              <div className="flex gap-2">
+                <input type="text" className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-slate-300 focus:bg-white"
+                  placeholder="输入问题，按 Enter 发送..." value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)} onKeyDown={handleChatKeyDown} disabled={chatBusy} />
+                <button type="button" className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
+                  onClick={handleChatSend} disabled={chatBusy || !chatInput.trim()}>
+                  {chatBusy ? '...' : '发送'}
+                </button>
+              </div>
+            </div>
           </div>
         </CollapsibleSection>
       </div>

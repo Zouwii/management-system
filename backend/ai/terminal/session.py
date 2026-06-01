@@ -108,15 +108,29 @@ def user_workspace(owner_key: str) -> dict:
     }
 
 
-def write_workspace_context(owner_key: str, auth_user: dict = None) -> None:
+_DEFAULT_WORKSPACE_INIT = None  # resolved lazily to avoid circular import
+
+
+def _resolve_default_init():
+    """Lazy import to avoid circular dependency with ai.tbcreate."""
+    global _DEFAULT_WORKSPACE_INIT
+    if _DEFAULT_WORKSPACE_INIT is None:
+        from ai.tbcreate.workspace import init_workspace as fn
+        _DEFAULT_WORKSPACE_INIT = fn
+    return _DEFAULT_WORKSPACE_INIT
+
+
+def write_workspace_context(
+    owner_key: str, auth_user: dict = None,
+    workspace_init: callable = None,
+) -> None:
     """Ensure workspace context files exist before starting a ttyd session.
 
-    Delegates to ai.tbcreate.workspace.init_workspace. The frontend should
-    call POST /ai/tbcreate/workspace/init first; this is a fallback.
+    Defaults to tbcreate workspace init. Pass a custom init function for
+    other ttyd purposes (e.g. knowledge base Q&A).
     """
-    from ai.tbcreate.workspace import init_workspace
-
-    init_workspace(owner_key, auth_user)
+    init_fn = workspace_init or _resolve_default_init()
+    init_fn(owner_key, auth_user)
 
 
 def make_env(owner_key: str, owner_name: str, model: str) -> dict:
@@ -173,13 +187,17 @@ def make_env(owner_key: str, owner_name: str, model: str) -> dict:
     return env
 
 
-def _normalize_owner_for_port(owner_key: str) -> int:
-    """Compute a deterministic port offset from an owner_key."""
-    seed = owner_key.encode("utf-8", errors="ignore")
+def _session_key(owner_key: str, purpose: str) -> str:
+    return f"{owner_key}::{purpose}" if purpose else owner_key
+
+
+def _normalize_owner_for_port(owner_key: str, purpose: str = "") -> int:
+    """Compute a deterministic port offset from an owner_key (+ purpose)."""
+    seed = f"{owner_key}::{purpose}".encode("utf-8", errors="ignore")
     return sum(seed) % _DEFAULT_TTYD_PORT_SPAN
 
 
-def owner_ttyd_port(owner_key: str) -> int:
+def owner_ttyd_port(owner_key: str, purpose: str = "") -> int:
     """Get the preferred ttyd port for an owner_key (stable mapping)."""
     base_raw = str(os.getenv("AI_TTYD_PORT_BASE", str(_DEFAULT_TTYD_PORT_BASE))).strip()
     span_raw = str(os.getenv("AI_TTYD_PORT_SPAN", str(_DEFAULT_TTYD_PORT_SPAN))).strip()
@@ -191,7 +209,7 @@ def owner_ttyd_port(owner_key: str) -> int:
         span = max(int(span_raw), 50)
     except Exception:
         span = _DEFAULT_TTYD_PORT_SPAN
-    return int(base + (_normalize_owner_for_port(owner_key) % span))
+    return int(base + (_normalize_owner_for_port(owner_key, purpose) % span))
 
 
 def _is_port_available(host: str, port: int) -> bool:
@@ -210,8 +228,8 @@ def _is_port_available(host: str, port: int) -> bool:
             pass
 
 
-def resolve_ttyd_port(owner_key: str) -> int:
-    """Find an available ttyd port for an owner_key, preferring the stable mapping.
+def resolve_ttyd_port(owner_key: str, purpose: str = "") -> int:
+    """Find an available ttyd port for an owner_key (+ purpose), preferring stable mapping.
 
     If the preferred port is occupied, scans forward within the configured span.
     """
@@ -225,7 +243,7 @@ def resolve_ttyd_port(owner_key: str) -> int:
         span = max(int(span_raw), 50)
     except Exception:
         span = _DEFAULT_TTYD_PORT_SPAN
-    preferred = owner_ttyd_port(owner_key)
+    preferred = owner_ttyd_port(owner_key, purpose)
     for i in range(span):
         candidate = int(base + ((preferred - base + i) % span))
         if _is_port_available("0.0.0.0", candidate):
@@ -265,13 +283,14 @@ def build_ttyd_embed_url(port: int, owner_key: str, model: str, skill: str = "")
 
 
 def ensure_ttyd_session(
-    owner_key: str, owner_name: str, model: str, auth_user: dict = None, skill: str = ""
+    owner_key: str, owner_name: str, model: str, auth_user: dict = None, skill: str = "",
+    workspace_init: callable = None, purpose: str = "",
 ) -> dict:
     """Create or reuse a ttyd + claude session for the given owner_key.
 
-    If an existing session is alive, returns it. Otherwise terminates any stale
-    session, allocates a port, launches ttyd -> launcher.sh -> claude, and
-    returns the new session state.
+    If an existing session with the same owner_key + purpose is alive, returns it.
+    Otherwise terminates any stale session, allocates a port, launches
+    ttyd -> launcher.sh -> claude, and returns the new session state.
 
     Args:
         owner_key: Unique user identifier for session isolation.
@@ -279,24 +298,29 @@ def ensure_ttyd_session(
         model: AI model name to pass to the launcher.
         auth_user: Optional authenticated user dict for workspace context.
         skill: Skill trigger phrase (e.g. "创建tb单"). Passed as initial prompt to Claude.
+        workspace_init: Optional workspace init function (owner_key, auth_user) -> dict.
+                       Defaults to tbcreate workspace init.
+        purpose: Session purpose tag (e.g. "knowledge"). Different purposes get
+                 separate ports and processes for the same owner_key.
 
     Returns:
-        Dict with owner_key, owner_safe, model, port, proc, created_at.
+        Dict with owner_key, purpose, owner_safe, model, port, proc, created_at.
 
     Raises:
         RuntimeError: If ttyd is not installed or fails to start.
     """
+    sk = _session_key(owner_key, purpose)
     with _TTYD_LOCK:
-        existing = _TTYD_SESSIONS.get(owner_key)
+        existing = _TTYD_SESSIONS.get(sk)
         if existing and existing["proc"].poll() is None:
             return existing
         if existing:
             _terminate_ttyd_locked(existing)
-            _TTYD_SESSIONS.pop(owner_key, None)
+            _TTYD_SESSIONS.pop(sk, None)
 
         resolved_env = make_env(owner_key=owner_key, owner_name=owner_name, model=model)
-        write_workspace_context(owner_key, auth_user or {})
-        port = resolve_ttyd_port(owner_key)
+        write_workspace_context(owner_key, auth_user or {}, workspace_init=workspace_init)
+        port = resolve_ttyd_port(owner_key, purpose)
         cmd = [
             "ttyd",
             "-W",
@@ -334,6 +358,7 @@ def ensure_ttyd_session(
         ws = user_workspace(owner_key)
         state = {
             "owner_key": owner_key,
+            "purpose": purpose,
             "owner_safe": ws["owner_safe"],
             "model": model,
             "skill": skill_trigger,
@@ -341,7 +366,7 @@ def ensure_ttyd_session(
             "proc": proc,
             "created_at": int(time.time()),
         }
-        _TTYD_SESSIONS[owner_key] = state
+        _TTYD_SESSIONS[sk] = state
         append_log(
             {
                 "ts": int(time.time()),

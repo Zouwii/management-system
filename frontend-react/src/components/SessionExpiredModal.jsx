@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { useEffect, useRef } from 'react';
 import { ROUTE_PATHS } from '../constants/routes';
 import { useAuthStore } from '../store/authStore';
 import { useSessionExpiredStore } from '../store/sessionExpiredStore';
@@ -8,6 +9,19 @@ export default function SessionExpiredModal() {
   const hide = useSessionExpiredStore((s) => s.hide);
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
+  const handledRef = useRef(false);
+
+  useEffect(() => {
+    if (!open || handledRef.current) return;
+    handledRef.current = true;
+    logout().finally(() => {
+      navigate(ROUTE_PATHS.LOGIN, { replace: true });
+    });
+  }, [open, logout, navigate]);
+
+  useEffect(() => {
+    if (!open) handledRef.current = false;
+  }, [open]);
 
   if (!open) return null;
 

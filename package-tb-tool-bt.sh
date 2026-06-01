@@ -24,8 +24,18 @@ rm -rf "${SCRIPT_DIR}/.package_stage"
 mkdir -p "${TAR_DIR}"
 mkdir -p "${STAGE_DIR}"
 
-# 只打包 backend 部署所需目录，避免把开发缓存和大体积依赖带进去
-cp -r "${SCRIPT_DIR}/backend" "${STAGE_DIR}/backend"
+# 只打包 backend 部署所需目录，避免先复制 .venv 等大目录再删除
+tar \
+  --exclude="backend/.venv" \
+  --exclude="backend/__pycache__" \
+  --exclude="backend/.pytest_cache" \
+  --exclude="backend/.mypy_cache" \
+  --exclude="backend/.ruff_cache" \
+  --exclude="backend/data" \
+  --exclude="backend/runtime" \
+  --exclude="backend/**/__pycache__" \
+  --exclude="backend/**/*.pyc" \
+  -C "${SCRIPT_DIR}" -cf - backend | tar -C "${STAGE_DIR}" -xf -
 
 echo "[${PROJECT_NAME}] cleaning unnecessary files..."
 rm -rf \

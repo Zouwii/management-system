@@ -47,6 +47,15 @@ def create_app() -> Flask:
 
     init_db()
 
+    # Embedding model loading is expensive; keep app startup fast by default.
+    # Set AI_PRELOAD_EMBEDDING=1 only on hosts that intentionally serve vector search.
+    if str(os.getenv("AI_PRELOAD_EMBEDDING", "0")).strip().lower() in ("1", "true", "yes", "on"):
+        try:
+            from ai.knowledge.embedder import _load_model
+            _load_model()
+        except Exception:
+            pass
+
     # 后台：根据 config 表里的自动计算设置，到点触发“更新数据”
     # 注意：用 daemon thread，且通过模块级标记避免重复启动。
     global _AUTO_CALC_THREAD_STARTED
@@ -204,6 +213,53 @@ def create_app() -> Flask:
 
         t2 = threading.Thread(target=_auto_full_update_loop, daemon=True)
         t2.start()
+
+    # 后台：北京时间每天 04:00 自动触发知识库全量同步+rechunk+embedding。
+    global _AUTO_KNOWLEDGE_SYNC_THREAD_STARTED
+    if not globals().get("_AUTO_KNOWLEDGE_SYNC_THREAD_STARTED"):
+        _AUTO_KNOWLEDGE_SYNC_THREAD_STARTED = True
+
+        def _auto_knowledge_sync_loop():
+            from ai.knowledge.auto_sync import sync_all_and_embed
+
+            bj_tz = timezone(timedelta(hours=8))
+            last_trigger_date = ""
+
+            while True:
+                try:
+                    now_bj = datetime.now(bj_tz)
+                    today = now_bj.strftime("%Y-%m-%d")
+
+                    # 每天北京时间 04:00 触发一次。
+                    if now_bj.hour == 4 and now_bj.minute == 0 and last_trigger_date != today:
+                        print("[auto_knowledge_sync_loop] starting knowledge base sync+rechunk+embed")
+                        result = sync_all_and_embed()
+                        if result.get("ok"):
+                            sync_info = result.get("sync", {})
+                            embed_info = result.get("embed", {})
+                            print(
+                                "[auto_knowledge_sync_loop] done"
+                                "  sync: {} synced, {} failed"
+                                "  embed: {} embedded, {} skipped"
+                                "  elapsed: {:.1f}s".format(
+                                    sync_info.get("totalSynced", 0),
+                                    sync_info.get("totalFailed", 0),
+                                    embed_info.get("embedded", 0),
+                                    embed_info.get("skipped", 0),
+                                    result.get("durationSec", 0),
+                                )
+                            )
+                        else:
+                            print("[auto_knowledge_sync_loop] failed:", result.get("error", "unknown error"))
+
+                        last_trigger_date = today
+                except Exception as e:
+                    print("[auto_knowledge_sync_loop] error:", repr(e))
+
+                _time.sleep(30)
+
+        t3 = threading.Thread(target=_auto_knowledge_sync_loop, daemon=True)
+        t3.start()
 
     @app.teardown_appcontext
     def _remove_db_session(_exc):

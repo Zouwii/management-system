@@ -30,27 +30,27 @@ BACKEND_DIR="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 WORKSPACE_DIR="${BACKEND_DIR}/runtime/users/${SAFE_OWNER}/workspaces/default"
 mkdir -p "${WORKSPACE_DIR}"
 
-# ====================== 模型选择（始终显示菜单） ======================
+# ====================== 模型选择（环境变量已有模型则跳过） ======================
 pick_and_apply_account() {
-  local default_num=3
-  # 如果环境变量已有模型，预选对应菜单项
+  # 如果环境变量已设置合法模型，直接使用，跳过交互菜单
   if [ -n "${ANTHROPIC_MODEL:-}" ]; then
+    local known=0
     case "${ANTHROPIC_MODEL}" in
-      claude*)   default_num=1 ;;
-      kimi*)     default_num=2 ;;
-      MiniMax*)  default_num=3 ;;
-      step*)     default_num=4 ;;
-      mimo*)     default_num=5 ;;
-      glm*)      default_num=6 ;;
-      deepseek*) default_num=7 ;;
+      claude*|kimi*|MiniMax*|step*|mimo*|glm*|deepseek*) known=1 ;;
     esac
+    if [ "${known}" = "1" ]; then
+      CLAUDE_EXTRA_ARGS=(--model "${ANTHROPIC_MODEL}")
+      return
+    fi
   fi
+
+  local default_num=3
   echo "请选择模型（直接回车默认）："
   echo "1) claude  2) kimi  3) minimax  4) step  5) mimo  6) glm  7) deepseek"
   read -r -p "选择模型 [${default_num}]: " choice
   choice="${choice:-${default_num}}"
 
-  local selected_model="${ANTHROPIC_MODEL:-MiniMax-M2.7-highspeed}"
+  local selected_model="MiniMax-M2.7-highspeed"
   choose_sub_model() {
     local title="$1"
     shift
@@ -93,6 +93,32 @@ if [ -d "${SHARED_SKILLS}" ]; then
   done
 fi
 
+# ====================== 默认权限：避免每次询问 ======================
+mkdir -p "${HOME}/.claude"
+if [ ! -f "${HOME}/.claude/settings.json" ]; then
+  cat > "${HOME}/.claude/settings.json" << 'SETEOF'
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl *)",
+      "Bash(cat *)",
+      "Bash(echo *)",
+      "Bash(grep *)",
+      "Bash(python3 *)",
+      "Bash(ls *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(wc *)",
+      "Bash(find *)",
+      "Bash(mkdir *)",
+      "Bash(cp *)",
+      "Bash(mv *)"
+    ]
+  }
+}
+SETEOF
+fi
+
 # ====================== 启动 ======================
 cd "${WORKSPACE_DIR}"
 echo "================================================"
@@ -101,7 +127,13 @@ echo "当前网关: ${ANTHROPIC_BASE_URL:-未设置}"
 echo "当前模型: ${ANTHROPIC_MODEL:-未设置}"
 echo "================================================"
 echo ""
-echo "💡 输入模式：1、tb单创建模式 2、正常对话模式"
 echo ""
 
-exec claude "${CLAUDE_EXTRA_ARGS[@]}" "$@"
+# 传一个初始提示词让 Claude 主动开始对话，而不是等待用户输入。
+# 有 skill trigger 时用它作为初始提示，否则用默认提示。
+# 注意用位置参数而非 -p，这样 Claude 回复后仍保持交互模式。
+if [ $# -gt 0 ]; then
+  exec claude --bare "${CLAUDE_EXTRA_ARGS[@]}" "$*"
+else
+  exec claude --bare "${CLAUDE_EXTRA_ARGS[@]}" "请按 CLAUDE.md 的指引开始"
+fi

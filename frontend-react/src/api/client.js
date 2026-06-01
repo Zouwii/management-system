@@ -33,11 +33,16 @@ export async function httpRequest(path, options = {}) {
 
   if (response.status === 401 && !skipSessionExpired) {
     useSessionExpiredStore.getState().show();
-    throw new Error(data?.error || 'unauthenticated');
+    const error = new Error(data?.error || 'unauthenticated');
+    error.status = 401;
+    error.sessionExpired = true;
+    throw error;
   }
 
   if (!response.ok) {
-    throw new Error(data?.error || `请求失败: ${response.status}`);
+    const error = new Error(data?.error || `请求失败: ${response.status}`);
+    error.status = response.status;
+    throw error;
   }
 
   return data;

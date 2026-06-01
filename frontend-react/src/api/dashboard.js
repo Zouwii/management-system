@@ -20,6 +20,8 @@ import {
   mockSaveTbcreateDraft,
   mockFetchTbcreateTasks,
   mockSyncKnowledgeBase,
+  mockCreateKnowledgeChatSession,
+  mockAnalyzeDashboard,
   mockFetchAIKnowledgeTtydSession,
 } from './providers/mock/dashboard';
 import {
@@ -43,6 +45,8 @@ import {
   realSaveTbcreateDraft,
   realFetchTbcreateTasks,
   realSyncKnowledgeBase,
+  realCreateKnowledgeChatSession,
+  realAnalyzeDashboard,
   realFetchAIKnowledgeTtydSession,
 } from './providers/real/dashboard';
 
@@ -78,4 +82,6 @@ export const fetchTbcreateTasks = createApiSwitch(
 );
 export const fetchPermissionMatrix = createApiSwitch(mockFetchPermissionMatrix, realFetchPermissionMatrix);
 export const syncKnowledgeBase = createApiSwitch(mockSyncKnowledgeBase, realSyncKnowledgeBase);
+export const createKnowledgeChatSession = createApiSwitch(mockCreateKnowledgeChatSession, realCreateKnowledgeChatSession);
+export const analyzeDashboard = createApiSwitch(mockAnalyzeDashboard, realAnalyzeDashboard);
 export const fetchAIKnowledgeTtydSession = createApiSwitch(mockFetchAIKnowledgeTtydSession, realFetchAIKnowledgeTtydSession);

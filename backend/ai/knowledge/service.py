@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 import time
+from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -31,7 +32,7 @@ from dingtalk_client import get_valid_access_token
 
 # ── knowledge base priority config ─────────────────────────────
 
-KNOWN_WORKSPACES: Dict[str, int] = {
+_HARDCODED_WORKSPACES: Dict[str, int] = {
     "1oam4Sk7BMLXxn8K": 0,    # 本体开发部
     "By8jQSbJyWLAL30M": 1,    # 研发共享文档
     "yq8ZkS3KYJW4enaX": 2,    # 研发体系文档【JZ-TOTAL】
@@ -45,8 +46,50 @@ KNOWN_WORKSPACES: Dict[str, int] = {
 }
 
 
+def get_known_workspaces() -> Dict[str, int]:
+    """Read workspace config from kb_workspaces.json, fall back to hardcoded list.
+
+    The JSON file lives at ``backend/kb_workspaces.json`` and follows the same
+    pattern as ``ids.json``::
+
+        {
+          "kb_workspaces": {
+            "本体开发部": { "workspace_id": "...", "enabled": true, "priority": 0 },
+            ...
+          }
+        }
+
+    Only entries with ``enabled: true`` are returned.
+    """
+    cfg_path = Path(__file__).resolve().parent.parent / "kb_workspaces.json"
+    if cfg_path.exists():
+        try:
+            raw = cfg_path.read_text(encoding="utf-8").strip()
+            if raw:
+                data = json.loads(raw)
+                workspaces = data.get("kb_workspaces", {})
+                if isinstance(workspaces, dict):
+                    result: Dict[str, int] = {}
+                    for _name, entry in workspaces.items():
+                        if not isinstance(entry, dict):
+                            continue
+                        if not entry.get("enabled", False):
+                            continue
+                        ws_id = str(entry.get("workspace_id", "")).strip()
+                        if not ws_id:
+                            continue
+                        priority = int(entry.get("priority", 999))
+                        result[ws_id] = priority
+                    if result:
+                        return result
+        except Exception:
+            pass
+    return dict(_HARDCODED_WORKSPACES)
+
+
 def workspace_priority(workspace_id: str) -> int:
-    return KNOWN_WORKSPACES.get(workspace_id, 999)
+    known = get_known_workspaces()
+    return known.get(workspace_id, 999)
 
 
 def sort_workspaces(workspaces: List[dict]) -> List[dict]:
@@ -58,7 +101,6 @@ def sort_workspaces(workspaces: List[dict]) -> List[dict]:
 
 def _log(entry: dict) -> None:
     try:
-        from pathlib import Path
         log_file = Path(__file__).resolve().parent.parent.parent / "runtime" / "logs" / "ai_debug.log"
         log_file.parent.mkdir(parents=True, exist_ok=True)
         with log_file.open("a", encoding="utf-8") as f:

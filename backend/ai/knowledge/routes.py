@@ -1,11 +1,18 @@
-"""HTTP routes for knowledge base document browsing and downloading.
+"""HTTP routes for knowledge base document browsing, sync, and chat.
 
 Endpoints:
   GET  /ai/knowledge/workspaces                    - List knowledge bases (sorted by priority)
   GET  /ai/knowledge/workspaces/<ws_id>/nodes      - Browse document tree
-  GET  /ai/knowledge/documents/<node_id>           - Get parsed document content (blocks → markdown)
-  POST /ai/knowledge/sync                          - Walk tree and cache all documents
-  POST /ai/knowledge/search                        - Full-text search across knowledge bases
+  GET  /ai/knowledge/documents/<node_id>           - Get parsed document content (blocks -> markdown)
+  POST /ai/knowledge/sync                          - Walk single workspace and cache documents
+  POST /ai/knowledge/sync-all                      - Sync all known workspaces (documents only)
+  POST /ai/knowledge/sync-and-embedding            - Full pipeline: sync -> rechunk -> embed
+  POST /ai/knowledge/search                        - Search via DingTalk API
+  POST /ai/knowledge/chunks/search                 - Local search on kb_chunks (keyword/vector/hybrid)
+  POST /ai/knowledge/rechunk                       - Re-chunk + auto reembed
+  POST /ai/knowledge/reembed                       - Embed chunks into pgvector
+  POST /ai/knowledge/chat/session                  - Create chat session
+  GET  /ai/knowledge/chat                          - SSE knowledge-base chat
   POST /ai/knowledge/ttyd/session                  - Create/reuse a knowledge-base Q&A ttyd session
 """
 
@@ -14,13 +21,13 @@ from __future__ import annotations
 import json
 import time
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import List
 
 from flask import request, session
 
-from ai.knowledge.models import KbDocument, KbChunk
+from ai.knowledge.models import KbDocument
 from ai.knowledge.parser import parse_document
-from ai.knowledge.service import DingTalkKnowledgeClient, sort_workspaces
+from ai.knowledge.service import DingTalkKnowledgeClient
 from ai.terminal.session import (
     build_ttyd_embed_url,
     ensure_ttyd_session,
@@ -39,6 +46,10 @@ def _current_union_id() -> str:
     auth = session.get("auth_user") or {}
     user_id = ""
     if isinstance(auth, dict):
+        for key in ("union_id", "unionId", "dingtalkUserId"):
+            union_id = str(auth.get(key) or "").strip()
+            if union_id:
+                return union_id
         user_id = str(auth.get("user_id") or "")
     if user_id:
         try:
@@ -85,12 +96,18 @@ def _dt_to_iso(dt) -> str:
 def _cache_document(node_id: str, workspace_id: str, title: str,
                     content: str, node_type: str = "FILE",
                     parent_id: str = "", raw_json: str = "",
-                    category: str = "") -> None:
+                    category: str = "") -> bool:
+    """Upsert a document. Returns True if the document was new or content changed."""
     db = SessionLocal()
     try:
         existing = db.query(KbDocument).filter(KbDocument.doc_id == node_id).first()
         now = datetime.now(timezone.utc)
         if existing:
+            # Content unchanged — skip the write to avoid unnecessary rechunk.
+            if existing.content == content and existing.title == title:
+                existing.synced_at = now
+                db.commit()
+                return False
             existing.title = title
             existing.content = content
             existing.node_type = node_type
@@ -113,6 +130,7 @@ def _cache_document(node_id: str, workspace_id: str, title: str,
                 updated_at=now,
             ))
         db.commit()
+        return True
     finally:
         db.close()
 
@@ -134,6 +152,86 @@ def _cached_document(node_id: str) -> dict | None:
         return None
     finally:
         db.close()
+
+
+# ── workspace sync (module-level, shared with auto_sync) ────────
+
+def _sync_workspace(client, workspace_id: str, root_id: str, limit: int = 0) -> dict:
+    """Walk a workspace tree, cache all documents.
+
+    Returns {syncedCount, syncedIds, failedCount, errors}.
+    syncedIds contains only doc_ids whose content actually changed (or are new).
+    """
+    synced: List[str] = []
+    changed_ids: List[str] = []
+    errors: List[dict] = []
+
+    def _walk(parent_id: str):
+        if limit and len(synced) >= limit:
+            return
+        result = client.list_nodes(workspace_id, parent_id)
+        if not result.get("ok"):
+            errors.append({"parentId": parent_id, "error": result.get("error", "")})
+            return
+
+        for n in result["data"]:
+            if limit and len(synced) >= limit:
+                return
+            nid = n["nodeId"]
+            ntype = n["type"]
+            title = n["name"]
+
+            if ntype == "FOLDER":
+                _walk(nid)
+            elif ntype == "FILE":
+                try:
+                    meta = client.get_node_detail(nid)
+                    if not meta.get("ok"):
+                        errors.append({"nodeId": nid, "title": title, "error": "metadata failed"})
+                        continue
+
+                    blocks = client.get_document_blocks(nid)
+                    if blocks.get("ok"):
+                        parsed = parse_document(blocks["data"], "blocks")
+                    else:
+                        sheets_result = client.get_workbook_sheets(nid)
+                        if sheets_result.get("ok"):
+                            sheets_data = []
+                            for s in sheets_result["data"]:
+                                sid = s.get("id", "")
+                                sname = s.get("name", "")
+                                rng = client.get_workbook_range(nid, sid)
+                                rows = rng.get("data", []) if rng.get("ok") else []
+                                sheets_data.append((sname, rows))
+                            parsed = parse_document(sheets_data, "workbook")
+                        else:
+                            errors.append({"nodeId": nid, "title": title, "error": "content failed"})
+                            continue
+
+                    changed = _cache_document(
+                        node_id=nid,
+                        workspace_id=workspace_id,
+                        title=title,
+                        content=parsed["markdown"],
+                        node_type="FILE",
+                        parent_id=parent_id or "",
+                        category=n.get("category", ""),
+                        raw_json=json.dumps(n, ensure_ascii=False),
+                    )
+                    synced.append(nid)
+                    if changed:
+                        changed_ids.append(nid)
+                except Exception as e:
+                    errors.append({"nodeId": nid, "title": title, "error": str(e)})
+
+    _walk(root_id)
+    return {
+        "syncedCount": len(synced),
+        "changedCount": len(changed_ids),
+        "syncedIds": changed_ids,
+        "failedCount": len(errors),
+        "errors": errors[:20],
+    }
 
 
 # ── route registration ─────────────────────────────────────────
@@ -249,74 +347,6 @@ def register(bp, ok, fail):
             "parseStatus": parsed.get("parse_status", "ok"),
         })
 
-    def _sync_workspace(client, workspace_id: str, root_id: str, limit: int = 0) -> dict:
-        """Walk a workspace tree, cache all documents. Returns {syncedCount, failedCount, errors}."""
-        synced: List[str] = []
-        errors: List[dict] = []
-
-        def _walk(parent_id: str):
-            if limit and len(synced) >= limit:
-                return
-            result = client.list_nodes(workspace_id, parent_id)
-            if not result.get("ok"):
-                errors.append({"parentId": parent_id, "error": result.get("error", "")})
-                return
-
-            for n in result["data"]:
-                if limit and len(synced) >= limit:
-                    return
-                nid = n["nodeId"]
-                ntype = n["type"]
-                title = n["name"]
-
-                if ntype == "FOLDER":
-                    _walk(nid)
-                elif ntype == "FILE":
-                    try:
-                        meta = client.get_node_detail(nid)
-                        if not meta.get("ok"):
-                            errors.append({"nodeId": nid, "title": title, "error": "metadata failed"})
-                            continue
-
-                        blocks = client.get_document_blocks(nid)
-                        if blocks.get("ok"):
-                            parsed = parse_document(blocks["data"], "blocks")
-                        else:
-                            sheets_result = client.get_workbook_sheets(nid)
-                            if sheets_result.get("ok"):
-                                sheets_data = []
-                                for s in sheets_result["data"]:
-                                    sid = s.get("id", "")
-                                    sname = s.get("name", "")
-                                    rng = client.get_workbook_range(nid, sid)
-                                    rows = rng.get("data", []) if rng.get("ok") else []
-                                    sheets_data.append((sname, rows))
-                                parsed = parse_document(sheets_data, "workbook")
-                            else:
-                                errors.append({"nodeId": nid, "title": title, "error": "content failed"})
-                                continue
-
-                        _cache_document(
-                            node_id=nid,
-                            workspace_id=workspace_id,
-                            title=title,
-                            content=parsed["markdown"],
-                            node_type="FILE",
-                            parent_id=parent_id or "",
-                            category=n.get("category", ""),
-                            raw_json=json.dumps(n, ensure_ascii=False),
-                        )
-                        synced.append(nid)
-                    except Exception as e:
-                        errors.append({"nodeId": nid, "title": title, "error": str(e)})
-
-        _walk(root_id)
-        return {
-            "syncedCount": len(synced),
-            "failedCount": len(errors),
-            "errors": errors[:20],
-        }
-
     @bp.route("/ai/knowledge/sync", methods=["POST"])
     def ai_knowledge_sync():
         """Walk a workspace tree and cache all documents.
@@ -364,9 +394,10 @@ def register(bp, ok, fail):
 
     @bp.route("/ai/knowledge/sync-all", methods=["POST"])
     def ai_knowledge_sync_all():
-        """Sync all known knowledge bases, then optionally rechunk.
+        """Sync all known knowledge bases (documents only, no chunk/embed).
 
-        Body: { "rechunk": true/false }  (default: false)
+        Body: { "limit"?: N, "ws_limit"?: N }
+        For sync + rechunk + embed, use /ai/knowledge/sync-and-embedding.
         """
         union_id = _current_union_id()
         if not union_id:
@@ -380,16 +411,16 @@ def register(bp, ok, fail):
             return fail("failed to list workspaces", code=502)
 
         body = request.get_json(silent=True) or {}
-        rechunk_flag = str(body.get("rechunk") or "").strip().lower() in ("1", "true", "yes")
         limit = max(0, int(body.get("limit") or 0))  # 0 = no limit
         ws_limit = max(0, int(body.get("ws_limit") or 0))  # 0 = all workspaces
 
-        from ai.knowledge.service import KNOWN_WORKSPACES
+        from ai.knowledge.service import get_known_workspaces
+        known = get_known_workspaces()
 
         workspaces_to_sync = [
             (w["workspaceId"], w["rootNodeId"], w["name"])
             for w in ws_list["data"]
-            if w["workspaceId"] in KNOWN_WORKSPACES
+            if w["workspaceId"] in known
         ]
         if ws_limit:
             workspaces_to_sync = workspaces_to_sync[:ws_limit]
@@ -416,46 +447,35 @@ def register(bp, ok, fail):
 
         finished = time.time()
 
-        # Auto-rechunk if requested
-        rechunk_result = None
-        if rechunk_flag:
-            from ai.knowledge.chunker import chunk_document
-            from ai.knowledge.models import create_kb_fts, drop_kb_fts
-            from db.engine import engine as _engine
-
-            db = SessionLocal()
-            try:
-                total_chunks = 0
-                docs = db.query(KbDocument).filter(KbDocument.content != "").all()
-                for doc in docs:
-                    db.query(KbChunk).filter(KbChunk.doc_id == doc.doc_id).delete()
-                    chunks = chunk_document(doc.doc_id, doc.title, doc.content, doc.node_type)
-                    for c in chunks:
-                        db.add(KbChunk(
-                            doc_id=c["doc_id"],
-                            chunk_index=c["chunk_index"],
-                            content=c["content"],
-                            token_count=c["token_count"],
-                        ))
-                    total_chunks += len(chunks)
-                db.commit()
-                drop_kb_fts(_engine)
-                create_kb_fts(_engine)
-                rechunk_result = {"chunkedDocs": len(docs), "totalChunks": total_chunks}
-            except Exception as e:
-                db.rollback()
-                rechunk_result = {"error": str(e)}
-            finally:
-                db.close()
-
         return ok({
             "syncedWorkspaces": len(results),
             "totalSynced": total_synced,
             "totalFailed": total_failed,
             "workspaces": results,
-            "rechunk": rechunk_result,
             "durationSec": round(finished - started, 1),
         })
+
+    @bp.route("/ai/knowledge/sync-and-embedding", methods=["POST"])
+    def ai_knowledge_sync_and_embedding():
+        """Full pipeline: sync all KBs -> rechunk changed docs -> embed.
+
+        This is the manual equivalent of the nightly daemon pipeline.
+        Returns phased results for each stage.
+        """
+        union_id = _current_union_id()
+        if not union_id:
+            return fail("not logged in", code=401)
+
+        from ai.knowledge.auto_sync import sync_all_and_embed
+
+        try:
+            result = sync_all_and_embed(union_id=union_id)
+            if result.get("ok"):
+                return ok(result)
+            else:
+                return fail(result.get("error", "full update failed"), code=500, data=result)
+        except Exception as e:
+            return fail(str(e), code=500)
 
     @bp.route("/ai/knowledge/search", methods=["POST"])
     def ai_knowledge_search():
@@ -487,15 +507,17 @@ def register(bp, ok, fail):
 
     @bp.route("/ai/knowledge/rechunk", methods=["POST"])
     def ai_knowledge_rechunk():
-        """Re-chunk one or all documents into kb_chunks.
+        """Re-chunk one or all documents, then auto-reembed vectors.
 
-        Body: { "doc_id"? "all"? }
+        Body: { "doc_id"? "all"? "embed"?: true/false }
+        embed defaults to true — set false to skip vector regeneration.
         """
         body = request.get_json(silent=True) or {}
         doc_id = str(body.get("doc_id") or "").strip()
         rechunk_all = not doc_id or str(body.get("all") or "").strip().lower() in ("1", "true", "yes")
+        do_embed = str(body.get("embed") or "true").strip().lower() not in ("0", "false", "no")
 
-        from ai.knowledge.chunker import chunk_document
+        from ai.knowledge.auto_sync import _rechunk_documents
 
         db = SessionLocal()
         try:
@@ -507,21 +529,10 @@ def register(bp, ok, fail):
             else:
                 return fail("missing doc_id or all=true", code=400)
 
-            total_chunks = 0
-            for doc in docs:
-                # Delete old chunks
-                db.query(KbChunk).filter(KbChunk.doc_id == doc.doc_id).delete()
-                chunks = chunk_document(doc.doc_id, doc.title, doc.content, doc.node_type)
-                for c in chunks:
-                    db.add(KbChunk(
-                        doc_id=c["doc_id"],
-                        chunk_index=c["chunk_index"],
-                        content=c["content"],
-                        token_count=c["token_count"],
-                    ))
-                total_chunks += len(chunks)
-
-            db.commit()
+            doc_ids = [d.doc_id for d in docs]
+            rechunk_result = _rechunk_documents(doc_ids)
+            if not rechunk_result.get("ok"):
+                return fail(rechunk_result.get("error", "rechunk failed"), code=500)
 
             # Refresh FTS index
             from ai.knowledge.models import create_kb_fts, drop_kb_fts
@@ -529,13 +540,349 @@ def register(bp, ok, fail):
             drop_kb_fts(_engine)
             create_kb_fts(_engine)
 
-            return ok({
-                "chunkedDocs": len(docs),
-                "totalChunks": total_chunks,
-            })
+            result = {
+                "chunkedDocs": rechunk_result["chunkedDocs"],
+                "totalChunks": rechunk_result["totalChunks"],
+            }
+
+            # Auto-reembed: clean orphan vectors + embed new chunks
+            if do_embed:
+                from db.engine import PgVectorSessionLocal
+                from sqlalchemy import text as sa_text
+
+                pg = PgVectorSessionLocal()
+                try:
+                    orphaned = pg.execute(
+                        sa_text(
+                            "DELETE FROM chunk_vectors WHERE chunk_id NOT IN "
+                            "(SELECT id FROM kb_chunks)"
+                        )
+                    )
+                    pg.commit()
+                    result["orphanedVectors"] = orphaned.rowcount
+                except Exception:
+                    pg.rollback()
+                finally:
+                    pg.close()
+
+                from ai.knowledge.embedder import embed_chunks
+                emb_stats = embed_chunks(limit=0)
+                result["embed"] = emb_stats
+
+            return ok(result)
         except Exception as e:
             db.rollback()
             return fail(str(e), code=500)
+        finally:
+            db.close()
+
+    @bp.route("/ai/knowledge/analyze/task", methods=["POST"])
+    def ai_knowledge_analyze_task():
+        """Fetch task data + retrieve relevant knowledge base chunks for analysis.
+
+        Body: { "task_id": "...", "project_id"?: "..." }
+        Returns task summary and knowledge base references.
+        The actual multi-dimensional analysis is done by a Claude Code skill.
+        """
+        body = request.get_json(silent=True) or {}
+        task_id = str(body.get("task_id") or "").strip()
+        if not task_id:
+            return fail("missing task_id", code=400)
+        project_id = str(body.get("project_id") or "").strip() or None
+
+        from db.orm import ProjectTask, ProjectTaskDetail
+        from ai.knowledge.retriever import search_hybrid
+
+        db = SessionLocal()
+        try:
+            # 1. Fetch task data
+            task = db.query(ProjectTask).filter(ProjectTask.task_id == task_id).first()
+            detail = None
+            if project_id:
+                detail = (
+                    db.query(ProjectTaskDetail)
+                    .filter(
+                        ProjectTaskDetail.task_id == task_id,
+                        ProjectTaskDetail.project_id == project_id,
+                    )
+                    .first()
+                )
+            if not detail:
+                detail = (
+                    db.query(ProjectTaskDetail)
+                    .filter(ProjectTaskDetail.task_id == task_id)
+                    .first()
+                )
+
+            if not task and not detail:
+                return fail(f"task not found: {task_id}", code=404)
+
+            # Build task summary
+            task_summary = {
+                "taskId": task_id,
+                "title": (detail.content if detail else None) or (task.content if task else ""),
+                "projectId": (detail.project_id if detail else None) or (task.project_id if task else ""),
+                "priority": task.priority if task else None,
+                "progress": task.progress if task else None,
+                "isDone": task.is_done if task else None,
+                "isOverdue": detail.is_overdue if detail else None,
+                "dueDate": (detail.due_date.isoformat() if detail and detail.due_date else None)
+                           or (task.due_date.isoformat() if task and task.due_date else None),
+                "workHour": detail.work_hour if detail else None,
+                "taskNature": detail.task_nature if detail else None,
+                "businessType": detail.business_type if detail else None,
+                "parentTaskId": detail.parent_task_id if detail else None,
+                "executorId": task.executor_id if task else None,
+                "note": task.note if task else "",
+            }
+
+            # 2. Build search query from task context
+            search_text = " ".join(filter(None, [
+                task_summary["title"],
+                task_summary["taskNature"] or "",
+                task_summary["note"],
+            ]))
+            if not search_text.strip():
+                search_text = task_summary["title"]
+
+            # 3. Retrieve knowledge base chunks
+            chunks = []
+            if search_text.strip():
+                try:
+                    chunks = search_hybrid(search_text, top_k=8)
+                except Exception:
+                    pass
+
+            kb_references = [
+                {
+                    "source": c.get("title", ""),
+                    "content": c.get("content", ""),
+                    "score": c.get("score", 0),
+                    "chunkId": c.get("chunk_id"),
+                }
+                for c in chunks
+            ]
+
+            return ok({
+                "task": task_summary,
+                "knowledge": kb_references,
+                "searchQuery": search_text,
+            })
+        finally:
+            db.close()
+
+    @bp.route("/ai/knowledge/analyze/task/report", methods=["POST"])
+    def ai_knowledge_analyze_task_report():
+        """Full pipeline: fetch task + retrieve KB + LLM analysis report.
+
+        Body: { "task_id": "..." }
+        Returns structured JSON analysis report.
+        """
+        body = request.get_json(silent=True) or {}
+        task_id = str(body.get("task_id") or "").strip()
+        if not task_id:
+            return fail("missing task_id", code=400)
+        project_id = str(body.get("project_id") or "").strip() or None
+
+        from db.orm import ProjectTask, ProjectTaskDetail
+        from ai.knowledge.retriever import search_hybrid
+        from ai.knowledge.analyze import analyze_task_report
+
+        db = SessionLocal()
+        try:
+            # 1. Fetch task
+            task = db.query(ProjectTask).filter(ProjectTask.task_id == task_id).first()
+            detail = None
+            if project_id:
+                detail = (
+                    db.query(ProjectTaskDetail)
+                    .filter(
+                        ProjectTaskDetail.task_id == task_id,
+                        ProjectTaskDetail.project_id == project_id,
+                    )
+                    .first()
+                )
+            if not detail:
+                detail = (
+                    db.query(ProjectTaskDetail)
+                    .filter(ProjectTaskDetail.task_id == task_id)
+                    .first()
+                )
+            if not task and not detail:
+                return fail(f"task not found: {task_id}", code=404)
+
+            task_summary = {
+                "taskId": task_id,
+                "title": (detail.content if detail else None) or (task.content if task else ""),
+                "projectId": (detail.project_id if detail else None) or (task.project_id if task else ""),
+                "priority": task.priority if task else None,
+                "progress": task.progress if task else None,
+                "isDone": task.is_done if task else None,
+                "isOverdue": detail.is_overdue if detail else None,
+                "dueDate": (detail.due_date.isoformat() if detail and detail.due_date else None)
+                           or (task.due_date.isoformat() if task and task.due_date else None),
+                "workHour": detail.work_hour if detail else None,
+                "taskNature": detail.task_nature if detail else None,
+                "businessType": detail.business_type if detail else None,
+                "parentTaskId": detail.parent_task_id if detail else None,
+                "executorId": task.executor_id if task else None,
+                "note": task.note if task else "",
+            }
+
+            # 2. Search KB
+            search_text = " ".join(filter(None, [
+                task_summary["title"],
+                task_summary["taskNature"] or "",
+                task_summary["note"],
+            ]))
+            if not search_text.strip():
+                search_text = task_summary["title"]
+
+            chunks = []
+            if search_text.strip():
+                try:
+                    chunks = search_hybrid(search_text, top_k=8)
+                except Exception:
+                    pass
+
+            kb_refs = [
+                {"source": c.get("title", ""), "content": c.get("content", ""),
+                 "score": c.get("score", 0), "chunkId": c.get("chunk_id")}
+                for c in chunks
+            ]
+
+            # 3. Generate report
+            report = analyze_task_report(task_summary, kb_refs)
+
+            return ok({
+                "task": task_summary,
+                "knowledge": kb_refs,
+                "report": report,
+            })
+        finally:
+            db.close()
+
+    @bp.route("/ai/knowledge/analyze/dashboard", methods=["POST"])
+    def ai_knowledge_analyze_dashboard():
+        """6-module task analysis dashboard: pull user tasks + KB + LLM.
+
+        Body: { "owner_key"?: "...", "project_ids"?: [...], "quarter"?: "2026Q2" }
+        Returns 6 analysis modules in a single response.
+        """
+        body = request.get_json(silent=True) or {}
+        owner_key = str(body.get("owner_key") or "").strip() or None
+        project_ids = body.get("project_ids") or []
+        if isinstance(project_ids, list):
+            project_ids = [str(p).strip() for p in project_ids if str(p).strip()]
+
+        from db.orm import ProjectTask, ProjectTaskDetail
+        from ai.knowledge.retriever import search_hybrid
+        from ai.knowledge.dashboard_analysis import analyze_dashboard
+
+        db = SessionLocal()
+        try:
+            # 1. Fetch tasks
+            task_query = db.query(ProjectTask).filter(
+                ProjectTask.is_deleted == False,
+                ProjectTask.is_archived == False,
+            )
+            if project_ids:
+                task_query = task_query.filter(ProjectTask.project_id.in_(project_ids))
+            if owner_key:
+                task_query = task_query.filter(ProjectTask.executor_id == owner_key)
+            else:
+                # No owner filter — return tasks across all users (admin/demo use)
+                pass
+
+            tasks = task_query.order_by(ProjectTask.priority.desc()).limit(30).all()
+            if not tasks:
+                return fail("no tasks found", code=404)
+
+            task_ids = [t.task_id for t in tasks]
+
+            # Fetch details
+            details_q = db.query(ProjectTaskDetail).filter(
+                ProjectTaskDetail.task_id.in_(task_ids)
+            ).all()
+            detail_map = {d.task_id: d for d in details_q}
+
+            # Build task summaries
+            task_summaries = []
+            for t in tasks:
+                d = detail_map.get(t.task_id)
+                task_summaries.append({
+                    "taskId": t.task_id,
+                    "title": t.content or "",
+                    "progress": t.progress or 0,
+                    "isOverdue": d.is_overdue if d else False,
+                    "isDone": t.is_done,
+                    "workHour": d.work_hour if d else None,
+                    "taskNature": d.task_nature if d else None,
+                    "businessType": d.business_type if d else None,
+                    "dueDate": d.due_date.isoformat() if d and d.due_date else (t.due_date.isoformat() if t and t.due_date else None),
+                })
+
+            # 2. Work hour stats (assigned/autonomous/capability)
+            work_types: Dict[str, int] = {"指派型": 0, "自主型": 0, "能力型": 0, "其他": 0}
+            done_count = 0
+            overdue_count = 0
+            total_work_hours = 0.0
+            for t in tasks:
+                d = detail_map.get(t.task_id)
+                if t.is_done:
+                    done_count += 1
+                if d and d.is_overdue:
+                    overdue_count += 1
+                wh = d.work_hour if d else None
+                if wh:
+                    total_work_hours += wh
+                nature = (d.task_nature if d else None) or "其他"
+                found = False
+                for key in work_types:
+                    if key in str(nature):
+                        work_types[key] += 1
+                        found = True
+                        break
+                if not found:
+                    work_types["其他"] += 1
+
+            total = len(tasks)
+            work_hour_stats = {
+                "total_tasks": total,
+                "done_count": done_count,
+                "overdue_count": overdue_count,
+                "total_work_hours": round(total_work_hours, 1),
+                "assigned_pct": round(work_types.get("指派型", 0) / max(total, 1) * 100, 1),
+                "autonomous_pct": round(work_types.get("自主型", 0) / max(total, 1) * 100, 1),
+                "capability_pct": round(work_types.get("能力型", 0) / max(total, 1) * 100, 1),
+            }
+
+            # 3. Search KB with combined task keywords
+            search_text = " ".join([t.get("title", "") for t in task_summaries[:5]])
+            kb_chunks = []
+            if search_text.strip():
+                try:
+                    kb_chunks = search_hybrid(search_text, top_k=8)
+                except Exception:
+                    pass
+            kb_refs = [
+                {"source": c.get("title", ""), "content": c.get("content", ""),
+                 "score": c.get("score", 0)} for c in kb_chunks
+            ]
+
+            # 4. Run analysis
+            modules = analyze_dashboard(task_summaries, work_hour_stats, kb_refs)
+
+            if "error" in modules:
+                return fail(modules["error"], code=502, data={"raw": modules.get("raw", "")})
+
+            return ok({
+                "modules": modules,
+                "meta": {
+                    "taskCount": total,
+                    "analyzedAt": datetime.now(timezone.utc).isoformat(),
+                },
+            })
         finally:
             db.close()
 
@@ -564,17 +911,13 @@ def register(bp, ok, fail):
             pass
         model = str(payload.get("model") or cfg.get("model") or "glm-5.1").strip() or "glm-5.1"
 
-        # Init knowledge workspace context before starting ttyd
-        try:
-            from ai.knowledge.workspace import init_knowledge_workspace
-            init_knowledge_workspace(owner_key)
-        except Exception:
-            pass
-
+        from ai.knowledge.workspace import init_knowledge_workspace
         try:
             state = ensure_ttyd_session(
                 owner_key=owner_key, owner_name=owner_name, model=model,
                 auth_user=auth_user, skill="",
+                workspace_init=init_knowledge_workspace,
+                purpose="knowledge",
             )
         except Exception as exc:
             return fail(str(exc), code=500, data={})
@@ -597,11 +940,44 @@ def register(bp, ok, fail):
             "pid": int(state.get("proc").pid) if state.get("proc") else 0,
         })
 
+    @bp.route("/ai/knowledge/chat/session", methods=["POST"])
+    def ai_knowledge_chat_session():
+        """Create a new chat session, return session_id."""
+        from ai.knowledge.chat_session import create_session
+        sid = create_session()
+        return ok({"sessionId": sid})
+
+    @bp.route("/ai/knowledge/chat", methods=["GET"])
+    def ai_knowledge_chat():
+        """SSE knowledge-base chat endpoint.
+
+        Query params: q (question), session_id (optional), workspace_id (optional).
+        Returns text/event-stream with message and done events.
+        """
+        q = str(request.args.get("q") or "").strip()
+        if not q:
+            return fail("missing q", code=400)
+        session_id = str(request.args.get("session_id") or "").strip()
+        ws_id = str(request.args.get("workspace_id") or "").strip() or None
+
+        from flask import Response, stream_with_context
+        from ai.knowledge.chat import chat_stream
+
+        return Response(
+            stream_with_context(chat_stream(q, session_id=session_id, workspace_id=ws_id)),
+            mimetype="text/event-stream; charset=utf-8",
+            headers={
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",
+            },
+        )
+
     @bp.route("/ai/knowledge/chunks/search", methods=["POST"])
     def ai_knowledge_chunks_search():
-        """Local full-text search on kb_chunks.
+        """Local search on kb_chunks (keyword / vector / hybrid).
 
-        Body: { "query": "...", "top_k": 10, "workspace_id": "..." }
+        Body: { "query": "...", "top_k": 10, "workspace_id": "...", "method": "hybrid" }
+        method: "keyword" (FULLTEXT), "vector" (cosine), "hybrid" (RRF fusion, default)
         """
         body = request.get_json(silent=True) or {}
         query = str(body.get("query") or body.get("q") or "").strip()
@@ -610,12 +986,35 @@ def register(bp, ok, fail):
 
         top_k = max(1, min(50, int(body.get("top_k") or 10)))
         ws_id = str(body.get("workspace_id") or "").strip() or None
+        method = str(body.get("method") or "hybrid").strip().lower()
 
-        from ai.knowledge.retriever import search_chunks
+        from ai.knowledge.retriever import search_chunks, search_hybrid, search_vector
 
         try:
-            chunks = search_chunks(query, top_k=top_k, workspace_id=ws_id)
-            return ok({"query": query, "total": len(chunks), "chunks": chunks})
+            if method == "keyword":
+                chunks = search_chunks(query, top_k=top_k, workspace_id=ws_id)
+            elif method == "vector":
+                chunks = search_vector(query, top_k=top_k, workspace_id=ws_id)
+            else:
+                chunks = search_hybrid(query, top_k=top_k, workspace_id=ws_id)
+            return ok({"query": query, "method": method, "total": len(chunks), "chunks": chunks})
         except Exception as e:
             return fail(str(e), code=500)
 
+    @bp.route("/ai/knowledge/reembed", methods=["POST"])
+    def ai_knowledge_reembed():
+        """Embed kb_chunks into pgvector chunk_vectors for semantic search.
+
+        Body: { "workspace_id"?: "...", "limit"?: N }
+        """
+        body = request.get_json(silent=True) or {}
+        ws_id = str(body.get("workspace_id") or "").strip() or None
+        limit = max(0, int(body.get("limit") or 0))
+
+        from ai.knowledge.embedder import embed_chunks
+
+        try:
+            stats = embed_chunks(workspace_id=ws_id, limit=limit)
+            return ok(stats)
+        except Exception as e:
+            return fail(str(e), code=500)

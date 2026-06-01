@@ -502,6 +502,38 @@ export function mockSyncKnowledgeBase() {
   }));
 }
 
+export function mockCreateKnowledgeChatSession() {
+  return request(() => ({ sessionId: 'mock-' + Date.now().toString(36) }));
+}
+
+export function mockAnalyzeDashboard() {
+  return request(() => ({
+    modules: {
+      requirement_radar: { keywords: [
+        {word: "导航优化", frequency: 5, suggestions: {horizontal: "扩展到叉车场景", quality: "增加RS优化参数调校", forward: "探索端到端深度学习方法"}},
+        {word: "托盘识别", frequency: 3, suggestions: {horizontal: "支持异形托盘", quality: "提升遮挡场景准确率", forward: "尝试多模态大模型方案"}},
+      ]},
+      tech_debt_auditor: { gaps: [
+        {task: "导航优化", current: "现有RS参数为经验值", target: "建立参数调校知识库", action: "输出参数调校指导文档", value_score: 8},
+        {task: "托盘识别", current: "2D相机方案", target: "3D点云+纹理融合", action: "评估3D相机性价比", value_score: 7},
+      ], summary: "技术债集中在感知和导航模块" },
+      performance_balancer: { ratio: {assigned: 55, autonomous: 30, capability: 15}, status: "基本合规", detail: "自主型偏低，建议增加技术研究类任务", suggestions: ["每月保留20%时间做技术预研"] },
+      growth_booster: { learnings: [
+        {pain_point: "参数调校依赖经验", ai_tech: "贝叶斯优化 / AutoML", why_learn: "自动化调参可提升效率50%+", output_required: "输出《AutoML参数调优实践》PPT"},
+      ]},
+      efficiency_transformer: { tools: [
+        {scenario: "每次发布手动check配置文件", tool_suggestion: "配置合规检查脚本(pre-commit hook)", expected_efficiency: "每次节省15分钟", effort_estimate: "0.5人天"},
+      ]},
+      risk_warning_engine: { alerts: [
+        {level: "yellow", type: "结构失衡", description: "连续3周无自主型任务，建议增加技术研究"},
+      ], draft_tasks: [
+        {title: "【自主】导航参数自动调优工具调研", description: "调研AutoML在ROS导航参数优化中的应用，输出调研报告"},
+      ]},
+    },
+    meta: { taskCount: 12, analyzedAt: new Date().toISOString() },
+  }));
+}
+
 export function mockFetchAIKnowledgeTtydSession(_user, payload = {}) {
   const ownerKey = String(payload?.ownerKey || _user?.user_id || _user?.userid || _user?.name || 'anonymous');
   const model = String(payload?.model || 'glm');

@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 
-from db.config import DATABASE_URI, PERF_DATABASE_URI
+from db.config import DATABASE_URI, PERF_DATABASE_URI, PGVECTOR_DATABASE_URI
 from db.orm import Base  # 导入即注册 ProjectTask 等到 Base.metadata
 
 # SQLite 下多线程需 check_same_thread=False（Flask 每请求一线程）
@@ -34,6 +34,15 @@ perf_engine = create_engine(
 )
 
 PerfSessionLocal = scoped_session(sessionmaker(bind=perf_engine, autoflush=False, autocommit=False, future=True))
+
+# pgvector（PostgreSQL）embedding 专用引擎
+pgvector_engine = create_engine(
+    PGVECTOR_DATABASE_URI,
+    future=True,
+    pool_pre_ping=True,
+)
+
+PgVectorSessionLocal = scoped_session(sessionmaker(bind=pgvector_engine, autoflush=False, autocommit=False, future=True))
 
 
 def _table_registry():

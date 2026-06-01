@@ -128,6 +128,8 @@ def workbook_to_markdown(sheets: List[dict]) -> str:
 
 
 # ── HTML → Markdown ────────────────────────────────────────────
+
+def html_to_markdown(html: str) -> str:
     """Convert HTML content to Markdown using regex and string transforms.
 
     Falls back gracefully: if we can't parse something, it stays as text.

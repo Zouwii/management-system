@@ -733,9 +733,19 @@ export function realFetchPermissionMatrix() {
 }
 
 export function realSyncKnowledgeBase() {
-  return httpRequest('/bt/ai/knowledge/sync', {
+  return httpRequest('/bt/ai/knowledge/sync-and-embedding', {
     method: 'POST',
-    body: JSON.stringify({ workspace_id: '1oam4Sk7BMLXxn8K' }),
+  });
+}
+
+export function realCreateKnowledgeChatSession() {
+  return httpRequest('/bt/ai/knowledge/chat/session', { method: 'POST' });
+}
+
+export function realAnalyzeDashboard(payload = {}) {
+  return httpRequest('/bt/ai/knowledge/analyze/dashboard', {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
   });
 }
 

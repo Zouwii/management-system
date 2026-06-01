@@ -347,33 +347,6 @@ data: {"type": "done"}
 
 ---
 
-## 6. Phase 5：AI 任务分析增强
-
-### 6.1 流程
-
-```
-用户选择任务/项目 → 触发分析
-    ↓
-[1] 拉取任务数据（工时、进度、逾期等）
-[2] 根据任务类型 + 项目信息构建检索词 → 检索知识库
-[3] 构造分析 Prompt（任务数据 + 规范引用）
-[4] LLM 生成分析报告（非流式 JSON）
-```
-
-### 6.2 API
-
-```
-POST /ai/analyze_task
-{ "task_id": "xxx", "project_id": "yyy" }
-
-→ {
-    "summary": "任务整体良好，需求描述需补充",
-    "risks": ["缺少验收标准"],
-    "suggestions": ["参考《需求文档规范》第3节"],
-    "evidence": [{ "source": "需求文档规范 v2.3", "content": "..." }]
-}
-```
-
 ---
 
 ## 7. 模块结构（目标）
@@ -402,7 +375,7 @@ backend/ai/knowledge/
 | Phase 2 | 文档切片（chunker.py + 重新切片 API） | 2-3 天 |
 | Phase 3 | 向量化 + 混合检索 | 3-5 天 |
 | Phase 4 | SSE 知识库对话 | 3-5 天 |
-| Phase 5 | 任务分析增强 | 2-3 天 |
+| Phase 5 | 任务分析增强（独立模块，见 `ai/docs/ai-task-analysis-design.md`） | - |
 
 ---
 
