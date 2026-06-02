@@ -398,14 +398,16 @@ def _prepare_workspace_dir(identity: Dict[str, str], workspace_dir: Optional[Pat
 def write_user_task_context_markdown(
     auth_user: Dict[str, Any], workspace_dir: Optional[Path] = None
 ) -> Dict[str, Any]:
-    """Load user task context from DB and write AI_TASK_CONTEXT.md + CLAUDE.md to workspace.
+    """Load user task context from DB and write AI_TASK_CONTEXT.md to workspace.
+
+    CLAUDE.md is written separately by workspace.init_workspace().
 
     Args:
         auth_user: Authenticated user dict.
         workspace_dir: Optional explicit workspace path. Auto-derived if not given.
 
     Returns:
-        Dict with identity, context, workspaceDir, contextMarkdownPath, claudeMarkdownPath, and markdown.
+        Dict with identity, context, workspaceDir, contextMarkdownPath, and markdown.
     """
     context = load_user_task_context(auth_user)
     identity = context["identity"]
@@ -413,50 +415,10 @@ def write_user_task_context_markdown(
     markdown = render_user_task_context_markdown(context)
     context_path = workspace / "AI_TASK_CONTEXT.md"
     context_path.write_text(markdown, encoding="utf-8")
-    claude_path = workspace / "CLAUDE.md"
-    claude_path.write_text(
-        "\n".join(
-            [
-                "# AI 任务助手工作区",
-                "",
-                "你是当前系统中的任务创建助手，职责是引导用户一步步创建 Teambition 任务草稿。",
-                "",
-                "## 启动行为",
-                "",
-                "会话开始后，先打招呼介绍自己的身份，然后展示以下选项等待用户输入数字：",
-                "",
-                "```",
-                "输入模式：1、tb单创建模式 2、正常对话模式",
-                "```",
-                "",
-                "**不要替用户做选择**，只展示选项等待用户回复数字。",
-                "",
-                "## tb单创建模式",
-                "",
-                "当用户选择模式 1 后，先阅读 `AI_TASK_CONTEXT.md` 了解当前登录用户的历史任务、任务压力、常见工作类型和父子任务关系。",
-                "然后严格按照一问一答的方式收集信息，每次只问一个问题，等用户回答后再问下一个。严禁一次问多个问题。",
-                "",
-                "收集顺序：",
-                "1. **任务标题** — '请描述一下这个任务的标题（控制在 18 字以内）'",
-                "2. **有效工时类型** — 用编号列出三个选项让用户回复数字：指派型/自主型/能力型",
-                "3. **任务背景** — '这个任务的背景是什么？为什么会做这个任务？'",
-                "4. **工作内容和目标** — 用户描述后先规范化展示，让用户确认后再进入下一步",
-                "5. **任务产出** — 根据需求描述和历史任务自动生成建议的产出清单（含预估天数），让用户确认或调整",
-                "6. **起止时间** — '任务的开始日期是哪天？截止日期默认是月底，你可以修改。'",
-                "",
-                "用户明确确认前，不要创建真实 Teambition 任务。",
-                "",
-                "用户明确确认前，不要创建真实 Teambition 任务。",
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
     return {
         "identity": identity,
         "context": context,
         "workspaceDir": str(workspace),
         "contextMarkdownPath": str(context_path),
-        "claudeMarkdownPath": str(claude_path),
         "markdown": markdown,
     }

@@ -1,6 +1,6 @@
-"""Dashboard analysis: 6-module task analysis via a single structured LLM call.
+"""Dashboard analysis: 4-module task analysis via a single structured LLM call.
 
-Prompt template is read from runtime/shared/.claude/skills/task-analysis/SKILL.md
+Prompt template is read from ai/skills/1_tb_analysis/SKILL.md
 — edit that file to adjust analysis rules without redeploying code.
 """
 
@@ -18,8 +18,8 @@ import requests
 logger = logging.getLogger(__name__)
 
 _SKILL_PATH = (
-    Path(__file__).resolve().parent.parent.parent
-    / "runtime" / "shared" / ".claude" / "skills" / "task-analysis" / "SKILL.md"
+    Path(__file__).resolve().parent.parent
+    / "skills" / "1_tb_analysis" / "SKILL.md"
 )
 
 

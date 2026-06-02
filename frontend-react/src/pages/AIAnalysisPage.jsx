@@ -11,7 +11,6 @@ import {
   syncKnowledgeBase,
   fetchAIKnowledgeTtydSession,
   createKnowledgeChatSession,
-  analyzeDashboard,
 } from '../api/dashboard';
 import Card from '../components/Card';
 import SectionTitle from '../components/SectionTitle';
@@ -254,20 +253,41 @@ export default function AIAnalysisPage() {
 
   const handleAnalyze = useCallback(async () => {
     setAnalysisBusy(true);
-    setAnalysisStatus('分析中...');
     setDashboardResult(null);
     setDashboardError('');
     try {
-      const res = await analyzeDashboard({ owner_key: ownerKey });
-      if (res.code === 200) {
-        setDashboardResult(res.data);
-        setAnalysisStatus(`分析完成（${res.data.meta?.taskCount || 0} 个任务）`);
-      } else {
-        setDashboardError(res.error || '分析失败');
-        setAnalysisStatus('分析失败');
-      }
+      setAnalysisStatus('拉取任务数据...');
+      const t1 = await fetch('/api/bt/ai/task-analysis/fetch-tasks', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ quarter: '2026Q2', owner_key: ownerKey }),
+        credentials: 'include',
+      });
+      const d1 = await t1.json();
+      if (d1.code !== 200) throw new Error(d1.error || '步骤1失败');
+      const { tasks, stats } = d1.data;
+
+      setAnalysisStatus('检索知识库...');
+      const t2 = await fetch('/api/bt/ai/task-analysis/search-kb', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ tasks, generate: true }),
+        credentials: 'include',
+      });
+      const d2 = await t2.json();
+      if (d2.code !== 200) throw new Error(d2.error || '步骤2失败');
+
+      setAnalysisStatus('LLM 分析中...');
+      const t3 = await fetch('/api/bt/ai/task-analysis/generate-report', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ tasks, stats, chunks: d2.data.chunks || [] }),
+        credentials: 'include',
+      });
+      const d3 = await t3.json();
+      if (d3.code !== 200) throw new Error(d3.error || '步骤3失败');
+
+      setDashboardResult({ modules: d3.data, meta: { taskCount: stats.total_tasks } });
+      setAnalysisStatus(`分析完成（${stats.total_tasks}个任务）`);
     } catch (e) {
-      setDashboardError(e.message || '分析请求失败');
+      setDashboardError(e.message || '分析失败');
       setAnalysisStatus('分析失败');
     } finally {
       setAnalysisBusy(false);
@@ -379,8 +399,6 @@ export default function AIAnalysisPage() {
     <EmployeeLayout>
       <SectionTitle
         title="AI助理"
-        desc="AI 工作台：任务分析、任务创建、知识库问答"
-        right={<div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm">AI 工作台</div>}
       />
 
       <div className="space-y-4">
@@ -388,7 +406,6 @@ export default function AIAnalysisPage() {
         <CollapsibleSection
           defaultOpen={false}
           title="AI任务分析栏"
-          subtitle="根据工时和绩效给出执行建议"
           extra={
             <div className="flex items-center gap-3">
               <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">{analysisStatus}</div>
@@ -411,7 +428,7 @@ export default function AIAnalysisPage() {
             </div>
           }
         >
-          <div className="mt-2 grid gap-5 xl:grid-cols-2">
+          <div className="mt-2 space-y-5">
             <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-4">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-base font-semibold text-slate-900">根据工时进行分析</div>
@@ -436,29 +453,45 @@ export default function AIAnalysisPage() {
                   </div>
                 )}
                 {dashboardResult?.modules && (
-                  <div className="grid gap-3 md:grid-cols-2">
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                     {/* 1. 需求雷达 */}
                     <div className="rounded-xl border border-slate-200 bg-white border-l-4 border-l-sky-400 p-3">
                       <div className="flex items-center gap-1.5 mb-2">
                         <svg className="h-4 w-4 text-sky-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                         <span className="text-xs font-semibold text-slate-800">需求雷达</span>
                       </div>
-                      <div className="flex flex-wrap gap-1">
-                        {(dashboardResult.modules.requirement_radar?.keywords || []).slice(0, 6).map((kw, i) => (
-                          <span key={i} className="rounded-full bg-sky-50 text-sky-700 px-2 py-0.5 text-[11px] font-medium cursor-pointer hover:bg-sky-100"
+                      <div className="flex flex-wrap gap-2">
+                        {(() => {
+                          const keywords = dashboardResult.modules.requirement_radar?.keywords || [];
+                          // 去重：同一词只保留首次出现
+                          const seen = new Set();
+                          const unique = keywords.filter(kw => {
+                            const w = kw.word?.trim();
+                            if (!w || seen.has(w)) return false;
+                            seen.add(w);
+                            return true;
+                          });
+                          return unique.slice(0, 10).map((kw, i) => (
+                          <span key={i}
+                            className={`rounded-lg px-3 py-1.5 text-sm font-medium cursor-pointer transition-colors ${
+                              expandedKeyword === i
+                                ? 'bg-sky-500 text-white shadow-sm'
+                                : 'bg-sky-50 text-sky-700 hover:bg-sky-200 hover:text-sky-800'
+                            }`}
                             onClick={() => setExpandedKeyword(expandedKeyword === i ? null : i)}>
                             {kw.word}
                           </span>
-                        ))}
+                        ));
+                        })()}
                       </div>
                       {expandedKeyword !== null && (() => {
                         const kw = (dashboardResult.modules.requirement_radar?.keywords || [])[expandedKeyword];
                         return kw ? (
-                          <div className="mt-2 rounded-lg border border-sky-100 bg-sky-50/50 p-2 text-[11px] space-y-1">
-                            <div className="font-medium text-sky-800">一词三建议 · {kw.word}</div>
-                            <div>横向补位：{kw.suggestions?.horizontal || '-'}</div>
-                            <div>质量升维：{kw.suggestions?.quality || '-'}</div>
-                            <div>前瞻实验：{kw.suggestions?.forward || '-'}</div>
+                          <div className="mt-2 rounded-lg border border-sky-100 bg-sky-50/50 p-3 text-sm space-y-1.5">
+                            <div className="font-semibold text-slate-700">{kw.word}</div>
+                            <div><span className="font-bold text-sky-600">横向补位</span>：{kw.suggestions?.horizontal || '-'}</div>
+                            <div><span className="font-bold text-sky-600">质量升维</span>：{kw.suggestions?.quality || '-'}</div>
+                            <div><span className="font-bold text-sky-600">前瞻实验</span>：{kw.suggestions?.forward || '-'}</div>
                           </div>
                         ) : null;
                       })()}
@@ -468,15 +501,14 @@ export default function AIAnalysisPage() {
                     <div className="rounded-xl border border-slate-200 bg-white border-l-4 border-l-amber-400 p-3">
                       <div className="flex items-center gap-1.5 mb-2">
                         <svg className="h-4 w-4 text-amber-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        <span className="text-xs font-semibold text-slate-800">技术债审计师</span>
+                        <span className="text-xs font-semibold text-slate-800">自主型建议</span>
                       </div>
-                      {(dashboardResult.modules.tech_debt_auditor?.gaps || []).slice(0, 2).map((g, i) => (
+                      {(dashboardResult.modules.autonomous_suggestions?.suggestions || []).slice(0, 2).map((s, i) => (
                         <div key={i} className="rounded-lg border border-amber-100 bg-amber-50/50 p-2 mb-1.5 text-[11px]">
-                          <div className="flex justify-between mb-0.5">
-                            <span className="font-medium text-slate-700 truncate max-w-[60%]">{g.task}</span>
-                            <span className="text-amber-600 font-bold">价值{g.value_score}/10</span>
-                          </div>
-                          <div className="text-slate-500">{g.action}</div>
+                          <div className="font-medium text-slate-700 mb-0.5">{s.source_task}</div>
+                          <div className="text-slate-500">{s.problem}</div>
+                          <div className="text-amber-600 font-medium mt-1">{s.action}</div>
+                          <div className="text-slate-400 mt-0.5">预估 {s.effort_days || '-'}d</div>
                         </div>
                       ))}
                     </div>
@@ -486,19 +518,40 @@ export default function AIAnalysisPage() {
                       <div className="flex items-center gap-1.5 mb-2">
                         <svg className="h-4 w-4 text-emerald-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg>
                         <span className="text-xs font-semibold text-slate-800">绩效平衡仪</span>
+                        <span className="ml-auto rounded-full px-2 py-0.5 text-[10px] font-medium text-white bg-emerald-500">{dashboardResult.modules.performance_balancer?.status || '-'}</span>
                       </div>
                       {(() => {
                         const pb = dashboardResult.modules.performance_balancer?.ratio || {};
                         const a = pb.assigned || 0, au = pb.autonomous || 0, c = pb.capability || 0;
-                        const t = a + au + c || 1;
+                        const total = a + au + c || 1;
+                        const aPct = Math.round(a/total*100);
+                        const auPct = Math.round(au/total*100);
+                        const cPct = Math.round(c/total*100);
+                        const cone = `conic-gradient(#38bdf8 0deg ${aPct*3.6}deg, #a78bfa ${aPct*3.6}deg ${(aPct+auPct)*3.6}deg, #fb7185 ${(aPct+auPct)*3.6}deg 360deg)`;
                         return (
-                          <div>
-                            <div className="flex h-5 rounded-full overflow-hidden mb-1">
-                              <div style={{width: `${(a/t)*100}%`}} className="bg-sky-400 flex items-center justify-center text-[9px] text-white font-medium">指派{a}%</div>
-                              <div style={{width: `${(au/t)*100}%`}} className="bg-violet-400 flex items-center justify-center text-[9px] text-white font-medium">自主{au}%</div>
-                              <div style={{width: `${(c/t)*100}%`}} className="bg-rose-400 flex items-center justify-center text-[9px] text-white font-medium">能力{c}%</div>
+                          <div className="flex items-center gap-3">
+                            <div className="w-20 h-20 rounded-full flex-shrink-0 flex items-center justify-center relative" style={{background: cone}}>
+                              <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center">
+                                <span className="text-xs font-bold text-slate-700">{aPct}%</span>
+                              </div>
                             </div>
-                            <div className="text-[10px] text-slate-400">理想 6:3:1 · {dashboardResult.modules.performance_balancer?.status || '-'}</div>
+                            <div className="flex-1 text-[11px] space-y-0.5">
+                              <div className="flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-sky-400 flex-shrink-0"></span>
+                                <span className="text-slate-500">指派</span>
+                                <span className="font-semibold text-slate-700 ml-auto">{aPct}%</span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-violet-400 flex-shrink-0"></span>
+                                <span className="text-slate-500">自主</span>
+                                <span className="font-semibold text-slate-700 ml-auto">{auPct}%</span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-rose-400 flex-shrink-0"></span>
+                                <span className="text-slate-500">能力</span>
+                                <span className="font-semibold text-slate-700 ml-auto">{cPct}%</span>
+                              </div>
+                            </div>
                           </div>
                         );
                       })()}
@@ -508,13 +561,14 @@ export default function AIAnalysisPage() {
                     <div className="rounded-xl border border-slate-200 bg-white border-l-4 border-l-violet-400 p-3">
                       <div className="flex items-center gap-1.5 mb-2">
                         <svg className="h-4 w-4 text-violet-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347" /></svg>
-                        <span className="text-xs font-semibold text-slate-800">成长助推器</span>
+                        <span className="text-xs font-semibold text-slate-800">能力型建议</span>
                       </div>
-                      {(dashboardResult.modules.growth_booster?.learnings || []).slice(0, 2).map((l, i) => (
+                      {(dashboardResult.modules.capability_suggestions?.suggestions || []).slice(0, 2).map((s, i) => (
                         <div key={i} className="rounded-lg border border-violet-100 bg-violet-50/50 p-2 mb-1.5 text-[11px]">
-                          <div className="font-medium text-slate-700">{l.pain_point}</div>
-                          <div className="text-violet-600">{l.ai_tech}</div>
-                          <div className="text-violet-700 bg-white rounded px-1.5 py-0.5 mt-1 font-medium">产出: {l.output_required}</div>
+                          <div className="font-medium text-slate-700">{s.direction}</div>
+                          <div className="text-slate-500 mt-0.5">{s.reason}</div>
+                          <div className="text-violet-700 bg-white rounded px-1.5 py-0.5 mt-1 font-medium">产出: {s.output_required}</div>
+                          <div className="text-slate-400 mt-0.5">预估 {s.effort_days || '-'}d</div>
                         </div>
                       ))}
                     </div>
@@ -576,7 +630,6 @@ export default function AIAnalysisPage() {
         <CollapsibleSection
           defaultOpen={false}
           title="AI创建任务单"
-          subtitle="与 Claude 对话创建任务草稿，确认后生成 Teambition 任务单"
           onToggle={(open) => { if (open) startTbTtyd(); }}
         >
           <div className="mt-4 grid gap-5 xl:grid-cols-[minmax(320px,0.88fr)_minmax(0,1.12fr)]">
@@ -801,7 +854,6 @@ export default function AIAnalysisPage() {
         <CollapsibleSection
           defaultOpen={false}
           title="AI问答助手"
-          subtitle="基于知识库文档回答你的问题"
           onToggle={(open) => { if (open) startKbTtyd(); }}
         >
           <div className="mt-2 flex min-h-[600px] flex-col rounded-[28px] border border-slate-200 bg-black p-2">
@@ -823,7 +875,6 @@ export default function AIAnalysisPage() {
         <CollapsibleSection
           defaultOpen={false}
           title="SSE 知识库对话"
-          subtitle="基于混合检索 + LLM 流式返回的轻量级问答"
         >
           <div className="mt-2 flex flex-col rounded-[28px] border border-slate-200 bg-white" style={{ minHeight: 480 }}>
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3" style={{ maxHeight: 380 }}>

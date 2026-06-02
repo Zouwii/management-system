@@ -79,6 +79,7 @@ pick_and_apply_account() {
 pick_and_apply_account
 
 # ====================== 共享 skills ======================
+# Source: ai/prompts/ → installed to runtime/shared/.claude/skills/ by install_prompts.sh
 SHARED_SKILLS="${BACKEND_DIR}/runtime/shared/.claude/skills"
 CLAUDE_SKILLS_DIR="${HOME}/.claude/skills"
 if [ -d "${SHARED_SKILLS}" ]; then

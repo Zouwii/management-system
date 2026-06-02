@@ -213,6 +213,20 @@ def init_database() -> None:
                         "ALTER TABLE project_task_details ADD COLUMN task_nature VARCHAR(128)"
                     )
                 )
+        if "requirement_desc" not in cols_b:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE project_task_details ADD COLUMN requirement_desc TEXT"
+                    )
+                )
+        if "task_outputs" not in cols_b:
+            with engine.begin() as conn:
+                conn.execute(
+                    text(
+                        "ALTER TABLE project_task_details ADD COLUMN task_outputs TEXT"
+                    )
+                )
         if "workday_costhour" not in cols_b:
             with engine.begin() as conn:
                 conn.execute(

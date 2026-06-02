@@ -269,6 +269,10 @@ def _extract_task_outputs(item_or_fields: Any) -> List[str]:
     return _extract_custom_field_value_titles(item_or_fields, TASK_OUTPUT_CUSTOMFIELD_ID)
 
 
+def _serialize_outputs(outputs: List[str]) -> str:
+    return "\n".join(outputs) if outputs else ""
+
+
 def _extract_workday_costhour(item: Dict[str, Any]) -> Optional[float]:
     # 优先直接字段；语义：None=未填，0=否，>0=是
     direct = None
@@ -397,6 +401,8 @@ def _sync_one_detail_to_b_and_c(
             row.unique_id = unique_id
             row.task_nature = task_nature
             row.workday_costhour = workday_costhour
+            row.requirement_desc = _extract_requirement_desc(item)
+            row.task_outputs = _serialize_outputs(_extract_task_outputs(item))
             row.is_overdue = is_overdue
             row.business_type = business_type
             row.task_flow_status_id = task_flow_status_id
@@ -421,6 +427,8 @@ def _sync_one_detail_to_b_and_c(
                     unique_id=unique_id,
                     task_nature=task_nature,
                     workday_costhour=workday_costhour,
+                    requirement_desc=_extract_requirement_desc(item),
+                    task_outputs=_serialize_outputs(_extract_task_outputs(item)),
                     is_overdue=is_overdue,
                     business_type=business_type,
                     task_flow_status_id=task_flow_status_id,
@@ -1295,6 +1303,8 @@ def _all_time_download_impl(payload: Dict[str, Any]) -> Dict[str, Any]:
                     unique_id=unique_id,
                     task_nature=_extract_task_nature(item),
                     workday_costhour=_extract_workday_costhour(item),
+                    requirement_desc=_extract_requirement_desc(item),
+                    task_outputs=_serialize_outputs(_extract_task_outputs(item)),
                     is_overdue=is_overdue,
                     business_type=business_type,
                     task_flow_status_id=task_flow_status_id,
@@ -1666,6 +1676,8 @@ def sync_task_detail_to_db(payload: Dict[str, Any]) -> Dict[str, Any]:
                     task_stage_id=str(item.get("taskStageId") or item.get("stageId") or "") or None,
                     unique_id=unique_id,
                     task_nature=_extract_task_nature(item),
+                    requirement_desc=_extract_requirement_desc(item),
+                    task_outputs=_serialize_outputs(_extract_task_outputs(item)),
                     is_overdue=is_overdue,
                     business_type=business_type,
                     task_flow_status_id=task_flow_status_id,

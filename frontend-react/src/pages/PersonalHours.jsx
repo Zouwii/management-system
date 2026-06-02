@@ -195,7 +195,8 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
   }, [dashboard.expectedCoefficient, selectedCharacter, workhourCharacterCoefficients]);
   const baseWorkdayCount = Number(dashboard.workdayCount || 0);
   const expectedWorkdayCount = Math.max(baseWorkdayCount - Number(compensatoryDays || 0), 0);
-  const expectedEffectiveDays = expectedWorkdayCount * expectedCoefficient;
+  const expectedEffectiveDays = expectedWorkdayCount * expectedCoefficient;  // 工时数据总览用（乘系数）
+  const rawExpectedWorkdays = expectedWorkdayCount;  // 工作日耗时柱状图用（不乘系数）
   const memberGroupOptions = useMemo(() => {
     if (!canViewAllPeople) return [];
     const navMembers = memberOptions.filter((option) => option.team === '导航组');
@@ -516,7 +517,7 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
       return '';
     };
     const bucket = new Map(
-      trend.map((item) => {
+      sourceTrend.map((item) => {
         const month = String(item.month || '').trim();
         return [month, {
           month,
@@ -547,7 +548,7 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
     });
     return Array.from(bucket.values())
       .sort((a, b) => Number(String(a.month).replace('月', '')) - Number(String(b.month).replace('月', '')));
-  }, [dashboard.issueMonthlyCostHours, dashboard.taskDetails, trend]);
+  }, [dashboard.issueMonthlyCostHours, dashboard.taskDetails, sourceTrend]);
   const maxMonthlyWorkdayValue = Math.max(
     ...monthlyWorkdayData.flatMap((item) => [Number(item.expected || 0), Number(item.filled || 0)]),
     1,

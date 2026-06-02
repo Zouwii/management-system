@@ -47,6 +47,8 @@ rm -rf \
 
 # 保留 shared claude 配置（skills / accounts / plugins 等）
 # runtime/ 其余部分（用户工作区、日志）由系统自动重建
+mkdir -p "${SCRIPT_DIR}/backend/runtime/shared/.claude/skills"
+cp -r "${SCRIPT_DIR}/backend/ai/skills/"* "${SCRIPT_DIR}/backend/runtime/shared/.claude/skills/"
 mkdir -p "${STAGE_DIR}/backend/runtime/shared/.claude"
 cp -r "${SCRIPT_DIR}/backend/runtime/shared/.claude/"* "${STAGE_DIR}/backend/runtime/shared/.claude/"
 

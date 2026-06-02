@@ -127,6 +127,9 @@ class ProjectTaskDetail(Base):
     custom_fields_json: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
     raw_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    requirement_desc: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    task_outputs: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
     parent_task_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     parent_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     task_list_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
