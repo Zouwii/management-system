@@ -284,7 +284,7 @@ export default function AIAnalysisPage() {
       const d3 = await t3.json();
       if (d3.code !== 200) throw new Error(d3.error || '步骤3失败');
 
-      setDashboardResult({ modules: d3.data, meta: { taskCount: stats.total_tasks } });
+      setDashboardResult({ modules: d3.data, meta: { taskCount: stats.total_tasks }, stats });
       setAnalysisStatus(`分析完成（${stats.total_tasks}个任务）`);
     } catch (e) {
       setDashboardError(e.message || '分析失败');
@@ -453,9 +453,9 @@ export default function AIAnalysisPage() {
                   </div>
                 )}
                 {dashboardResult?.modules && (
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  <div className="grid gap-4 grid-cols-2">
                     {/* 1. 需求雷达 */}
-                    <div className="rounded-xl border border-slate-200 bg-white border-l-4 border-l-sky-400 p-3">
+                    <div className="rounded-xl border border-slate-200 bg-white border-l-4 border-l-sky-400 p-4 max-h-[260px] overflow-y-auto">
                       <div className="flex items-center gap-1.5 mb-2">
                         <svg className="h-4 w-4 text-sky-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                         <span className="text-xs font-semibold text-slate-800">需求雷达</span>
@@ -489,23 +489,26 @@ export default function AIAnalysisPage() {
                         return kw ? (
                           <div className="mt-2 rounded-lg border border-sky-100 bg-sky-50/50 p-3 text-sm space-y-1.5">
                             <div className="font-semibold text-slate-700">{kw.word}</div>
-                            <div><span className="font-bold text-sky-600">横向补位</span>：{kw.suggestions?.horizontal || '-'}</div>
-                            <div><span className="font-bold text-sky-600">质量升维</span>：{kw.suggestions?.quality || '-'}</div>
-                            <div><span className="font-bold text-sky-600">前瞻实验</span>：{kw.suggestions?.forward || '-'}</div>
+                            <div><span className="font-bold text-sky-600">存量挖掘</span>：{kw.suggestions?.dig_deeper || '-'}</div>
+                            <div><span className="font-bold text-sky-600">质量升维</span>：{kw.suggestions?.quality_up || '-'}</div>
+                            <div><span className="font-bold text-sky-600">前瞻探索</span>：{kw.suggestions?.look_forward || '-'}</div>
                           </div>
                         ) : null;
                       })()}
                     </div>
 
-                    {/* 2. 技术债审计师 */}
-                    <div className="rounded-xl border border-slate-200 bg-white border-l-4 border-l-amber-400 p-3">
+                    {/* 2. 自主型建议 */}
+                    <div className="rounded-xl border border-slate-200 bg-white border-l-4 border-l-amber-400 p-4 max-h-[260px] overflow-y-auto">
                       <div className="flex items-center gap-1.5 mb-2">
                         <svg className="h-4 w-4 text-amber-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         <span className="text-xs font-semibold text-slate-800">自主型建议</span>
                       </div>
-                      {(dashboardResult.modules.autonomous_suggestions?.suggestions || []).slice(0, 2).map((s, i) => (
-                        <div key={i} className="rounded-lg border border-amber-100 bg-amber-50/50 p-2 mb-1.5 text-[11px]">
-                          <div className="font-medium text-slate-700 mb-0.5">{s.source_task}</div>
+                      {(dashboardResult.modules.autonomous_suggestions?.suggestions || []).slice(0, 5).map((s, i) => (
+                        <div key={i} className="rounded-lg border border-amber-100 bg-amber-50/50 p-2 mb-1.5 text-sm">
+                          <div className="flex items-center justify-between mb-0.5">
+                            <span className="font-medium text-slate-700">{s.source_task}</span>
+                            <span className="rounded-full bg-amber-100 text-amber-700 px-1.5 py-0.5 text-xs font-bold">{s.priority_score || '-'}/10</span>
+                          </div>
                           <div className="text-slate-500">{s.problem}</div>
                           <div className="text-amber-600 font-medium mt-1">{s.action}</div>
                           <div className="text-slate-400 mt-0.5">预估 {s.effort_days || '-'}d</div>
@@ -513,59 +516,90 @@ export default function AIAnalysisPage() {
                       ))}
                     </div>
 
-                    {/* 3. 绩效平衡仪 */}
-                    <div className="rounded-xl border border-slate-200 bg-white border-l-4 border-l-emerald-400 p-3">
+                    {/* 3. 任务分布与风险分析 */}
+                    <div className="rounded-xl border border-slate-200 bg-white border-l-4 border-l-emerald-400 p-3 max-h-[260px] overflow-y-auto">
                       <div className="flex items-center gap-1.5 mb-2">
                         <svg className="h-4 w-4 text-emerald-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" /></svg>
-                        <span className="text-xs font-semibold text-slate-800">绩效平衡仪</span>
-                        <span className="ml-auto rounded-full px-2 py-0.5 text-[10px] font-medium text-white bg-emerald-500">{dashboardResult.modules.performance_balancer?.status || '-'}</span>
+                        <span className="text-xs font-semibold text-slate-800">任务分布与风险分析</span>
                       </div>
                       {(() => {
-                        const pb = dashboardResult.modules.performance_balancer?.ratio || {};
-                        const a = pb.assigned || 0, au = pb.autonomous || 0, c = pb.capability || 0;
-                        const total = a + au + c || 1;
-                        const aPct = Math.round(a/total*100);
-                        const auPct = Math.round(au/total*100);
-                        const cPct = Math.round(c/total*100);
+                        const tra = dashboardResult.modules.task_risk_analysis || {};
+                        const st = dashboardResult.stats || {};
+                        const aPct = Math.round(st.assigned_pct || 0);
+                        const auPct = Math.round(st.autonomous_pct || 0);
+                        const cPct = Math.round(st.capability_pct || 0);
+
                         const cone = `conic-gradient(#38bdf8 0deg ${aPct*3.6}deg, #a78bfa ${aPct*3.6}deg ${(aPct+auPct)*3.6}deg, #fb7185 ${(aPct+auPct)*3.6}deg 360deg)`;
+
                         return (
-                          <div className="flex items-center gap-3">
-                            <div className="w-20 h-20 rounded-full flex-shrink-0 flex items-center justify-center relative" style={{background: cone}}>
-                              <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center">
-                                <span className="text-xs font-bold text-slate-700">{aPct}%</span>
+                          <div>
+                            <div className="flex gap-3 mb-3">
+                              <div className="flex items-start gap-2.5">
+                                <div className="w-[100px] h-[100px] rounded-full flex-shrink-0 flex items-center justify-center" style={{ background: cone }}>
+                                  <div className="w-[56px] h-[56px] rounded-full bg-white flex items-center justify-center">
+                                    <span className="text-xs font-bold text-slate-500">占比</span>
+                                  </div>
+                                </div>
+                                <div className="text-sm space-y-1 pt-1">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="w-2.5 h-2.5 rounded-sm bg-sky-400 flex-shrink-0"></span>
+                                    <span className="text-slate-500">指派</span>
+                                    <span className="font-semibold text-slate-700">{aPct}%</span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="w-2.5 h-2.5 rounded-sm bg-violet-400 flex-shrink-0"></span>
+                                    <span className="text-slate-500">自主</span>
+                                    <span className="font-semibold text-slate-700">{auPct}%</span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="w-2.5 h-2.5 rounded-sm bg-rose-400 flex-shrink-0"></span>
+                                    <span className="text-slate-500">能力</span>
+                                    <span className="font-semibold text-slate-700">{cPct}%</span>
+                                  </div>
+                                </div>
+                              </div>
+                              {/* 右上：工时天数 */}
+                              <div className="flex-1 space-y-1 text-sm">
+                                <div className="flex justify-between"><span className="text-slate-500">已排工时</span><span className="font-semibold">{st.quarter_work_hour || '-'}d</span></div>
+                                <div className="flex justify-between"><span className="text-slate-500">已完成</span><span className="font-semibold text-emerald-600">{st.quarter_completed_work_hour || '-'}d</span></div>
+                                <div className="flex justify-between"><span className="text-slate-500">至今预期</span><span className="font-semibold">{st.expected_hours_by_today || '-'}d</span></div>
+                                <div className="flex justify-between"><span className="text-slate-500">逾期工时</span><span className="font-semibold text-red-500">{st.quarter_overdue_work_hour || '0'}d</span></div>
                               </div>
                             </div>
-                            <div className="flex-1 text-[11px] space-y-0.5">
-                              <div className="flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-sky-400 flex-shrink-0"></span>
-                                <span className="text-slate-500">指派</span>
-                                <span className="font-semibold text-slate-700 ml-auto">{aPct}%</span>
-                              </div>
-                              <div className="flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-violet-400 flex-shrink-0"></span>
-                                <span className="text-slate-500">自主</span>
-                                <span className="font-semibold text-slate-700 ml-auto">{auPct}%</span>
-                              </div>
-                              <div className="flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-rose-400 flex-shrink-0"></span>
-                                <span className="text-slate-500">能力</span>
-                                <span className="font-semibold text-slate-700 ml-auto">{cPct}%</span>
-                              </div>
+                            {/* 下方：结论文字 */}
+                            <div className="text-sm leading-relaxed text-slate-600 border-t border-slate-100 pt-2">
+                              {tra.detail ? (
+                                <div className="mb-1.5">{tra.detail}</div>
+                              ) : (
+                                <div className="mb-1.5 text-slate-400">暂无分析结论</div>
+                              )}
+                              {(tra.alerts || []).length > 0 && (
+                                <div className="space-y-1">
+                                  {(tra.alerts || []).map((al, i) => (
+                                    <span key={i} className={`inline-block rounded px-1.5 py-0.5 mr-1.5 mb-1 text-xs font-medium ${al.level === 'red' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'}`}>
+                                      {al.description}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           </div>
                         );
                       })()}
                     </div>
 
-                    {/* 4. 成长助推器 */}
-                    <div className="rounded-xl border border-slate-200 bg-white border-l-4 border-l-violet-400 p-3">
+                    {/* 4. 能力型建议 */}
+                    <div className="rounded-xl border border-slate-200 bg-white border-l-4 border-l-violet-400 p-3 max-h-[260px] overflow-y-auto">
                       <div className="flex items-center gap-1.5 mb-2">
                         <svg className="h-4 w-4 text-violet-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347" /></svg>
                         <span className="text-xs font-semibold text-slate-800">能力型建议</span>
                       </div>
-                      {(dashboardResult.modules.capability_suggestions?.suggestions || []).slice(0, 2).map((s, i) => (
-                        <div key={i} className="rounded-lg border border-violet-100 bg-violet-50/50 p-2 mb-1.5 text-[11px]">
-                          <div className="font-medium text-slate-700">{s.direction}</div>
+                      {(dashboardResult.modules.capability_suggestions?.suggestions || []).slice(0, 4).map((s, i) => (
+                        <div key={i} className="rounded-lg border border-violet-100 bg-violet-50/50 p-2 mb-1.5 text-sm">
+                          <div className="flex items-center justify-between mb-0.5">
+                            <span className="font-medium text-slate-700">{s.direction}</span>
+                            <span className="rounded-full bg-violet-100 text-violet-700 px-1.5 py-0.5 text-xs font-bold">{s.priority_score || '-'}/10</span>
+                          </div>
                           <div className="text-slate-500 mt-0.5">{s.reason}</div>
                           <div className="text-violet-700 bg-white rounded px-1.5 py-0.5 mt-1 font-medium">产出: {s.output_required}</div>
                           <div className="text-slate-400 mt-0.5">预估 {s.effort_days || '-'}d</div>
@@ -573,37 +607,6 @@ export default function AIAnalysisPage() {
                       ))}
                     </div>
 
-                    {/* 5. 效能转化器 */}
-                    <div className="rounded-xl border border-slate-200 bg-white border-l-4 border-l-rose-400 p-3">
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <svg className="h-4 w-4 text-rose-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" /></svg>
-                        <span className="text-xs font-semibold text-slate-800">效能转化器</span>
-                      </div>
-                      {(dashboardResult.modules.efficiency_transformer?.tools || []).slice(0, 2).map((t, i) => (
-                        <div key={i} className="rounded-lg border border-rose-100 bg-rose-50/50 p-2 mb-1.5 text-[11px]">
-                          <div className="font-medium text-slate-700">{t.scenario}</div>
-                          <div className="flex justify-between text-slate-500 mt-0.5">
-                            <span className="text-rose-600 font-medium">{t.tool_suggestion}</span>
-                            <span>提效{t.expected_efficiency}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* 6. 风险预警机 */}
-                    <div className="rounded-xl border border-slate-200 bg-white border-l-4 border-l-orange-400 p-3">
-                      <div className="flex items-center gap-1.5 mb-2">
-                        <svg className="h-4 w-4 text-orange-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008z" /></svg>
-                        <span className="text-xs font-semibold text-slate-800">风险预警机</span>
-                      </div>
-                      {(dashboardResult.modules.risk_warning_engine?.alerts || []).map((a, i) => (
-                        <div key={i} className={`rounded-lg px-2.5 py-1.5 text-[11px] font-medium mb-1 ${
-                          a.level === 'red' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
-                        }`}>
-                          {a.description}
-                        </div>
-                      ))}
-                    </div>
                   </div>
                 )}
               </div>

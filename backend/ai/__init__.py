@@ -12,21 +12,16 @@ Usage:
   register_all_routes(bp, ok, fail)
 """
 
-from ai.tbcreate.routes import register as _register_tbcreate
-from ai.terminal.routes import register as _register_terminal
-from ai.teambition.routes import register as _register_teambition
-from ai.knowledge.routes import register as _register_knowledge
-from ai.task_analysis.routes import register as _register_task_analysis
-
-
+# Flask route registrations are lazy to keep the package importable
+# without Flask (e.g. for MCP server which doesn't need HTTP routes).
 def register_all_routes(bp, ok, fail):
-    """Register all AI-related HTTP routes on the given Flask Blueprint.
+    """Register all AI-related HTTP routes on the given Flask Blueprint."""
+    from ai.tbcreate.routes import register as _register_tbcreate
+    from ai.terminal.routes import register as _register_terminal
+    from ai.teambition.routes import register as _register_teambition
+    from ai.knowledge.routes import register as _register_knowledge
+    from ai.task_analysis.routes import register as _register_task_analysis
 
-    Args:
-        bp: Flask Blueprint (api_bp, prefix /api/bt).
-        ok: Response helper for successful JSON responses.
-        fail: Response helper for error JSON responses.
-    """
     _register_tbcreate(bp, ok, fail)
     _register_terminal(bp, ok, fail)
     _register_teambition(bp, ok, fail)

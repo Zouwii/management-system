@@ -150,10 +150,19 @@ def generate_report(
     # 任务上下文
     task_lines = []
     for t in tasks[:20]:
-        task_lines.append(
-            f"- [{t.get('taskNature', '?')}] {t.get('title', '')} "
-            f"({t.get('status', '?')}, {t.get('workHour', 0)}d)"
-        )
+        parts = [f"- [{t.get('taskNature', '?')}] {t.get('title', '')}"]
+        parts.append(f"  状态:{t.get('status', '?')} 工时:{t.get('workHour', 0)}d")
+        desc = t.get('description', '')
+        if desc:
+            parts.append(f"  描述:{desc[:200]}")
+        outputs = t.get('outputs', '')
+        if outputs:
+            parts.append(f"  产出:{outputs[:200]}")
+        sibs = t.get('siblings', [])
+        if sibs:
+            sib_titles = [s['title'] for s in sibs[:5]]
+            parts.append(f"  兄弟任务: {' | '.join(sib_titles)}")
+        task_lines.append("\n".join(parts))
     task_context = "\n".join(task_lines) if task_lines else "无"
 
     # 知识库上下文

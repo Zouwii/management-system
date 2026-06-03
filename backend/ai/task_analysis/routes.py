@@ -42,7 +42,7 @@ def _extract_keywords_from_tasks(tasks: list) -> str:
             f"{base_url}/v1/chat/completions",
             headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
             json={
-                "model": "kimi-for-coding",
+                "model": "deepseek-v4-pro",
                 "messages": [
                     {"role": "system", "content": skill_text},
                     {"role": "user", "content": f"从以下任务提取搜索关键词：\n{task_text}"},
