@@ -214,7 +214,8 @@ def create_app() -> Flask:
         t2 = threading.Thread(target=_auto_full_update_loop, daemon=True)
         t2.start()
 
-    # 后台：北京时间每天 04:00 自动触发知识库全量同步+rechunk+embedding。
+    # 后台：北京时间每天 04:00 自动触发知识库同步。
+    # 每天小同步（增量拉新文档），每月 1 号大同步（全量对比更新）。
     global _AUTO_KNOWLEDGE_SYNC_THREAD_STARTED
     if not globals().get("_AUTO_KNOWLEDGE_SYNC_THREAD_STARTED"):
         _AUTO_KNOWLEDGE_SYNC_THREAD_STARTED = True
@@ -230,20 +231,36 @@ def create_app() -> Flask:
                     now_bj = datetime.now(bj_tz)
                     today = now_bj.strftime("%Y-%m-%d")
 
-                    # 每天北京时间 04:00 触发一次。
+                    # 小同步：每周一/周四 04:00；大同步：每月1号 04:00
                     if now_bj.hour == 4 and now_bj.minute == 0 and last_trigger_date != today:
-                        print("[auto_knowledge_sync_loop] starting knowledge base sync+rechunk+embed")
-                        result = sync_all_and_embed()
+                        weekday = now_bj.weekday()  # 0=周一, 3=周四
+                        # 每月 1 号做大同步，周一/周四做小同步
+                        if now_bj.day == 1:
+                            full_sync = True
+                            mode = "大同步(全量)"
+                        elif weekday in (0, 3):
+                            full_sync = False
+                            mode = "小同步(增量)"
+                        else:
+                            last_trigger_date = today
+                            _time.sleep(30)
+                            continue
+                        print(f"[auto_knowledge_sync_loop] starting {mode}")
+                        result = sync_all_and_embed(full_sync=full_sync)
                         if result.get("ok"):
                             sync_info = result.get("sync", {})
                             embed_info = result.get("embed", {})
                             print(
                                 "[auto_knowledge_sync_loop] done"
                                 "  sync: {} synced, {} failed"
+                                "  skipped: {} wb, {} cached, {} unchanged"
                                 "  embed: {} embedded, {} skipped"
                                 "  elapsed: {:.1f}s".format(
                                     sync_info.get("totalSynced", 0),
                                     sync_info.get("totalFailed", 0),
+                                    sync_info.get("skippedWorkbooks", 0),
+                                    sync_info.get("skippedCached", 0),
+                                    sync_info.get("skippedUnchanged", 0),
                                     embed_info.get("embedded", 0),
                                     embed_info.get("skipped", 0),
                                     result.get("durationSec", 0),

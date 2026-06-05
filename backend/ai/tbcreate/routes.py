@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 from flask import request, session, Response, stream_with_context
+from sqlalchemy import or_
 
 from ai.tbcreate.workspace import init_workspace
 from ai.terminal.session import resolve_owner_key, user_workspace
@@ -105,35 +106,51 @@ def register(bp, ok, fail):
 
         db_session = SessionLocal()
         try:
-            # Step 1: collect distinct parent_task_id values
+            # Step 1: collect distinct parent_task_id / parent_id values.
+            # (Some tasks only have parent_id populated, not parent_task_id.)
             parent_rows = (
-                db_session.query(ProjectTaskDetail.parent_task_id)
+                db_session.query(
+                    ProjectTaskDetail.parent_task_id,
+                    ProjectTaskDetail.parent_id,
+                )
                 .filter(
                     ProjectTaskDetail.query_user_id == user_id,
-                    ProjectTaskDetail.parent_task_id.isnot(None),
-                    ProjectTaskDetail.parent_task_id != "",
+                    or_(
+                        ProjectTaskDetail.parent_task_id.isnot(None),
+                        ProjectTaskDetail.parent_id.isnot(None),
+                    ),
                 )
                 .distinct()
                 .all()
             )
-            parent_ids = [r.parent_task_id for r in parent_rows]
+            # Merge both columns; prefer parent_task_id, fall back to parent_id.
+            parent_ids = set()
+            for r in parent_rows:
+                pid = (r.parent_task_id or r.parent_id or "").strip()
+                if pid:
+                    parent_ids.add(pid)
+            parent_ids = sorted(parent_ids)
             if not parent_ids:
                 return ok([])
 
-            # Step 2: look up task content, skip empty
+            # Step 2: look up task content (skip query_user_id filter —
+            # the same parent task may have been fetched by a different user).
+            # Deduplicate by task_id since the table's unique key is
+            # (task_id, query_user_id).
             detail_rows = (
                 db_session.query(
                     ProjectTaskDetail.task_id,
                     ProjectTaskDetail.content,
                 )
-                .filter(
-                    ProjectTaskDetail.task_id.in_(parent_ids),
-                    ProjectTaskDetail.query_user_id == user_id,
-                )
+                .filter(ProjectTaskDetail.task_id.in_(parent_ids))
                 .all()
             )
+            seen = set()
             items = []
             for row in detail_rows:
+                if row.task_id in seen:
+                    continue
+                seen.add(row.task_id)
                 title = (row.content or "").strip()
                 if title:
                     items.append({"taskId": row.task_id, "title": title})

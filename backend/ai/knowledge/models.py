@@ -25,6 +25,11 @@ class KbDocument(Base):
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
     )
+    remote_modified_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, default=None,
+        comment="DingTalk API 最后修改时间，用于判断是否需要重新拉取"
+    )
+    category: Mapped[str] = mapped_column(String(16), default="")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),

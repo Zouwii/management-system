@@ -96,16 +96,28 @@ def _dt_to_iso(dt) -> str:
 def _cache_document(node_id: str, workspace_id: str, title: str,
                     content: str, node_type: str = "FILE",
                     parent_id: str = "", raw_json: str = "",
-                    category: str = "") -> bool:
+                    category: str = "",
+                    remote_modified_at: str = "") -> bool:
     """Upsert a document. Returns True if the document was new or content changed."""
     db = SessionLocal()
     try:
         existing = db.query(KbDocument).filter(KbDocument.doc_id == node_id).first()
         now = datetime.now(timezone.utc)
+        # 解析远程修改时间
+        rmt = None
+        if remote_modified_at:
+            try:
+                rmt = datetime.fromisoformat(remote_modified_at.replace("Z", "+00:00"))
+            except Exception:
+                pass
+
         if existing:
-            # Content unchanged — skip the write to avoid unnecessary rechunk.
             if existing.content == content and existing.title == title:
                 existing.synced_at = now
+                if rmt:
+                    existing.remote_modified_at = rmt
+                if category:
+                    existing.category = category
                 db.commit()
                 return False
             existing.title = title
@@ -114,6 +126,8 @@ def _cache_document(node_id: str, workspace_id: str, title: str,
             existing.parent_id = parent_id
             existing.workspace_id = workspace_id
             existing.raw_json = raw_json
+            existing.category = category or existing.category
+            existing.remote_modified_at = rmt
             existing.synced_at = now
             existing.updated_at = now
         else:
@@ -125,6 +139,8 @@ def _cache_document(node_id: str, workspace_id: str, title: str,
                 parent_id=parent_id,
                 content=content,
                 raw_json=raw_json,
+                category=category,
+                remote_modified_at=rmt,
                 synced_at=now,
                 created_at=now,
                 updated_at=now,
@@ -156,17 +172,49 @@ def _cached_document(node_id: str) -> dict | None:
 
 # ── workspace sync (module-level, shared with auto_sync) ────────
 
-def _sync_workspace(client, workspace_id: str, root_id: str, limit: int = 0) -> dict:
-    """Walk a workspace tree, cache all documents.
+def _sync_workspace(client, workspace_id: str, root_id: str, limit: int = 0,
+                    full_sync: bool = False) -> dict:
+    """Walk a workspace tree, cache documents.
 
-    Returns {syncedCount, syncedIds, failedCount, errors}.
-    syncedIds contains only doc_ids whose content actually changed (or are new).
+    full_sync=False (小同步/日常):   仅拉取未缓存过的新 ALIDOC 文档。
+    full_sync=True  (大同步/月度):   对比 remote_modified_at，重新拉取已变更的文档。
+
+    Returns {syncedCount, syncedIds, failedCount, errors, skippedWorkbooks,
+             skippedCached, skippedUnchanged}.
     """
     synced: List[str] = []
     changed_ids: List[str] = []
     errors: List[dict] = []
+    skipped_workbooks: int = 0
+    skipped_cached: int = 0
+    skipped_unchanged: int = 0
+
+    # 预加载缓存：{doc_id: (content, category, remote_modified_at)}
+    db = SessionLocal()
+    try:
+        rows = db.query(
+            KbDocument.doc_id, KbDocument.content,
+            KbDocument.category, KbDocument.remote_modified_at,
+        ).filter(KbDocument.workspace_id == workspace_id).all()
+        cache = {
+            r[0]: {"content": r[1] or "", "category": r[2] or "",
+                   "remote_modified_at": r[3]}
+            for r in rows
+        }
+    finally:
+        db.close()
+
+    def _parse_modified_time(ts_str: str):
+        """解析钉钉返回的时间字符串 -> datetime(UTC)"""
+        if not ts_str:
+            return None
+        try:
+            return datetime.fromisoformat(str(ts_str).replace("Z", "+00:00"))
+        except Exception:
+            return None
 
     def _walk(parent_id: str):
+        nonlocal skipped_workbooks, skipped_cached, skipped_unchanged
         if limit and len(synced) >= limit:
             return
         result = client.list_nodes(workspace_id, parent_id)
@@ -184,29 +232,38 @@ def _sync_workspace(client, workspace_id: str, root_id: str, limit: int = 0) -> 
             if ntype == "FOLDER":
                 _walk(nid)
             elif ntype == "FILE":
-                try:
-                    meta = client.get_node_detail(nid)
-                    if not meta.get("ok"):
-                        errors.append({"nodeId": nid, "title": title, "error": "metadata failed"})
+                category = (n.get("category") or "").strip().upper()
+                remote_mod = n.get("modifiedTime", "")
+
+                # 1. 跳过非文档
+                if category != "ALIDOC":
+                    skipped_workbooks += 1
+                    continue
+
+                cached = cache.get(nid)
+
+                # 2. 小同步：已缓存 → 跳过
+                if not full_sync:
+                    if cached and cached["content"]:
+                        skipped_cached += 1
                         continue
 
+                # 3. 大同步：对比修改时间，未变 → 跳过
+                if full_sync and cached and cached["content"]:
+                    last_rmt = cached["remote_modified_at"]
+                    cur_rmt = _parse_modified_time(remote_mod)
+                    if last_rmt and cur_rmt and cur_rmt <= last_rmt:
+                        skipped_unchanged += 1
+                        continue
+
+                # 需要拉取内容
+                try:
                     blocks = client.get_document_blocks(nid)
-                    if blocks.get("ok"):
-                        parsed = parse_document(blocks["data"], "blocks")
-                    else:
-                        sheets_result = client.get_workbook_sheets(nid)
-                        if sheets_result.get("ok"):
-                            sheets_data = []
-                            for s in sheets_result["data"]:
-                                sid = s.get("id", "")
-                                sname = s.get("name", "")
-                                rng = client.get_workbook_range(nid, sid)
-                                rows = rng.get("data", []) if rng.get("ok") else []
-                                sheets_data.append((sname, rows))
-                            parsed = parse_document(sheets_data, "workbook")
-                        else:
-                            errors.append({"nodeId": nid, "title": title, "error": "content failed"})
-                            continue
+                    if not blocks.get("ok"):
+                        errors.append({"nodeId": nid, "title": title, "error": "blocks failed"})
+                        continue
+
+                    parsed = parse_document(blocks["data"], "blocks")
 
                     changed = _cache_document(
                         node_id=nid,
@@ -215,8 +272,9 @@ def _sync_workspace(client, workspace_id: str, root_id: str, limit: int = 0) -> 
                         content=parsed["markdown"],
                         node_type="FILE",
                         parent_id=parent_id or "",
-                        category=n.get("category", ""),
+                        category=category,
                         raw_json=json.dumps(n, ensure_ascii=False),
+                        remote_modified_at=remote_mod,
                     )
                     synced.append(nid)
                     if changed:
@@ -230,6 +288,9 @@ def _sync_workspace(client, workspace_id: str, root_id: str, limit: int = 0) -> 
         "changedCount": len(changed_ids),
         "syncedIds": changed_ids,
         "failedCount": len(errors),
+        "skippedWorkbooks": skipped_workbooks,
+        "skippedCached": skipped_cached,
+        "skippedUnchanged": skipped_unchanged,
         "errors": errors[:20],
     }
 
@@ -306,23 +367,15 @@ def register(bp, ok, fail):
         category = meta.get("category", "")
         node_type = meta.get("type", "FILE")
 
-        # 3. Get document content
+        # 3. Get document content — only ALIDOC documents
+        if category != "ALIDOC":
+            return fail(f"unsupported category: {category}", code=400,
+                        data={"nodeId": node_id, "title": title, "category": category})
+
         blocks = client.get_document_blocks(node_id)
         if not blocks.get("ok"):
-            # Try workbook
-            sheets_result = client.get_workbook_sheets(node_id)
-            if sheets_result.get("ok"):
-                sheets_data = []
-                for s in sheets_result["data"]:
-                    sid = s.get("id", "")
-                    sname = s.get("name", "")
-                    ranges = client.get_workbook_range(node_id, sid)
-                    rows = ranges.get("data", []) if ranges.get("ok") else []
-                    sheets_data.append((sname, rows))
-                parsed = parse_document(sheets_data, "workbook")
-            else:
-                return fail(blocks.get("error", "failed to get document content"),
-                            code=blocks.get("status", 502))
+            return fail(blocks.get("error", "failed to get document content"),
+                        code=blocks.get("status", 502))
         else:
             parsed = parse_document(blocks["data"], "blocks")
 
@@ -351,7 +404,9 @@ def register(bp, ok, fail):
     def ai_knowledge_sync():
         """Walk a workspace tree and cache all documents.
 
-        Body: { "workspace_id": "..." }
+        Body: { "workspace_id": "...", "full_sync": false }
+        full_sync=false (小同步): 仅拉取新文档
+        full_sync=true  (大同步): 对比 remote_modified_at 重拉变更文档
         """
         union_id = _current_union_id()
         if not union_id:
@@ -363,6 +418,7 @@ def register(bp, ok, fail):
             return fail("missing workspace_id", code=400)
 
         limit = max(0, int(body.get("limit") or 0))  # 0 = no limit
+        full_sync = str(body.get("full_sync") or "").lower() in ("1", "true", "yes")
 
         client = DingTalkKnowledgeClient(union_id)
 
@@ -380,7 +436,8 @@ def register(bp, ok, fail):
             return fail("cannot find rootNodeId for this workspace", code=404)
 
         started = time.time()
-        result = _sync_workspace(client, workspace_id, root_id, limit=limit)
+        result = _sync_workspace(client, workspace_id, root_id, limit=limit,
+                                 full_sync=full_sync)
         finished = time.time()
 
         return ok({
@@ -388,16 +445,20 @@ def register(bp, ok, fail):
             "workspaceName": ws_name,
             "syncedCount": result["syncedCount"],
             "failedCount": result["failedCount"],
+            "skippedWorkbooks": result.get("skippedWorkbooks", 0),
+            "skippedCached": result.get("skippedCached", 0),
+            "skippedUnchanged": result.get("skippedUnchanged", 0),
             "errors": result["errors"],
             "durationSec": round(finished - started, 1),
         })
 
     @bp.route("/ai/knowledge/sync-all", methods=["POST"])
     def ai_knowledge_sync_all():
-        """Sync all known knowledge bases (documents only, no chunk/embed).
+        """Sync all known knowledge bases.
 
-        Body: { "limit"?: N, "ws_limit"?: N }
-        For sync + rechunk + embed, use /ai/knowledge/sync-and-embedding.
+        Body: { "limit"?: N, "ws_limit"?: N, "full_sync"?: true/false }
+        full_sync=false (小同步): 仅拉取新文档
+        full_sync=true  (大同步): 对比修改时间重拉变更文档
         """
         union_id = _current_union_id()
         if not union_id:
@@ -411,8 +472,9 @@ def register(bp, ok, fail):
             return fail("failed to list workspaces", code=502)
 
         body = request.get_json(silent=True) or {}
-        limit = max(0, int(body.get("limit") or 0))  # 0 = no limit
-        ws_limit = max(0, int(body.get("ws_limit") or 0))  # 0 = all workspaces
+        limit = max(0, int(body.get("limit") or 0))
+        ws_limit = max(0, int(body.get("ws_limit") or 0))
+        full_sync = str(body.get("full_sync") or "").lower() in ("1", "true", "yes")
 
         from ai.knowledge.service import get_known_workspaces
         known = get_known_workspaces()
@@ -428,22 +490,32 @@ def register(bp, ok, fail):
         started = time.time()
         total_synced = 0
         total_failed = 0
+        total_skipped_wb = 0
+        total_skipped_cached = 0
+        total_skipped_unchanged = 0
         results: List[dict] = []
 
         for ws_id, root_id, ws_name in workspaces_to_sync:
             ws_started = time.time()
-            r = _sync_workspace(client, ws_id, root_id, limit=limit)
+            r = _sync_workspace(client, ws_id, root_id, limit=limit,
+                                full_sync=full_sync)
             ws_elapsed = round(time.time() - ws_started, 1)
             results.append({
                 "workspaceId": ws_id,
                 "name": ws_name,
                 "syncedCount": r["syncedCount"],
                 "failedCount": r["failedCount"],
+                "skippedWorkbooks": r.get("skippedWorkbooks", 0),
+                "skippedCached": r.get("skippedCached", 0),
+                "skippedUnchanged": r.get("skippedUnchanged", 0),
                 "errors": r["errors"],
                 "durationSec": ws_elapsed,
             })
             total_synced += r["syncedCount"]
             total_failed += r["failedCount"]
+            total_skipped_wb += r.get("skippedWorkbooks", 0)
+            total_skipped_cached += r.get("skippedCached", 0)
+            total_skipped_unchanged += r.get("skippedUnchanged", 0)
 
         finished = time.time()
 
@@ -451,16 +523,20 @@ def register(bp, ok, fail):
             "syncedWorkspaces": len(results),
             "totalSynced": total_synced,
             "totalFailed": total_failed,
+            "skippedWorkbooks": total_skipped_wb,
+            "skippedCached": total_skipped_cached,
+            "skippedUnchanged": total_skipped_unchanged,
             "workspaces": results,
             "durationSec": round(finished - started, 1),
         })
 
     @bp.route("/ai/knowledge/sync-and-embedding", methods=["POST"])
     def ai_knowledge_sync_and_embedding():
-        """Full pipeline: sync all KBs -> rechunk changed docs -> embed.
+        """Full pipeline: sync all KBs -> rechunk -> embed.
 
-        This is the manual equivalent of the nightly daemon pipeline.
-        Returns phased results for each stage.
+        Body: { "full_sync"?: true/false }
+        full_sync=false (小同步): 增量拉取 + rechunk 变更 + embed 增量
+        full_sync=true  (大同步): 对比修改时间重拉 + 全量 rechunk + embed
         """
         union_id = _current_union_id()
         if not union_id:
@@ -468,8 +544,11 @@ def register(bp, ok, fail):
 
         from ai.knowledge.auto_sync import sync_all_and_embed
 
+        body = request.get_json(silent=True) or {}
+        full_sync = str(body.get("full_sync") or "").lower() in ("1", "true", "yes")
+
         try:
-            result = sync_all_and_embed(union_id=union_id)
+            result = sync_all_and_embed(union_id=union_id, full_sync=full_sync)
             if result.get("ok"):
                 return ok(result)
             else:
