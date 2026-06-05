@@ -30,7 +30,7 @@ from typing import Any, Dict, List, Optional
 
 import requests
 
-from dingtalk_client import get_valid_access_token
+from base.dingtalk_client import get_valid_access_token
 
 
 # ── helpers ────────────────────────────────────────────────────

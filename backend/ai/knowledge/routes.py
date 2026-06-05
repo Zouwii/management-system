@@ -36,7 +36,7 @@ from ai.terminal.session import (
     resolve_owner_name,
     user_workspace,
 )
-from db.engine import SessionLocal
+from base.db.engine import SessionLocal
 
 
 # ── helpers ────────────────────────────────────────────────────
@@ -53,7 +53,7 @@ def _current_union_id() -> str:
         user_id = str(auth.get("user_id") or "")
     if user_id:
         try:
-            from db.orm import UserCharacter as DbUserCharacter
+            from base.db.orm import UserCharacter as DbUserCharacter
             db = SessionLocal()
             try:
                 row = db.query(DbUserCharacter).filter(DbUserCharacter.user_id == user_id).first()
@@ -66,7 +66,7 @@ def _current_union_id() -> str:
 
     # Fallback: for admin/scenario use, grab any available union_id from DB
     try:
-        from db.orm import UserCharacter as DbUserCharacter
+        from base.db.orm import UserCharacter as DbUserCharacter
         db = SessionLocal()
         try:
             row = db.query(DbUserCharacter).filter(
@@ -615,7 +615,7 @@ def register(bp, ok, fail):
 
             # Refresh FTS index
             from ai.knowledge.models import create_kb_fts, drop_kb_fts
-            from db.engine import engine as _engine
+            from base.db.engine import engine as _engine
             drop_kb_fts(_engine)
             create_kb_fts(_engine)
 
@@ -626,7 +626,7 @@ def register(bp, ok, fail):
 
             # Auto-reembed: clean orphan vectors + embed new chunks
             if do_embed:
-                from db.engine import PgVectorSessionLocal
+                from base.db.engine import PgVectorSessionLocal
                 from sqlalchemy import text as sa_text
 
                 pg = PgVectorSessionLocal()
@@ -669,7 +669,7 @@ def register(bp, ok, fail):
             return fail("missing task_id", code=400)
         project_id = str(body.get("project_id") or "").strip() or None
 
-        from db.orm import ProjectTask, ProjectTaskDetail
+        from base.db.orm import ProjectTask, ProjectTaskDetail
         from ai.knowledge.retriever import search_hybrid
 
         db = SessionLocal()
@@ -763,7 +763,7 @@ def register(bp, ok, fail):
             return fail("missing task_id", code=400)
         project_id = str(body.get("project_id") or "").strip() or None
 
-        from db.orm import ProjectTask, ProjectTaskDetail
+        from base.db.orm import ProjectTask, ProjectTaskDetail
         from ai.knowledge.retriever import search_hybrid
         from ai.knowledge.analyze import analyze_task_report
 
@@ -854,7 +854,7 @@ def register(bp, ok, fail):
         if isinstance(project_ids, list):
             project_ids = [str(p).strip() for p in project_ids if str(p).strip()]
 
-        from db.orm import ProjectTask, ProjectTaskDetail
+        from base.db.orm import ProjectTask, ProjectTaskDetail
         from ai.knowledge.retriever import search_hybrid
         from ai.knowledge.dashboard_analysis import analyze_dashboard
 

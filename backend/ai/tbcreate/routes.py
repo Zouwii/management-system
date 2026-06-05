@@ -21,8 +21,8 @@ from sqlalchemy import or_
 
 from ai.tbcreate.workspace import init_workspace
 from ai.terminal.session import resolve_owner_key, user_workspace
-from db.engine import SessionLocal
-from db.orm import ProjectTaskDetail
+from base.db.engine import SessionLocal
+from base.db.orm import ProjectTaskDetail
 
 # SSE: owner_key -> list of queues (one per connected frontend)
 _draft_sse_queues: Dict[str, List[queue_module.Queue]] = {}

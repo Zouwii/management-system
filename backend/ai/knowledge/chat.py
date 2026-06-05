@@ -75,8 +75,8 @@ def _build_context(query: str, workspace_id: str | None = None) -> tuple[str, li
 
 def _find_person_names(query: str) -> list[str]:
     """Extract potential person names from the query by matching user_character.name."""
-    from db.engine import SessionLocal
-    from db.orm import UserCharacter
+    from base.db.engine import SessionLocal
+    from base.db.orm import UserCharacter
 
     db = SessionLocal()
     try:
@@ -94,8 +94,8 @@ def _fetch_tb_tasks(query: str) -> tuple[str, list[str]]:
     if not names:
         return "", []
 
-    from db.engine import SessionLocal
-    from db.orm import ProjectTask, UserCharacter
+    from base.db.engine import SessionLocal
+    from base.db.orm import ProjectTask, UserCharacter
 
     db = SessionLocal()
     try:

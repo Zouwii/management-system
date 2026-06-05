@@ -54,7 +54,7 @@ def _business_type_label(business_type) -> str:
 
 
 def _get_project_id() -> str:
-    from services.config_service import get_config_projectids
+    from base.config.service import get_config_projectids
     projectids = get_config_projectids() or {}
     if isinstance(projectids, dict) and projectids:
         return str(next(iter(projectids.values())) or "").strip()
@@ -62,7 +62,7 @@ def _get_project_id() -> str:
 
 
 def _get_time_range():
-    from services.config_service import get_default_time_range_service
+    from base.config.service import get_default_time_range_service
     tr = get_default_time_range_service() or {}
     if tr.get("success"):
         return str(tr.get("start_time", "")), str(tr.get("end_time", ""))
@@ -70,7 +70,7 @@ def _get_time_range():
 
 
 def _get_coefficient(user_character: Optional[int]) -> float:
-    from services.config_service import get_workhour_character_coefficients_service
+    from base.config.service import get_workhour_character_coefficients_service
     coeff_out = get_workhour_character_coefficients_service() or {}
     coeff_map = coeff_out.get("workhour_character_coefficients") or {}
     if user_character is not None:
@@ -79,7 +79,7 @@ def _get_coefficient(user_character: Optional[int]) -> float:
 
 
 def _get_workday_count(start: str, end: str) -> float:
-    from services.workhour_aggregate_service import workdays_in_range_service
+    from workhour.personal.aggregate import workdays_in_range_service
     wd_out = workdays_in_range_service({"start_time": start, "end_time": end, "compensatoryDays": 0}) or {}
     return float((wd_out.get("data") or {}).get("workday_count") or 0.0)
 
@@ -163,9 +163,9 @@ def fetch_tasks(
     直接调用 executor_quarter_workhours_db_service，
     确保与工时管理界面数据口径完全一致。
     """
-    from services.workhour_aggregate_service import executor_quarter_workhours_db_service
-    from db.engine import SessionLocal
-    from db.orm import ProjectTask, UserCharacter
+    from workhour.personal.aggregate import executor_quarter_workhours_db_service
+    from base.db.engine import SessionLocal
+    from base.db.orm import ProjectTask, UserCharacter
 
     if quarter:
         start, end = _quarter_range(quarter)
@@ -249,7 +249,7 @@ def fetch_tasks(
     if parent_ids:
         db2 = SessionLocal()
         try:
-            from db.orm import ProjectTaskDetail as PTD
+            from base.db.orm import ProjectTaskDetail as PTD
             # 走 project_task_details.parent_task_id 查同父任务
             siblings = (
                 db2.query(PTD.task_id, PTD.parent_task_id, PTD.content)

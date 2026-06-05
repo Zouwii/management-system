@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy import text
 
-from db.engine import SessionLocal, PgVectorSessionLocal, engine
+from base.db.engine import SessionLocal, PgVectorSessionLocal, engine
 
 
 def search_chunks(

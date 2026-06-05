@@ -176,8 +176,8 @@ def register_tools(mcp: FastMCP) -> None:
         uid, _ = _resolve_user()
         if not uid:
             return {"error": "未设置用户身份"}
-        from db.engine import SessionLocal
-        from db.orm import ProjectTaskDetail
+        from base.db.engine import SessionLocal
+        from base.db.orm import ProjectTaskDetail
 
         session = SessionLocal()
         try:

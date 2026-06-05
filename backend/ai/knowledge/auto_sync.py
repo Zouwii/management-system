@@ -18,7 +18,7 @@ from ai.knowledge.embedder import embed_chunks
 from ai.knowledge.models import KbDocument, KbChunk
 from ai.knowledge.routes import _sync_workspace
 from ai.knowledge.service import DingTalkKnowledgeClient, get_known_workspaces
-from db.engine import SessionLocal
+from base.db.engine import SessionLocal
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ def _sync_log(entry: dict) -> None:
 
 def _resolve_union_id() -> str:
     """Resolve a union_id for automated operations (non-request context)."""
-    from db.orm import UserCharacter as DbUserCharacter
+    from base.db.orm import UserCharacter as DbUserCharacter
 
     db = SessionLocal()
     try:

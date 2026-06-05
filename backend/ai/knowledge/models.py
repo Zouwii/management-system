@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from sqlalchemy import DateTime, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from db.orm import Base
+from base.db.orm import Base
 
 
 class KbDocument(Base):

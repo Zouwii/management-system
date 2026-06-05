@@ -6,98 +6,69 @@
 backend/
 ├── app.py                          # Flask 入口，create_app()
 ├── api.py                          # /api/bt 蓝图 + ok/fail 工具函数
+├── dingtalk_client.py              # 钉钉 OpenAPI 封装
+├── config.json                     # 应用配置
+├── ids.json                        # 用户/项目 ID 映射
 │
 ├── db/                             # 数据层
 │   ├── config.py                   # DB 连接配置（读 .env）
 │   ├── engine.py                   # SQLAlchemy engine + session
 │   └── orm.py                      # ORM 模型定义
 │
-├── route_registry/                 # 路由层 — 每个业务一个模块
-│   ├── __init__.py                 # register_all_routes(bp, ok, fail)
-│   ├── route_index.py              # URL → handler → service 映射索引
-│   ├── auth.py                     # 钉钉登录（OAuth/免登/session）
-│   ├── sync.py                     # 数据同步（全量/时间段/A表/B表/批量）+ 锁状态
-│   ├── projects.py                 # 项目任务搜索/列表/用户任务/自定义字段
-│   ├── config_routes.py            # 配置读写（userid/时间范围/工时系数）
-│   ├── perf.py                     # 绩效 fill / calculate
-│   ├── stats.py                    # 统计汇总
-│   ├── health_proxy.py             # 健康检查 / 钉钉代理 / gettoken
-│   └── dashboard/                  # Dashboard 蓝图 (/api/dashboard)
-│       ├── __init__.py             # dashboard_bp 创建 + 共享工具函数
-│       ├── personal_hours.py       # 个人工时页（默认结构/查询/更新）
-│       ├── team_detail.py          # 导航组/对接组详情
-│       └── ai_task.py              # AI 创建任务单
+├── base/                           # 基础建设
+│   ├── auth/                       #   登录认证
+│   │   ├── routes.py               #     OAuth/免登/session
+│   │   └── service.py              #     角色推导、钉钉认证
+│   ├── sync/                       #   数据同步
+│   │   ├── routes.py               #     全量/增量/时间段
+│   │   ├── task_sync.py            #     钉钉数据落库（A表/B表）
+│   │   ├── lock.py                 #     分布式锁
+│   │   └── task_detail_extract.py  #     任务详情提取
+│   ├── projects/                   #   项目管理
+│   │   ├── routes.py               #     任务搜索/列表/用户任务
+│   │   └── task_service.py         #     钉钉 API 查询
+│   ├── config/                     #   配置管理
+│   │   ├── routes.py               #     配置读写
+│   │   ├── service.py              #     配置服务
+│   │   └── member_visibility.py    #     成员可见性
+│   ├── stats/                      #   统计汇总
+│   │   └── routes.py               #
+│   └── health/                     #   健康检查/代理
+│       ├── routes.py               #     health/gettoken/proxy
+│       └── proxy.py                #     钉钉 API 代理
 │
-├── services/                       # 业务逻辑层 — 被路由层调用
-│   ├── auth_service.py             # 角色推导、用户画像解析、钉钉认证
-│   ├── task_sync_service.py        # 钉钉数据落库（A表/B表/全量/增量）
-│   ├── project_task_service.py     # 钉钉 API 查询（项目任务/用户任务）
-│   ├── sync_lock.py                # 分布式锁（UpdateLock 表操作）
-│   ├── proxy_service.py            # 钉钉 API 代理
-│   ├── config_service.py           # 配置管理
-│   ├── perf_service.py             # 绩效计算
-│   ├── workhour_aggregate_service.py  # 工时聚合
-│   ├── workhour_util.py            # 工时解析工具
-│   ├── task_detail_extract_service.py # 任务详情自定义字段提取
-│   └── member_visibility.py        # 成员可见性
+├── workhour/                       # 工时管理
+│   ├── personal/                   #   个人工时
+│   │   ├── routes.py               #     /api/dashboard/personal-hours
+│   │   ├── aggregate.py            #     工时聚合查询
+│   │   └── util.py                 #     工时解析工具
+│   └── team/                       #   团队详情
+│       └── routes.py               #     /api/dashboard/nav-team-detail
 │
-├── ai/                             # AI 功能 — 分包设计
-│   ├── __init__.py                 # register_all_routes(bp, ok, fail)
-│   ├── config.json                 # one-api 网关配置
-│   ├── docs/                       # AI 设计文档（11篇）
-│   ├── domain/                     # 领域规则（tb_rule.md, work_hour.md）
-│   ├── skills/                     # LLM prompt 模板
-│   │   ├── 1_tb_analysis/SKILL.md
-│   │   ├── 1-1_keyword_extract/SKILL.md
-│   │   ├── 2_tb_create/SKILL.md
-│   │   └── 3_kb_qa/SKILL.md
-│   │
-│   ├── knowledge/                  # 知识库子系统（同步/检索/聊天/分析）
-│   │   ├── routes.py               #   HTTP 路由（14个端点）
-│   │   ├── service.py              #   钉钉知识库 API 客户端
-│   │   ├── auto_sync.py            #   同步 pipeline（daemon 调用）
-│   │   ├── retriever.py            #   search_hybrid（FTS + vector RRF 融合）
-│   │   ├── chunker.py              #   文档分块
-│   │   ├── embedder.py             #   本地 embedding（BAAI/bge-small-zh-v1.5）
-│   │   ├── parser.py               #   钉钉文档 → markdown
-│   │   ├── chat.py                 #   SSE 流式聊天
-│   │   ├── chat_session.py         #   聊天会话管理
-│   │   ├── analyze.py              #   单任务 LLM 分析
-│   │   ├── dashboard_analysis.py   #   仪表盘多维度分析
-│   │   ├── models.py               #   KbDocument / KbChunk ORM
-│   │   └── workspace.py            #   KB 问答 ttyd 工作区
-│   │
-│   ├── task_analysis/              # AI 任务分析栏（3步流程）
-│   │   ├── routes.py               #   HTTP 路由（3个端点）
-│   │   ├── data.py                 #   TB 任务数据查询
-│   │   ├── retrieval.py            #   知识库检索封装
-│   │   └── analysis.py             #   LLM 报告生成（2次调用）
-│   │
-│   ├── tbcreate/                   # AI 任务创建（草稿管理）
-│   │   ├── routes.py               #   HTTP 路由 + SSE 通知（6个端点）
-│   │   ├── context.py              #   用户任务上下文读取
-│   │   └── workspace.py            #   工作区初始化
-│   │
-│   ├── teambition/                 # TB 任务正式创建
-│   │   ├── routes.py               #   HTTP 路由
-│   │   └── service.py              #   钉钉 TB 任务创建 API
-│   │
-│   ├── terminal/                   # AI 交互终端（ttyd + Claude CLI）
-│   │   ├── routes.py               #   HTTP 路由（session 管理）
-│   │   ├── session.py              #   ttyd 进程/端口/环境变量管理
-│   │   └── launcher.sh             #   模型选择 + Claude CLI 启动
-│   │
-│   └── mcp/                        # MCP Server（FastMCP）
-│       ├── server.py               #   Resources / Prompts / Tools
-│       └── __main__.py             #   入口
+├── performance/                    # 绩效管理
+│   ├── routes.py                   #   /api/bt/perf/*
+│   └── service.py                  #   绩效计算
 │
-├── dingtalk_client.py              # 钉钉 OpenAPI 封装（token/用户/项目/auth）
-├── config.json                     # 应用配置（corpId/clientId 等）
-├── ids.json                        # 用户/项目 ID 映射
+├── ai/                             # AI 功能
+│   ├── knowledge/                  #   知识库子系统
+│   ├── task_analysis/              #   任务分析栏
+│   ├── tbcreate/                   #   任务草稿创建
+│   ├── teambition/                 #   TB 任务创建
+│   ├── terminal/                   #   交互终端
+│   ├── mcp/                        #   MCP Server
+│   ├── skills/                     #   LLM prompt 模板
+│   ├── domain/                     #   领域规则
+│   └── docs/                       #   AI 设计文档
 │
+├── route_registry/                 # 兼容层 — 路由入口索引
+│   ├── __init__.py                 #   → 实际指向 base/、performance/
+│   ├── route_index.py              #   URL 映射索引
+│   └── dashboard/                  #   Dashboard 蓝图（workhour 路由）
+│
+├── services/                       # 废弃 — 旧服务代码（已迁移）
 ├── data/                           # 本地数据文件
-├── static/                         # 前端静态资源（react/vue 构建产物）
-├── runtime/                        # 运行时数据（Claude 工作区、用户会话）
+├── static/                         # 前端静态资源
+├── runtime/                        # 运行时数据
 └── scripts/                        # 运维脚本
 ```
 

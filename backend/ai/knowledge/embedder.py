@@ -9,7 +9,7 @@ from typing import Optional
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 os.environ.setdefault("MKL_NUM_THREADS", "1")
 
-from db.engine import PgVectorSessionLocal, SessionLocal
+from base.db.engine import PgVectorSessionLocal, SessionLocal
 
 logger = logging.getLogger(__name__)
 

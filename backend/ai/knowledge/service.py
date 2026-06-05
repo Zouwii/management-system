@@ -28,7 +28,7 @@ from typing import Any, Dict, List, Optional
 
 import requests
 
-from dingtalk_client import get_valid_access_token
+from base.dingtalk_client import get_valid_access_token
 
 # ── knowledge base priority config ─────────────────────────────
 
@@ -61,7 +61,7 @@ def get_known_workspaces() -> Dict[str, int]:
 
     Only entries with ``enabled: true`` are returned.
     """
-    cfg_path = Path(__file__).resolve().parent.parent / "kb_workspaces.json"
+    cfg_path = Path(__file__).resolve().parent.parent / "base" / "kb_workspaces.json"
     if cfg_path.exists():
         try:
             raw = cfg_path.read_text(encoding="utf-8").strip()

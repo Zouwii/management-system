@@ -14,8 +14,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import desc
 
-from db.engine import SessionLocal
-from db.orm import ProjectTaskDetail
+from base.db.engine import SessionLocal
+from base.db.orm import ProjectTaskDetail
 
 REQUIREMENT_DESC_CUSTOMFIELD_ID = "686273700d15b3f835491a2e"
 TASK_OUTPUT_CUSTOMFIELD_ID = "6862737e3b781c68b3181925"
