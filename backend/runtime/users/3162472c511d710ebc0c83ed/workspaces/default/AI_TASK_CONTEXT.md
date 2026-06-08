@@ -1,0 +1,1395 @@
+# 当前用户任务上下文
+
+## 说明
+- 这是一份只读上下文，用于聊天前给 AI 提供任务背景。
+- 这里只借鉴现有数据库中的文字描述和父子任务关系，不会修改任何任务单。
+
+## 基本信息
+- 用户：邹宏睿
+- 用户 ID：01195014075436361289
+- 读取时间：2026-06-05T10:07:27+00:00
+- 摘要：已读取 135 条任务：未完成 34 个，已完成 101 个，逾期 0 个。常见任务性质：未标注 100 个、69d4d037c253ef42e9c31b39 24 个、69d4d037c253ef42e9c31b3a 8 个。
+
+## 指标
+- taskCount: 135
+- completedTaskCount: 101
+- unfinishedTaskCount: 34
+- overdueTaskCount: 0
+- scheduledHours: 144.5
+
+## 最近任务
+- [创建中] 【b+】无为238到点精度大数据分析-1月底备份
+  - taskId: 6971d2cddde142b695bd08a4
+  - parent: 69549679f1e33c17c6b1ccb3
+  - dueDate: 2026-01-24T10:00:00
+  - workHour: 0.0
+  - content: 【b+】无为238到点精度大数据分析-1月底备份
+  - requirementDesc: 无为的数据库拷回本地，进行分析
+  - taskOutputs: 数据库备份拷回，分为238（0.2天）对于238数据进行基础分析，输出分析文档。（0.8天）结论：已经对无为238数据进行基础分析，但是数据中存在异常值，由于时间久远以及部署情况不清晰，结论为数据异常。目前已经将无为常态化运行的数据拷...
+- [创建中] 【4-1】MCP服务搭建
+  - taskId: 6a1e96b7b4f589c1e7ae6dc4
+  - parent: 【2】AI模块
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - taskNature: 69d4d037c253ef42e9c31b3a
+  - content: 【4-1】MCP服务搭建
+  - requirementDesc: 用户在使用其他ai终端的时候，希望能够调用mcp服务直接进行tb单创建，不用进入到页面中进行重复操作。
+  - taskOutputs: （1）进行mcp设计，mcp设计文档（1.0天）（2）mcp后端服务开发（1.0天）（3）cli调用mcp功能联调（1.0天）
+- [未完成] 【4】工作日耗时模块-研发办定制
+  - taskId: 6a102d7c38dbe40b2e37fff9
+  - parent: 平台搭建
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - content: 【4】工作日耗时模块-研发办定制
+  - requirementDesc: 此为父任务，记录研发办定制有效工时相关tb单
+- [未完成] 【0】平台搭建准备工作
+  - taskId: 6a10285e0c85b02ac896985a
+  - parent: 平台搭建
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - content: 【0】平台搭建准备工作
+  - requirementDesc: 此为父任务，记录管理平台的准备工作
+- [未完成] 【2-1】ai任务分析栏
+  - taskId: 6a102b5cb0d4da5e98ff901d
+  - parent: 【2】AI模块
+  - dueDate: 2026-05-31T10:00:00
+  - workHour: 2.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - content: 【2-1】ai任务分析栏
+  - requirementDesc: 输出设计文档。（0.5天）考虑从不同的角度分析任务编写ai任务分析栏skill。（0.5天）ai任务分析栏前后端开发。（1.0天）
+- [创建中] 【0-4】多用户下服务器ttyd崩溃测试
+  - taskId: 6a16c272739ade47d7d0b982
+  - parent: 【2】AI模块
+  - dueDate: 2026-05-31T10:00:00
+  - workHour: 0.0
+  - taskNature: 69d4d037c253ef42e9c31b3a
+  - content: 【0-4】多用户下服务器ttyd崩溃测试
+  - requirementDesc: 目前页面一个用户共有两个ttyd进程，需要考虑多用户使用场景下，是否会导致服务器内存不足而崩溃
+- [已完成] 【1】工时管理模块
+  - taskId: 6a102906e05ec4a6fbd54499
+  - parent: 平台搭建
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - content: 【1】工时管理模块
+  - requirementDesc: 此为父任务，工时管理部分的单子汇总
+- [未完成] 【3-2】ai问答功能模块
+  - taskId: 6a102ccd43e1cc7d1fa6a441
+  - parent: 【2】AI模块
+  - dueDate: 2026-06-11T10:00:00
+  - workHour: 2.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - content: 【3-2】ai问答功能模块
+  - requirementDesc: 在ttyd中提供ai问答功能，接入知识库和tb单，可以了解同事的工作并进行基础问答。
+  - taskOutputs: 设计输出格式输出设计文档。（0.5天）支持员工信息分析（数字员工）和主题信息分析（某个特定主题信息）ai问答skill开发。（0.5天）进行功能联调。（1.0天）
+- [未完成] 【0-3】AI接入知识库能力
+  - taskId: 6a0c122ca10f54aba823384b
+  - parent: 【2】AI模块
+  - dueDate: 2026-05-30T10:00:00
+  - workHour: 3.0
+  - taskNature: 69d4d037c253ef42e9c31b3a
+  - content: 【0-3】AI接入知识库能力
+  - requirementDesc: 为了使得ai可以准确分析工单，需要将知识库内容接入。同时，在ttyd的对话中，希望新增一个聊天模式，可以让用户了解知识库中的信息。
+  - taskOutputs: RAG检索增强和知识库数据储存设计，输出设计文档（1.0天）进行RAG检索增强业务开发和数据库部分开发，可以使用ttyd进行知识库聊天。（2.0天）
+- [未完成] 【3】绩效模块
+  - taskId: 6a102d3dc0950de68c609878
+  - parent: 平台搭建
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - content: 【3】绩效模块
+  - requirementDesc: 此为父任务，记录绩效模块相关tb单
+- [未完成] 【2】AI模块
+  - taskId: 6a1029ac55bbfbf0723a6c5d
+  - parent: 平台搭建
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - content: 【2】AI模块
+  - requirementDesc: 此为父任务，记录ai模块单子汇总
+- [评审中] 无相机车型到点自学习异常保护
+  - taskId: 6a02dd5948997ef1448d5a6f
+  - parent: 69549660156f5c03808a5709
+  - dueDate: 2026-05-31T10:00:00
+  - workHour: 1.5
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 1
+  - content: 无相机车型到点自学习异常保护
+  - requirementDesc: 由于伺服调用感知可能因为没有安装相机导致失败，故采集时调用伺服会导致程序崩溃。伺服调用过于频繁会导致错误，需要修改伺服快速示教时机。
+  - taskOutputs: 预期产出：进行需求澄清，进行讨论，明确结论为：增加是否有相机这一判断条件，并对于伺服返回进行透传。（0.2天）无相机报错开发：如果相机初始化失败且开启自学习采集，需要进行三代机型报错（0.5天）梳理伺服快速示教逻辑，提取整体初始化模块...
+- [创建中] 云端组件算法测试final
+  - taskId: 6a0d6f9fc96939e4a244caf7
+  - dueDate: 2026-05-31T15:59:59
+  - workHour: 0.0
+  - taskNature: 指派型
+  - content: 云端组件算法测试final
+  - requirementDesc: 测试换行修复
+  - taskOutputs: 1. 搭建算法测试框架(1.0天); 2. 测试并筛选算法(1.5天); 3. 输出文档(0.5天)
+- [未完成] 梳理行为树导航伺服切换逻辑
+  - taskId: 6a1025de0e68d33ace3b0cea
+  - dueDate: 2026-05-31T10:00:00
+  - workHour: 0.5
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - content: 梳理行为树导航伺服切换逻辑
+  - requirementDesc: 在行为树模式下，导航切换伺服过早，需要进行问题排查并梳理导航伺服切换逻辑。
+  - taskOutputs: 协助排查行为树模式下，伺服接管过早的问题。（0.25天）梳理导航伺服切换逻辑，输出文档。（0.25天）
+- [评审中] 在WSL环境中使用vscode AI插件
+  - taskId: 6a018ee595ce53ea402b843c
+  - dueDate: 2026-05-29T10:00:00
+  - workHour: 0.2
+  - taskNature: 69d4d037c253ef42e9c31b3a
+  - businessType: 1
+  - content: 在WSL环境中使用vscode AI插件
+  - requirementDesc: 探究vscode怎么连接ubuntu并使用codex，使用vscode而非命令行的优点是在ide中，可以选取指定内容添加到对话
+  - taskOutputs: 输出wsl配置文档，使得在vscode里面，可以类似cursor的方式在ubuntu中使用codex。（0.2天）结论：已完成配置，并输出插件文档
+- [创建中] 云端组件算法测试
+  - taskId: 6a0d308b1402a8781090a8d1
+  - dueDate: 2026-05-31T15:59:59
+  - workHour: 0.0
+  - taskNature: 指派型
+  - content: 云端组件算法测试
+  - requirementDesc: 任务背景：需要对云端组件调用自学习算法做不同的算法测试。工作内容和目标：对云端组件调用自学习算法进行不同算法测试，测试出可以收敛的算法。
+  - taskOutputs: 1. 搭建算法测试框架，验证不同算法的收敛效果(1.0天)2. 测试并筛选可收敛的算法，输出算法对比报告(1.5天)3. 输出文档（0.5天）
+- [评审中] 【1-2】ai任务单创建交互优化
+  - taskId: 6a0e6760a94bf8a34462ce74
+  - parent: 【2】AI模块
+  - dueDate: 2026-05-31T10:00:00
+  - workHour: 1.0
+  - taskNature: 69d4d037c253ef42e9c31b3a
+  - businessType: 1
+  - content: 【1-2】ai任务单创建交互优化
+  - requirementDesc: AI任务单创建 功能为了方便交互，增加了下拉选择父任务、多轮交互对话、总工时档位审核提示功能，并且探索超文本进行换行方法，需求描述、任务产出支持按条换行功能。
+  - taskOutputs: 任务产出：界面优化、按钮位置优化以及超链接功能开发（0.2天）多轮交互对话功能开发（0.2天）总工时档位审核提示功能开发（0.1天）任务产出、需求描述换行功能开发（0.5天）结论：已完成ai任务单创建的优化，目前可以支持多轮对话功能
+- [创建中] 换行测试-需求描述
+  - taskId: 6a0d7161b5768b65eb79678d
+  - dueDate: 2026-05-31T15:59:59
+  - workHour: 0.0
+  - taskNature: 指派型
+  - content: 换行测试-需求描述
+  - requirementDesc: A: 123
+B: 234
+C: 567
+  - taskOutputs: 1. 测试产出(1.0天)
+- [未完成] management-system代码重构
+  - taskId: 6a0560899e2d95c44964f202
+  - parent: 【0】平台搭建准备工作
+  - dueDate: 2026-05-31T10:00:00
+  - workHour: 1.0
+  - taskNature: 69d4d037c253ef42e9c31b3a
+  - content: management-system代码重构
+  - requirementDesc: 之前management-system属于敏捷开发，没有做分模块、分级管理，在增加ai业务后结构过于复杂，可读性太差，因此做重构。
+  - taskOutputs: 对management-system做代码重构，输出模块设计文档。（1.0天）便于后期增加绩效管理和工作日耗时统计
+- [创建中] 【更新中】海康车激光和二维码混合测试
+  - taskId: 69fd4d93a55e918553995ee1
+  - parent: 海康车性能测试二阶段
+  - dueDate: 2026-05-30T10:00:00
+  - workHour: 0.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - content: 【更新中】海康车激光和二维码混合测试
+  - requirementDesc: 戴总希望比较一下海康车对于激光/二维码场景切换的实现效果，因此需要进行海康车激光和二维码混合测试。
+  - taskOutputs: 海康车进行激光+二维码场景建图。（0.5天）对海康车的不同导航模式切换方法进行研究，输出切换文档。（0.5天）整理海康知识库文档，输出分析文档，对海康车激光/二维码切换逻辑进行分析。（1.0天）
+- [创建中] test-creatre
+  - taskId: 69f085186a8fc94674bb090f
+  - dueDate: 2026-04-30T10:00:00
+  - workHour: 0.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - content: test-creatre
+- [已完成] 问题处理数据库设计和联调
+  - taskId: 69f097656ba167e8df44d976
+  - parent: 【1】工时管理模块
+  - dueDate: 2026-04-30T10:00:00
+  - workHour: 2.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 1
+  - content: 问题处理数据库设计和联调
+  - requirementDesc: 目前希望导入单子的时候，同时将问题处理类型的单子进行导入。界面增加了工作日耗时、软件开发/问题处理， 这两类内容，需要进行联调保证功能正常。
+  - taskOutputs: 问题处理数据库（工作日耗时）设计，以及前后端开发。输出设计文档。（1.0天）优化饼图和柱状图的显示，现在可以按照百分比进行显示，且文字不会和引导线交互。（0.5天）对工作日耗时、问题处理/软件开发 显示进行联调，确保数据准确。（0.5...
+- [未完成] 自学习后端计算模块异常数据过滤功能开发
+  - taskId: 69fd98a798bbdf5d3ccef98e
+  - parent: 到点自学习六期
+  - dueDate: 2026-05-31T10:00:00
+  - workHour: 2.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - content: 自学习后端计算模块异常数据过滤功能开发
+  - requirementDesc: 自学习后端计算模块需要进行异常数据过滤，为此需要测试阈值并做后端开发。
+  - taskOutputs: 在实车上测试不同机器学习算法基获得样本空间，估算过滤阈值，输出nav-application版本。（1.5天）自学习后端增加阈值过滤功能（0.5天）
+- [评审中] 【0-1】ai基座-环境与多用户服务
+  - taskId: 69f0901b9bdb733c6bad7c8e
+  - parent: 【2】AI模块
+  - dueDate: 2026-04-30T10:00:00
+  - workHour: 3.0
+  - taskNature: 69d4d037c253ef42e9c31b3a
+  - businessType: 1
+  - content: 【0-1】ai基座-环境与多用户服务
+  - requirementDesc: 为了把ai进行接入，需要做基座的设计。基座主要包含以下几方面内容：1、开发环境和运行环境数据迁移 2、用户与进程池管理  3、使用ttyd进行对话交互。
+  - taskOutputs: 任务产出：探索ai部署的问题，在server22服务器和在本地服务器分别部署claude模型的问题，测试api形式和对话框形式的ai调用问题。（1天）对ai资源进行用户与进程池管理，为不同用户保存不同对话。（0.5天）探究迁移部署方式...
+- [评审中] 和产品讨论大数据需求
+  - taskId: 69f094a98703b7a99d481c28
+  - parent: 69549660156f5c03808a5709
+  - dueDate: 2026-04-30T10:00:00
+  - workHour: 0.5
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 1
+  - content: 和产品讨论大数据需求
+  - requirementDesc: 和产品进行关于大数据平台的讨论，完成需求导入之前的工作
+  - taskOutputs: 与产品进行讨论，协助完成需求导入。（0.5天）
+- [已完成] 【17】自学习库区非共享参数协议变更
+  - taskId: 69eb0a5ea51a38487cd19c08
+  - parent: 到点自学习六期
+  - dueDate: 2026-04-30T10:00:00
+  - workHour: 0.5
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 1
+  - content: 【17】自学习库区非共享参数协议变更
+  - requirementDesc: 库区非共享参数只包含库区属性，不包含点位属性。需要讨论解决方案并输出变更协议。
+  - taskOutputs: 与前端、地图侧进行方案讨论。输出新的变更协议，前端新增非共享参数列表字段，包含点位、路线是否使用非共享参数。（0.5天） [图片]
+- [未完成] 【0-2】ai基座- claude API接入
+  - taskId: 69df278c0359c49e6fd67af4
+  - parent: 【2】AI模块
+  - dueDate: 2026-04-30T10:00:00
+  - workHour: 1.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - content: 【0-2】ai基座- claude API接入
+  - requirementDesc: 现在基线已经提供claude服务，目前需要把ai接入到管理系统平台中
+  - taskOutputs: 设计ai后端模块，输出ai后端架构文档（0.5天）AI助理接入后端，进行最小系统开发（0.5天）
+- [已完成] 工时管理需求搜集以及补充开发
+  - taskId: 69e0b175c3a9fde722cdf05b
+  - parent: 【1】工时管理模块
+  - dueDate: 2026-04-30T10:00:00
+  - workHour: 2.5
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 1
+  - content: 工时管理需求搜集以及补充开发
+  - requirementDesc: 需要根据需求搜集的内容，进行增补开发和内容修改
+  - taskOutputs: 整理同事使用反馈的建议，做补充开发。包括界面优化、控件显示优化等（2.1天）按照父子任务导出csv功能团队点击人名可以跳转成员工时查询来源是excel中的内容更新、全量更新增加数据库锁。禁止在更新数据库的时候让其他用户查询结果。增加用...
+- [创建中] 【更新中】绩效表格后端与数据库开发
+  - taskId: 69ce252dbd58fd8485791ce0
+  - parent: 【3】绩效模块
+  - dueDate: 2026-04-30T10:00:00
+  - workHour: 0.0
+  - content: 【更新中】绩效表格后端与数据库开发
+  - requirementDesc: 需要设计绩效表格数据库，设计后端接口与前端调用
+  - taskOutputs: 设计绩效数据库与计算程序，输出文档。（0.5天）设计后端接口服务，完成前后端联调。（1天）组长、管理员端的聚合绩效表格开发和联调。（1天）
+- [评审中] 【1-1】ai任务单创建
+  - taskId: 69df41b03e2b8a25404bdfa0
+  - parent: 【2】AI模块
+  - dueDate: 2026-04-30T10:00:00
+  - workHour: 2.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 1
+  - content: 【1-1】ai任务单创建
+  - requirementDesc: 需要开发ai任务单系统，自动化创建tb单
+  - taskOutputs: 编写ai任务单创建skill，输出设计文档。（1天）ai任务创建联调，完成自动父子任务检索、任务归属，输出可用的任务单系统（1天）结论：目前已经可以实现ai任务单创建。 [图片]
+- [评审中] 到点自学习专利撰写
+  - taskId: 69e0b85cf6e47cd9122e34e3
+  - parent: 69549660156f5c03808a5709
+  - dueDate: 2026-04-21T10:00:00
+  - workHour: 0.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 1
+  - content: 到点自学习专利撰写
+  - requirementDesc: 自学习专利，见子任务
+  - taskOutputs: 无
+- [已完成] 钉钉OAuth登录和服务器重定向
+  - taskId: 69d4a5a9b6a6e8c6a9b403c2
+  - parent: 【0】平台搭建准备工作
+  - dueDate: 2026-04-30T10:00:00
+  - workHour: 1.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 1
+  - content: 钉钉OAuth登录和服务器重定向
+  - requirementDesc: 需要配置钉钉oauth权限，设置本地服务器重定向来使用钉钉登录
+  - taskOutputs: 开发钉钉oauth后端业务（0.5天）配置服务器重定向，使用nginx使得所有用户可以访问该登录界面（0.5天）结论：目前已在http://172.19.3.79:5002/login上部署，现在部门同事可以正常登录使用管理工具。 [图片]
+- [已完成] 工时管理系统——个人和团队前后端开发
+  - taskId: 69d616118548e9e37b15e70f
+  - parent: 【1】工时管理模块
+  - dueDate: 2026-04-30T10:00:00
+  - workHour: 3.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 1
+  - content: 工时管理系统——个人和团队前后端开发
+  - requirementDesc: 更新/全量更新后端业务优化，目前支持更新操作的时候同步更新季度逾期状态
+  - taskOutputs: 个人系统，更新按钮、全量更新逻辑变更。重新进行流程设计，重新进行时间区间设计。输出1.0版本新前端+后端的个人工时管理系统（0.5天）团队工时系统，前后端开发（1.0天）联调个人工时管理和团队工时管理界面，修复显示问题，确保系统正确交...
+- [已完成] 【15】自学习六期合入主干
+  - taskId: 69cb8e2eeb364a3712fd3600
+  - parent: 到点自学习六期
+  - dueDate: 2026-04-30T10:00:00
+  - workHour: 0.2
+  - taskNature: 69d4d037c253ef42e9c31b3a
+  - businessType: 1
+  - content: 【15】自学习六期合入主干
+  - requirementDesc: 自学习六期需要合入2603
+  - taskOutputs: nav-manager合入主干（0.1天）nav-application合入主干（0.1天）结论：已完成nav-manager的合入，版本为 1.2603.4。已完成nav-application的合入，版本为 1.2603.1
+- [创建中] 密码与权限系统设计开发
+  - taskId: 69ce12fcabb0ec0846743d2d
+  - parent: 平台搭建
+  - dueDate: 2026-04-30T10:00:00
+  - workHour: 0.0
+  - content: 密码与权限系统设计开发
+  - requirementDesc: 平台需要对不同权限的用户组进行设计，并根据相应权限做功能限制
+  - taskOutputs: 对密码权限系统进行设计，输出设计文档。（0.5天）进行数据库开发，数据库用户组加密。以及密码校验、cookie业务开发。（1天）
+- [未完成] 平台搭建
+  - taskId: 69ca76c65d0dfc53eb0ac9cc
+  - parent: 69c9e4b62d257d0af28399da
+  - dueDate: 2026-04-30T10:00:00
+  - workHour: 0.0
+  - content: 平台搭建
+- [已完成] 【2】数据库和服务器部署
+  - taskId: 69c67b5582ff0f12ab33633c
+  - parent: 【0】平台搭建准备工作
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 1.0
+  - businessType: 1
+  - content: 【2】数据库和服务器部署
+  - requirementDesc: 需要设计数据库，并且把系统上线到服务器
+  - taskOutputs: 参考tb_tool项目的数据库，设计数据库表格结构，输出文档。（0.5天）系统上线服务器（0.5天）结论：已经输出数据库设计文档，并在服务器上上线系统。 [图片]
+- [已完成] 专利交底书修改稿
+  - taskId: 69c7906c7af96e17b320be7e
+  - parent: 到点自学习专利撰写
+  - dueDate: 2026-04-15T10:00:00
+  - workHour: 0.5
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 1
+  - content: 专利交底书修改稿
+  - requirementDesc: 需要对专利稿做补充修改
+  - taskOutputs: 输出专利修改稿（0.5天）结论：已完成专利修改稿的编写，预期专利在4月底完成提交
+- [已完成] 【1】工时统计任务最小系统开发
+  - taskId: 69c6531312838824b0b6ae09
+  - parent: 【0】平台搭建准备工作
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 2.0
+  - businessType: 1
+  - content: 【1】工时统计任务最小系统开发
+  - requirementDesc: 开发工时统计任务最小系统，跑通整体tb流程
+  - taskOutputs: 开发前后端系统，进行工时统计和界面展示demo，打通链路。（1.5天）输出后端设计文档，将teabition的任务管理api进行分析。（0.5天）结论：已完成工时统计和界面展示demo，后端基础框架搭建完成，输出后端设计文档 [图片]
+- [已完成] 26年1季度季度考核表书写【邹宏睿】
+  - taskId: 69c63af62c53b32abea352b1
+  - parent: 69c63af52c53b32abea3524f
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 0.5
+  - businessType: 1
+  - content: 26年1季度季度考核表书写【邹宏睿】
+  - requirementDesc: 完成季度考核表的书写
+  - taskOutputs: 已完成季度考核表的编写
+- [已完成] 【0】最小系统前后端优化
+  - taskId: 69c67b076931b36f72e76b6c
+  - parent: 【0】平台搭建准备工作
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 2.0
+  - businessType: 1
+  - content: 【0】最小系统前后端优化
+  - requirementDesc: 需要设计前端界面；给后端增加“季度逾期”、季度法定工作日计算、成员分组；计算当前工时缺口；
+  - taskOutputs: 前端界面开发（1.0）后端增加业务开发（1.0）结论：已完成基础版本界面的开发以及后端业务开发 [图片]
+- [已完成] 【14】地图工程中文化适配
+  - taskId: 69be029bbff2af2713226c53
+  - parent: 到点自学习六期
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 1.0
+  - businessType: 0
+  - content: 【14】地图工程中文化适配
+  - requirementDesc: 目前ops、自学习、map-master对中文协议不一致，需要制定中文筛选规则，完成三端一致。 [图片]  [图片]
+  - taskOutputs: 任务产出：协助排查地图下发异常原因，联系调度端对jzagent对地图工程编码进行中文化适配。（0.5天）nav-application增加中文转义，筛除可能导致地图崩溃的未转义字符。（0.5天）结论：调度端增加中文转义包，jzagen...
+- [创建中] 【更新中】海康车激光地图性能测试
+  - taskId: 69bb5ab52e233df5f98337f0
+  - parent: 海康车性能测试二阶段
+  - dueDate: 2026-03-25T10:00:00
+  - workHour: 0.0
+  - content: 【更新中】海康车激光地图性能测试
+  - requirementDesc: （1）海康车激光地图节拍，精度测试，输出结论表格。（1.0天）
+- [已完成] 【11】自学习精度分析测试用例生成
+  - taskId: 69bb5bad3530042fa2799cdc
+  - parent: 到点自学习六期
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 1.7
+  - businessType: 0
+  - content: 【11】自学习精度分析测试用例生成
+  - requirementDesc: 测试需要了解自学习精度分析制造数据的方法，因此需要写文档指导测试进行用例创建
+  - taskOutputs: 枚举自学习精度分析可能出现的报错情况，构造标准测试用例，输出文档供测试学习使用。（1.0天）建图，构建真实测试场景，在定位准确的地方建点并部署二维码。输出精度分析实车用例文档。（0.5天）协助测试进行精度分析实验，确保项目顺利验收。（...
+- [已完成] nav-application Doxygen配置
+  - taskId: 69bb58f27586a2a736a38915
+  - parent: 69c9e41a05deebed5e1f8ed5
+  - dueDate: 2026-03-25T10:00:00
+  - workHour: 0.5
+  - businessType: 1
+  - content: nav-application Doxygen配置
+  - requirementDesc: 参考nav-net，nav-application仓库通过git-ci自动生成doxygen文档并上传到pages里面展示
+  - taskOutputs: 生成模块说明文档；将模块文档通过doxygen生成（layout）；上传到pages里面正常显示。 [图片]
+- [已完成] 【13】自学习库区使用问题排查
+  - taskId: 69bd2038d90e6244dae2fc46
+  - parent: 到点自学习六期
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 1.0
+  - businessType: 0
+  - content: 【13】自学习库区使用问题排查
+  - requirementDesc: 自学习联调需要使用库区模板，协助测试进行实验，发现库区模板的bug
+  - taskOutputs: 使用库区模板，测试出可用线路和模板。（0.5）录制测试视频并提交bug单，协助库区修复完成（0.5）结论：已完成库区模板的测试和建立，并录制bug视频给前端
+- [已完成] 自学习与地图操作工作流文档
+  - taskId: 69bcf15cca33caea887cf93c
+  - parent: 到点自学习六期
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 0.5
+  - businessType: 0
+  - content: 自学习与地图操作工作流文档
+  - requirementDesc: 自学习和地图经常出现错误，导致频繁修复的问题。需要输出文档记录自学习和新版本地图之间的常见联动问题以及错误处理方式
+  - taskOutputs: 输出自学习与地图操作工作流文档。（0.5天）
+- [已完成] 【12】自学习库区模板问题澄清会议
+  - taskId: 69bb5c843530042fa279fa1d
+  - parent: 到点自学习六期
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 0.5
+  - businessType: 0
+  - content: 【12】自学习库区模板问题澄清会议
+  - requirementDesc: 与产品/前端进行库区模板问题澄清，指明需求导入的偏差，确定新的库区设置方案。
+  - taskOutputs: 了解产品真实需求内容，本期开发功能和产品达成一致，输出总结性文档
+- [已完成] 海康车激光导航建图和rcs使用
+  - taskId: 69bb5a8e83d4b50716a6cc34
+  - parent: 海康车性能测试二阶段
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 2.0
+  - businessType: 1
+  - content: 海康车激光导航建图和rcs使用
+  - requirementDesc: 海康车需要进行激光建图，完成激光场景下的到点精度测试
+  - taskOutputs: 熟悉海康车的激光建图方法，使用海康的rcs和mapstudio工具，建立符合标准的测试激光地图。（1.0天）输出激光地图的建图方法和rcs使用文档。（0.5天）输出海康车激光建图和网段配置文档。（0.5天）结论：已了解海康车的激光建图...
+- [已完成] 自学习专利
+  - taskId: 699e66d73ff582c1541e3024
+  - parent: 到点自学习专利撰写
+  - dueDate: 2026-02-28T10:00:00
+  - workHour: 2.0
+  - businessType: 0
+  - content: 自学习专利
+  - requirementDesc: 自学习需要编写专利，先写初版本的技术交底书
+  - taskOutputs: 讨论专利相关情况并输出自学习技术交底书（2天）
+- [未完成] 海康车性能测试二阶段
+  - taskId: 699e63bc399fdd0cf662fe3e
+  - parent: 69254a465347265453246b69
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 0.0
+  - businessType: 1
+  - content: 海康车性能测试二阶段
+- [已完成] 海康车性能测试二阶段需求梳理讨论
+  - taskId: 699e66155b4a19f79071cd7e
+  - parent: 海康车性能测试二阶段
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 1.0
+  - businessType: 1
+  - content: 海康车性能测试二阶段需求梳理讨论
+  - requirementDesc: 和产品讨论海康车性能测试二阶段的任务，输出需求分解文档。
+  - taskOutputs: 输出海康车性能测试二阶段需求讨论文档（1.0天）
+- [已完成] 【远舢】自学习地图-数据库uuid一致性排查
+  - taskId: 6984689b5279443f443065b8
+  - parent: 69549679f1e33c17c6b1ccb3
+  - dueDate: 2026-02-27T10:00:00
+  - workHour: 1.5
+  - businessType: 2
+  - content: 【远舢】自学习地图-数据库uuid一致性排查
+  - requirementDesc: 需求1：明确影响范围，筛查自学习数据库与地图点位对比，输出哪些车&点 uuid不同，导致自学习数据未生效方案：研发通过脚本比对地图数据，输出表格，供现场排查确认需求2：批量修改，尽量在不重新学习情况下让动修改链路生效批量修改问题车&点uuid：篡改自学习数据库中的uuid，使其与最新地图文件保持一致，在次基础上手动补偿csv
+  - taskOutputs: 产出：远舢uuid筛选脚本和csv文件（1.0天） [图片] 远舢数据库操作，使得raw_data内uuid和地图一致，先计算learning_result，然后将补偿值全部置零以便进行人工补偿。（0.5天）结论：远舢已应用上 [图片]
+- [已完成] 【7-1】精度分析数据库协议设计
+  - taskId: 697c1fc493ea5e5a68e5d53b
+  - parent: 到点自学习六期
+  - dueDate: 2026-01-31T10:00:00
+  - workHour: 1.5
+  - businessType: 0
+  - content: 【7-1】精度分析数据库协议设计
+  - requirementDesc: 精度分析界面需要设计数据库结构，以及过程数据的协议。
+  - taskOutputs: 产出：设计并输出精度分析接口协议文档（1.0）更新nav-application里面的模块文档和uml类图。（0.5）结论：已完成精度分析接口协议文档的编写，已更新nav-application的模块文档和uml类图 [图片]
+- [已完成] 自学习问答补充
+  - taskId: 6979b755be19ee092e54038c
+  - parent: 69549660156f5c03808a5709
+  - dueDate: 2026-01-31T10:00:00
+  - workHour: 0.5
+  - businessType: 0
+  - content: 自学习问答补充
+  - requirementDesc: 钉钉ai问答关于自学习触发补偿值计算block的回答是空的，需要编写文档补充QA
+  - taskOutputs: 产出：输出自学习问答QA文档（0.5天）
+- [已完成] 邹宏睿年终述职报告
+  - taskId: 69661ccb099a47e24fcf6e00
+  - parent: 6969d7ca23f3f51138227a31
+  - dueDate: 2026-01-16T10:00:00
+  - workHour: 1.5
+  - businessType: 1
+  - content: 邹宏睿年终述职报告
+  - requirementDesc: 按照研发体系要求完成年终述职。
+  - taskOutputs: 输出年终述职文档（1天）参加年终述职报告（0.5天）
+- [已完成] 25年4季度季度考核表书写【邹宏睿】
+  - taskId: 694e71fa2f840bf4060d47ea
+  - parent: 694e713f91a3e532d86e6d2c
+  - dueDate: 2025-12-31T10:00:00
+  - workHour: 0.5
+  - businessType: 1
+  - content: 25年4季度季度考核表书写【邹宏睿】
+  - requirementDesc: 完成季度考核表的书写
+  - taskOutputs: 已完成季度考核表的编写
+- [已完成] 【5】单条数据和所有点数据的置0开发
+  - taskId: 694e26fd2f250228bbf3ef4a
+  - parent: 到点自学习六期
+  - dueDate: 2025-12-31T10:00:00
+  - workHour: 2.0
+  - businessType: 0
+  - content: 【5】单条数据和所有点数据的置0开发
+  - requirementDesc: 无码自学习需要将补偿值置为0。原先的清除补偿值是将这一条点位信息直接清掉，没有置0的功能。
+  - taskOutputs: 任务产出：补偿值置0方案设计，考虑修改learning_result表的结构，增加置0标识，置0过的数据后续不参与计算（1.0天）【额外】单条数据置0开发（0.5天）所有数据置0开发（0.5天）结论：已完成补偿值置0方案设计，复用计算...
+- [已完成] 【8】自学习示教值发生变化，清空对应的原始值和补偿值后端开发
+  - taskId: 694e2735a2a06744701e0e9e
+  - parent: 到点自学习六期
+  - dueDate: 2025-12-31T10:00:00
+  - workHour: 1.0
+  - businessType: 0
+  - content: 【8】自学习示教值发生变化，清空对应的原始值和补偿值后端开发
+  - requirementDesc: 若前端示教值发生修改时，对应自学习后端的原始值和补偿值要清空。Carly端打开/关闭自学习以及有码无码切换时，自学习界面同步删除对应补偿值数据。
+  - taskOutputs: 任务产出：nav-application做对应开发，给出版本（1.0天）结论：已完成compensation_type改变对应开发，等待和map-master进行联调。nav-application 1.2.1+t1
+- [已完成] 【2】前端界面增加两个开关说明
+  - taskId: 694e26bd1899152e4b945d0a
+  - parent: 到点自学习六期
+  - dueDate: 2025-12-31T10:00:00
+  - workHour: 0.2
+  - businessType: 0
+  - content: 【2】前端界面增加两个开关说明
+  - requirementDesc: 目前自学习计算开关/使用开关没有解释说明，使用者可能不理解具体含义。需要增加问号提示
+  - taskOutputs: 任务产出：nav-application功能开发，给出版本。（0.2天） [图片] 结论：已完成计算开关和补偿开关的提示符号开发
+- [已完成] 【9】从3代机型参数中修改到点精度判断的阈值
+  - taskId: 694e2757aaecaf330679a237
+  - parent: 到点自学习六期
+  - dueDate: 2025-12-31T10:00:00
+  - workHour: 0.2
+  - businessType: 0
+  - content: 【9】从3代机型参数中修改到点精度判断的阈值
+  - requirementDesc: 到点精度判断阈值，支持从3代机型参数中配置
+  - taskOutputs: nav-manager做对应开发，给出版本（0.1）jcar3-params做对应开发，给出版本（0.1）
+- [已完成] 【6】精度分析前端界面开发
+  - taskId: 694e2712853599aa5f2dd042
+  - parent: 到点自学习六期
+  - dueDate: 2025-12-31T10:00:00
+  - workHour: 1.5
+  - businessType: 0
+  - content: 【6】精度分析前端界面开发
+  - requirementDesc: 自学习在部署阶段，需要进行控制误差、定位误差分析，用于提高现场实施效率。预期显示控制误差、定位误差、有码误差三个分栏，分栏内包含车辆健康度诊断和路径健康度诊断。
+  - taskOutputs: nav-application的精度分析前端界面开发（1.5）结论：已完成目标页面的开发 [图片]  [图片]
+- [已完成] 【3】自学习数据分析界面优化
+  - taskId: 694e26d1925d5b122b7e3f83
+  - parent: 到点自学习六期
+  - dueDate: 2025-12-31T10:00:00
+  - workHour: 0.5
+  - businessType: 0
+  - content: 【3】自学习数据分析界面优化
+  - requirementDesc: 自学习分析界面，目前需要先点击分析，下次进入的时候才能点击查询，不方便使用
+  - taskOutputs: 任务产出：nav-application对应界面优化，给出版本。（0.5天）结论：已完成界面的优化，现在分析按钮一改名为“更新”，并且右侧有问号提示。若是某张地图未进行分析，会弹窗提示。 [图片]  [图片]
+- [已完成] 【0】叉车轨迹整体补偿方案设计和开发
+  - taskId: 694e26916559ff61bbbfe6b5
+  - parent: 到点自学习六期
+  - dueDate: 2026-02-06T10:00:00
+  - workHour: 2.5
+  - businessType: 0
+  - content: 【0】叉车轨迹整体补偿方案设计和开发
+  - requirementDesc: 叉车进库位轨迹，如果只补偿终点，会导致AGV进入库位车身歪的问题，需要对路径上前置点位也进行部分补偿，使得入库时车身不歪。
+  - taskOutputs: 对nav-manager进行开发（2.5天），包括：地图热更新读取库区内容搜路层库区重合路径查找匹配对重合路径应用自学习 nav-manager 1.2512.35+rl6+7
+- [已完成] 【7】精度分析后端开发
+  - taskId: 694e271fb866d238992bb5e1
+  - parent: 到点自学习六期
+  - dueDate: 2025-12-31T10:00:00
+  - workHour: 2.5
+  - businessType: 0
+  - content: 【7】精度分析后端开发
+  - requirementDesc: 自学习在部署阶段，需要进行控制误差、定位误差分析，用于提高现场实施效率。预期显示控制误差、定位误差、有码误差三个分栏，分栏内包含车辆健康度诊断和路径健康度诊断。
+  - taskOutputs: 精度分析后端逻辑开发（2.5天）结论：已完成精度分析后端逻辑开发
+- [已完成] 【1】叉车轨迹整体补偿功能联调
+  - taskId: 694e26a71f64f263fb7f6678
+  - parent: 到点自学习六期
+  - dueDate: 2026-02-06T10:00:00
+  - workHour: 2.0
+  - businessType: 0
+  - content: 【1】叉车轨迹整体补偿功能联调
+  - requirementDesc: 叉车进库位轨迹，如果只补偿终点，会导致AGV进入库位车身歪的问题，需要对路径上前置点位也进行部分补偿，使得入库时车身不歪。
+  - taskOutputs: 进行联调，确保叉车补偿功能可用（2.0天）结论：目前库区只能走直线，不能走贝塞尔曲线，下一期预期走贝塞尔曲线。库区实例化有问题，需要实例化后支持可编辑库区补偿功能测试需对比：无补偿、仅补偿终点、补偿整个库区有码/无码开关切换地图的遗留问题
+- [已完成] 【4】增加筛选框选择有码/无码
+  - taskId: 694e26e1b148fcdc5c7f2605
+  - parent: 到点自学习六期
+  - dueDate: 2025-12-31T10:00:00
+  - workHour: 1.0
+  - businessType: 0
+  - content: 【4】增加筛选框选择有码/无码
+  - requirementDesc: 目前自学习界面无法区分有码/无码自学习，现场有筛选出无码点位然后手动修改补偿值的需求，故应该修改自学习界面显示
+  - taskOutputs: 任务产出：nav-application做对应开发，增加筛选框选择有码/无码，给出版本。（1.0天）结论：已完成前后端逻辑变更，增加有码/无码筛选框。nav-application 1.2.1+t1 [图片]
+- [已完成] 到点自学习六期需求分解
+  - taskId: 693f7536f4aa0f9ede124089
+  - parent: 到点自学习六期
+  - dueDate: 2025-12-31T10:00:00
+  - workHour: 3.2
+  - businessType: 0
+  - content: 到点自学习六期需求分解
+  - requirementDesc: 到点自学习六期专项需要需求分解文档，里面提供详细的方案设计和相关开发人员。
+  - taskOutputs: 输出自学习六期需求分解文档，按照评论补充或细化方案（3.0）召开需求分解会议（0.2）
+- [已完成] 测试效能提升nav-net合入2509
+  - taskId: 692e8d9139c7cbf93117dd44
+  - parent: 677f4bc8fcff03e29681c511
+  - dueDate: 2025-12-31T10:00:00
+  - workHour: 0.5
+  - businessType: 1
+  - content: 测试效能提升nav-net合入2509
+  - requirementDesc: 测试效能提升nav-net开发的内容需要合入2509
+  - taskOutputs: 预期产出：测试效能提升内容合入nav-net2509主干，给出版本。（0.2天）ftp修改，将config内容增加进jz_install 执行脚本中，自动在车上安装config文件。（0.3天）结论：已完成功能合入，nav-net 1...
+- [未完成] 到点自学习六期
+  - taskId: 6926cd83996fac51110f525c
+  - parent: 66c2c1dfe65b7336de712d7e
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 0.0
+  - businessType: 0
+  - content: 到点自学习六期
+- [已完成] 到点自学习六期需求导入
+  - taskId: 69317654c98d1478b49fdcfd
+  - parent: 到点自学习六期
+  - dueDate: 2025-12-31T10:00:00
+  - workHour: 1.2
+  - businessType: 0
+  - content: 到点自学习六期需求导入
+  - requirementDesc: 整理验收报告报告、产品经济、项目经理的反馈，编写自学习六期需求导入文档
+  - taskOutputs: 输出自学习六期需求导入文档（1.0）召开需求导入会，进行方案讨论（0.2）
+- [未完成] 自学习部署算法优化-使用云端组件优化速度
+  - taskId: 6926cfe5c1a64a71989b9ef3
+  - parent: 到点自学习六期
+  - dueDate: 2026-05-28T10:00:00
+  - workHour: 3.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 0
+  - content: 自学习部署算法优化-使用云端组件优化速度
+  - requirementDesc: 自学习算法提效，需要进行软件端的算法模拟验证以及实车端的算法验证。
+  - taskOutputs: 预期：建立算法测试框架，自动测试不同算法的收敛效果。nav-application给出版本。（1.0天）实车验证算法有效性，输出算法对比报告。（1.5天）平均滑窗welffold旧方法配合云端组件进行后台开发。（0.5天）
+- [已完成] 【韩国LG】自学习定制化开发部署
+  - taskId: 69243230da24207bab4c3cab
+  - parent: 677f4bd01eb5e811f19c76e2
+  - dueDate: 2025-11-30T10:00:00
+  - workHour: 0.8
+  - businessType: 2
+  - content: 【韩国LG】自学习定制化开发部署
+  - requirementDesc: 由于韩国LG希望使用无码自学习，通过手动修改的方式使用补偿值而非计算得出，因此需要做定制开发
+  - taskOutputs: 任务产出：nav-application 修改手动计算按钮，增加密码，给出版本（0.2）nav-application 自学习自动计算开关修改，禁止开启自动计算 (0.1)开发脚本，将所有计算出来的无码补偿值清零并屏蔽补偿值变化（0....
+- [未完成] 【自驱】codeReview 到点自学习计算节点优化，有码和无码使用同一字段，不再分别进行解析
+  - taskId: 6926c82bc4b4b03e3753c9c1
+  - parent: 到点自学习六期
+  - dueDate: 2026-06-25T10:00:00
+  - workHour: 0.0
+  - businessType: 0
+  - content: 【自驱】codeReview 到点自学习计算节点优化，有码和无码使用同一字段，不再分别进行解析
+  - requirementDesc: 采集的时候有码和无码的补偿效果应该用同一字段表示
+  - taskOutputs: （1）nav-manager数据采集进行改动，将无码和有码的补偿效果并为一个字段（2）nav-application 的calculage.go 修改逻辑，从同一个补偿效果字段中获取补偿值并计算
+- [已完成] 多车到点精度大数据分析
+  - taskId: 691af05d4c98fdd3e57410f0
+  - parent: 677f4bd01eb5e811f19c76e2
+  - dueDate: 2026-01-30T10:00:00
+  - workHour: 0.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 0
+  - content: 多车到点精度大数据分析
+  - requirementDesc: 充分利用现场的运行数据
+- [已完成] 海康车载货1000KG二维码场景测试
+  - taskId: 692528a977b0f25f6f5cb66e
+  - parent: 海康车性能测试一阶段
+  - dueDate: 2025-11-30T10:00:00
+  - workHour: 1.0
+  - businessType: 1
+  - content: 海康车载货1000KG二维码场景测试
+  - requirementDesc: 对海康车进行载货1000KG下的二维码场景性能测试
+  - taskOutputs: 对海康车进行载货状态下的二维码遮挡、二维码横向偏差测试、二维码角度偏差测试分析海康车底盘速度曲线和转盘速度曲线（1.0）
+- [已完成] 【henkel】多车到到点精度大数据分析
+  - taskId: 69242e8c5473673bc61dc12e
+  - parent: 多车到点精度大数据分析
+  - dueDate: 2025-11-30T10:00:00
+  - workHour: 0.7
+  - businessType: 1
+  - content: 【henkel】多车到到点精度大数据分析
+  - requirementDesc: 分析henkel车辆的控制误差和定位误差。
+  - taskOutputs: 任务产出：获取henkel的自学习数据库数据，导入到本地数据库（0.2）分析henkel车辆的控制误差，输出控制误差的分析文档（0.5）结论：已完成henkel数据的分析
+- [已完成] 全流程自动化到点精度大数据分析
+  - taskId: 692431eec9c0a8ea446b6465
+  - parent: 到点自学习六期
+  - dueDate: 2025-11-30T10:00:00
+  - workHour: 3.0
+  - businessType: 0
+  - content: 全流程自动化到点精度大数据分析
+  - requirementDesc: 为自学习六期数据分析界面做的前置工作，也是现场大数据分析的自动化工作。导入某个数据库，输入地图名称后自动进行控制误差、定位误差的分析，并给出结论。
+  - taskOutputs: 任务产出：编写全流程运行脚本，自动分析所有车辆的控制误差、定位误差。（1.0）自动结合有码、无码场景分别进行分析，生成总结报告。分别根据均值、标准差、极值来检测车辆健康度，并且根据线路的极值和均值来判断已发生事故路段（2.0）结论：使...
+- [已完成] 【远舢】无码自学习手动补偿值在数据库中应用
+  - taskId: 69169d0c5612f41ab6a9eab8
+  - parent: 677f4bd01eb5e811f19c76e2
+  - dueDate: 2025-11-30T10:00:00
+  - workHour: 0.5
+  - businessType: 2
+  - content: 【远舢】无码自学习手动补偿值在数据库中应用
+  - requirementDesc: 远舢现场为了稳定运行，在没有使用修复后的无码自学习时人工采集了y方向的补偿量。现在希望在应用上修复后的无码自学习后能够在数据库中恢复补偿量 [图片]
+  - taskOutputs: 编写脚本，计算出y方向补偿量（0.3）协助远舢进行修复无码自学习后的到点自学习部署，在数据库中恢复y方向补偿量（0.2）结论：已完成手动补偿值的恢复，现在远舢无码自学习正常使用。 [图片]
+- [已完成] 海康车日志解析
+  - taskId: 691297702c9009383224d394
+  - parent: 海康车性能测试一阶段
+  - dueDate: 2025-11-30T10:00:00
+  - workHour: 1.0
+  - businessType: 0
+  - content: 海康车日志解析
+  - requirementDesc: 由于海康车自带的绘图工具难以在同一个时间轴下比较曲线，因此需要分析日志文件的名词含义并编写脚本进行绘制。
+  - taskOutputs: （1）查询并推测海康车RCD日志的名词含义，输出海康车日志分析文档（0.5）（2）编写脚本，进行海康车日志分析（0.5）结论：软件版本：motion-share 1.0.1 [图片]
+- [已完成] 【远舢】为远舢仓库二层4号车修改数据库中载货状态
+  - taskId: 691451dd3c6168b99c5b7ede
+  - parent: 677f4bd01eb5e811f19c76e2
+  - dueDate: 2025-11-30T10:00:00
+  - workHour: 0.3
+  - businessType: 2
+  - content: 【远舢】为远舢仓库二层4号车修改数据库中载货状态
+  - requirementDesc: 远舢仓库二层的4号车的栈板存在问题，导致一直处于载货状态。由于之前采集数据使用的是载货状态，在前置任务状态修改为空载状态后无法使用补偿值。
+  - taskOutputs: 编写脚本修改数据库的内容，将远舢仓库二层4号车采集的原始数据修改为空载状态。（0.3）配合现场监控远舢仓库二层4号车的采集和使用自学习状态。 [图片] 结论：已完成修复，现场4号车已经可以正常使用自学习。 [图片]
+- [已完成] 仿真通道评估最小转弯路线宽度
+  - taskId: 6916f4083a173c4c6987d6e8
+  - parent: 692556bbecff47720a52b72e
+  - dueDate: 2025-11-27T10:00:00
+  - workHour: 1.0
+  - businessType: 1
+  - content: 仿真通道评估最小转弯路线宽度
+  - requirementDesc: 现场需要评估牵引车过弯的最小路径宽度
+  - taskOutputs: 任务产出：motion-share提供脚本和配置文件，进行过弯最小宽度计算（1.0）结论：已完成脚本开发，motion-share 1.0.1+tr1 [图片]
+- [已完成] 【远舢】多车到点精度大数据分析
+  - taskId: 69095f14dda4e35796b3eddf
+  - parent: 多车到点精度大数据分析
+  - dueDate: 2025-11-30T10:00:00
+  - workHour: 2.0
+  - businessType: 2
+  - content: 【远舢】多车到点精度大数据分析
+  - requirementDesc: 远舢车辆已经使用自学习运行了很久，希望能利用起来远舢的车辆到点大数据，进行数据分析并输出分析报告
+  - taskOutputs: 对远舢1、2、3、4层楼的地图数据进行抓取并整理（0.5）编写脚本绘图分析数据，包括靶图和车辆、线路的热力图，呈现多车的到点状态（0.5）编写脚本绘图分析数据，包括tag_error误差的靶图和车辆、线路的热力图，呈现多车的闭环状态（...
+- [已完成] nav-application模块说明书
+  - taskId: 690d67bbc48d46c34405ed1c
+  - parent: 690d655a16f6b91df1b9252c
+  - dueDate: 2025-11-27T10:00:00
+  - workHour: 2.0
+  - businessType: 1
+  - content: nav-application模块说明书
+  - requirementDesc: 所有模块将设计说明书移到代码仓库中。1、文档内容设计说明书模块概述功能列表系统架构流程图核心逻辑流程算法流程时序图接口说明类关系图2、文档规范模块说明书，接口说明和流程图使用.md格式 [图片] 类关系图使用.puml格式 [图片]  [图片]
+  - taskOutputs: 任务产出：1. 整理nav-application模块的说明文档，并导入到仓库中（1天）2. 借助AI工具生成各种图表并审查是否有错误（1天）结论：已完成nav-application文档的1.0版本编写，并进行了校验。 [图片] 分...
+- [已完成] motion-share模块说明书
+  - taskId: 690d697a4ef97feb5af34490
+  - parent: 690d655a16f6b91df1b9252c
+  - dueDate: 2025-11-27T10:00:00
+  - workHour: 2.0
+  - businessType: 1
+  - content: motion-share模块说明书
+  - requirementDesc: 所有模块将设计说明书移到代码仓库中。1、文档内容设计说明书模块概述功能列表系统架构流程图核心逻辑流程算法流程时序图接口说明类关系图2、文档规范模块说明书，接口说明和流程图使用.md格式 [图片] 类关系图使用.puml格式 [图片]  [图片]
+  - taskOutputs: 任务产出：1. 整理nav-application模块的说明文档，并导入到仓库中（1天）2. 借助AI工具生成各种图表并审查是否有错误（1天）结论：已完成motion-share文档的1.0版本编写，并进行了校验。 [图片] 分支：f...
+- [已完成] 海康车使用方法学习及使用文档输出
+  - taskId: 6903047f64938fe8d808dae4
+  - parent: 海康车性能测试一阶段
+  - dueDate: 2025-12-31T10:00:00
+  - workHour: 1.0
+  - businessType: 1
+  - content: 海康车使用方法学习及使用文档输出
+  - requirementDesc: 需要熟悉海康车的建图、二维码导航方法，并输出使用文档
+  - taskOutputs: 任务产出：由于和测试场地使用冲突，扩建地图中二维码区域（0.5）熟悉海康车软件的使用方法，输出使用文档（0.5）结论：已经完成地图扩建。 [图片] 输出使用文档
+- [已完成] 【远舢】从3代机型参数中修改到点精度判断的阈值
+  - taskId: 690aff95f38dfd1f7045057e
+  - parent: 677f4bd01eb5e811f19c76e2
+  - dueDate: 2025-11-30T10:00:00
+  - workHour: 0.7
+  - businessType: 2
+  - content: 【远舢】从3代机型参数中修改到点精度判断的阈值
+  - requirementDesc: 远舢特定车辆需要从机型参数中设置到点精度阈值。
+  - taskOutputs: jcar3 新增参数，给出版本。（0.2）nav-manager，到点精度判定使用机型参数的阈值。（0.3）配合现场进行测试，测试通过。（0.2）结论：jcar3  1.3.17+ys3   机型参数配置添加navigation/co...
+- [已完成] 海康车空载二维码场景测试
+  - taskId: 6903064fa87720bb4cb567ac
+  - parent: 海康车性能测试一阶段
+  - dueDate: 2025-12-31T10:00:00
+  - workHour: 2.5
+  - businessType: 1
+  - content: 海康车空载二维码场景测试
+  - requirementDesc: 仿照仙工600车型测试报告，对海康车进行二维码场景测试，包括横向贴歪和旋转场景。（实验：把车旋转旋转，然后移动，看下里程计怎么动的。）
+  - taskOutputs: 对海康车进行二维码遮挡、二维码横向偏差测试（0.8）对海康车进行二维码角度偏差测试（0.7）进行海康车测试文档的编写。通过日志分析工具绘制曲线，输出测试文档（1.0）结论：海康车在原地旋转的时候编码器精度更高，三角波情况下下发基本等同...
+- [已完成] 海康车性能测试一阶段
+  - taskId: 69030425aaa2f51d4ecfc090
+  - parent: 69254a465347265453246b69
+  - dueDate: 2025-11-27T10:00:00
+  - workHour: 0.0
+  - businessType: 1
+  - content: 海康车性能测试一阶段
+- [已完成] henkel自学习更新版本
+  - taskId: 69018df138f3745ec0182e37
+  - parent: 677f4bd01eb5e811f19c76e2
+  - dueDate: 2025-10-31T10:00:00
+  - workHour: 0.7
+  - businessType: 2
+  - content: henkel自学习更新版本
+  - requirementDesc: henkel需要更新自学习版本，与b+保持同步。新增功能：（1）自学习界面增加前点和负载状态   （2）自学习计算移动到go里面     （3）修复无码自学习问题 （4）全局开关勾选所有页面的
+  - taskOutputs: 预期：对nav-application进行修改，修复无码自学习问题，给出版本。（0.5）协助现场排查下发失败的问题，进行ops和车辆ip的配置。（0.2）结论：已完成henkel自学习版本的更新，现在可以勾选全部界面的开关进行计算。n...
+- [已完成] 【远舢】修改逻辑，负载状态使用空载补偿值
+  - taskId: 68f5ab130c928042242dea94
+  - parent: 677f4bd01eb5e811f19c76e2
+  - dueDate: 2025-10-31T10:00:00
+  - workHour: 0.5
+  - businessType: 2
+  - content: 【远舢】修改逻辑，负载状态使用空载补偿值
+  - requirementDesc: 由于远舢没有负载状态跑补偿值的条件，需要在载货状态下使用空载的补偿值。因此需要修改nav-manager中使用补偿值的逻辑，使得载货可以使用空载的补偿值。
+  - taskOutputs: 预期：（1）修改nav-manager中使用补偿值的逻辑，如果识别为载货状态则手动置为空载状态并应用补偿值（0.3天）（2）修改nav-manager中采集数据部分逻辑，如果载货状态则置为空载状态进行上传（0.2天）结论：已完成nav...
+- [已完成] 自学习五期nav-manager合入2509
+  - taskId: 68f726c215b2f45823b72adb
+  - parent: 6874f1ceba3520a08df11067
+  - dueDate: 2025-10-31T10:00:00
+  - workHour: 0.5
+  - businessType: 0
+  - content: 自学习五期nav-manager合入2509
+  - requirementDesc: 到点自学习五期开发内容需要合入2509
+  - taskOutputs: 预期：（1）进行代码合入操作，给出版本。（0.5天）结论：已经完成2509的代码合入，nav-manager 1.2509.4 [图片]
+- [已完成] 【远舢】适配控制误差字段变更，修复无码自学习问题
+  - taskId: 68ea04fc5ea5bb94c2c3a549
+  - parent: 677f4bd01eb5e811f19c76e2
+  - dueDate: 2025-10-31T10:00:00
+  - workHour: 0.5
+  - businessType: 2
+  - content: 【远舢】适配控制误差字段变更，修复无码自学习问题
+  - requirementDesc: 远舢之前做了多次变更，包括：控制误差字段修改、无码补偿计算修改。目前无码自学习不可用，需要修复问题
+  - taskOutputs: （1）nav-application，给出版本。（0.4天）（2）协助现场进行部署。（0.1天）结论：已经对nav-application的计算部分进行修改，首先使用goal_nav_pose来计算控制误差，其次使用mgl64库进行坐...
+- [已完成] 【远舢】批量化修改示教值需求变更
+  - taskId: 68ede2f90c4a1f551b6a81c3
+  - parent: 677f4bd01eb5e811f19c76e2
+  - dueDate: 2025-10-31T10:00:00
+  - workHour: 0.5
+  - businessType: 2
+  - content: 【远舢】批量化修改示教值需求变更
+  - requirementDesc: 原先提供远舢脚本，可以修改单车的示教值。现在远舢提出新需求，希望批量修改车辆示教值。（多车，同一点位修改示教值）
+  - taskOutputs: 输出脚本，修改原先逻辑。(0.4天)（1）输入增加为多选  （2）增加KEY对不同的id组进行区分，对于每一组单独进行示教值修改配合现场进行部署。（0.1天）结论： [图片]  [图片]  [图片]
+- [已完成] 25年3季度季度考核表书写【邹宏睿】
+  - taskId: 68d931b056fbb0eeac459002
+  - parent: 68d931b056fbb0eeac458fad
+  - dueDate: 2025-09-30T10:00:00
+  - workHour: 0.5
+  - businessType: 1
+  - content: 25年3季度季度考核表书写【邹宏睿】
+  - requirementDesc: 完成季度考核表的书写
+  - taskOutputs: 见关联文档
+- [已完成] 到点自学习与map-master交接
+  - taskId: 68d609f1ba8898cc3706195a
+  - parent: 673fecb5b7e9401fb5ca9c84
+  - dueDate: 2025-09-30T10:00:00
+  - workHour: 0.5
+  - businessType: 1
+  - content: 到点自学习与map-master交接
+  - requirementDesc: 到点自学习出现人员变更，需要（1）编写流程图帮助沈旭东了解自学习和地图的数据流向  （2）对于部分接口和功能进行解释说明
+  - taskOutputs: （1）输出自学习与map-master数据流向文档。（0.3）（2）对于示教值、uuid、补偿值等交互进行解释说明，并协助排查map-cloud的问题。（0.2）
+- [已完成] 远舢二层学习以及示教值变更脚本开发
+  - taskId: 68c8dfe94d66be78f076a87a
+  - parent: 677f4bd01eb5e811f19c76e2
+  - dueDate: 2025-09-30T10:00:00
+  - workHour: 1.5
+  - businessType: 2
+  - content: 远舢二层学习以及示教值变更脚本开发
+  - requirementDesc: 远舢提了新需求，由于码贴歪了但是不想重新示教，因此有两个脚本修改数据库的需求。具体需求：（1）为输入的（点位）（车号）将一层补偿值数据复制为二层补偿值数据。（2）为输入的（点位）（车号），将最新的一批raw_data数据的示教值、误差值进行修改，在手动计算后可以生成基于新示教值的补偿值。
+  - taskOutputs: （1）编写补偿值数据复制脚本，测试通过并给现场应用（0.5）（2）修改raw_data数据的示教值和误差值，在本地进行测试，确认生效后协助现场进行部署并验证通过。（1.0）结论：已完成脚本的开发，并交付现场 [图片]  [图片]
+- [已完成] 二维码补偿应用部分联调
+  - taskId: 68c8dfac8d8a78508733c50b
+  - parent: 68a2e26c1b2775974a8e6fdd
+  - dueDate: 2025-09-30T10:00:00
+  - workHour: 2.0
+  - businessType: 0
+  - content: 二维码补偿应用部分联调
+  - requirementDesc: 二维码补偿应用部分联调，包括：（1）从后端发送数据到map-master   （2）地图热更新，并从地图中解析补偿值   （3）应用二维码补偿值，确保补偿值生效
+  - taskOutputs: nav-manager调试，给出版本 1.2506.19+QC17。（1.0）输出实验结论文档，证明二维码补偿生效。（1.0）进行对比实验，证明二维码补偿在二维码贴歪的场景中，可以减小扭动情况。结论：目前贴歪1cm的情况下，二维码过点...
+- [已完成] 二维码七期工作交接和补充开发
+  - taskId: 68b55c1896884e6d4dbf680c
+  - parent: 68a2e26c1b2775974a8e6fdd
+  - dueDate: 2025-09-30T10:00:00
+  - workHour: 6.0
+  - businessType: 1
+  - content: 二维码七期工作交接和补充开发
+  - requirementDesc: 由于人员变动，需要接手二维码七期中二维码补偿tag_compensator的代码以及对远舢进行到点精度异常分析
+  - taskOutputs: （1）进行二维码补偿相关交接，输出二维码补偿功能解析文档（1.0）（2）分析二维码补偿的数据链路，重构任务链部分代码，将采集标签从调度任务中解析，使得二维码采集功能正常。（1.0）（3）修复二维码应用补偿值的时候时序异常问题，解决两个...
+- [已完成] b+现场，自学习数据分析脚本优化
+  - taskId: 68a59d404a490647aad5afe6
+  - parent: 677f4bd01eb5e811f19c76e2
+  - dueDate: 2025-08-31T10:00:00
+  - workHour: 1.3
+  - businessType: 1
+  - content: b+现场，自学习数据分析脚本优化
+  - requirementDesc: 目前到点自学习数据分析，远舢现场（1）在服务器上运行数据采集脚本  （2）把脚本csv移动到本地PC，执行数据分析脚本   数据采集脚本速度很慢，大概一张地图30-40分钟，需要进行优化。
+  - taskOutputs: （1）调研当前脚本的cpu占用情况（0.3） [图片] 结论：现场有32核，在运行脚本的时候会使一个核心满载，其他核心可以保证系统稳定。同时在脚本运行时，内存占用量小，对系统影响不大。（2）优化b+现场的数据采集脚本，在不影响整体性能...
+- [已完成] 远舢到点精度判断逻辑修改
+  - taskId: 68ad61dea527a88fe8f1a18f
+  - parent: 677f4bd01eb5e811f19c76e2
+  - dueDate: 2025-08-31T10:00:00
+  - workHour: 0.5
+  - businessType: 2
+  - content: 远舢到点精度判断逻辑修改
+  - requirementDesc: 远舢：到点自学习补偿后报到点精度异常，实际查看二维码位置符合预期。需要修改到点精度判断逻辑，使用补偿后的坐标作为判断原点
+  - taskOutputs: （1）修改nav-base的代码，给出nav-base版本 （0.2）（2）将nav-base develop新的改动合入远舢版本，修复精度检测时机不对的问题。（0.2）（3）解决现场问题，测试通过（0.1）结论：已经完成nav-ba...
+- [已完成] uuid增加示教值变更开发
+  - taskId: 68a5469cccb79db87d0d64c7
+  - parent: 到点自学习六期
+  - dueDate: 2025-08-31T10:00:00
+  - workHour: 2.0
+  - businessType: 0
+  - content: uuid增加示教值变更开发
+  - requirementDesc: 自学习五期，示教值变更后希望能触发后端uuid变更操作，清除掉原始数据并把补偿值设置为0。需要修改uuid的含义，增加不同层高的操作次数，并修改计算、分组等部分，使得一个点位对应不同uuid。
+  - taskOutputs: uuid变更方案设计（0.5）公共uuid变更逻辑开发。包含：（0.7）（1）点位坐标变动，清除该点位所有补偿值和原始数据 （2）某点位层高uuid变动，清除对应层高的补偿值和原始数据，更新该点位该层高的uuid （3）更新该点位其他...
+- [已完成] 日常检码支持清除错误
+  - taskId: 68a024a0343b7d9554fd9c33
+  - parent: 68a2e26c1b2775974a8e6fdd
+  - dueDate: 2025-08-30T10:00:00
+  - workHour: 1.5
+  - businessType: 0
+  - content: 日常检码支持清除错误
+  - requirementDesc: 二维码六期在设计的时候没有考虑数据的删除，二维码七期希望增加清除错误的逻辑。
+  - taskOutputs: 二维码检码界面增加清除错误按钮，以及弹窗提示。（0.5）二维码检码数据清除逻辑后端开发。（0.5）进行自测，并通过测试。（0.5）结论：已完成二维码检码清除错误的开发，nav-application 1.1.1+rl1（1）进入界面会...
+- [已完成] 远舢进行相机外参修改自学习数据分析
+  - taskId: 689d7a2fa70acf3ac00994a9
+  - parent: 677f4bd01eb5e811f19c76e2
+  - dueDate: 2025-08-30T10:00:00
+  - workHour: 0.3
+  - businessType: 2
+  - content: 远舢进行相机外参修改自学习数据分析
+  - requirementDesc: 远舢需要大规模进行外参修改，现在需要检验单车修改外参后自学习结果的准确性。并且验证脚本修改补偿值的准确性。
+  - taskOutputs: 任务产出（1）编写脚本，对远舢单车修改外参后的到点误差进行分析。（0.3）结论：（1）远舢修改相机外参后，到点误差结果接近修改的角度值。但是波动范围不完全在+-0.5度之内。（2）脚本可以批量按照config参数修改角度值。 [图片]...
+- [已完成] 【自学习五期】自学习数据分析界面开发
+  - taskId: 688b4162a069807b34c2a94b
+  - parent: 6874f1ceba3520a08df11067
+  - dueDate: 2025-08-31T10:00:00
+  - workHour: 1.0
+  - businessType: 0
+  - content: 【自学习五期】自学习数据分析界面开发
+  - requirementDesc: 现场使用到点自学习希望有数据分析功能，为了方便现场人员使用，需要进行数据分析界面开发。
+  - taskOutputs: 到点自学习数据分析界面。 nav-application 1.1.1+rl4 [图片]
+- [已完成] 自学习计算符号优化
+  - taskId: 689015fe389a3e368a0f17af
+  - parent: 6874f1ceba3520a08df11067
+  - dueDate: 2025-08-31T10:00:00
+  - workHour: 0.5
+  - businessType: 0
+  - content: 自学习计算符号优化
+  - requirementDesc: 到点自学习在初始版本开发时有如下符号问题：nav-manager采集数据时会将补偿值反向，实际不希望篡改补偿值。nav-manager在应用补偿值的时候符号不清晰。期望的结果是直接加上补偿值，但是现在有码和无码会减去误差值，并且存在坐标系问题，含义混淆。自学习后端由于补偿值是被篡改的，计算补偿值的时候应当加上当次补偿值，实际则有加有减，含义混淆。为此需要进行自学习的符号优化，使得计算过程清晰。
+  - taskOutputs: 任务产出：优化nav-manager的代码，nav-manager 1.2506.34+f4。(0.1)优化nav-application的代码，nav-application 1.1.0+js1。(0.2)进行到点自学习实验，验证优...
+- [已完成] nav-manager数据采集类代码重构
+  - taskId: 6891629b52a6dd0aa824102f
+  - parent: 673fecb5b7e9401fb5ca9c84
+  - dueDate: 2025-08-31T10:00:00
+  - workHour: 0.5
+  - businessType: 0
+  - content: nav-manager数据采集类代码重构
+  - requirementDesc: 由于到点自学习四期和二维码六期都需要进行数据采集发送到ops这个步骤，因此需要（1）goal_compensator将数据发送有关部分迁移进data_collector；（2）原本二维码六期的设计为data_collector持有tag_compensator的指针，现在需要反过来，将data_collector这个类改造成工具类。预期改造结果：tag_compensator和goal_compensator持有data_collector的指针并调用函数。
+  - taskOutputs: 完成主干nav-manager中GoalCompensator、TagCompensator、DataCollector类的改造，给出版本。（0.4）自测通过，自学习数据采集功能正常、二维码补偿采集数据功能正常。（0.1） [图片]...
+- [已完成] 【自学习五期】到点自学习前端界面数据操作响应开发
+  - taskId: 688b4196becf1ab1238de1fc
+  - parent: 6874f1ceba3520a08df11067
+  - dueDate: 2025-08-31T10:00:00
+  - workHour: 1.0
+  - businessType: 0
+  - content: 【自学习五期】到点自学习前端界面数据操作响应开发
+  - requirementDesc: 现场反馈点击“一键计算”，“一键下发”，“一键清空”会刷新页面，影响现场使用，需要优化。
+  - taskOutputs: 完成对应前端功能变更开发（0.8）进行自测，与预期效果相符（0.2）---------------结论：已经完成不刷新界面的功能开发，nav-application 1.1.1+rl4
+- [已完成] 【自学习五期】自学习数据分析功能后端开发
+  - taskId: 688b41772a4d8661428a40d1
+  - parent: 6874f1ceba3520a08df11067
+  - dueDate: 2025-08-31T10:00:00
+  - workHour: 2.5
+  - businessType: 0
+  - content: 【自学习五期】自学习数据分析功能后端开发
+  - requirementDesc: 需求描述：现场使用到点自学习希望有数据分析功能，为了方便现场人员使用，需要进行数据分析后端开发。具体实现：（1）从原始数据中提取有码到点误差、无码到点误差、补偿值、示教值、控制误差和激光地图点坐标（2）进行阈值计算，判断是否属于【最后一轮学习精度异常】、【闭环误差极差大】、【最后一轮学习补偿值偏大】（3）根据异常类型进行解决方案判断，包括【研发处理】、【继续学习】、【导航处理】、【定位处理】、【不处理】
+  - taskOutputs: 到点自学习支持数据分析功能开发，nav-application 1.1.1+rl4（2天）进行自测，结果复合预期（0.5天） [图片]
+- [已完成] 【自学习五期】单机支持不同层高数据采集功能合入
+  - taskId: 688b4102ab2073e1d221b2d7
+  - parent: 6874f1ceba3520a08df11067
+  - dueDate: 2025-08-31T10:00:00
+  - workHour: 0.25
+  - businessType: 0
+  - content: 【自学习五期】单机支持不同层高数据采集功能合入
+  - requirementDesc: 需要将将远舢版本带层高的导航任务合入专项，支持不同层高的自学习数据采集，以便主干能够使用该功能。
+  - taskOutputs: 将远舢分支相关代码逻辑合入nav-manager，1.2506.38+rl9
+- [已完成] 【自学习五期】本体部署block进行叉车自学习部署提效功能联调
+  - taskId: 688b413d039aa31d732b3346
+  - parent: 6874f1ceba3520a08df11067
+  - dueDate: 2025-08-31T10:00:00
+  - workHour: 1.5
+  - businessType: 0
+  - content: 【自学习五期】本体部署block进行叉车自学习部署提效功能联调
+  - requirementDesc: 需求描述：为了现场部署提效，需要在自学习后端开发接口，配合前端新的block使用，并进行联调测试具体实现：自学习后端开发，提供接口配合新block自学习后端需求变更，部署接口的“关闭所有点位补偿值计算开关”变更为“关闭制定车号所有点位补偿值计算开关”进行自学习后端接口联调
+  - taskOutputs: 自学习后端新增接口配合部署block使用。 nav-application 1.1.1+rl3使用新block触发部署接口，联调完成 [图片]
+- [已完成] 【自学习五期】到点精度检测变更开发
+  - taskId: 688b3fde4949ceeef05f7601
+  - parent: 6874f1ceba3520a08df11067
+  - dueDate: 2025-08-31T10:00:00
+  - workHour: 0.25
+  - businessType: 0
+  - content: 【自学习五期】到点精度检测变更开发
+  - requirementDesc: 由于目前的到点精度检测的基准点是激光地图中的点位，在使用补偿值的情况下，有可能报到点精度异常。为了解决此问题，需要进行到点精度检测基准点变更开发。
+  - taskOutputs: nav-manager对应开发，nav-manager 1.2506.38+rl9 (0.2)进行自测，得到与预期相符结果(0.05)
+- [已完成] nav-application提取公共部分common方案设计
+  - taskId: 687daa5d1e695863e87b72a4
+  - parent: nav-application改造方案整理
+  - dueDate: 2025-07-31T10:00:00
+  - workHour: 0.5
+  - businessType: 1
+  - content: nav-application提取公共部分common方案设计
+  - requirementDesc: nav-application原本设计只有一个package main，因此代码逻辑冗长，影响后续开发效率。故需要对nav-applicaion进行重构设计
+  - taskOutputs: 任务产出：nav-application公共部分提取方案结论：经过开会讨论，确定一期优化方案为拆分四个package，分别是run_learning，qr_code、common和main [图片]
+- [已完成] 【测试效能提升二期】导航运行接口提供
+  - taskId: 6879e94c9508a3726d36629e
+  - parent: 680b1a344db842bad1d99070
+  - dueDate: 2025-07-31T10:00:00
+  - workHour: 3.0
+  - businessType: 0
+  - content: 【测试效能提升二期】导航运行接口提供
+  - requirementDesc: 测试能效提升二期中，测试组希望导航能提供自动化测试用例，包括导航运行扭动检测、跟踪精度、运行速度流畅性的自动化测试。
+  - taskOutputs: 任务产出：输出包含运行扭动检测、跟踪精度检测、运行速度流畅性检测的测试工具。（2.5）输出脚本使用说明文档，并向测试组讲解使用方法（0.5）结论：已完成测试工具开发 nav-net 1.2506.5+ts14-7已输出使用文档，告知测...
+- [已完成] 【自学习五期】计算提效方案设计和开发
+  - taskId: 688196f1a5eeefb72e30a615
+  - parent: 6874f1ceba3520a08df11067
+  - dueDate: 2025-07-31T10:00:00
+  - workHour: 4.0
+  - businessType: 0
+  - content: 【自学习五期】计算提效方案设计和开发
+  - requirementDesc: 到点自学习在现场的部署方法需要采集5+5=10条数据，部署耗时太长。为了进行部署计算提效，需要进行卡尔曼滤波和滑动窗口方法进行部署的实验测试，并根据测试结果进行算法优化开发
+  - taskOutputs: 任务产出：测试区域建图为zxx619:11（0.5）输出方案设计文档（0.5）输出测试文档（1.0）nav-application算法应用开发，给出版本（2.0）结论：已完成实验并确定最终方案为滑动窗口方法。测试了卡尔曼滤波、自适应参...
+- [已完成] nav-application重构开发
+  - taskId: 687daaf8f6d8f3f91513e0eb
+  - parent: nav-application改造方案整理
+  - dueDate: 2025-07-31T10:00:00
+  - workHour: 1.5
+  - businessType: 1
+  - content: nav-application重构开发
+  - requirementDesc: 需求描述：nav-application原本设计只有一个package main，因此代码逻辑冗长，影响后续开发效率。故需要对nav-applicaion进行重构开发。
+  - taskOutputs: 任务产出：nav-application 1.1.0（1）进行自测，测试通过。(0.5)结论：已完成nav-application的重构开发，版本：nav-application 1.1.0。现在分为main，公共（common）、自...
+- [已完成] 【测试效能提升二期】nav-manager接口提供
+  - taskId: 6879e90fbd8551d585c94190
+  - parent: 680b1a344db842bad1d99070
+  - dueDate: 2025-07-31T10:00:00
+  - workHour: 0.3
+  - businessType: 0
+  - content: 【测试效能提升二期】nav-manager接口提供
+  - requirementDesc: 测试组需要导航接口文档，并希望在后续的测试中使用nav-manager接口。因此需要提供nav-manager接口文档，并向测试组进行解释说明。
+  - taskOutputs: （1）nav-manager接口文档（0.2）（2）后续向测试组进行解释说明（0.1）结论：已通过验收
+- [已完成] 【自学习五期】到点自学习方案分解
+  - taskId: 6878d921e768b6e01b905c3d
+  - parent: 6874f1ceba3520a08df11067
+  - dueDate: 2025-07-22T10:00:00
+  - workHour: 1.0
+  - businessType: 0
+  - content: 【自学习五期】到点自学习方案分解
+  - requirementDesc: 到点自学习五期专项需要需求分解文档，里面提供详细的方案设计和相关开发人员。
+  - taskOutputs: 输出需求分解文档（1.0）
+- [已完成] 导航模块软件功能自动化测试
+  - taskId: 687856ab2346013e824bb7a4
+  - parent: 6878da6572dc136c15d56783
+  - dueDate: 2025-08-15T10:00:00
+  - workHour: 0.0
+  - businessType: 1
+  - content: 导航模块软件功能自动化测试
+  - requirementDesc: 主要软件架构流程如下：点位构建器任务执行器运行监测器结果评估器报告输出预计一个月左右能够搞出一个完整的运行demo。
+  - taskOutputs: 见子单
+- [已完成] 7.【导航模块自动化测试】模块设计文档和使用文档编写
+  - taskId: 68787527df7a77bf66af9ab1
+  - parent: 导航模块软件功能自动化测试
+  - dueDate: 2025-08-14T10:00:00
+  - workHour: 1.5
+  - businessType: 1
+  - content: 7.【导航模块自动化测试】模块设计文档和使用文档编写
+  - requirementDesc: 导航模块自动化测试设计文档，编写文档说明设计方法输出自动化测试使用文档
+  - taskOutputs: 输出模块设计文档。（1.0）输出使用文档协助使用者使用（0.5）
+- [已完成] 6.【导航模块自动化测试】全流程自动化
+  - taskId: 6878749f935923cc9f7966c6
+  - parent: 导航模块软件功能自动化测试
+  - dueDate: 2025-08-06T10:00:00
+  - workHour: 2.0
+  - businessType: 1
+  - content: 6.【导航模块自动化测试】全流程自动化
+  - requirementDesc: 需要对任务下发、状态监测、日志传输、绘图分析进行自动化操作。所有输入参数放到config配置中
+  - taskOutputs: 任务产出：设计websocket进行长连接。在任务完成后发送消息给PC端，PC端依次调用get_log和plot_analysis。（1.5）在plot_analysis文件夹的config中“goal_ids”设置了任务点位，避免通...
+- [已完成] 5.【导航模块自动化测试】结果评估器
+  - taskId: 687872e1fbc28485359390f3
+  - parent: 导航模块软件功能自动化测试
+  - dueDate: 2025-08-01T10:00:00
+  - workHour: 1.0
+  - businessType: 1
+  - content: 5.【导航模块自动化测试】结果评估器
+  - requirementDesc: 需要对运行过程数据进行绘制，以便可视化进行结果评估
+  - taskOutputs: 设定阈值配置文件，根据设定的阈值分析过程数据文件。对【线路运行流畅】、【跟踪精度合格】、【未发生明显扭动】进行判断。开发nav-net，通过http将最新运行的json文件（包含debug日志和结果输出日志）传输回PC端指定位置。(0...
+- [已完成] 4.【导航模块自动化测试】运行监测器
+  - taskId: 687861753ebe3503c00753b5
+  - parent: 导航模块软件功能自动化测试
+  - dueDate: 2025-07-29T10:00:00
+  - workHour: 2.5
+  - businessType: 1
+  - content: 4.【导航模块自动化测试】运行监测器
+  - requirementDesc: 监控导航任务中的流畅性、跟踪精度、扭动情况，输出过程信息文件以便后续进行数据分析。
+  - taskOutputs: 设计运行监控器，主要功能如下：加载配置，获取目标ip和port。启动状态结束监听线程，根据任务点数决定监听的navigation end数量。如果参数只有一个点位，调用nav-net中的运行状态检测，当监听到任务完成时，结束状态检测，...
+- [已完成] 3.【导航模块自动化测试】任务执行器
+  - taskId: 68785cf8be4955760c6bed60
+  - parent: 导航模块软件功能自动化测试
+  - dueDate: 2025-07-24T10:00:00
+  - workHour: 1.0
+  - businessType: 1
+  - content: 3.【导航模块自动化测试】任务执行器
+  - requirementDesc: 参考调度和block的任务下发的spare_json_str格式，编写任务执行器脚本。预期结果：正确下发任务进行导航扩展任务执行器格式，接受目标点位作为入参：     （1）输入(A)，从当前位置到A点     （2）输入(A) (B) , 从当前位置到A点，等任务结束后，再到B点将内容整合进nav-net中，/nav_auto_test/sendgoal {"goalids":"5,6"} 可以发送任务
+  - taskOutputs: 结论：已完成脚本的开发，现在可以直接向/vtr/move/goal发送目标任务 [图片]
+- [已完成] nav-application改造方案整理
+  - taskId: 6878d871e74ffbb502d2c500
+  - parent: 69c9e14ab2a822d5b6af0f6b
+  - dueDate: 2025-07-22T10:00:00
+  - workHour: 0.0
+  - businessType: 1
+  - content: nav-application改造方案整理
+  - requirementDesc: 见子单
+  - taskOutputs: 见子单
+- [已完成] 1.【导航模块自动化测试】程序仓库搭建以及账户授权
+  - taskId: 68777c31fd2c8e40f67b78e3
+  - parent: 导航模块软件功能自动化测试
+  - dueDate: 2025-07-17T10:00:00
+  - workHour: 1.0
+  - businessType: 1
+  - content: 1.【导航模块自动化测试】程序仓库搭建以及账户授权
+  - requirementDesc: 程序仓库搭建，使用mothon-share进行脚本开发，创建导航模块自动化测试分支.调研离线地图编辑器的使用方法。配置地图编辑环境，进行离线地图编辑器的授权，获得编辑地图权限。
+  - taskOutputs: （1）已完成nav_auto_test分支的创建（0.1）（2）已完成账户授权与地图编辑权限的获取，并输出操作文档（0.9） [图片]
+- [已完成] B+项目2x2二维码识别出错问题修复
+  - taskId: 6870c88b1f7fb1029abf71ce
+  - parent: 677f4bd01eb5e811f19c76e2
+  - dueDate: 2025-07-31T10:00:00
+  - workHour: 0.5
+  - businessType: 2
+  - content: B+项目2x2二维码识别出错问题修复
+  - requirementDesc: 按照伺服组文档进行开发，调用伺服快速示教时传入二维码id，修复B+项目2x2二维码识别错误的问题配合现场进行测试
+  - taskOutputs: 任务产出：修复现场问题，nav-manager 0.0.8+bplus7-2结论：已完成适配开发，nav-manager 0.0.8+bplus7-2
+- [已完成] 远舢转换指定车号的原始数据补偿相机外参2.0
+  - taskId: 68746b74de6e0158696a83e7
+  - parent: 677f4bd01eb5e811f19c76e2
+  - dueDate: 2025-07-23T10:00:00
+  - workHour: 0.5
+  - businessType: 2
+  - content: 远舢转换指定车号的原始数据补偿相机外参2.0
+  - requirementDesc: 远舢现场自学习车辆由于外参设置不对，导致原始数据里面x,y,yaw有偏差。现场希望开发脚本针对不同车辆设置不同的x,y,yaw，修改原始数据，并使得自学习计算结果增大或减小对应的x,y,yaw。
+  - taskOutputs: 任务产出：相机外参修改脚本。结论：（1）在金盛服务器自测通过。（2）指导现场进行部署，已完成。修改前： [图片] 修改后： [图片]
+- [已完成] 2.【导航模块自动化测试】测试场景生成
+  - taskId: 6876051cdf37a696837b0a94
+  - parent: 导航模块软件功能自动化测试
+  - dueDate: 2025-07-21T10:00:00
+  - workHour: 2.0
+  - businessType: 1
+  - content: 2.【导航模块自动化测试】测试场景生成
+  - requirementDesc: 调研点位和线路生成方法。开发on_create脚本，进行编辑地图的前置操作。开发generate_scene脚本，生成不同类型的点位和线路。i,ii 的线路参数是写死的模式1，生成点位A,B，并将点位A,B连接为直线模式2，按照config里面的坐标(x1,y1)(x2,y2)生成点位A,B，并且自动计算角度和线路长度。模式3，生成点位A,B，并将点位A,B连接为贝塞尔曲线。
+  - taskOutputs: （1）调研点位和线路生成方法，设计模块流程图。（0.3）（2）开发on_create接口，获取目标车辆ip和工程名，进行“登录”和“加载地图工程”操作，获取Cookie。（0.5）（3）开发generate_scene脚本，使用之前登...
+- [已完成] 强化学习仿真平台搭建
+  - taskId: 686de4ed70ed19ff15318509
+  - parent: 685e2f2951d1cab31c2cf707
+  - dueDate: 2025-07-18T10:00:00
+  - workHour: 0.0
+  - businessType: 1
+  - content: 强化学习仿真平台搭建
+- [已完成] motion-share库区分linux和windows版本
+  - taskId: 686cb8ef1ae76d2b06969d33
+  - parent: 677f4bc8fcff03e29681c511
+  - dueDate: 2025-07-31T10:00:00
+  - workHour: 0.5
+  - businessType: 1
+  - content: motion-share库区分linux和windows版本
+  - requirementDesc: motion_share由于python版本问题无法在windows中运行强化学习相关代码，需要对该仓库进行改造。
+  - taskOutputs: 任务产出：创建windows版本强化学习，配置poetry环境。将环境配置项上传至git将文件夹按系统环境分成Windows和Ubuntu两个已完成windows版本motion-share的创建，现在可以正确运行强化学习程序。 [图...
+- [已完成] 远舢【提升自学习部署效率】配合调度资源联调及需求变更开发
+  - taskId: 6863bf77908fbf768e260db4
+  - parent: 677f4bd01eb5e811f19c76e2
+  - dueDate: 2025-07-31T10:00:00
+  - workHour: 2.0
+  - businessType: 2
+  - content: 远舢【提升自学习部署效率】配合调度资源联调及需求变更开发
+  - requirementDesc: 需求描述：远舢需要进行自动化部署，因此需要开发接口配合调度资源进行使用，并进行联调确保现场运行正常。具体内容：本体使用【调度资源】block跟自学习后端通信，运行该block，可以调用自学习接口运行自动化自学习脚本定制层高服务，修改原有到点自学习查询逻辑。编写自动化脚本使用文档现场人员在使用调度资源时，希望省去robot_id的填写从而复用block。为此需要做需求变更开发增加保护措施：如果输入点位全部查询不到，不执行后续计算、下发操作，并增加日志警告；如果输入点位能查询到，但是数量与输入不相符，日志增加警告并继续执行后续操作；如果输入点位全部找到，正常执行后续操作
+  - taskOutputs: 任务产出：到点自学习调度端开发api供调度资源调用将bash脚本定制为api服务，加入到plugin_run_learning中，可以通过调度资源block进行调用优化api服务，增加指定层高功能指导现场部署并顺利运行结论：已完成调度...
+- [已完成] 定位源切换，到点自学习
+  - taskId: 68623dd03cfe51c036769fcd
+  - parent: 68623bcd35b6451ffe47de4f
+  - dueDate: 2025-07-22T10:00:00
+  - workHour: 0.5
+  - businessType: 1
+  - content: 定位源切换，到点自学习
+  - requirementDesc: nav-manager功能设计说明书中到点自学习和定位源切换部分编写
+  - taskOutputs: 已完成nav-manager功能设计说明书中到点自学习和定位源切换部分的编写 [图片]  [图片]
+- [已完成] 到点自学习五期需求导入
+  - taskId: 6859432613e0b10ed0fdbe16
+  - parent: 6874f1ceba3520a08df11067
+  - dueDate: 2025-07-10T10:00:00
+  - workHour: 1.0
+  - businessType: 0
+  - content: 到点自学习五期需求导入
+  - requirementDesc: 自学习五期专项需要整理上一期需求和现场提出来的新需求，所以需要整理自学习五期需求导入文档
+  - taskOutputs: 整理到点自学习四期的验收建议和项目需求，输出到点自学习五期需求导入文档召开需求导入会议整理会议讨论内容
+- [已完成] 仿真叉车和差分车现况梳理
+  - taskId: 6859430c6952877c7b876998
+  - parent: 强化学习仿真平台搭建
+  - dueDate: 2025-07-10T10:00:00
+  - workHour: 1.5
+  - businessType: 1
+  - content: 仿真叉车和差分车现况梳理
+  - requirementDesc: 由于导航自动化测试需要用到仿真环境，需要梳理当前仿真平台可用性；需要配置一台专门的工控机进行测试，能够在配置好的工控机上完成常用的导航功能测试，以便后续功能开展。
+  - taskOutputs: 任务产出：输出仿真现状梳理文档配置工控机，安装验收版本软件，依照文档进行仿真转发设置，并创建地图。仿真尝试使用直线和贝塞尔曲线导航结论：仿真现状梳理文档工控机已进行部署，安装验收版本软件并创建地图 [图片]  [图片] 仿真快速到点直...
+
+## 父子任务关系
+- [创建中] test-creatre
+  - taskId: 69f085186a8fc94674bb090f
+  - dueDate: 2026-04-30T10:00:00
+  - workHour: 0.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - content: test-creatre
+- [评审中] 在WSL环境中使用vscode AI插件
+  - taskId: 6a018ee595ce53ea402b843c
+  - dueDate: 2026-05-29T10:00:00
+  - workHour: 0.2
+  - taskNature: 69d4d037c253ef42e9c31b3a
+  - businessType: 1
+  - content: 在WSL环境中使用vscode AI插件
+  - requirementDesc: 探究vscode怎么连接ubuntu并使用codex，使用vscode而非命令行的优点是在ide中，可以选取指定内容添加到对话
+  - taskOutputs: 输出wsl配置文档，使得在vscode里面，可以类似cursor的方式在ubuntu中使用codex。（0.2天）结论：已完成配置，并输出插件文档
+- [未完成] 梳理行为树导航伺服切换逻辑
+  - taskId: 6a1025de0e68d33ace3b0cea
+  - dueDate: 2026-05-31T10:00:00
+  - workHour: 0.5
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - content: 梳理行为树导航伺服切换逻辑
+  - requirementDesc: 在行为树模式下，导航切换伺服过早，需要进行问题排查并梳理导航伺服切换逻辑。
+  - taskOutputs: 协助排查行为树模式下，伺服接管过早的问题。（0.25天）梳理导航伺服切换逻辑，输出文档。（0.25天）
+- [创建中] 云端组件算法测试
+  - taskId: 6a0d308b1402a8781090a8d1
+  - dueDate: 2026-05-31T15:59:59
+  - workHour: 0.0
+  - taskNature: 指派型
+  - content: 云端组件算法测试
+  - requirementDesc: 任务背景：需要对云端组件调用自学习算法做不同的算法测试。工作内容和目标：对云端组件调用自学习算法进行不同算法测试，测试出可以收敛的算法。
+  - taskOutputs: 1. 搭建算法测试框架，验证不同算法的收敛效果(1.0天)2. 测试并筛选可收敛的算法，输出算法对比报告(1.5天)3. 输出文档（0.5天）
+- [创建中] 云端组件算法测试final
+  - taskId: 6a0d6f9fc96939e4a244caf7
+  - dueDate: 2026-05-31T15:59:59
+  - workHour: 0.0
+  - taskNature: 指派型
+  - content: 云端组件算法测试final
+  - requirementDesc: 测试换行修复
+  - taskOutputs: 1. 搭建算法测试框架(1.0天); 2. 测试并筛选算法(1.5天); 3. 输出文档(0.5天)
+- [创建中] 换行测试-需求描述
+  - taskId: 6a0d7161b5768b65eb79678d
+  - dueDate: 2026-05-31T15:59:59
+  - workHour: 0.0
+  - taskNature: 指派型
+  - content: 换行测试-需求描述
+  - requirementDesc: A: 123
+B: 234
+C: 567
+  - taskOutputs: 1. 测试产出(1.0天)
+
+## 孤立子任务
+- 【b+】无为238到点精度大数据分析-1月底备份
+  - parentTaskId: 69549679f1e33c17c6b1ccb3
+- 无相机车型到点自学习异常保护
+  - parentTaskId: 69549660156f5c03808a5709
+- 和产品讨论大数据需求
+  - parentTaskId: 69549660156f5c03808a5709
+- 到点自学习专利撰写
+  - parentTaskId: 69549660156f5c03808a5709
+- 平台搭建
+  - parentTaskId: 69c9e4b62d257d0af28399da
+- 26年1季度季度考核表书写【邹宏睿】
+  - parentTaskId: 69c63af52c53b32abea3524f
+- nav-application Doxygen配置
+  - parentTaskId: 69c9e41a05deebed5e1f8ed5
+- 海康车性能测试二阶段
+  - parentTaskId: 69254a465347265453246b69
+- 【远舢】自学习地图-数据库uuid一致性排查
+  - parentTaskId: 69549679f1e33c17c6b1ccb3
+- 自学习问答补充
+  - parentTaskId: 69549660156f5c03808a5709
+- 邹宏睿年终述职报告
+  - parentTaskId: 6969d7ca23f3f51138227a31
+- 25年4季度季度考核表书写【邹宏睿】
+  - parentTaskId: 694e713f91a3e532d86e6d2c
+- 测试效能提升nav-net合入2509
+  - parentTaskId: 677f4bc8fcff03e29681c511
+- 到点自学习六期
+  - parentTaskId: 66c2c1dfe65b7336de712d7e
+- 【韩国LG】自学习定制化开发部署
+  - parentTaskId: 677f4bd01eb5e811f19c76e2
+- 多车到点精度大数据分析
+  - parentTaskId: 677f4bd01eb5e811f19c76e2
+- 【远舢】无码自学习手动补偿值在数据库中应用
+  - parentTaskId: 677f4bd01eb5e811f19c76e2
+- 【远舢】为远舢仓库二层4号车修改数据库中载货状态
+  - parentTaskId: 677f4bd01eb5e811f19c76e2
+- 仿真通道评估最小转弯路线宽度
+  - parentTaskId: 692556bbecff47720a52b72e
+- nav-application模块说明书
+  - parentTaskId: 690d655a16f6b91df1b9252c
+- motion-share模块说明书
+  - parentTaskId: 690d655a16f6b91df1b9252c
+- 【远舢】从3代机型参数中修改到点精度判断的阈值
+  - parentTaskId: 677f4bd01eb5e811f19c76e2
+- 海康车性能测试一阶段
+  - parentTaskId: 69254a465347265453246b69
+- henkel自学习更新版本
+  - parentTaskId: 677f4bd01eb5e811f19c76e2
+- 【远舢】修改逻辑，负载状态使用空载补偿值
+  - parentTaskId: 677f4bd01eb5e811f19c76e2
+- 自学习五期nav-manager合入2509
+  - parentTaskId: 6874f1ceba3520a08df11067
+- 【远舢】适配控制误差字段变更，修复无码自学习问题
+  - parentTaskId: 677f4bd01eb5e811f19c76e2
+- 【远舢】批量化修改示教值需求变更
+  - parentTaskId: 677f4bd01eb5e811f19c76e2
+- 25年3季度季度考核表书写【邹宏睿】
+  - parentTaskId: 68d931b056fbb0eeac458fad
+- 到点自学习与map-master交接
+  - parentTaskId: 673fecb5b7e9401fb5ca9c84
+- 远舢二层学习以及示教值变更脚本开发
+  - parentTaskId: 677f4bd01eb5e811f19c76e2
+- 二维码补偿应用部分联调
+  - parentTaskId: 68a2e26c1b2775974a8e6fdd
+- 二维码七期工作交接和补充开发
+  - parentTaskId: 68a2e26c1b2775974a8e6fdd
+- b+现场，自学习数据分析脚本优化
+  - parentTaskId: 677f4bd01eb5e811f19c76e2
+- 远舢到点精度判断逻辑修改
+  - parentTaskId: 677f4bd01eb5e811f19c76e2
+- 日常检码支持清除错误
+  - parentTaskId: 68a2e26c1b2775974a8e6fdd
+- 远舢进行相机外参修改自学习数据分析
+  - parentTaskId: 677f4bd01eb5e811f19c76e2
+- 【自学习五期】自学习数据分析界面开发
+  - parentTaskId: 6874f1ceba3520a08df11067
+- 自学习计算符号优化
+  - parentTaskId: 6874f1ceba3520a08df11067
+- nav-manager数据采集类代码重构
+  - parentTaskId: 673fecb5b7e9401fb5ca9c84
+- 【自学习五期】到点自学习前端界面数据操作响应开发
+  - parentTaskId: 6874f1ceba3520a08df11067
+- 【自学习五期】自学习数据分析功能后端开发
+  - parentTaskId: 6874f1ceba3520a08df11067
+- 【自学习五期】单机支持不同层高数据采集功能合入
+  - parentTaskId: 6874f1ceba3520a08df11067
+- 【自学习五期】本体部署block进行叉车自学习部署提效功能联调
+  - parentTaskId: 6874f1ceba3520a08df11067
+- 【自学习五期】到点精度检测变更开发
+  - parentTaskId: 6874f1ceba3520a08df11067
+- 【测试效能提升二期】导航运行接口提供
+  - parentTaskId: 680b1a344db842bad1d99070
+- 【自学习五期】计算提效方案设计和开发
+  - parentTaskId: 6874f1ceba3520a08df11067
+- 【测试效能提升二期】nav-manager接口提供
+  - parentTaskId: 680b1a344db842bad1d99070
+- 【自学习五期】到点自学习方案分解
+  - parentTaskId: 6874f1ceba3520a08df11067
+- 导航模块软件功能自动化测试
+  - parentTaskId: 6878da6572dc136c15d56783
+- nav-application改造方案整理
+  - parentTaskId: 69c9e14ab2a822d5b6af0f6b
+- B+项目2x2二维码识别出错问题修复
+  - parentTaskId: 677f4bd01eb5e811f19c76e2
+- 远舢转换指定车号的原始数据补偿相机外参2.0
+  - parentTaskId: 677f4bd01eb5e811f19c76e2
+- 强化学习仿真平台搭建
+  - parentTaskId: 685e2f2951d1cab31c2cf707
+- motion-share库区分linux和windows版本
+  - parentTaskId: 677f4bc8fcff03e29681c511
+- 远舢【提升自学习部署效率】配合调度资源联调及需求变更开发
+  - parentTaskId: 677f4bd01eb5e811f19c76e2
+- 定位源切换，到点自学习
+  - parentTaskId: 68623bcd35b6451ffe47de4f
+- 到点自学习五期需求导入
+  - parentTaskId: 6874f1ceba3520a08df11067
+
+## 给 AI 的使用规则
+- 优先参考任务标题、content、note 和父子任务结构。
+- 生成新任务草稿时，只做归纳整理，不要改写既有任务内容。
+- 如果历史任务信息不足，可以追问用户，而不是猜测数据库里不存在的事实。

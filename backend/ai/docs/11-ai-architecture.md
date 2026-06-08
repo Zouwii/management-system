@@ -1,15 +1,15 @@
 # AI 后端架构
 
-> 更新日期: 2026-06-04
+> 更新日期: 2026-06-05
 
 ---
 
 ## 一、模块总览
 
 ```
-app.py (Flask)
-  └── api.py  → Blueprint /api/bt
-        └── route_registry/__init__.py
+app.py → base/app.py (Flask create_app)
+  └── base/api.py  → Blueprint /api/bt
+        └── base/route_registry/__init__.py
               └── ai/__init__.py  → 注册 5 个子模块
 ```
 
@@ -78,7 +78,7 @@ app.py (Flask)
 |------|------|------|--------|
 | 钉钉知识库 API | `api.dingtalk.com` | 同步文档内容 | knowledge/routes.py |
 | 钉钉 TB API | `api.dingtalk.com` | 创建 Teambition 任务 | teambition/service.py |
-| 钉钉 OAuth | `oapi.dingtalk.com` | 获取 access_token（缓存） | dingtalk_client.py |
+| 钉钉 OAuth | `oapi.dingtalk.com` | 获取 access_token（缓存） | base/dingtalk_client.py |
 | LLM API | `one-api.server22.jz` | 分析/聊天/报告 | analysis/chat/dashboard |
 | 本地 Embedding | `BAAI/bge-small-zh-v1.5` | 语义向量（离线） | embedder.py |
 | ttyd | 本地进程 | Web 终端代理 | terminal/session.py |

@@ -96,29 +96,18 @@ fi
 
 # ====================== 默认权限：避免每次询问 ======================
 mkdir -p "${HOME}/.claude"
-if [ ! -f "${HOME}/.claude/settings.json" ]; then
-  cat > "${HOME}/.claude/settings.json" << 'SETEOF'
+cat > "${HOME}/.claude/settings.json" << 'SETEOF'
 {
   "permissions": {
     "allow": [
-      "Bash(curl *)",
-      "Bash(cat *)",
-      "Bash(echo *)",
-      "Bash(grep *)",
-      "Bash(python3 *)",
-      "Bash(ls *)",
-      "Bash(head *)",
-      "Bash(tail *)",
-      "Bash(wc *)",
-      "Bash(find *)",
-      "Bash(mkdir *)",
-      "Bash(cp *)",
-      "Bash(mv *)"
+      "Bash(*)",
+      "Read(/home/jz/zhr/tb_tool_bt/**)",
+      "Write(/home/jz/zhr/tb_tool_bt/**)",
+      "Edit(/home/jz/zhr/tb_tool_bt/**)"
     ]
   }
 }
 SETEOF
-fi
 
 # ====================== 启动 ======================
 cd "${WORKSPACE_DIR}"

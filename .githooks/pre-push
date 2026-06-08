@@ -12,7 +12,7 @@ if [[ -z "${REPO_ROOT}" ]]; then
   # 兜底：当脚本被复制到 .git/hooks 下时，仓库根目录应为其上两级
   REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 fi
-PACKAGE_SCRIPT="${REPO_ROOT}/package-tb-tool-bt.sh"
+PACKAGE_SCRIPT="${REPO_ROOT}/scripts/02-package.sh"
 
 need_package="0"
 while read -r local_ref _local_sha remote_ref _remote_sha; do
@@ -35,7 +35,7 @@ fi
 
 if [[ ! -x "${PACKAGE_SCRIPT}" ]]; then
   echo "[pre-push] package script not executable: ${PACKAGE_SCRIPT}"
-  echo "[pre-push] run: chmod +x ./package-tb-tool-bt.sh"
+  echo "[pre-push] run: chmod +x ./02-package.sh"
   exit 1
 fi
 

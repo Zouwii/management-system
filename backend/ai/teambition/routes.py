@@ -3,9 +3,12 @@
 POST /ai/create_teambition  - Create a Teambition task from an AI draft
 """
 
+import os
+
 from flask import request, session
 
 from ai.teambition.service import create_task
+from ai.terminal.session import resolve_owner_key, user_workspace
 
 
 def register(bp, ok, fail):
@@ -15,6 +18,7 @@ def register(bp, ok, fail):
 
         Request body: { title, workType, requirementDesc, outputs,
                         dueDate, startDate, executorId?, userId? }
+        After success, clears draft.json so the next conversation starts fresh.
         """
         body = request.get_json(silent=True) or {}
         auth_user = session.get("auth_user") or {}
@@ -37,6 +41,18 @@ def register(bp, ok, fail):
                 code=status_code,
                 data=result.get("data", {}),
             )
+
+        # Clear draft.json so the next conversation starts fresh
+        owner_key = resolve_owner_key(body, auth_user)
+        ws = user_workspace(owner_key)
+        draft_path = os.path.join(ws["workspace_dir"], "draft.json")
+        flag_path = os.path.join(ws["workspace_dir"], "draft_changed.flag")
+        for p in (draft_path, flag_path):
+            try:
+                if os.path.isfile(p):
+                    os.remove(p)
+            except OSError:
+                pass
 
         data = result.get("data", {})
         return ok({

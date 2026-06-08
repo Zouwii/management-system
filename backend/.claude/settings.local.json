@@ -1,15 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(curl *)",
-      "Bash(mkdir -p ~/.config/jz-dingtalk)",
-      "Bash(echo '{\"unionId\":\"S5IGvDIokQ0mFnGFz3n7OgiEiE\",\"nick\":\"邹宏睿\"}')",
-      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(json.dumps\\(d, indent=2, ensure_ascii=False\\)\\)\")",
-      "Bash(python3 -c \" import sys,json d=json.load\\(sys.stdin\\) for b in d.get\\('result',{}\\).get\\('data',[]\\): bt = b.get\\('blockType'\\) if bt == 'heading': lvl = b['heading'].get\\('level',''\\) txt = b['heading'].get\\('text',''\\) print\\('#' * \\(int\\(lvl[-1]\\) if lvl[-1].isdigit\\(\\) else 1\\), txt\\) elif bt == 'paragraph': txt = b['paragraph'].get\\('text',''\\) if txt.strip\\(\\): print\\(txt\\) elif bt == 'callout': txt = b.get\\('callout',{}\\).get\\('text',''\\) if txt.strip\\(\\): print\\('> ' + txt\\) \")",
-      "Bash(python3 -c \" import sys,json d=json.load\\(sys.stdin\\) for b in d.get\\('result',{}\\).get\\('data',[]\\): bt = b.get\\('blockType'\\) if bt == 'heading': lvl = b['heading'].get\\('level',''\\) txt = b['heading'].get\\('text',''\\) prefix = '#' * \\(int\\(lvl[-1]\\) if lvl[-1].isdigit\\(\\) else 1\\) print\\(prefix, txt\\) elif bt == 'paragraph': txt = b['paragraph'].get\\('text',''\\) if txt.strip\\(\\): print\\(txt\\) \")",
-      "Bash(python3 -c \" import sys,json d=json.load\\(sys.stdin\\) for b in d.get\\('result',{}\\).get\\('data',[]\\): bt = b.get\\('blockType'\\) if bt == 'heading': lvl = b['heading'].get\\('level',''\\) txt = b['heading'].get\\('text',''\\) prefix = '#' * \\(int\\(lvl[-1]\\) if lvl[-1].isdigit\\(\\) else 1\\) print\\(prefix, txt\\) elif bt == 'paragraph': txt = b['paragraph'].get\\('text',''\\) if txt.strip\\(\\): print\\(txt\\) elif bt == 'callout': txt = b.get\\('callout',{}\\).get\\('text',''\\) if txt.strip\\(\\): print\\('>', txt\\) \")",
-      "Bash(python3 cache_manager.py new)",
-      "Bash(python3 *)"
+      "Bash(*)",
+      "Read(/home/jz/zhr/tb_tool_bt/**)",
+      "Write(/home/jz/zhr/tb_tool_bt/**)",
+      "Edit(/home/jz/zhr/tb_tool_bt/**)"
     ]
   }
 }

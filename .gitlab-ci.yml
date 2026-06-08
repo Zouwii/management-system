@@ -16,8 +16,8 @@ package-on-tag:
     - apt-get install -y nodejs
     - node -v
     - npm -v
-    - chmod +x ./package-tb-tool-bt.sh
-    - ./package-tb-tool-bt.sh
+    - chmod +x ./scripts/02-package.sh
+    - ./scripts/02-package.sh
   artifacts:
     name: "tb_tool_bt_backend-${CI_COMMIT_TAG}"
     paths:

@@ -165,7 +165,7 @@ def fetch_tasks(
     """
     from workhour.personal.aggregate import executor_quarter_workhours_db_service
     from base.db.engine import SessionLocal
-    from base.db.orm import ProjectTask, UserCharacter
+    from base.db.orm import ProjectTask, ProjectTaskDetail, UserCharacter
 
     if quarter:
         start, end = _quarter_range(quarter)
@@ -249,11 +249,10 @@ def fetch_tasks(
     if parent_ids:
         db2 = SessionLocal()
         try:
-            from base.db.orm import ProjectTaskDetail as PTD
             # 走 project_task_details.parent_task_id 查同父任务
             siblings = (
-                db2.query(PTD.task_id, PTD.parent_task_id, PTD.content)
-                .filter(PTD.parent_task_id.in_(parent_ids))
+                db2.query(ProjectTaskDetail.task_id, ProjectTaskDetail.parent_task_id, ProjectTaskDetail.content)
+                .filter(ProjectTaskDetail.parent_task_id.in_(parent_ids))
                 .all()
             )
             for sid, spid, s_content in siblings:

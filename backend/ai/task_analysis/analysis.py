@@ -229,4 +229,48 @@ def generate_report(
               "task_risk_analysis"]:
         if m not in merged:
             merged[m] = {}
+
+    # 补调：如果自主型/能力型建议为空，单独 LLM 调用一次
+    def _is_empty_suggestions(mod: dict) -> bool:
+        if not isinstance(mod, dict):
+            return True
+        sug = mod.get("suggestions")
+        return not isinstance(sug, list) or len(sug) == 0
+
+    def _retry_module(module_id: int, next_id: int, output_key: str, sample_json: str) -> dict | None:
+        start_marker = f"### {module_id}."
+        end_marker = f"### {next_id}."
+        start = full_prompt.find(start_marker)
+        if start == -1:
+            return None
+        end = full_prompt.find(end_marker, start)
+        section = full_prompt[start:end] if end != -1 else full_prompt[start:]
+        prompt = section + "\n\n只输出 JSON：" + sample_json + "\n不要 markdown 代码块。"
+        result = _call_and_parse(prompt, f"module{module_id}_retry")
+        if output_key in result:
+            return result[output_key]
+        if "suggestions" in result:
+            return result
+        return None
+
+    if _is_empty_suggestions(merged.get("autonomous_suggestions")):
+        logger.warning("autonomous_suggestions empty, retrying individually...")
+        retry = _retry_module(2, 3, "autonomous_suggestions",
+            '{"suggestions": [{"source_task": "任务标题", "problem": "发现的问题", "action": "改进建议", "priority_score": 8, "effort_days": 1.5}]}')
+        if retry:
+            merged["autonomous_suggestions"] = retry
+            logger.info("autonomous_suggestions retry OK, %d items", len(retry.get("suggestions", [])))
+        else:
+            logger.error("autonomous_suggestions retry FAILED")
+
+    if _is_empty_suggestions(merged.get("capability_suggestions")):
+        logger.warning("capability_suggestions empty, retrying individually...")
+        retry = _retry_module(3, 4, "capability_suggestions",
+            '{"suggestions": [{"direction": "学习方向", "reason": "为什么需要学", "output_required": "强制产出", "priority_score": 8, "effort_days": 1.5}]}')
+        if retry:
+            merged["capability_suggestions"] = retry
+            logger.info("capability_suggestions retry OK, %d items", len(retry.get("suggestions", [])))
+        else:
+            logger.error("capability_suggestions retry FAILED")
+
     return merged

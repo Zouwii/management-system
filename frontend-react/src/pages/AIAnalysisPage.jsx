@@ -34,7 +34,7 @@ function normalizeDraft(nextDraft, fallback) {
       : fallback.participationLevel,
     dueDate: String(draft.dueDate || fallback.dueDate || ''),
     startDate: String(draft.startDate || fallback.startDate || ''),
-    parentTaskId: String(draft.parentTaskId || fallback.parentTaskId || ''),
+    parentTaskId: String(draft.parentTaskId || ''),
   };
 }
 
@@ -154,6 +154,7 @@ export default function AIAnalysisPage() {
     });
 
     es.addEventListener('draft_updated', () => {
+      setCreateResult(null);
       fetchTbcreateDraft(user, { ownerKey })
         .then((response) => {
           const data = response?.data;
@@ -259,7 +260,7 @@ export default function AIAnalysisPage() {
       setAnalysisStatus('拉取任务数据...');
       const t1 = await fetch('/api/bt/ai/task-analysis/fetch-tasks', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ quarter: '2026Q2', owner_key: ownerKey }),
+        body: JSON.stringify({ owner_key: ownerKey }),
         credentials: 'include',
       });
       const d1 = await t1.json();

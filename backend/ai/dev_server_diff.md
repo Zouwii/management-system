@@ -62,10 +62,10 @@ Claude CLI 依赖 Node.js，两个版本都兼容。
 
 ```bash
 # 构建 + 打包（在 one-key 目录执行）
-bash package-tb-tool-bt.sh
+bash scripts/02-package.sh
 
 # 部署到服务器
-bash deploy-tb-tool-bt.sh
+bash scripts/03-deploy.sh
 ```
 
-注意：`package-tb-tool-bt.sh` 会删除 `runtime/` 目录，部署后需重新初始化（访问 AI 页面时会自动创建）。
+注意：`scripts/02-package.sh` 会删除 `runtime/` 目录，部署后需重新初始化（访问 AI 页面时会自动创建）。

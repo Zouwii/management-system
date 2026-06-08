@@ -21,7 +21,7 @@ jobs:
           cache-dependency-path: frontend-react/package-lock.json
 
       - name: Run package script
-        run: bash ./package-tb-tool-bt.sh
+        run: bash ./scripts/02-package.sh
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v4

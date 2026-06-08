@@ -179,6 +179,10 @@ def register(bp, ok, fail):
         try:
             with open(draft_path, "w", encoding="utf-8") as f:
                 json.dump(draft, f, ensure_ascii=False, indent=2)
+            # Touch flag file so Claude knows the draft was modified externally
+            flag_path = os.path.join(draft_dir, "draft_changed.flag")
+            with open(flag_path, "w") as _:
+                pass
             return ok({
                 "saved": True,
                 "savedAt": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
