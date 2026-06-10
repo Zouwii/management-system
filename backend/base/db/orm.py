@@ -145,6 +145,11 @@ class ProjectTaskDetail(Base):
     # 任务状态映射值：0..N（由 taskflowStatusId 映射）
     task_flow_status_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
 
+    # 级联自定义字段解析（customFieldId=665ee4b45b46f34b3e045af2）
+    project_category_1: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    vehicle_type_2: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    project_name_3: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+
     fetched_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
@@ -190,6 +195,12 @@ class ProgramIssueDetail(Base):
     tag_ids: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
     custom_fields_json: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
     raw_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # 级联自定义字段解析（customFieldId=665ee4b45b46f34b3e045af2）
+    project_category_1: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    vehicle_type_2: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    project_name_3: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.now)
 
 
@@ -228,6 +239,12 @@ class ProjectTaskOverdueDetail(Base):
     workday_costhour: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     custom_fields_json: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
     raw_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    # 级联自定义字段解析（customFieldId=665ee4b45b46f34b3e045af2）
+    project_category_1: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    vehicle_type_2: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    project_name_3: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+
     fetched_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
 

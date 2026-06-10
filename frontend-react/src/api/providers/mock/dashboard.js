@@ -8,6 +8,10 @@ import {
   personalHoursDashboard,
 } from '../../../mock/platformData';
 import { buildDepartmentStats, filterRowsByDataScope } from '../../../utils/dataScope';
+
+function delay(data, ms = 120) {
+  return new Promise((resolve) => setTimeout(() => resolve(data), ms));
+}
 import { getDataScopeLabel } from '../../../utils/dataScope';
 import { request } from '../../request';
 import { httpRequest } from '../../client';
@@ -603,4 +607,127 @@ export function mockFetchPermissionMatrix() {
 
 export function mockApplySuggestion() {
   return delay({ code: 200, data: { accepted: true } });
+}
+
+// ── 工作日耗时统计 Mock 数据 ──
+
+const mockTeamSummaryData = {
+  timeRange: { start_time: '2026-01-01T00:00:00', end_time: '2026-03-31T23:59:59' },
+  total: { hours: 97, taskCount: 58 },
+  teams: [
+    {
+      teamId: '0',
+      teamName: '导航组',
+      totalHours: 52,
+      totalCount: 30,
+      byProjectType: {
+        '研发项目': { hours: 25, count: 15 },
+        '产品项目': { hours: 18, count: 10 },
+        '订单项目': { hours: 9, count: 5 },
+      },
+      byVehicleType: {
+        '通用': { hours: 28, count: 16 },
+        'AMR': { hours: 12, count: 7 },
+        '叉车': { hours: 8, count: 5 },
+        '非标': { hours: 4, count: 2 },
+      },
+      byTaskType: {
+        '软件开发': { hours: 48, count: 26 },
+        '问题处理': { hours: 4, count: 4 },
+      },
+    },
+    {
+      teamId: '1',
+      teamName: '对接组',
+      totalHours: 45,
+      totalCount: 28,
+      byProjectType: {
+        '研发项目': { hours: 22, count: 12 },
+        '产品项目': { hours: 15, count: 10 },
+        '订单项目': { hours: 8, count: 6 },
+      },
+      byVehicleType: {
+        '通用': { hours: 24, count: 14 },
+        'AMR': { hours: 10, count: 6 },
+        '叉车': { hours: 7, count: 5 },
+        '非标': { hours: 4, count: 3 },
+      },
+      byTaskType: {
+        '软件开发': { hours: 42, count: 24 },
+        '问题处理': { hours: 3, count: 4 },
+      },
+    },
+  ],
+};
+
+const mockDeptAggregateData = {
+  timeRange: { start_time: '2026-01-01T00:00:00', end_time: '2026-03-31T23:59:59' },
+  total: { hours: 97, taskCount: 58 },
+  byProjectType: {
+    '研发项目': { hours: 47, count: 27 },
+    '产品项目': { hours: 33, count: 20 },
+    '订单项目': { hours: 17, count: 11 },
+  },
+  byVehicleType: {
+    '通用': { hours: 52, count: 30 },
+    'AMR': { hours: 22, count: 13 },
+    '叉车': { hours: 15, count: 10 },
+    '非标': { hours: 8, count: 5 },
+  },
+};
+
+const mockTaskDetailData = {
+  timeRange: { start_time: '2026-01-01T00:00:00', end_time: '2026-03-31T23:59:59' },
+  total: { hours: 97, taskCount: 58 },
+  details: [
+    {
+      projectType: '研发项目',
+      totalHours: 47,
+      totalCount: 27,
+      children: [
+        { taskType: '软件开发', hours: 42.5, count: 20 },
+        { taskType: '问题处理', hours: 4.5, count: 7 },
+      ],
+    },
+    {
+      projectType: '产品项目',
+      totalHours: 33,
+      totalCount: 20,
+      children: [
+        { taskType: '软件开发', hours: 30.5, count: 16 },
+        { taskType: '问题处理', hours: 2.5, count: 4 },
+      ],
+    },
+    {
+      projectType: '订单项目',
+      totalHours: 17,
+      totalCount: 11,
+      children: [
+        { taskType: '软件开发', hours: 14, count: 7 },
+        { taskType: '问题处理', hours: 3, count: 4 },
+      ],
+    },
+  ],
+  summary: {
+    '软件开发': { hours: 87, count: 43 },
+    '问题处理': { hours: 10, count: 15 },
+    totalHours: 97,
+    totalCount: 58,
+  },
+};
+
+export function mockFetchWorkdayCosthourTeamSummary() {
+  return delay({ code: 200, data: mockTeamSummaryData });
+}
+
+export function mockFetchWorkdayCosthourDeptAggregate() {
+  return delay({ code: 200, data: mockDeptAggregateData });
+}
+
+export function mockFetchWorkdayCosthourTaskDetail() {
+  return delay({ code: 200, data: mockTaskDetailData });
+}
+
+export function mockFetchWorkdays() {
+  return delay({ code: 200, data: { workdays: 59 } });
 }

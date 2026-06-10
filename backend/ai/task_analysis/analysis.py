@@ -131,9 +131,9 @@ def _build_expected_vs_actual(stats: dict) -> str:
     completed = stats.get("quarter_completed_work_hour", 0)
     expected_by_today = stats.get("expected_hours_by_today", 0)
     return (
-        f"预期有效:{expected}d, 至今预期:{expected_by_today}d, "
+        f"预期有效:{expected}d, 所需:{expected_by_today}d, "
         f"已排:{actual}d, 已完成:{completed}d, "
-        f"缺口:{round(expected - actual, 1)}d, 至今缺口:{round(expected_by_today - completed, 1)}d"
+        f"缺口:{round(expected - actual, 1)}d, 所需缺口:{round(expected_by_today - completed, 1)}d"
     )
 
 
@@ -197,6 +197,8 @@ def generate_report(
         "expected_vs_actual": _build_expected_vs_actual(stats),
         "kb_context": kb_context,
         "ratio_stats": ratio_stats,
+        "overdue_count": str(stats.get("overdue_count", 0)),
+        "overdue_hours": str(stats.get("quarter_overdue_work_hour", 0)),
     }
 
     full_prompt = _load_prompt()

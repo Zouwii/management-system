@@ -4,7 +4,7 @@ import { sideMenuConfig } from '../constants/navigation';
 import { ROLE_LABELS, ROLES } from '../constants/roles';
 import { ROUTE_PATHS } from '../constants/routes';
 import { useAuthStore } from '../store/authStore';
-import { getMenuRoutesByRole } from '../utils/permission';
+import { getMenuRoutesByRole, hasRoleAccess } from '../utils/permission';
 
 export default function ManagerLayout({ children }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -14,6 +14,9 @@ export default function ManagerLayout({ children }) {
     label: route.label,
     section: route.section,
     to: route.path,
+    children: (route.children || [])
+      .filter((child) => hasRoleAccess(role, child.allowedRoles))
+      .map((child) => ({ label: child.label, to: child.path })),
   }));
 
   const subtitle = role === ROLES.ADMIN

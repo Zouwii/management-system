@@ -261,6 +261,16 @@ def init_database() -> None:
                     pass
         if "workday_costhour" in cols_b:
             _ensure_workday_costhour_float("project_task_details")
+        # B 表：级联自定义字段
+        if "project_category_1" not in cols_b:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE project_task_details ADD COLUMN project_category_1 VARCHAR(128)"))
+        if "vehicle_type_2" not in cols_b:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE project_task_details ADD COLUMN vehicle_type_2 VARCHAR(128)"))
+        if "project_name_3" not in cols_b:
+            with engine.begin() as conn:
+                conn.execute(text("ALTER TABLE project_task_details ADD COLUMN project_name_3 VARCHAR(256)"))
 
         # C 表若不存在，create_all 理论上已创建；这里额外做一次兜底检查
         tables = set(inspector.get_table_names() or [])
@@ -351,6 +361,16 @@ def init_database() -> None:
                         pass
             if "workday_costhour" in cols_c:
                 _ensure_workday_costhour_float("project_task_overdue_details")
+            # C 表：级联自定义字段
+            if "project_category_1" not in cols_c:
+                with engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE project_task_overdue_details ADD COLUMN project_category_1 VARCHAR(128)"))
+            if "vehicle_type_2" not in cols_c:
+                with engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE project_task_overdue_details ADD COLUMN vehicle_type_2 VARCHAR(128)"))
+            if "project_name_3" not in cols_c:
+                with engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE project_task_overdue_details ADD COLUMN project_name_3 VARCHAR(256)"))
 
         # B2 表字段补齐（program_issue_detail）
         if "program_issue_detail" in tables:
@@ -404,6 +424,16 @@ def init_database() -> None:
                         pass
             if "workday_costhour" in cols_b2:
                 _ensure_workday_costhour_float("program_issue_detail")
+            # B2 表 (program_issue_detail)：级联自定义字段
+            if "project_category_1" not in cols_b2:
+                with engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE program_issue_detail ADD COLUMN project_category_1 VARCHAR(128)"))
+            if "vehicle_type_2" not in cols_b2:
+                with engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE program_issue_detail ADD COLUMN vehicle_type_2 VARCHAR(128)"))
+            if "project_name_3" not in cols_b2:
+                with engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE program_issue_detail ADD COLUMN project_name_3 VARCHAR(256)"))
 
         # user_character 表字段补齐（无迁移环境下避免缺列导致启动失败）
         try:

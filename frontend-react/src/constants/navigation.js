@@ -12,6 +12,14 @@ export const sideMenuConfig = [
     permissionCode: PAGE_PERMISSION_CODES.DEPARTMENT_OVERVIEW,
   },
   {
+    path: ROUTE_PATHS.WORKDAY_COSTHOUR,
+    label: '工作日耗时统计',
+    employeeLabel: '工作日耗时统计',
+    section: '部门',
+    allowedRoles: [ROLES.MANAGER, ROLES.ADMIN],
+    permissionCode: PAGE_PERMISSION_CODES.WORKDAY_COSTHOUR,
+  },
+  {
     path: ROUTE_PATHS.NAV_TEAM_DETAIL,
     label: '导航组',
     employeeLabel: '导航组',

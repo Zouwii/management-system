@@ -9,6 +9,7 @@ export const PAGE_PERMISSION_CODES = {
   AI_ANALYSIS: 'page.ai_analysis',
   PERMISSIONS: 'page.permissions',
   PROTOTYPE: 'page.prototype',
+  WORKDAY_COSTHOUR: 'page.workday_costhour',
 };
 
 export const BUTTON_PERMISSION_CODES = {

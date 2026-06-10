@@ -22,6 +22,10 @@ import {
   mockCreateKnowledgeChatSession,
   mockAnalyzeDashboard,
   mockApplySuggestion,
+  mockFetchWorkdayCosthourTeamSummary,
+  mockFetchWorkdayCosthourDeptAggregate,
+  mockFetchWorkdayCosthourTaskDetail,
+  mockFetchWorkdays,
 } from './providers/mock/dashboard';
 import {
   realFetchAIInsightList,
@@ -46,6 +50,10 @@ import {
   realCreateKnowledgeChatSession,
   realAnalyzeDashboard,
   realApplySuggestion,
+  realFetchWorkdayCosthourTeamSummary,
+  realFetchWorkdayCosthourDeptAggregate,
+  realFetchWorkdayCosthourTaskDetail,
+  realFetchWorkdays,
 } from './providers/real/dashboard';
 
 export const fetchDepartmentOverview = createApiSwitch(mockFetchDepartmentOverview, realFetchDepartmentOverview);
@@ -82,3 +90,7 @@ export const fetchPermissionMatrix = createApiSwitch(mockFetchPermissionMatrix, 
 export const createKnowledgeChatSession = createApiSwitch(mockCreateKnowledgeChatSession, realCreateKnowledgeChatSession);
 export const analyzeDashboard = createApiSwitch(mockAnalyzeDashboard, realAnalyzeDashboard);
 export const applySuggestion = createApiSwitch(mockApplySuggestion, realApplySuggestion);
+export const fetchWorkdayCosthourTeamSummary = createApiSwitch(mockFetchWorkdayCosthourTeamSummary, realFetchWorkdayCosthourTeamSummary);
+export const fetchWorkdayCosthourDeptAggregate = createApiSwitch(mockFetchWorkdayCosthourDeptAggregate, realFetchWorkdayCosthourDeptAggregate);
+export const fetchWorkdayCosthourTaskDetail = createApiSwitch(mockFetchWorkdayCosthourTaskDetail, realFetchWorkdayCosthourTaskDetail);
+export const fetchWorkdays = createApiSwitch(mockFetchWorkdays, realFetchWorkdays);

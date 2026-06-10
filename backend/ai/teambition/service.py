@@ -28,6 +28,9 @@ from __future__ import annotations
 import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+from zoneinfo import ZoneInfo
+
+CHINA_TZ = ZoneInfo("Asia/Shanghai")
 
 import requests
 
@@ -48,7 +51,11 @@ def _int(value: Any, default: int = 0) -> int:
 
 
 def _iso_fmt(value: str) -> str:
-    """Normalize an ISO datetime string to DingTalk format (UTC Z)."""
+    """Normalize an ISO datetime string to DingTalk format (UTC Z).
+
+    Naive datetimes (no timezone) are treated as Asia/Shanghai time (UTC+8)
+    and converted to UTC before sending to the API.
+    """
     if not value:
         return ""
     v = value.strip()
@@ -61,12 +68,12 @@ def _iso_fmt(value: str) -> str:
         try:
             from datetime import date
             d = date.fromisoformat(v)
-            dt = datetime(d.year, d.month, d.day, tzinfo=timezone.utc)
-            return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+            dt = datetime(d.year, d.month, d.day, tzinfo=CHINA_TZ)
+            return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         except Exception:
             return v
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=CHINA_TZ)
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 

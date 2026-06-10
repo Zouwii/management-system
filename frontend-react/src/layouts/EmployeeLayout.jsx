@@ -4,7 +4,7 @@ import { sideMenuConfig } from '../constants/navigation';
 import { ROLE_LABELS, ROLES } from '../constants/roles';
 import { ROUTE_PATHS } from '../constants/routes';
 import { useAuthStore } from '../store/authStore';
-import { getMenuRoutesByRole } from '../utils/permission';
+import { getMenuRoutesByRole, hasRoleAccess } from '../utils/permission';
 
 export default function EmployeeLayout({ children }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -15,6 +15,12 @@ export default function EmployeeLayout({ children }) {
     label: useEmployeeTheme ? route.employeeLabel ?? route.label : route.label,
     section: useEmployeeTheme ? route.employeeSection ?? route.section : route.section,
     to: route.path,
+    children: (route.children || [])
+      .filter((child) => hasRoleAccess(role, child.allowedRoles))
+      .map((child) => ({
+        label: useEmployeeTheme ? child.employeeLabel ?? child.label : child.label,
+        to: child.path,
+      })),
   }));
 
   const title = useEmployeeTheme ? user?.name ?? '李四' : '本体开发部数据管理平台';

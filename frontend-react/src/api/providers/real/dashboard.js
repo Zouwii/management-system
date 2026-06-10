@@ -749,3 +749,35 @@ export function realApplySuggestion(_user, payload = {}) {
     body: JSON.stringify(payload || {}),
   });
 }
+
+// ── 工作日耗时统计 三个接口 ──
+
+export function realFetchWorkdayCosthourTeamSummary(payload = {}) {
+  return httpRequest('/bt/stats/workday_costhour/team_summary', {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+  });
+}
+
+export function realFetchWorkdayCosthourDeptAggregate(payload = {}) {
+  return httpRequest('/bt/stats/workday_costhour/department_aggregate', {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+  });
+}
+
+export function realFetchWorkdayCosthourTaskDetail(payload = {}) {
+  return httpRequest('/bt/stats/workday_costhour/task_status_detail', {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+  });
+}
+
+// ── 工作日数查询 ──
+
+export function realFetchWorkdays(payload = {}) {
+  return httpRequest('/bt/stats/workdays', {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+  });
+}

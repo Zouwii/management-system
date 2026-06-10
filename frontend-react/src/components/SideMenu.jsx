@@ -67,7 +67,10 @@ export default function SideMenu({
     const nextState = {};
 
     Object.entries(groupedMenus).forEach(([section, items]) => {
-      const hasActiveItem = items.some((item) => item.to === location.pathname);
+      const hasActiveItem = items.some((item) =>
+        item.to === location.pathname
+        || (item.children || []).some((child) => child.to === location.pathname)
+      );
       nextState[section] = !hasActiveItem;
     });
 
@@ -145,13 +148,27 @@ export default function SideMenu({
                   {!resolvedCollapsedSections[section] ? (
                     <div className="space-y-2 pl-2">
                       {items.map((item) => (
-                        <NavLink
-                          key={item.to}
-                          to={item.to}
-                          className={({ isActive }) => `block rounded-2xl px-4 py-3 text-sm font-medium transition-all ${isActive ? activeClass : 'text-slate-700 hover:bg-white/80'}`}
-                        >
-                          {item.label}
-                        </NavLink>
+                        <div key={item.to || item.path}>
+                          <NavLink
+                            to={item.to || item.path}
+                            className={({ isActive }) => `block rounded-2xl px-4 py-3 text-sm font-medium transition-all ${isActive ? activeClass : 'text-slate-700 hover:bg-white/80'}`}
+                          >
+                            {item.label}
+                          </NavLink>
+                          {item.children?.length > 0 && (
+                            <div className="ml-4 mt-1 space-y-1 border-l-2 border-slate-200 pl-3">
+                              {item.children.map((child) => (
+                                <NavLink
+                                  key={child.to}
+                                  to={child.to}
+                                  className={({ isActive }) => `block rounded-xl px-3 py-2 text-xs font-medium transition-all ${isActive ? activeClass : 'text-slate-500 hover:bg-white/80'}`}
+                                >
+                                  {child.label}
+                                </NavLink>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       ))}
                     </div>
                   ) : null}

@@ -11,6 +11,7 @@ export const ROUTE_PATHS = {
   PERFORMANCE: '/employee/performance',
   AI_ANALYSIS: '/employee/ai-analysis',
   PERMISSIONS: '/manager/permissions',
+  WORKDAY_COSTHOUR: '/manager/workday-costhour',
 };
 
 export const ROLE_HOME_PATH = {
