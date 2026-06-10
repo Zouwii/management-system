@@ -1,6 +1,7 @@
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import Card from './Card';
+import KnowledgeChatDialog from './KnowledgeChatDialog';
 import { useAuthStore } from '../store/authStore';
 
 export default function SideMenu({
@@ -40,7 +41,11 @@ export default function SideMenu({
   const sectionPillClass = theme === 'dark'
     ? 'inline-flex h-7 min-w-7 items-center justify-center rounded-xl bg-slate-900 px-2 text-xs font-semibold text-white'
     : 'inline-flex h-7 min-w-7 items-center justify-center rounded-xl bg-sky-500 px-2 text-xs font-semibold text-white';
+  const chatButtonClass = theme === 'dark'
+    ? 'fixed bottom-24 left-6 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-purple-600 text-white shadow-[0_18px_36px_-18px_rgba(88,28,135,0.8)] transition hover:bg-purple-700 hover:shadow-[0_22px_44px_-18px_rgba(88,28,135,0.9)]'
+    : 'fixed bottom-24 left-6 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-purple-600 text-white shadow-[0_18px_36px_-18px_rgba(88,28,135,0.8)] transition hover:bg-purple-700 hover:shadow-[0_22px_44px_-18px_rgba(88,28,135,0.9)]';
   const collapseStorageKey = `side-menu-collapsed:${theme}:${title}`;
+  const [chatOpen, setChatOpen] = useState(false);
 
   async function handleSwitchRole() {
     await logout();
@@ -94,78 +99,92 @@ export default function SideMenu({
   }
 
   return (
-    <Card className={`${containerClass} p-5`}>
-      <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-5">
-        <div className="flex items-center gap-3">
-          <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl font-semibold ${logoSrc ? 'border border-slate-200 bg-white shadow-none' : logoClass}`}>
-            {logoSrc ? (
-              <img src={logoSrc} alt={logoAlt} className="h-9 w-9 rounded-lg bg-white p-1 object-contain" />
-            ) : (theme === 'dark' ? 'LOGO' : '李')}
-          </div>
-          {!collapsed ? (
-            <div className="min-w-0">
-              <div className="text-[15px] font-semibold leading-5 text-slate-900 whitespace-nowrap max-[1400px]:whitespace-normal">
-                {title}
-              </div>
-              <div className="text-sm text-slate-500">{subtitle}</div>
+    <>
+      <Card className={`${containerClass} p-5`}>
+        <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-5">
+          <div className="flex items-center gap-3">
+            <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl font-semibold ${logoSrc ? 'border border-slate-200 bg-white shadow-none' : logoClass}`}>
+              {logoSrc ? (
+                <img src={logoSrc} alt={logoAlt} className="h-9 w-9 rounded-lg bg-white p-1 object-contain" />
+              ) : (theme === 'dark' ? 'LOGO' : '李')}
             </div>
-          ) : null}
-        </div>
-        <button
-          type="button"
-          onClick={onToggleCollapse}
-          className="mt-1 flex h-9 w-9 items-center justify-center rounded-2xl border border-slate-200 bg-white/90 text-slate-500 hover:bg-slate-50"
-          title={collapsed ? '展开导航栏' : '折叠导航栏'}
-        >
-          <span className={`text-base transition-transform ${collapsed ? 'rotate-180' : ''}`}>◀</span>
-        </button>
-      </div>
-      {!collapsed ? (
-        <>
-          <div className="mt-5 space-y-4">
-            {Object.entries(groupedMenus).map(([section, items]) => (
-              <div key={section}>
-                <button
-                  type="button"
-                  onClick={() => toggleSection(section)}
-                  className={sectionButtonClass}
-                >
-                  <span className="flex items-center gap-3">
-                    <span className={sectionPillClass}>{section.slice(0, 1)}</span>
-                    <span>{section}</span>
-                  </span>
-                  <span className={`text-slate-400 transition-transform ${resolvedCollapsedSections[section] ? '' : 'rotate-90'}`}>›</span>
-                </button>
-                {!resolvedCollapsedSections[section] ? (
-                  <div className="space-y-2 pl-2">
-                    {items.map((item) => (
-                      <NavLink
-                        key={item.to}
-                        to={item.to}
-                        className={({ isActive }) => `block rounded-2xl px-4 py-3 text-sm font-medium transition-all ${isActive ? activeClass : 'text-slate-700 hover:bg-white/80'}`}
-                      >
-                        {item.label}
-                      </NavLink>
-                    ))}
-                  </div>
-                ) : null}
+            {!collapsed ? (
+              <div className="min-w-0">
+                <div className="text-[15px] font-semibold leading-5 text-slate-900 whitespace-nowrap max-[1400px]:whitespace-normal">
+                  {title}
+                </div>
+                <div className="text-sm text-slate-500">{subtitle}</div>
               </div>
-            ))}
+            ) : null}
           </div>
-          {note ? (
-            <div className={`mt-8 rounded-2xl border p-4 ${noteClass}`}>
-              <div className="mt-2 text-sm leading-6">{note}</div>
-            </div>
-          ) : null}
           <button
             type="button"
-            onClick={handleSwitchRole}
-            className={actionButtonClass}
+            onClick={onToggleCollapse}
+            className="mt-1 flex h-9 w-9 items-center justify-center rounded-2xl border border-slate-200 bg-white/90 text-slate-500 hover:bg-slate-50"
+            title={collapsed ? '展开导航栏' : '折叠导航栏'}
           >
-            {actionLabel}
+            <span className={`text-base transition-transform ${collapsed ? 'rotate-180' : ''}`}>◀</span>
           </button>
-        </>
-      ) : null}
-    </Card>
+        </div>
+        {!collapsed ? (
+          <>
+            <div className="mt-5 space-y-4">
+              {Object.entries(groupedMenus).map(([section, items]) => (
+                <div key={section}>
+                  <button
+                    type="button"
+                    onClick={() => toggleSection(section)}
+                    className={sectionButtonClass}
+                  >
+                    <span className="flex items-center gap-3">
+                      <span className={sectionPillClass}>{section.slice(0, 1)}</span>
+                      <span>{section}</span>
+                    </span>
+                    <span className={`text-slate-400 transition-transform ${resolvedCollapsedSections[section] ? '' : 'rotate-90'}`}>›</span>
+                  </button>
+                  {!resolvedCollapsedSections[section] ? (
+                    <div className="space-y-2 pl-2">
+                      {items.map((item) => (
+                        <NavLink
+                          key={item.to}
+                          to={item.to}
+                          className={({ isActive }) => `block rounded-2xl px-4 py-3 text-sm font-medium transition-all ${isActive ? activeClass : 'text-slate-700 hover:bg-white/80'}`}
+                        >
+                          {item.label}
+                        </NavLink>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+            {note ? (
+              <div className={`mt-8 rounded-2xl border p-4 ${noteClass}`}>
+                <div className="mt-2 text-sm leading-6">{note}</div>
+              </div>
+            ) : null}
+            <button
+              type="button"
+              onClick={handleSwitchRole}
+              className={actionButtonClass}
+            >
+              {actionLabel}
+            </button>
+          </>
+        ) : null}
+      </Card>
+      <button
+        type="button"
+        onClick={() => setChatOpen(true)}
+        className={chatButtonClass}
+        title="AI知识库问答"
+        aria-label="AI知识库问答"
+      >
+        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+        </svg>
+      </button>
+      <KnowledgeChatDialog open={chatOpen} onClose={() => setChatOpen(false)} />
+    </>
   );
 }

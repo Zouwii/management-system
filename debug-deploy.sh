@@ -10,6 +10,8 @@ cleanup() {
   echo "[dev] stopping..."
   kill $BACKEND_PID 2>/dev/null || true
   wait $BACKEND_PID 2>/dev/null || true
+  kill $MCP_PID 2>/dev/null || true
+  wait $MCP_PID 2>/dev/null || true
   echo "[dev] all stopped."
   exit 0
 }
@@ -18,7 +20,7 @@ trap cleanup SIGINT SIGTERM
 # 后端
 cd "${BACKEND_DIR}"
 echo "[dev] starting backend (port 5001)..."
-python app.py &
+poetry run python3 app.py &
 BACKEND_PID=$!
 
 # 等后端就绪
@@ -29,6 +31,12 @@ for i in $(seq 1 15); do
   fi
   sleep 1
 done
+
+# MCP SSE Server
+cd "${BACKEND_DIR}"
+echo "[dev] starting MCP SSE server (port 5200)..."
+poetry run python3 -m ai.mcp --transport sse --port 5200 --host 127.0.0.1 &
+MCP_PID=$!
 
 # 前端
 cd "${FRONTEND_DIR}"

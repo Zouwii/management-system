@@ -272,9 +272,9 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
     无: 'bg-rose-500',
   };
   const taskNatureBarClassMap = {
-    自主型: 'bg-emerald-500',
-    指派型: 'bg-rose-500',
-    能力型: 'bg-blue-500',
+    自主型: 'bg-[#10b981]',
+    指派型: 'bg-[#d04934]',
+    能力型: 'bg-[#1b9aee]',
     无: 'bg-slate-400',
   };
   const quarterTagClassMap = {
@@ -296,9 +296,9 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
     无: 'border-rose-100 bg-rose-50 text-rose-700',
   };
   const taskNatureTagClassMap = {
-    自主型: 'border-emerald-100 bg-emerald-50 text-emerald-700',
-    能力型: 'border-blue-100 bg-blue-50 text-blue-700',
-    指派型: 'border-rose-100 bg-rose-50 text-rose-700',
+    自主型: 'border-[#10b981]/20 bg-[#10b981]/10 text-[#059669]',
+    能力型: 'border-[#1b9aee]/20 bg-[#1b9aee]/10 text-[#1b9aee]',
+    指派型: 'border-[#d04934]/20 bg-[#d04934]/10 text-[#d04934]',
     无: 'border-slate-200 bg-slate-50 text-slate-600',
   };
   const taskTypeOptions = ['全部', '产品', '订单', '研发', '无'];
@@ -439,70 +439,6 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
     const costRatio = total > 0 ? 100 - effectiveRatio : 0;
     return { effectiveHours, costHours, effectiveRatio, costRatio };
   }, [dashboard.taskDetails]);
-  const hourCompositionGuides = useMemo(() => {
-    const viewBoxWidth = 520;
-    const viewBoxHeight = 224;
-    const cx = 260;
-    const cy = 112;
-    const radius = 80;
-    const outerRadius = 102;
-    const leftEndX = 150;
-    const rightEndX = 370;
-    const minTextGap = 18;
-
-    const polarToPoint = (angleDeg, distance) => {
-      const rad = (angleDeg * Math.PI) / 180;
-      return {
-        x: cx + Math.cos(rad) * distance,
-        y: cy + Math.sin(rad) * distance,
-      };
-    };
-
-    const clampY = (y) => Math.max(20, Math.min(viewBoxHeight - 20, y));
-    const effectiveSweep = (Number(hourComposition.effectiveRatio) / 100) * 360;
-    const costSweep = 360 - effectiveSweep;
-    const effectiveCenterAngle = -90 + (effectiveSweep / 2);
-    const costCenterAngle = -90 + effectiveSweep + (costSweep / 2);
-    const sideByAngle = (angleDeg) => (((Math.cos((angleDeg * Math.PI) / 180)) >= 0) ? 'right' : 'left');
-
-    const buildGuide = (angleDeg, side) => {
-      const start = polarToPoint(angleDeg, radius + 2);
-      const elbow = polarToPoint(angleDeg, outerRadius);
-      const endX = side === 'left' ? leftEndX : rightEndX;
-      const endY = clampY(elbow.y);
-      const textOffsetY = side === 'left' ? -10 : 12;
-      return {
-        start,
-        elbow: { x: elbow.x, y: endY },
-        end: { x: endX, y: endY },
-        textX: side === 'left' ? endX + 6 : endX - 6,
-        textY: clampY(endY + textOffsetY),
-        textAnchor: side === 'left' ? 'start' : 'end',
-      };
-    };
-
-    let effectiveSide = sideByAngle(effectiveCenterAngle);
-    let costSide = sideByAngle(costCenterAngle);
-    // 两个中心角落在同侧时，固定把两类放到左右两侧，避免文案/引导线打架。
-    if (effectiveSide === costSide) {
-      effectiveSide = 'left';
-      costSide = 'right';
-    }
-
-    const effectiveGuide = buildGuide(effectiveCenterAngle, effectiveSide);
-    const costGuide = buildGuide(costCenterAngle, costSide);
-
-    if (Math.abs(effectiveGuide.textY - costGuide.textY) < minTextGap) {
-      effectiveGuide.textY = clampY(effectiveGuide.textY - minTextGap / 2);
-      effectiveGuide.end.y = effectiveGuide.textY;
-      effectiveGuide.elbow.y = effectiveGuide.textY;
-      costGuide.textY = clampY(costGuide.textY + minTextGap / 2);
-      costGuide.end.y = costGuide.textY;
-      costGuide.elbow.y = costGuide.textY;
-    }
-
-    return { effectiveGuide, costGuide };
-  }, [hourComposition.effectiveRatio]);
   const monthlyWorkdayData = useMemo(() => {
     const normalizeMonthLabel = (rawMonth) => {
       const txt = String(rawMonth || '').trim();
@@ -777,7 +713,17 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
   }
 
   return (
-    <EmployeeLayout>
+    <>
+      <style>{`
+        @keyframes drawCircle {
+          from { stroke-dasharray: 0, 100; }
+        }
+        .chart-segment {
+          animation: drawCircle 1s ease-out forwards;
+        }
+        .chart-segment:nth-child(2) { animation-delay: 0.15s; }
+      `}</style>
+      <EmployeeLayout>
       <SectionTitle
         title="工时管理"
         desc={canViewAllPeople
@@ -1217,60 +1163,50 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
       <div className="mt-5 grid grid-cols-2 gap-5">
           <div className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-4">
             <div className="text-sm font-semibold text-slate-700">软件开发 / 问题处理占比</div>
-            <div className="mt-4 flex flex-1 flex-col rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="relative mx-auto flex h-56 w-full max-w-[520px] items-center justify-center">
-                <div
-                  className="h-40 w-40 rounded-full border border-slate-200"
-                  style={{
-                    background: `conic-gradient(#14b8a6 0% ${hourComposition.effectiveRatio}%, #f97316 ${hourComposition.effectiveRatio}% 100%)`,
-                  }}
-                  title={`软件开发 ${hourComposition.effectiveRatio}% · 问题处理 ${hourComposition.costRatio}%`}
-                />
-                <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox="0 0 520 224" preserveAspectRatio="none">
-                  <polyline
-                    points={`${hourCompositionGuides.effectiveGuide.start.x},${hourCompositionGuides.effectiveGuide.start.y} ${hourCompositionGuides.effectiveGuide.elbow.x},${hourCompositionGuides.effectiveGuide.elbow.y} ${hourCompositionGuides.effectiveGuide.end.x},${hourCompositionGuides.effectiveGuide.end.y}`}
-                    fill="none"
-                    stroke="#94a3b8"
-                    strokeWidth="1.5"
-                  />
-                  <polyline
-                    points={`${hourCompositionGuides.costGuide.start.x},${hourCompositionGuides.costGuide.start.y} ${hourCompositionGuides.costGuide.elbow.x},${hourCompositionGuides.costGuide.elbow.y} ${hourCompositionGuides.costGuide.end.x},${hourCompositionGuides.costGuide.end.y}`}
-                    fill="none"
-                    stroke="#94a3b8"
-                    strokeWidth="1.5"
-                  />
-                </svg>
-                <div
-                  className="pointer-events-none absolute text-xs text-slate-600"
-                  style={{
-                    left: `${(hourCompositionGuides.effectiveGuide.textX / 520) * 100}%`,
-                    top: `${(hourCompositionGuides.effectiveGuide.textY / 224) * 100}%`,
-                    transform: 'translateY(-50%)',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  软件开发：{hourComposition.effectiveRatio}%（{formatRawDays(hourComposition.effectiveHours)}天）
+            <div className="mt-4 flex flex-1 flex-col items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-center justify-center gap-6">
+                {/* SVG Donut */}
+                <div className="relative w-36 h-36 shrink-0">
+                  <svg viewBox="0 0 36 36" className="w-full h-full overflow-visible">
+                    <path className="text-slate-200" strokeWidth="3.5" stroke="currentColor" fill="none"
+                      d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                    {hourComposition.effectiveRatio > 0 && (
+                      <path className="chart-segment"
+                        strokeWidth="3.5" stroke="#1b9aee" fill="none"
+                        strokeDasharray={`${hourComposition.effectiveRatio}, 100`}
+                        strokeDashoffset="0"
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                    )}
+                    {hourComposition.costRatio > 0 && (
+                      <path className="chart-segment"
+                        strokeWidth="3.5" stroke="#f97316" fill="none"
+                        strokeDasharray={`${hourComposition.costRatio}, 100`}
+                        strokeDashoffset={-hourComposition.effectiveRatio}
+                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                        style={{ animationDelay: '0.15s' }} />
+                    )}
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-xl font-bold text-slate-800 leading-none">
+                      {formatRawDays(hourComposition.effectiveHours + hourComposition.costHours).replace('天', '')}
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-medium mt-0.5">人天</span>
+                  </div>
                 </div>
-                <div
-                  className="pointer-events-none absolute text-xs text-slate-600"
-                  style={{
-                    left: `${(hourCompositionGuides.costGuide.textX / 520) * 100}%`,
-                    top: `${(hourCompositionGuides.costGuide.textY / 224) * 100}%`,
-                    transform: 'translate(-100%, -50%)',
-                    whiteSpace: 'nowrap',
-                  }}
-                >
-                  问题处理：{hourComposition.costRatio}%（{formatRawDays(hourComposition.costHours)}天）
-                </div>
-              </div>
-              <div className="mt-2 flex items-center justify-center gap-6 text-xs text-slate-600">
-                <div className="flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full bg-teal-500" />
-                  <span>软件开发</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-3 w-3 rounded-full bg-orange-500" />
-                  <span>问题处理</span>
+                {/* 图例 */}
+                <div className="space-y-2 text-[12px] leading-4">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-sm shrink-0 bg-[#1b9aee]" />
+                    <span className="text-slate-500">软件开发</span>
+                    <span className="font-semibold text-slate-800">{hourComposition.effectiveRatio}%</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 pl-[22px]">{formatRawDays(hourComposition.effectiveHours)}</div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-sm shrink-0 bg-[#f97316]" />
+                    <span className="text-slate-500">问题处理</span>
+                    <span className="font-semibold text-slate-800">{hourComposition.costRatio}%</span>
+                  </div>
+                  <div className="text-[11px] text-slate-400 pl-[22px]">{formatRawDays(hourComposition.costHours)}</div>
                 </div>
               </div>
             </div>
@@ -1556,5 +1492,6 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
         </div>
       ) : null}
     </EmployeeLayout>
+    </>
   );
 }

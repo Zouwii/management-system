@@ -70,13 +70,13 @@ def _fix_truncated_json(text: str) -> str | None:
     return text + "]" * open_brackets + "}" * open_braces
 
 
-def _call_and_parse(prompt: str, label: str) -> dict:
+def _call_and_parse(prompt: str, label: str, max_tokens: int = 16384) -> dict:
     """调 LLM 并解析 JSON."""
     try:
         content = _llm_call([
             {"role": "system", "content": "严格按 JSON 格式回答，不要加 markdown 代码块或任何解释。"},
             {"role": "user", "content": prompt},
-        ])
+        ], max_tokens=max_tokens)
         if not content:
             return {"error": f"{label}: LLM 返回空内容"}
 
@@ -217,8 +217,8 @@ def generate_report(
         "不要 markdown 代码块。"
     )
 
-    # 两次 LLM 调用
-    r1 = _call_and_parse(group_1_prompt, "group1")
+    # 两次 LLM 调用 — group1 需要更多 token（12+12 条建议 + 需求雷达）
+    r1 = _call_and_parse(group_1_prompt, "group1", max_tokens=32768)
     r2 = _call_and_parse(group_2_prompt, "group2")
 
     if "error" in r1 and "error" in r2:
@@ -246,7 +246,7 @@ def generate_report(
         end = full_prompt.find(end_marker, start)
         section = full_prompt[start:end] if end != -1 else full_prompt[start:]
         prompt = section + "\n\n只输出 JSON：" + sample_json + "\n不要 markdown 代码块。"
-        result = _call_and_parse(prompt, f"module{module_id}_retry")
+        result = _call_and_parse(prompt, f"module{module_id}_retry", max_tokens=32768)
         if output_key in result:
             return result[output_key]
         if "suggestions" in result:
@@ -256,7 +256,7 @@ def generate_report(
     if _is_empty_suggestions(merged.get("autonomous_suggestions")):
         logger.warning("autonomous_suggestions empty, retrying individually...")
         retry = _retry_module(2, 3, "autonomous_suggestions",
-            '{"suggestions": [{"source_task": "任务标题", "problem": "发现的问题", "action": "改进建议", "priority_score": 8, "effort_days": 1.5}]}')
+            '{"suggestions": [{"source_task": "任务标题", "problem": "发现的问题", "action": "改进建议", "priority_score": 8, "effort_days": 1.5, "task_template": {"title": "任务标题", "requirement_desc": "需求描述", "outputs": ["产出描述1(0.5天)", "产出描述2(1.0天)"]}}]}')
         if retry:
             merged["autonomous_suggestions"] = retry
             logger.info("autonomous_suggestions retry OK, %d items", len(retry.get("suggestions", [])))
@@ -266,7 +266,7 @@ def generate_report(
     if _is_empty_suggestions(merged.get("capability_suggestions")):
         logger.warning("capability_suggestions empty, retrying individually...")
         retry = _retry_module(3, 4, "capability_suggestions",
-            '{"suggestions": [{"direction": "学习方向", "reason": "为什么需要学", "output_required": "强制产出", "priority_score": 8, "effort_days": 1.5}]}')
+            '{"suggestions": [{"direction": "学习方向", "reason": "为什么需要学", "output_required": "强制产出", "priority_score": 8, "effort_days": 1.5, "task_template": {"title": "任务标题", "requirement_desc": "需求描述", "outputs": ["产出描述1(0.5天)", "产出描述2(1.0天)"]}}]}')
         if retry:
             merged["capability_suggestions"] = retry
             logger.info("capability_suggestions retry OK, %d items", len(retry.get("suggestions", [])))

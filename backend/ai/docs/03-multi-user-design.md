@@ -32,16 +32,17 @@
 
 ```mermaid
 flowchart LR
-    U[前端 AIAnalysisPage iframe] -->|POST /bt/ai/ttyd/session| A[Flask ai_debug.py]
-    A -->|owner_key 解析| B{_TTYD_SESSIONS 命中?}
-    B -->|是| C[复用 ttyd 进程与端口]
-    B -->|否| D[创建 ttyd 子进程]
-    D --> E[bash easy_start_claude_jz]
-    E --> F[claude --bare]
-    A --> G[(会话缓存: users/owner_key)]
+    U[前端 AIAnalysisPage iframe] -->|POST /api/bt/ai/ttyd/session| A[ai/terminal/routes.py]
+    A -->|ownerKey/model/skill| B[ensure_ttyd_session]
+    B --> C{_TTYD_SESSIONS 命中且未过期?}
+    C -->|模型和 skill 一致| D[复用 ttyd 进程与端口]
+    C -->|未命中/已退出/过期/模型变化| E[终止旧进程组并创建 ttyd]
+    E --> F[bash ai/terminal/launcher.sh]
+    F --> G[claude --bare --model]
+    A --> J[(会话缓存: users/owner_key)]
     A --> H[(可选 Redis: 路由与状态)]
-    C --> I[返回 embedUrl/port/pid]
-    D --> I
+    D --> I[返回 embedUrl/port/pid/expiresAt]
+    E --> I
     I --> U
 ```
 
@@ -49,24 +50,26 @@ flowchart LR
 
 ## 4. 关键模块设计
 
-### 4.1 API 层（`ai_debug.py`）
+### 4.1 API 层（`ai/terminal/routes.py`）
 
 入口：
 
-- `POST /bt/ai/ttyd/session`
+- `POST /api/bt/ai/ttyd/session`
 
 逻辑：
 
-1. 从请求中解析 `owner_key`（无则回退 `default`）
-2. 检查内存映射 `_TTYD_SESSIONS[owner_key]`
-3. 存活则复用；不存在或已退出则拉起新进程
-4. 返回 `embedUrl + ownerKey + model + port + pid`
+1. 从请求中解析 `ownerKey`（无则从登录会话推断）
+2. 读取 `model`，为空时回退到 `ai/config.json`
+3. 检查内存映射 `_TTYD_SESSIONS[ownerKey + purpose]`
+4. 仅在进程存活、模型一致、skill 一致且未超过 TTL 时复用
+5. 返回 `embedUrl + ownerKey + model + port + pid + expiresAt + ttlSeconds`
 
 ### 4.2 ttyd 与 Claude 子进程
 
-- 一条活跃会话对应一条 `ttyd -> easy_start_claude_jz -> claude` 链路
+- 一条活跃会话对应一条 `ttyd -> ai/terminal/launcher.sh -> claude` 链路
 - `owner_key` 决定端口映射（优先固定、冲突时顺延）
 - 进程创建使用独立进程组，便于统一回收
+- `session.py` 注入 `ANTHROPIC_*` 网关环境，并清理 `OPENAI_*`，避免被用户 shell 配置污染
 
 ### 4.3 缓存层（按用户目录隔离）
 
@@ -166,24 +169,31 @@ ai/cache/
 stateDiagram-v2
     [*] --> Created: 首次请求 /ttyd/session
     Created --> Active: 进程启动成功
-    Active --> Idle: 无操作超过 idle_threshold
-    Idle --> Active: 用户重新访问
-    Idle --> Recycled: 超时回收
+    Active --> Recycled: 存活超过 ttl_seconds
+    Active --> Recycled: 模型/skill 变化
+    Active --> Recycled: 进程退出
     Recycled --> Active: 再次访问时重建
 ```
 
-### 7.2 回收策略（推荐初始值）
+### 7.2 回收策略（当前实现）
 
-- `idle_threshold`: 15 分钟
-- `sweep_interval`: 60 秒
-- `max_sessions_global`: 100（按机器规格调整）
-- `max_sessions_per_user`: 2（防止单用户占满资源）
+- `ttl_seconds`: 默认 7200 秒，可通过 `AI_TTYD_TTL_SECONDS` 配置，最小 60 秒
+- `sweep_interval`: `min(300, max(30, ttl_seconds / 6))`
+- `max_sessions_per_user`: 当前按 `ownerKey + purpose` 保留一个活跃会话
+- `_TTYD_SESSIONS`: 仅保存本后端进程创建的 ttyd
 
 回收动作：
 
 1. 发送 `SIGTERM` 到会话进程组
-2. 更新用户 metadata（`active_pid/port = null`）
-3. 记录审计日志
+2. 从 `_TTYD_SESSIONS` 移除
+3. 写入 `runtime/logs/ai_debug_subprocess.log`
+
+停止原因：
+
+- `ttl_expired`
+- `dead`
+- `model_or_skill_changed`
+- `stale`
 
 ---
 
@@ -194,6 +204,7 @@ stateDiagram-v2
 - `_TTYD_SESSIONS` 内存映射管理活跃会话
 - 文件缓存存 `ai/cache/users/...`
 - 定时线程扫超时并回收
+- 后端重启后 `_TTYD_SESSIONS` 会重建；旧进程由端口占用扫描绕开，后续可增加启动时孤儿进程清理
 
 ### 8.2 多实例（后续演进）
 
@@ -274,4 +285,3 @@ stateDiagram-v2
 ## 12. 一句话结论
 
 对当前系统最优解是：**按 `owner_key` 做“动态多进程 + 用户级缓存目录隔离 + 空闲回收”**，而不是预创建多进程池；先单机稳定，再平滑升级到 Redis 路由的多实例架构。
-

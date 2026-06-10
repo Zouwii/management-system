@@ -14,8 +14,8 @@ export default defineConfig({
     port: 5173,
     host: '0.0.0.0',
     proxy: {
-      // 前端开发阶段直接代理到后端 API
-      '/api/bt': {
+      // 前端开发阶段把所有 /api 请求代理到后端
+      '/api': {
         target: 'http://localhost:5001',
         changeOrigin: true,
       },

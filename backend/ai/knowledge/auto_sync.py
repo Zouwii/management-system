@@ -115,10 +115,18 @@ def _sync_all_workspaces(client: DingTalkKnowledgeClient,
         total_synced += r["syncedCount"]
         total_changed += r.get("changedCount", 0)
         total_failed += r["failedCount"]
-        logger.info(
-            "auto_sync: workspace=%s synced=%d changed=%d failed=%d elapsed=%.1fs",
-            ws_name, r["syncedCount"], r.get("changedCount", 0), r["failedCount"], ws_elapsed,
+        skipped_info = ""
+        if "skippedWorkbooks" in r:
+            skipped_info = f" skippedWb={r['skippedWorkbooks']} skippedCached={r.get('skippedCached',0)} skippedUnchanged={r.get('skippedUnchanged',0)}"
+        print(
+            f"[auto_sync] workspace={ws_name} synced={r['syncedCount']} changed={r.get('changedCount', 0)}"
+            f" failed={r['failedCount']}{skipped_info} elapsed={ws_elapsed:.1f}s"
         )
+        # Log first few errors for debugging
+        ws_errors = r.get("errors", [])
+        if ws_errors:
+            for err in ws_errors[:5]:
+                print(f"[sync-error-detail] workspace={ws_name} {err}")
 
     return {
         "ok": True,
@@ -190,12 +198,34 @@ def _rechunk_documents(doc_ids: List[str]) -> dict:
         db.close()
 
 
+def _is_sync_disabled() -> bool:
+    """Check if sync operations are temporarily disabled via flag file.
+
+    To disable:  touch backend/runtime/sync_disabled
+    To re-enable: rm backend/runtime/sync_disabled
+    """
+    flag_file = (
+        Path(__file__).resolve().parent.parent.parent
+        / "runtime" / "sync_disabled"
+    )
+    return flag_file.exists()
+
+
 def sync_all_and_embed(union_id: str = "", full_sync: bool = False) -> dict:
     """Run the full pipeline: sync all KBs -> rechunk -> embed.
 
     full_sync=False (小同步): 增量拉取 + rechunk 变更 + embed 增量
     full_sync=True  (大同步): 对比修改时间重拉 + 全量 rechunk + embed
     """
+    if _is_sync_disabled():
+        msg = "sync is temporarily disabled (runtime/sync_disabled exists)"
+        print(f"[auto_sync] ABORT: {msg}")
+        _sync_log({
+            "ts": int(time.time()), "phase": "pipeline", "event": "abort",
+            "error": msg,
+        })
+        return {"ok": False, "error": msg}
+
     if not union_id:
         union_id = _resolve_union_id()
     if not union_id:

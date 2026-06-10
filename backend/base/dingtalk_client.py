@@ -7,6 +7,14 @@ from typing import Dict, Any, Optional
 import requests
 
 
+def _monitor_api(endpoint: str, status: int, latency_ms: int, error: str = "", source: str = "auth"):
+    try:
+        from base.api_monitor import record_api_call
+        record_api_call(endpoint, status, latency_ms, error, source)
+    except Exception:
+        pass
+
+
 def _sanitize_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
     """避免在返回里把密钥原文回显（例如 clientSecret/appSecret）。"""
     redacted = dict(payload or {})
@@ -142,6 +150,7 @@ def exchange_dingtalk_auth_code(auth_code: str, payload: Optional[Dict[str, Any]
             },
             timeout=30,
         )
+        _monitor_api("/v1.0/oauth2/userAccessToken", resp.status_code, 0)
         data = resp.json()
     except Exception as e:
         return {"ok": False, "error": str(e)}
@@ -164,6 +173,8 @@ def get_dingtalk_user_info(access_token: str) -> Dict[str, Any]:
             headers={"x-acs-dingtalk-access-token": token},
             timeout=30,
         )
+        _monitor_api("/v1.0/contact/users/me", resp.status_code, 0)
+        data = resp.json()
         data = resp.json()
     except Exception as e:
         return {"ok": False, "error": str(e)}
@@ -194,6 +205,7 @@ def get_userid_by_unionid(unionid: str) -> Dict[str, Any]:
             params={"access_token": access_token, "unionid": uid},
             timeout=30,
         )
+        _monitor_api("/user/getUseridByUnionid", resp.status_code, 0)
         data = resp.json()
     except Exception as e:
         return {"ok": False, "error": str(e)}
@@ -224,6 +236,7 @@ def get_unionid_by_userid(userid: str) -> Dict[str, Any]:
             json={"userid": uid},
             timeout=30,
         )
+        _monitor_api("/topapi/v2/user/get", resp.status_code, 0)
         data = resp.json()
     except Exception as e:
         return {"ok": False, "error": str(e)}
@@ -324,6 +337,7 @@ def fetch_dingtalk_json(payload: Dict) -> Dict:
     params = {"appkey": app_key, "appsecret": app_secret}
     try:
         resp = requests.get(url, params=params, timeout=30)
+        _monitor_api("/gettoken", resp.status_code, 0)
         data = resp.json()
         ok = data.get("errcode", 0) == 0
         errcode = data.get("errcode")

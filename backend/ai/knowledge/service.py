@@ -108,6 +108,19 @@ def _log(entry: dict) -> None:
     except Exception:
         pass
 
+    # Also feed to the in-memory monitor
+    try:
+        from base.api_monitor import record_api_call
+        record_api_call(
+            endpoint=entry.get("endpoint", "?"),
+            status=entry.get("status", 0),
+            latency_ms=entry.get("latency_ms", 0),
+            error=entry.get("error", ""),
+            source="kb_sync",
+        )
+    except Exception:
+        pass
+
 
 # ── client ─────────────────────────────────────────────────────
 

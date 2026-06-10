@@ -732,12 +732,6 @@ export function realFetchPermissionMatrix() {
   return httpRequest('/dashboard/permission-matrix');
 }
 
-export function realSyncKnowledgeBase() {
-  return httpRequest('/bt/ai/knowledge/sync-and-embedding', {
-    method: 'POST',
-  });
-}
-
 export function realCreateKnowledgeChatSession() {
   return httpRequest('/bt/ai/knowledge/chat/session', { method: 'POST' });
 }
@@ -749,8 +743,8 @@ export function realAnalyzeDashboard(payload = {}) {
   });
 }
 
-export function realFetchAIKnowledgeTtydSession(_user, payload = {}) {
-  return httpRequest('/bt/ai/knowledge/ttyd/session', {
+export function realApplySuggestion(_user, payload = {}) {
+  return httpRequest('/bt/ai/task-analysis/apply-suggestion', {
     method: 'POST',
     body: JSON.stringify(payload || {}),
   });

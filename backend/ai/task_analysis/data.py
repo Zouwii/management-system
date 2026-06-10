@@ -326,6 +326,7 @@ def fetch_tasks(
     passed_workdays = _get_workday_count(start, effective_end.isoformat() + "T23:59:59")
 
     total = len(tasks)
+    valid_total = work_types.get("指派型", 0) + work_types.get("自主型", 0) + work_types.get("能力型", 0)
     stats = {
         "quarter": quarter,
         "total_tasks": total,
@@ -337,9 +338,9 @@ def fetch_tasks(
         "quarter_completed_work_hour": round(svc_data.get("quarter_completed_work_hour", 0), 1),
         "quarter_overdue_work_hour": round(svc_data.get("quarter_overdue_work_hour", 0), 1),
         "filled_cost_hour_sum": round(svc_data.get("filled_cost_hour_sum", 0), 1),
-        "assigned_pct": round(work_types.get("指派型", 0) / max(total, 1) * 100, 1),
-        "autonomous_pct": round(work_types.get("自主型", 0) / max(total, 1) * 100, 1),
-        "capability_pct": round(work_types.get("能力型", 0) / max(total, 1) * 100, 1),
+        "assigned_pct": round(work_types.get("指派型", 0) / max(valid_total, 1) * 100, 1),
+        "autonomous_pct": round(work_types.get("自主型", 0) / max(valid_total, 1) * 100, 1),
+        "capability_pct": round(work_types.get("能力型", 0) / max(valid_total, 1) * 100, 1),
         "coefficient": coefficient,
         "workday_count": workday_count,
         "expected_effective_days": round(workday_count * coefficient, 2),

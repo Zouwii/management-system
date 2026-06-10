@@ -21,8 +21,8 @@ ai/
 │
 ├── terminal/                # 【功能3】AI 交互终端：ttyd + Claude CLI
 │   ├── routes.py            #   HTTP 路由 (models / ttyd/session)
-│   ├── session.py           #   ttyd 进程生命周期管理
-│   └── launcher.sh          #   模型选择菜单 + claude 启动脚本
+│   ├── session.py           #   ttyd 进程/端口/TTL/环境变量管理
+│   └── launcher.sh          #   ttyd 内部启动 claude 的唯一脚本
 │
 ├── rules/                   # 【共享】AI 行为规则（供 LLM prompt 使用）
 │   ├── task_ticket.md       #   任务单创建规则
@@ -61,7 +61,10 @@ ai/
 
 ### 终端接入
 ```
-前端 iframe → POST /api/bt/ai/ttyd/session → 获取 embedUrl → 嵌入页面
+前端 iframe → POST /api/bt/ai/ttyd/session
+          → ai/terminal/routes.py
+          → ai/terminal/session.py
+          → ttyd → ai/terminal/launcher.sh → claude --bare
 ```
 
 ### 任务创建
@@ -73,8 +76,10 @@ ai/
 ## 多用户隔离规则
 
 - 以 `ownerKey` 作为会话隔离键
-- 每个 `ownerKey` 对应一个活跃 ttyd 会话（进程 + 端口）
-- 相同 `ownerKey` 重入优先复用会话，不同 `ownerKey` 互相隔离
+- 每个 `ownerKey + purpose` 对应一个活跃 ttyd 会话（进程 + 端口）
+- 相同 `ownerKey`、模型、skill 重入优先复用会话
+- 模型或 skill 变化时，旧 ttyd 进程组会先收到 `SIGTERM` 再重建
+- ttyd 默认最多存活 2 小时，到期由后台 janitor 回收
 
 ## 配置项
 
@@ -93,13 +98,22 @@ ai/
 - `AI_TTYD_BASE_URL`：ttyd 对外地址模板，默认 `http://127.0.0.1:{port}/`
 - `AI_TTYD_PORT_BASE`：端口起始值，默认 `8800`
 - `AI_TTYD_PORT_SPAN`：端口池跨度，默认 `400`
+- `AI_TTYD_TTL_SECONDS`：ttyd 最大存活时间，默认 `7200` 秒，最小 `60` 秒
+
+### ttyd 环境变量约束
+
+- `session.py` 从 `ai/config.json` 注入 `ANTHROPIC_API_KEY`、`ANTHROPIC_BASE_URL`、`ANTHROPIC_MODEL`
+- 启动 ttyd 前会清理 `OPENAI_API_KEY`、`OPENAI_API_BASE`、`OPENAI_BASE_URL`、`OPENAI_MODEL`
+- `PATH` 会优先放入 WSL/用户本地 Node 路径，避免误命中 Windows 侧 `claude`
 
 ## 本地调试
 
-在 `backend` 目录执行：
+生产链路由 `session.py` 读取 `ai/config.json` 并注入环境变量，再启动 `launcher.sh`。本地验证建议通过接口走完整链路：
 
 ```bash
-python3 ai/start_claude_jz.py
+curl -X POST http://127.0.0.1:5001/api/bt/ai/ttyd/session \
+  -H 'Content-Type: application/json' \
+  -d '{"ownerKey":"debug"}'
 ```
 
 用途：

@@ -398,3 +398,17 @@ class ServoPerfQuarterResult(_PerfQuarterResultMixin, Base):
     __table_args__ = (UniqueConstraint("year", "quarter", "user_id", name="uq_servo_perf_quarter_user"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+
+class ApiCallLog(Base):
+    """钉钉 API 调用日志（持久化统计）。"""
+
+    __tablename__ = "api_call_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    endpoint: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    source: Mapped[str] = mapped_column(String(50), default="")
+    status: Mapped[int] = mapped_column(Integer, default=0)
+    latency_ms: Mapped[int] = mapped_column(Integer, default=0)
+    error_msg: Mapped[str] = mapped_column(String(500), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)

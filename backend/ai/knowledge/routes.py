@@ -13,7 +13,6 @@ Endpoints:
   POST /ai/knowledge/reembed                       - Embed chunks into pgvector
   POST /ai/knowledge/chat/session                  - Create chat session
   GET  /ai/knowledge/chat                          - SSE knowledge-base chat
-  POST /ai/knowledge/ttyd/session                  - Create/reuse a knowledge-base Q&A ttyd session
 """
 
 from __future__ import annotations
@@ -28,14 +27,6 @@ from flask import request, session
 from ai.knowledge.models import KbDocument
 from ai.knowledge.parser import parse_document
 from ai.knowledge.service import DingTalkKnowledgeClient
-from ai.terminal.session import (
-    build_ttyd_embed_url,
-    ensure_ttyd_session,
-    owner_ttyd_port,
-    resolve_owner_key,
-    resolve_owner_name,
-    user_workspace,
-)
 from base.db.engine import SessionLocal
 
 
@@ -219,7 +210,10 @@ def _sync_workspace(client, workspace_id: str, root_id: str, limit: int = 0,
             return
         result = client.list_nodes(workspace_id, parent_id)
         if not result.get("ok"):
-            errors.append({"parentId": parent_id, "error": result.get("error", "")})
+            err_detail = result.get("error", "")
+            status = result.get("status", "?")
+            errors.append({"parentId": parent_id, "error": err_detail, "status": status})
+            print(f"[sync-error] list_nodes failed parentId={parent_id} status={status} error={err_detail}")
             return
 
         for n in result["data"]:
@@ -260,7 +254,10 @@ def _sync_workspace(client, workspace_id: str, root_id: str, limit: int = 0,
                 try:
                     blocks = client.get_document_blocks(nid)
                     if not blocks.get("ok"):
-                        errors.append({"nodeId": nid, "title": title, "error": "blocks failed"})
+                        err_detail = blocks.get("error", "")
+                        status = blocks.get("status", "?")
+                        errors.append({"nodeId": nid, "title": title, "error": "blocks failed", "detail": err_detail, "status": status})
+                        print(f"[sync-error] blocks failed nodeId={nid} title={title} status={status} error={err_detail}")
                         continue
 
                     parsed = parse_document(blocks["data"], "blocks")
@@ -281,6 +278,7 @@ def _sync_workspace(client, workspace_id: str, root_id: str, limit: int = 0,
                         changed_ids.append(nid)
                 except Exception as e:
                     errors.append({"nodeId": nid, "title": title, "error": str(e)})
+                    print(f"[sync-error] exception nodeId={nid} title={title} error={str(e)}")
 
     _walk(root_id)
     return {
@@ -964,60 +962,6 @@ def register(bp, ok, fail):
             })
         finally:
             db.close()
-
-    @bp.route("/ai/knowledge/ttyd/session", methods=["POST"])
-    def ai_knowledge_ttyd_session():
-        """Create or reuse a knowledge-base Q&A ttyd session.
-
-        Uses '{ownerKey}__kb' as the session key to avoid conflicting with
-        the tbcreate ttyd session (which uses '{ownerKey}').
-
-        Request body (optional): {"ownerKey": "...", "model": "..."}
-        Returns embedUrl, ownerKey, model, port, pid.
-        """
-        payload = request.get_json(silent=True) or {}
-        auth_user = session.get("auth_user") or {}
-        base_owner_key = resolve_owner_key(payload, auth_user)
-        owner_name = resolve_owner_name(auth_user)
-
-        # Use a dedicated session key to isolate from tbcreate ttyd
-        owner_key = f"{base_owner_key}__kb"
-        cfg = {}
-        try:
-            from ai.terminal.session import load_ai_config
-            cfg = load_ai_config()
-        except Exception:
-            pass
-        model = str(payload.get("model") or cfg.get("model") or "glm-5.1").strip() or "glm-5.1"
-
-        from ai.knowledge.workspace import init_knowledge_workspace
-        try:
-            state = ensure_ttyd_session(
-                owner_key=owner_key, owner_name=owner_name, model=model,
-                auth_user=auth_user, skill="",
-                workspace_init=init_knowledge_workspace,
-                purpose="knowledge",
-            )
-        except Exception as exc:
-            return fail(str(exc), code=500, data={})
-
-        ws = user_workspace(owner_key)
-        embed_url = build_ttyd_embed_url(
-            port=int(state.get("port") or owner_ttyd_port(owner_key)),
-            owner_key=owner_key,
-            model=model,
-            skill="",
-        )
-        return ok({
-            "embedUrl": embed_url,
-            "ownerKey": owner_key,
-            "ownerSafe": ws["owner_safe"],
-            "userRoot": ws["user_root"],
-            "workspaceDir": ws["workspace_dir"],
-            "model": model,
-            "port": int(state.get("port") or 0),
-            "pid": int(state.get("proc").pid) if state.get("proc") else 0,
-        })
 
     @bp.route("/ai/knowledge/chat/session", methods=["POST"])
     def ai_knowledge_chat_session():

@@ -5,8 +5,7 @@
       "args": ["-m", "ai.mcp"],
       "cwd": "/home/zhr/zhr_ws/src/management-system/backend",
       "env": {
-        "MCP_USER_ID": "your-dingtalk-user-id",
-        "MCP_USER_NAME": "你的姓名"
+        "MCP_USER_ID": "250124013220811839"
       }
     }
   }

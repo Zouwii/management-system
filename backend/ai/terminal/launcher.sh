@@ -3,6 +3,7 @@ set -euo pipefail
 
 # 环境变量由 session.py:make_env() 传入，这里不再硬编码
 unset ANTHROPIC_AUTH_TOKEN || true
+unset OPENAI_API_KEY OPENAI_API_BASE OPENAI_BASE_URL OPENAI_MODEL || true
 
 # ====================== 兜底 PATH ======================
 REAL_HOME="${HOME:-}"
@@ -14,7 +15,7 @@ if [ -n "${REAL_HOME}" ]; then
     "${REAL_HOME}/.local/bin"
   do
     if [ -d "${p}" ] && [[ ":${PATH}:" != *":${p}:"* ]]; then
-      PATH="${PATH}:${p}"
+      PATH="${p}:${PATH}"
     fi
   done
 fi

@@ -25,6 +25,7 @@ Builds and sends DingTalk create-task requests in the format:
 
 from __future__ import annotations
 
+import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -200,6 +201,7 @@ def create_task(draft: Dict[str, Any], template: Optional[Dict[str, Any]] = None
     # Call DingTalk API
     url = f"https://api.dingtalk.com/v1.0/project/users/{user_id}/tasks"
     try:
+        _start = time.time()
         resp = requests.post(
             url,
             json=req_body,
@@ -209,6 +211,12 @@ def create_task(draft: Dict[str, Any], template: Optional[Dict[str, Any]] = None
             },
             timeout=30,
         )
+        _elapsed = int((time.time() - _start) * 1000)
+        try:
+            from base.api_monitor import record_api_call
+            record_api_call("/v1.0/project/users/{userId}/tasks", resp.status_code, _elapsed, source="tb_create")
+        except Exception:
+            pass
         try:
             data = resp.json()
         except Exception:

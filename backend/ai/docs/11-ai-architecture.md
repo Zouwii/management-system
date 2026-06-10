@@ -231,7 +231,6 @@ ai/
 │   ├── analyze.py           # 单任务 LLM 分析
 │   ├── dashboard_analysis.py # 仪表盘 LLM 分析
 │   ├── models.py            # KbDocument / KbChunk ORM
-│   └── workspace.py         # KB 问答 ttyd 工作区
 ├── task_analysis/
 │   ├── routes.py            # 3 端点
 │   ├── data.py              # TB 任务数据查询

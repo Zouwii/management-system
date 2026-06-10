@@ -382,17 +382,16 @@ def register_prompts(mcp):
 
 ## 6. Tools 设计 — AI 的"可执行操作"
 
-### 6.1 Tool 总览
+### 6.1 Tool 总览（当前实现）
 
 | Tool | 用途 | 调用时机 |
 |------|------|---------|
 | `get_user_task_context` | 获取用户当前全部任务数据 | 开始创建前，了解用户任务全景 |
-| `get_parent_tasks` | 获取可选父任务列表 | 用户需要指定父任务时 |
-| `save_task_draft` | 保存任务草稿 + 校验 | 信息收集完毕，生成草稿 |
-| `get_task_draft` | 读取当前草稿 | 恢复之前的草稿状态 |
 | `create_teambition_task` | 正式创建 TB 任务 | 用户确认草稿后 |
-| `analyze_tasks` | 多维任务分析 | 用户要求分析季度任务时 |
 | `search_knowledge_base` | 语义检索知识库 | 需要了解具体技术背景时 |
+| `get_workhour_summary` | 查询工时汇总（季度/指定范围） | 查看工时分布、工种占比时 |
+
+> 设计文档中 `save_task_draft`、`get_task_draft`、`analyze_tasks` 等 Tool 为后续规划，当前未实现。
 
 ### 6.2 save_task_draft — 核心 Tool
 
@@ -507,70 +506,16 @@ def create_server(user_id: str, user_name: str):
     register_prompts(mcp)
 
     # ── 3. 注册 Tools（可执行操作） ──
-    @mcp.tool()
-    async def get_user_task_context() -> dict:
-        """获取当前用户的所有任务上下文。在创建 TB 单前先调用此 Tool 了解任务全景。"""
-        return task_context.get_user_task_context(user_id, user_name)
+def register_tools(mcp: FastMCP) -> None:
+    from ai.mcp.tools.task_context import register_tool as reg_ctx
+    from ai.mcp.tools.task_create import register_tool as reg_create
+    from ai.mcp.tools.kb_search import register_tool as reg_kb
+    from ai.mcp.tools.workhour import register_tool as reg_wh
 
-    @mcp.tool()
-    async def get_parent_tasks(keyword: str = "") -> dict:
-        """获取可作为父任务的任务列表。可按 keyword 过滤标题。"""
-        return parent_tasks.get_parent_tasks(user_id, keyword)
-
-    @mcp.tool()
-    async def save_task_draft(
-        title: str,
-        work_type: str,
-        requirement_desc: str,
-        outputs: list[str],
-        start_date: str,
-        due_date: str,
-        parent_task_id: str = "",
-    ) -> dict:
-        """保存 TB 任务草稿。后端自动校验参与度档位、标题长度等。"""
-        return draft.save_task_draft(
-            owner_key=user_id,
-            title=title,
-            work_type=work_type,
-            requirement_desc=requirement_desc,
-            outputs=outputs,
-            start_date=start_date,
-            due_date=due_date,
-            parent_task_id=parent_task_id,
-        )
-
-    @mcp.tool()
-    async def get_task_draft() -> dict:
-        """读取当前保存的任务草稿。"""
-        return draft.get_task_draft(user_id)
-
-    @mcp.tool()
-    async def create_teambition_task(
-        title: str, work_type: str, requirement_desc: str,
-        outputs: list[str], participation_level: float,
-        start_date: str, due_date: str, parent_task_id: str = "",
-    ) -> dict:
-        """正式创建 Teambition 任务。调用前请确保用户已确认草稿内容。"""
-        draft_data = {
-            "title": title, "workType": work_type,
-            "requirementDesc": requirement_desc, "outputs": outputs,
-            "participationLevel": participation_level,
-            "startDate": start_date, "dueDate": due_date,
-            "parentTaskId": parent_task_id, "executorId": user_id,
-        }
-        return task_create.create_teambition_task(draft_data)
-
-    @mcp.tool()
-    async def analyze_tasks(quarter: str = "") -> dict:
-        """多维任务分析。返回需求雷达、自主型/能力型建议、风险分析及建议任务草案。"""
-        return analysis.analyze_tasks(user_id, quarter)
-
-    @mcp.tool()
-    async def search_knowledge_base(query: str, top_k: int = 10) -> dict:
-        """在知识库中语义检索相关技术文档。"""
-        return kb_search.search(query, top_k)
-
-    return mcp
+    reg_ctx(mcp, _resolve_user)
+    reg_create(mcp, _resolve_user)
+    reg_kb(mcp, _resolve_user)
+    reg_wh(mcp, _resolve_user)
 ```
 
 ---
@@ -744,3 +689,118 @@ MCP `save_task_draft` 和 ttyd Claude CLI 写入**同一个文件**。Web 前端
 ## 12. 一句话结论
 
 **MCP 的本质不是暴露 API，而是让 AI "学会"一个领域。通过 Resources 灌规则、Prompts 定角色、Tools 给能力，AI 连接 MCP Server 后自己就知道怎么创建 TB 单 — 不需要操作手册，不需要 ttyd，不需要 curl。**
+
+---
+
+## 13. 已发现问题与修正
+
+### 13.1 Prompts 不会自动生效
+
+**问题**：设计文档第 5 节将 SKILL.md 的学习流程定义在了 Prompts 中。但 MCP 协议的 Prompts 是**被动拉取**机制 — AI 客户端连接后能看到有哪些 Prompt 模板可用，但**不会自动将 Prompt 内容注入上下文**。必须由用户或客户端显式请求 `prompts/get` 才会返回内容。
+
+**实际表现**（2026-06-09 测试）：
+- 用户说"mcp测试" → AI 只知道有 4 个 Tools 可用，直接调了 `get_user_task_context`
+- 用户说"我想建个单子" → AI 不知道任务创建流程（一问一答、产出格式、参与度档位），只能列出字段让用户自己填
+- Resources（`tb_rule.md`、`work_hour.md`）也是按需读取，但至少 AI 可以在需要时主动调 `read_resource`
+
+**结论**：Prompts 在本场景下不满足「AI 自动加载行为指令」的需求。
+
+### 13.2 解决方案：Skills → Resources
+
+将 `ai/skills/*/SKILL.md` 注册为 MCP **Resources**，让 AI 在需要时主动读取。
+
+**为什么用 Resources 而不是 Prompts**：
+| | Resources | Prompts |
+|---|---|---|
+| 加载方式 | AI 可主动调用 `read_resource` | 需用户/客户端显式请求 |
+| 内容语义 | "这是什么领域的知识/规则" | "你按照这个模板回答" |
+| 适合存放 | 规则、流程、行为定义 | 格式模板、角色设定 |
+
+SKILL.md 本质上是**行为流程定义**（做什么、怎么做），更接近"领域操作知识"而非"回答模板"，放在 Resources 里语义也合适。
+
+### 13.3 新增 Resources
+
+在现有 2 个 Resources 基础上，增加 4 个 Skills Resources：
+
+| URI | 内容 | 来源 | 触发时机 |
+|-----|------|------|---------|
+| `skill://tb/create` | 任务创建流程（一问一答、产出格式、草稿写入、面板同步） | `ai/skills/2_tb_create/SKILL.md` | 用户说"创建TB单"时 AI 主动读取 |
+| `skill://tb/analyze` | 多维任务分析（4维分析要求、JSON输出格式） | `ai/skills/1_tb_analysis/SKILL.md` | 用户说"分析任务"时 AI 主动读取 |
+| `skill://tb/kb-qa` | 知识库问答流程（搜索方式、回答规范） | `ai/skills/3_kb_qa/SKILL.md` | 用户知识库提问时 AI 主动读取 |
+| `skill://tb/keyword-extract` | 关键词提取规则 | `ai/skills/1-1_keyword_extract/SKILL.md` | 需提取关键词时 AI 主动读取 |
+
+此外，将 `tb_create` Prompt 的流程定义也转化为一个独立 Resource：
+
+| URI | 内容 | 来源 |
+|-----|------|------|
+| `rule://tb/create-flow` | 任务创建完整流程指引（从 Prompt 提取） | `ai/domain/tb_create_flow.md`（新建） |
+
+### 13.4 实现改动
+
+**server.py 改动**（`register_resources` 函数）：
+
+```python
+def register_resources(mcp: FastMCP) -> None:
+    # 现有 — 领域规则
+    @mcp.resource("rule://tb/task-spec")
+    def get_task_spec() -> str:
+        return _read_domain("tb_rule.md")
+
+    @mcp.resource("rule://tb/work-hour")
+    def get_work_hour_rules() -> str:
+        return _read_domain("work_hour.md")
+
+    # 新增 — 创建流程指引
+    @mcp.resource("rule://tb/create-flow")
+    def get_create_flow() -> str:
+        return _read_domain("tb_create_flow.md")
+
+    # 新增 — Skills（行为流程）
+    @mcp.resource("skill://tb/create")
+    def get_skill_create() -> str:
+        return _read_skill("2_tb_create/SKILL.md")
+    
+    @mcp.resource("skill://tb/analyze")
+    def get_skill_analyze() -> str:
+        return _read_skill("1_tb_analysis/SKILL.md")
+    
+    @mcp.resource("skill://tb/kb-qa")
+    def get_skill_kb_qa() -> str:
+        return _read_skill("3_kb_qa/SKILL.md")
+    
+    @mcp.resource("skill://tb/keyword-extract")
+    def get_skill_keyword_extract() -> str:
+        return _read_skill("1-1_keyword_extract/SKILL.md")
+```
+
+其中 `_SKILL_DIR = Path(__file__).resolve().parent.parent / "skills"`。
+
+### 13.5 预期效果
+
+改动后，Claude Code 连接 MCP 时能看到的 Resources：
+
+```
+rule://tb/task-spec        — TB字段规范
+rule://tb/work-hour        — 工时分类规则  
+rule://tb/create-flow      — 创建流程指引
+skill://tb/create          — 任务创建行为流程（一问一答+产出格式+草稿+面板同步）
+skill://tb/analyze         — 任务分析行为流程（4维分析+JSON输出）
+skill://tb/kb-qa           — 知识库问答行为流程
+skill://tb/keyword-extract — 关键词提取规则
+```
+
+AI 在用户说"创建TB单"时，主动调用 `read_resource("skill://tb/create")` 获取完整流程，然后按一问一答方式引导用户：
+
+```
+用户: 建个单子
+AI: [内部：read_resource("skill://tb/create") → 知道流程]
+    [内部：get_user_task_context() → 了解用户任务全景]
+    好的，我来帮你创建TB任务。请先告诉我任务标题（控制在18字以内）
+```
+
+### 13.6 注意事项
+
+- Resources 是按需加载（AI 主动 `read_resource`），不占初始上下文 token
+- AI 可以在对话中途随时读取任意 Resource，实现真正的"按需学习"
+- Skills 内容如有变更，只需修改 `ai/skills/*/SKILL.md`，无需改 server.py 代码
+- `tb_create` Prompt 可以保留（作为备用的模板化入口），但主要流程由 Resources 承载

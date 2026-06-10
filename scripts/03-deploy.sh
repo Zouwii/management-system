@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TAR_DIR="${SCRIPT_DIR}/tar"
 PACKAGE_GLOB="${TAR_DIR}/tb_tool_bt_backend-*.tar.gz"
 
@@ -62,6 +62,6 @@ rm -f "${LATEST_PACKAGE}"
 
 echo "[deploy] extract and start daemon..."
 sshpass -p "${REMOTE_PASS}" ssh -o StrictHostKeyChecking=no "${REMOTE_USER}@${REMOTE_HOST}" \
-  "bash -lc 'set -e; export PATH=\"\$HOME/.local/bin:\$PATH\"; cd \"${REMOTE_BASE_DIR}\"; tar -vzxf \"${PACKAGE_NAME}\"; rm -f \"${PACKAGE_NAME}\"; if [ -d .tb_tool_bt_preserve/.venv ]; then mv .tb_tool_bt_preserve/.venv \"${REMOTE_PROJECT_DIR}/backend/.venv\"; fi; if [ -f .tb_tool_bt_preserve/.env ]; then mv .tb_tool_bt_preserve/.env \"${REMOTE_PROJECT_DIR}/backend/.env\"; fi; rm -rf .tb_tool_bt_preserve; cd \"${REMOTE_PROJECT_DIR}/backend\"; echo \"[deploy] remote PATH: \$PATH\"; if [[ -x \"./run_on_pc_daemon\" ]]; then ./run_on_pc_daemon start; elif [[ -x \"./run_on_pc_daemon.sh\" ]]; then bash ./run_on_pc_daemon.sh start; else echo \"run_on_pc_daemon(.sh) 不存在或不可执行\"; exit 1; fi'"
+  "bash -lc 'set -e; export PATH=\"\$HOME/.local/bin:\$PATH\"; cd \"${REMOTE_BASE_DIR}\"; tar -vzxf \"${PACKAGE_NAME}\"; rm -f \"${PACKAGE_NAME}\"; if [ -d .tb_tool_bt_preserve/.venv ]; then mv .tb_tool_bt_preserve/.venv \"${REMOTE_PROJECT_DIR}/backend/.venv\"; fi; if [ -f .tb_tool_bt_preserve/.env ]; then mv .tb_tool_bt_preserve/.env \"${REMOTE_PROJECT_DIR}/backend/.env\"; fi; rm -rf .tb_tool_bt_preserve; cd \"${REMOTE_PROJECT_DIR}/backend\"; mkdir -p runtime; touch runtime/sync_disabled; echo \"[deploy] sync_disabled flag created\"; echo \"[deploy] remote PATH: \$PATH\"; if [[ -x \"./run_on_pc_daemon\" ]]; then ./run_on_pc_daemon start; elif [[ -x \"./run_on_pc_daemon.sh\" ]]; then bash ./run_on_pc_daemon.sh start; else echo \"run_on_pc_daemon(.sh) 不存在或不可执行\"; exit 1; fi'"
 
 echo "[deploy] done."

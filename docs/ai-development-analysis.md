@@ -27,11 +27,12 @@
 
 后端 (Flask)
 ├── route_registry/ai_mission.py  # REST API：对话管理、消息发送、草稿确认
-├── route_registry/ai_debug.py    # REST API：ttyd 会话生命周期、端口分配
+├── ai/terminal/routes.py         # REST API：ttyd 会话创建与复用
+├── ai/terminal/session.py        # ttyd 进程、端口、TTL 回收、环境变量管理
+├── ai/terminal/launcher.sh       # ttyd 内部启动 claude CLI 的唯一脚本
 ├── services/ai_task_assistant_service.py   # 对话状态管理、草稿合并（规则引擎）
 ├── services/ai_task_context_service.py     # DB 任务上下文读取、Markdown 生成
 ├── services/ai_mission_service.py          # 钉钉任务创建 payload 构建与调用
-├── easy_start_claude_jz         # Shell 脚本：模型选择菜单 → 启动 claude CLI
 ├── ai/config.json               # one-api 网关配置
 └── ai/project_memory/           # AI 行为规则（task_ticket / task_analysis / data_contracts）
 ```

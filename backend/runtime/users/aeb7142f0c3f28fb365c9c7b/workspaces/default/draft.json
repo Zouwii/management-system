@@ -1,0 +1,13 @@
+{
+  "title": "测试MCP工具创建草稿",
+  "workType": "自主型",
+  "requirementDesc": "这是一个MCP工具测试任务",
+  "outputs": [
+    "编写单元测试(0.5天)",
+    "代码审查(0.5天)"
+  ],
+  "participationLevel": 0.0,
+  "dueDate": "2026-06-30T23:59:59",
+  "startDate": "2026-06-08T00:00:00",
+  "parentTaskId": ""
+}

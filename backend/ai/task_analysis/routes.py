@@ -144,3 +144,46 @@ def register(bp, ok, fail):
         except Exception as e:
             _log(f"step3 FAILED: {e}")
             return fail(str(e), code=500)
+
+    # ── apply_suggestion: 应用分析建议，创建 TB 任务模板 ─────────
+
+    @bp.route("/ai/task-analysis/apply-suggestion", methods=["POST"])
+    def ai_task_analysis_apply_suggestion():
+        body = request.get_json(silent=True) or {}
+        suggestion_type = str(body.get("suggestion_type") or "").strip()
+        suggestion = body.get("suggestion") or {}
+
+        if suggestion_type not in ("autonomous", "capability"):
+            return fail("invalid suggestion_type, must be 'autonomous' or 'capability'", code=400)
+
+        template = suggestion.get("task_template") or {}
+        title = str(template.get("title") or "").strip()
+        requirement_desc = str(template.get("requirement_desc") or "").strip()
+
+        # 兼容两种格式：outputs（数组）和 output（字符串）
+        outputs_arr = template.get("outputs")
+        if isinstance(outputs_arr, list) and outputs_arr:
+            output = "\n".join(str(o) for o in outputs_arr)
+        else:
+            output = str(template.get("output") or "").strip()
+
+        if not title:
+            return fail("task_template.title is required", code=400)
+
+        owner_key = str(body.get("owner_key") or "").strip()
+        if not owner_key:
+            auth_user = session.get("auth_user") or {}
+            owner_key = str(auth_user.get("user_id") or "").strip()
+
+        _log(f"apply_suggestion: type={suggestion_type} title={title[:60]} owner={owner_key}")
+
+        return ok({
+            "accepted": True,
+            "suggestion_type": suggestion_type,
+            "template": {
+                "title": title,
+                "requirement_desc": requirement_desc,
+                "output": output,
+            },
+            "owner_key": owner_key,
+        })

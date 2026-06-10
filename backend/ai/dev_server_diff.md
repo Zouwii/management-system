@@ -5,7 +5,7 @@
 | 文件 | 状态 | 说明 |
 |------|------|------|
 | `backend/ai/terminal/session.py` | ✅ 一致 | 均含 `-W`、`0.0.0.0` 绑定 |
-| `backend/ai/terminal/launcher.sh` | ✅ 一致 | 均无硬编码 API key，始终显示模型选择菜单 |
+| `backend/ai/terminal/launcher.sh` | ✅ 一致 | 均无硬编码 API key；`ANTHROPIC_MODEL` 已设置时跳过模型菜单 |
 | `backend/ai/config.json` | ✅ 一致 | 同一份 one-api gateway 配置 |
 | `backend/app.py` | ✅ 一致 | — |
 | `backend/ai/tbcreate/routes.py` | ✅ 一致 | — |

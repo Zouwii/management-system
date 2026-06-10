@@ -8,6 +8,15 @@ import time
 
 from base.dingtalk_client import get_valid_access_token
 
+
+def _monitor_api(endpoint: str, status: int, latency_ms: int, error: str = "", source: str = ""):
+    """Feed API call data to the in-memory + DB monitor."""
+    try:
+        from base.api_monitor import record_api_call
+        record_api_call(endpoint, status, latency_ms, error, source)
+    except Exception:
+        pass
+
 _RESULT_CACHE: Dict[str, Dict[str, Any]] = {}
 _CACHE_TTL_PROJECT_QUERY_SEC = 45
 _CACHE_TTL_TASK_QUERY_SEC = 60
@@ -80,7 +89,14 @@ def search_project_tasks_service(payload: Dict[str, Any]) -> Dict[str, Any]:
     }
 
     try:
+        _start = time.time()
         resp = requests.post(url, params=params, json=body, headers=headers, timeout=30)
+        _monitor_api(
+            endpoint="/v1.0/project/users/{userId}/tasks/search",
+            status=resp.status_code,
+            latency_ms=int((time.time() - _start) * 1000),
+            source="task_search",
+        )
         try:
             data = resp.json()
         except Exception:
@@ -172,7 +188,8 @@ def query_project_tasks_service(payload: Dict[str, Any]) -> Dict[str, Any]:
             return cached
 
     def _do_request(token: str, req_params: Dict[str, Any]):
-        return requests.get(
+        _start = time.time()
+        resp = requests.get(
             url,
             params=req_params,
             headers={
@@ -181,6 +198,13 @@ def query_project_tasks_service(payload: Dict[str, Any]) -> Dict[str, Any]:
             },
             timeout=30,
         )
+        _monitor_api(
+            endpoint="/v1.0/project/users/{userId}/projectIds/{projectId}/tasks",
+            status=resp.status_code,
+            latency_ms=int((time.time() - _start) * 1000),
+            source="task_list",
+        )
+        return resp
 
     try:
         retries = int(payload.get("retries", 2))
@@ -351,7 +375,8 @@ def query_user_tasks_service(payload: Dict[str, Any]) -> Dict[str, Any]:
     }
 
     def _do_request(token: str):
-        return requests.get(
+        _start = time.time()
+        resp = requests.get(
             url,
             params=params,
             headers={
@@ -360,6 +385,13 @@ def query_user_tasks_service(payload: Dict[str, Any]) -> Dict[str, Any]:
             },
             timeout=30,
         )
+        _monitor_api(
+            endpoint="/v1.0/project/users/{userId}/tasks",
+            status=resp.status_code,
+            latency_ms=int((time.time() - _start) * 1000),
+            source="task_detail",
+        )
+        return resp
 
     try:
         resp = _do_request(access_token)

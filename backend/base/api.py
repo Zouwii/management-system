@@ -27,4 +27,14 @@ def api_routes_index():
     return _ok(get_all_route_index())
 
 
+@api_bp.route("/monitor/api-stats", methods=["GET"])
+def api_monitor_stats():
+    """Return real-time DingTalk API call statistics."""
+    try:
+        from base.api_monitor import monitor
+        return _ok(monitor.snapshot())
+    except Exception as e:
+        return _fail(str(e), code=500)
+
+
 register_all_routes(api_bp, _ok, _fail)

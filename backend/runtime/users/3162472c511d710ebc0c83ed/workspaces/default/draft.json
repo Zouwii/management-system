@@ -1,0 +1,12 @@
+{
+  "title": "自学习计算节点架构文档编写",
+  "workType": "自主型",
+  "requirementDesc": "在codeReview优化完成后，需要系统整理模块架构，输出清晰的技术文档，降低后续维护成本。",
+  "outputs": [
+    "编写自学习计算节点模块的架构文档，描述模块职责、数据流图、关键接口。产出可复用于新成员入门和代码评审。"
+  ],
+  "participationLevel": 1,
+  "dueDate": "",
+  "startDate": "",
+  "parentTaskId": ""
+}

@@ -15,6 +15,7 @@ from ai.terminal.session import (
     owner_ttyd_port,
     resolve_owner_key,
     resolve_owner_name,
+    ttyd_ttl_seconds,
     user_workspace,
 )
 
@@ -75,5 +76,8 @@ def register(bp, ok, fail):
                 "skill": skill,
                 "port": int(state.get("port") or 0),
                 "pid": int(state.get("proc").pid) if state.get("proc") else 0,
+                "createdAt": int(state.get("created_at") or 0),
+                "expiresAt": int(state.get("expires_at") or 0),
+                "ttlSeconds": ttyd_ttl_seconds(),
             }
         )

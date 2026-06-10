@@ -29,7 +29,7 @@ ai/
 | `tbcreate/workspace.py:_claude_md_template()` | 硬编码在函数体内 | **反模式** |
 | `tbcreate/workspace.py:init_workspace()` | `ai/rules/task_ticket.md` → 复制到 workspace | 文件复制 |
 | `tbcreate/context.py:write_user_task_context_markdown()` | 硬编码 CLAUDE.md 在函数体内 | **反模式** |
-| `knowledge/workspace.py:_claude_md_template()` | 硬编码在函数体内 | **反模式** |
+| `knowledge/chat.py` / `knowledge/routes.py` | SSE 知识库问答，不再使用 ttyd workspace | 当前实现 |
 | `task_analysis/analysis.py` | `ai/skills/task-analysis/SKILL.md` | 文件读取 |
 | `knowledge/dashboard_analysis.py` | `runtime/shared/.claude/skills/task-analysis/SKILL.md` | 文件读取（应指向同一文件） |
 | `task_analysis/routes.py` | `ai/skills/keyword-extract/SKILL.md` | 废弃的 LLM 关键词提取 |
@@ -156,7 +156,7 @@ ai/skills/keyword-extract/SKILL.md ─► 删除（废弃）
 
 ai/tbcreate/workspace.py:_claude_md_template() ─► 改为读 prompts/tb_create.md
 ai/tbcreate/context.py 硬编码 CLAUDE.md ─► 删除，由 workspace.py 统一生成
-ai/knowledge/workspace.py:_claude_md_template() ─► 保留（知识库指令独立场景）
+ai/knowledge/workspace.py:_claude_md_template() ─► 已删除（知识库改为 SSE/chat 链路）
 
 runtime/shared/.claude/skills/ ─► 改为 install_prompts.sh 从 ai/prompts/ 同步
 ```
@@ -382,7 +382,7 @@ runtime/shared/.claude/skills/ ─► 改为 install_prompts.sh 从 ai/prompts/ 
 |------|------|
 | `tbcreate/workspace.py` | `_claude_md_template()` 改为 `ai/prompts/tb_create.md` 文件读取；`init_workspace()` 更新路径 |
 | `tbcreate/context.py` | 删除硬编码 CLAUDE.md（约 30 行），改用 workspace.py 的统一入口 |
-| `knowledge/workspace.py` | 保留独立 `_claude_md_template()`（知识库场景不同） |
+| `knowledge/chat.py` / `knowledge/routes.py` | 保留知识库 SSE/chat 链路，不再维护独立 ttyd workspace |
 | `task_analysis/analysis.py` | 第 18 行路径从 `skills/task-analysis/SKILL.md` 改为 `prompts/tb_analyze.md` |
 | `knowledge/dashboard_analysis.py` | 第 22 行路径从 `runtime/shared/.../SKILL.md` 改为 `ai/prompts/tb_analyze.md` |
 | `task_analysis/routes.py` | 删除第 25 行 keyword-extract 引用（废弃功能） |

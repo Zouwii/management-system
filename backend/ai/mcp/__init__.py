@@ -43,7 +43,7 @@ def main():
         import uvicorn
         app = build_sse_app(mcp)
         print(f"[tb-mcp] SSE server starting on {args.host}:{args.port}", file=sys.stderr)
-        uvicorn.run(app, host=args.host, port=args.port)
+        uvicorn.run(app, host=args.host, port=args.port, forwarded_allow_ips="*")
     else:
         mcp.run(transport="stdio")
 
