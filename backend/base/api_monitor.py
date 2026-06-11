@@ -34,7 +34,7 @@ class ApiCallMonitor:
 
     @staticmethod
     def _today_key() -> str:
-        return dt.datetime.now().strftime("%Y-%m-%d")
+        return dt.datetime.utcnow().strftime("%Y-%m-%d")
 
     def record(self, endpoint: str, status: int, latency_ms: int, error: str = "",
                source: str = ""):
@@ -88,26 +88,21 @@ class ApiCallMonitor:
         except Exception:
             pass
 
-    def snapshot(self) -> dict:
-        """Return stats: DB aggregation for today + memory recent buffer."""
+    def snapshot(self, day: str = "") -> dict:
+        """Return stats: DB aggregation for the given day (default today UTC).
+        Queries DB on every call."""
 
         # Flush pending batch first
         self._flush_batch()
 
-        today = self._today_key()
+        today = day or self._today_key()
 
         # Query DB for today's stats
-        db_stats = self._query_today_stats()
+        db_stats = self._query_stats_for_day(today)
         total_calls = db_stats.get("total", 0)
         total_errors = db_stats.get("errors", 0)
         endpoints = db_stats.get("endpoints", {})
-        recent_db = db_stats.get("recent", [])
-
-        # Merge memory recent with DB recent (memory is fresher)
-        with self._lock:
-            memory_recent = list(reversed(self._recent[-50:]))
-
-        recent = memory_recent if memory_recent else recent_db
+        recent = db_stats.get("recent", [])
 
         # Top 5
         top = sorted(endpoints.items(), key=lambda x: -x[1]["calls"])[:5]
@@ -131,20 +126,18 @@ class ApiCallMonitor:
         }
 
     @staticmethod
-    def _query_today_stats() -> dict:
-        """Query today's API call stats from MySQL."""
+    def _query_stats_for_day(day: str) -> dict:
+        """Query API call stats from MySQL for a specific day (YYYY-MM-DD, UTC)."""
         try:
             from base.db.engine import SessionLocal
             from sqlalchemy import text
             session = SessionLocal()
             try:
-                today_str = dt.datetime.now().strftime("%Y-%m-%d")
-
                 row = session.execute(text(
                     "SELECT COUNT(*) as total, "
                     "SUM(CASE WHEN status >= 400 THEN 1 ELSE 0 END) as errors "
                     "FROM api_call_logs WHERE DATE(created_at) = :today"
-                ), {"today": today_str}).fetchone()
+                ), {"today": day}).fetchone()
                 total = int(row.total) if row and row.total else 0
                 errors = int(row.errors) if row and row.errors else 0
 
@@ -152,9 +145,9 @@ class ApiCallMonitor:
                     "SELECT endpoint, COUNT(*) as cnt, "
                     "SUM(CASE WHEN status >= 400 THEN 1 ELSE 0 END) as err_cnt, "
                     "ROUND(AVG(latency_ms), 1) as avg_ms "
-                    "FROM api_call_logs WHERE DATE(created_at) = :today "
+                    "FROM api_call_logs WHERE DATE(created_at) = :day "
                     "GROUP BY endpoint ORDER BY cnt DESC"
-                ), {"today": today_str}).fetchall()
+                ), {"day": day}).fetchall()
 
                 endpoints = {}
                 for r in endpoint_rows:
@@ -166,9 +159,9 @@ class ApiCallMonitor:
 
                 recent_rows = session.execute(text(
                     "SELECT endpoint, source, status, latency_ms, error_msg, created_at "
-                    "FROM api_call_logs WHERE DATE(created_at) = :today "
+                    "FROM api_call_logs WHERE DATE(created_at) = :day "
                     "ORDER BY id DESC LIMIT 50"
-                ), {"today": today_str}).fetchall()
+                ), {"day": day}).fetchall()
 
                 recent = []
                 for r in recent_rows:

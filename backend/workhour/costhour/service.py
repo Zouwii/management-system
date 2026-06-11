@@ -18,8 +18,6 @@ from base.db.orm import (
 
 SH_TZ = ZoneInfo("Asia/Shanghai")
 
-BUSINESS_TYPE_LABELS = {0: "产品", 1: "研发", 2: "订单"}
-
 # 工作日耗时统计参与人员白名单
 WHITELIST_USER_IDS = {
     "01195014075436361289",  # 邹宏睿 导航组
@@ -91,7 +89,7 @@ def _query_workday_costhour_base(
             session.query(
                 ProjectTaskDetail.query_user_id,
                 ProjectTaskDetail.workday_costhour,
-                ProjectTaskDetail.business_type,
+                ProjectTaskDetail.project_category_1,
                 ProjectTaskDetail.task_id,
                 ProjectTaskDetail.content,
                 ProjectTaskDetail.scenario_field_config_id,
@@ -115,7 +113,7 @@ def _query_workday_costhour_base(
             session.query(
                 ProjectTaskOverdueDetail.query_user_id,
                 ProjectTaskOverdueDetail.workday_costhour,
-                ProjectTaskOverdueDetail.business_type,
+                ProjectTaskOverdueDetail.project_category_1,
                 ProjectTaskOverdueDetail.task_id,
                 ProjectTaskOverdueDetail.content,
                 ProjectTaskOverdueDetail.scenario_field_config_id,
@@ -139,7 +137,7 @@ def _query_workday_costhour_base(
             session.query(
                 ProgramIssueDetail.query_user_id,
                 ProgramIssueDetail.workday_costhour,
-                ProgramIssueDetail.business_type,
+                ProgramIssueDetail.project_category_1,
                 ProgramIssueDetail.vehicle_type_2,
             )
             .join(
@@ -191,8 +189,15 @@ def _query_workday_costhour_base(
         # ── 组装统一行 ──
         results: List[Dict[str, Any]] = []
 
+        def _project_type_label(pc1: Any) -> str:
+            """将 project_category_1 值映射为项目类型标签。"""
+            s = str(pc1 or "").strip()
+            if s and s != "None":
+                return s
+            return "其他"
+
         # B 表 → 软件开发
-        for uid, wdc, bt, tid, content, _scenario, vt in b_rows:
+        for uid, wdc, pc1, tid, content, _scenario, vt in b_rows:
             uid = str(uid or "").strip()
             if not uid:
                 continue
@@ -203,12 +208,11 @@ def _query_workday_costhour_base(
                 "teamId": team_id,
                 "teamName": team_name,
                 "taskType": "软件开发",
-                "businessType": bt,
+                "projectType": _project_type_label(pc1),
                 "taskId": str(tid or ""),
                 "content": str(content or ""),
                 "workdayCosthour": float(wdc) if wdc is not None and wdc == wdc else 0.0,
                 "vehicleType2": str(vt or "").strip() if vt else "",
-                "source": "B",
             })
 
         # C 表 → 软件开发（B/C 去重：以 task_id 为 key，B 表优先）
@@ -217,7 +221,7 @@ def _query_workday_costhour_base(
             for r in results
             if r.get("taskId")
         }
-        for uid, wdc, bt, tid, content, _scenario, vt in c_rows:
+        for uid, wdc, pc1, tid, content, _scenario, vt in c_rows:
             uid = str(uid or "").strip()
             if not uid:
                 continue
@@ -231,16 +235,15 @@ def _query_workday_costhour_base(
                 "teamId": team_id,
                 "teamName": team_name,
                 "taskType": "软件开发",
-                "businessType": bt,
+                "projectType": _project_type_label(pc1),
                 "taskId": task_id_str,
                 "content": str(content or ""),
                 "workdayCosthour": float(wdc) if wdc is not None and wdc == wdc else 0.0,
                 "vehicleType2": str(vt or "").strip() if vt else "",
-                "source": "C",
             })
 
         # 问题处理
-        for uid, wdc, bt, vt in issue_rows:
+        for uid, wdc, pc1, vt in issue_rows:
             uid = str(uid or "").strip()
             if not uid:
                 continue
@@ -251,12 +254,11 @@ def _query_workday_costhour_base(
                 "teamId": team_id,
                 "teamName": team_name,
                 "taskType": "问题处理",
-                "businessType": bt,
+                "projectType": _project_type_label(pc1),
                 "taskId": "",
                 "content": "",
                 "workdayCosthour": float(wdc) if wdc is not None and wdc == wdc else 0.0,
                 "vehicleType2": str(vt or "").strip() if vt else "",
-                "source": "Issue",
             })
 
         # ── 白名单过滤：只保留指定参与人员 ──
@@ -271,8 +273,9 @@ def _aggregate_by_project_type(rows: List[Dict[str, Any]]) -> Dict[str, Dict[str
     """按项目类型聚合：{ "研发项目": {hours, count}, ... }"""
     agg: Dict[str, Dict[str, float]] = {}
     for r in rows:
-        bt = r.get("businessType")
-        label = BUSINESS_TYPE_LABELS.get(bt, "其他") + "项目"
+        label = r.get("projectType", "其他")
+        if label == "其他":
+            continue  # 跳过未分类
         bucket = agg.setdefault(label, {"hours": 0.0, "count": 0})
         bucket["hours"] += r.get("workdayCosthour", 0.0)
         bucket["count"] += 1
@@ -414,8 +417,9 @@ def workday_costhour_task_status_detail_service(payload: Dict[str, Any]) -> Dict
 
     group_buckets: Dict[str, Dict[str, Dict[str, float]]] = {}
     for r in rows:
-        bt = r.get("businessType")
-        pt_label = BUSINESS_TYPE_LABELS.get(bt, "其他") + "项目"
+        pt_label = r.get("projectType", "其他")
+        if pt_label == "其他":
+            continue
         tt = r.get("taskType", "未知")
         bucket = group_buckets.setdefault(pt_label, {}).setdefault(tt, {"hours": 0.0, "count": 0})
         bucket["hours"] += r.get("workdayCosthour", 0.0)

@@ -6,7 +6,7 @@ HTTP API 入口（类似 Go 里集中 init 注册路由）。
 - 一览与注册顺序：route_registry/__init__.py
 """
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 
 from base.route_registry import register_all_routes
 from base.route_registry.route_index import get_all_route_index
@@ -29,10 +29,15 @@ def api_routes_index():
 
 @api_bp.route("/monitor/api-stats", methods=["GET"])
 def api_monitor_stats():
-    """Return real-time DingTalk API call statistics."""
+    """Return real-time DingTalk API call statistics.
+
+    Query params:
+        day (optional): YYYY-MM-DD in UTC, defaults to today UTC.
+    """
     try:
         from base.api_monitor import monitor
-        return _ok(monitor.snapshot())
+        day = request.args.get("day", "").strip()
+        return _ok(monitor.snapshot(day))
     except Exception as e:
         return _fail(str(e), code=500)
 

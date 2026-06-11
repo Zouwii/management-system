@@ -25,6 +25,7 @@
 | `project_tasks` | **A 表** | 项目下任务列表快照（浅字段，`customfields` 常无 value） |
 | `project_task_details` | **B 表** | 单任务详情快照（含 `customFields` 全量或抽取的工时等） |
 | `sync_runs` | 可选 | 同步批次元数据（对账、排障） |
+| `api_call_logs` | **监控表** | 钉钉 API 调用日志，按日聚合统计（端点/状态/延迟） |
 
 ---
 
@@ -134,6 +135,30 @@
 | `error_message` | TEXT | 失败记录 |
 
 用于排查「哪次全量列表同步写了多少条」「明细批次是否半路失败」。
+
+---
+
+## 6. 表 `api_call_logs`（API 监控）
+
+### 6.1 用途
+
+记录每次钉钉 API 调用的端点、状态、延迟，支持按日聚合统计。
+
+### 6.2 列
+
+| 列名 | 类型 | 约束 | 说明 |
+|------|------|------|------|
+| `id` | BIGINT | PK, 自增 | |
+| `endpoint` | VARCHAR(255) | NOT NULL, INDEX | API 端点路径 |
+| `source` | VARCHAR(50) | DEFAULT "" | 调用来源（auth / task_detail / task_list / kb_sync / tb_create） |
+| `status` | INT | DEFAULT 0 | HTTP 状态码 |
+| `latency_ms` | INT | DEFAULT 0 | 调用耗时（毫秒） |
+| `error_msg` | VARCHAR(500) | DEFAULT "" | 错误信息 |
+| `created_at` | DATETIME | INDEX | 记录时间（UTC） |
+
+### 6.3 查询接口
+
+`GET /api/bt/monitor/api-stats?day=YYYY-MM-DD`，默认当天 UTC。返回总调用数、错误率、各端点聚合（calls/errors/avg_latency_ms）、最近 50 条记录。
 
 ---
 

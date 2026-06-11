@@ -1,34 +1,64 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 
-const POLL_SEC = 15;
+function todayStr() {
+  const d = new Date();
+  return fmtDate(d);
+}
+
+function yesterdayStr() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return fmtDate(d);
+}
+
+function fmtDate(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+const quickBtnStyle = {
+  padding: '4px 8px',
+  background: '#334155', color: '#e2e8f0',
+  border: '1px solid #475569', borderRadius: 6,
+  fontSize: 11, cursor: 'pointer', whiteSpace: 'nowrap',
+};
 
 export default function ApiMonitorBadge() {
   const [stats, setStats] = useState(null);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState('');
+  const [day, setDay] = useState(todayStr());
 
-  const fetchStats = useCallback(async () => {
+  const fetchStats = async (d) => {
+    setError('');
     try {
-      const resp = await fetch('/api/bt/monitor/api-stats');
+      const url = '/api/bt/monitor/api-stats' + (d ? '?day=' + d : '');
+      const resp = await fetch(url);
       const json = await resp.json();
       if (json.code === 200) {
         setStats(json.data);
-        setError('');
       } else {
         setError(json.error || 'fetch failed');
       }
     } catch (e) {
       setError('unreachable');
     }
-  }, []);
+  };
 
-  useEffect(() => {
-    fetchStats();
-    const t = setInterval(fetchStats, POLL_SEC * 1000);
-    return () => clearInterval(t);
-  }, [fetchStats]);
+  const handleToggle = () => {
+    const willOpen = !open;
+    setOpen(willOpen);
+    if (willOpen) {
+      fetchStats(day);
+    }
+  };
 
-  if (!stats && !error) return null;
+  const handleDayChange = (d) => {
+    setDay(d);
+    fetchStats(d);
+  };
 
   const total = stats?.total_calls || 0;
   const errors = stats?.total_errors || 0;
@@ -46,11 +76,34 @@ export default function ApiMonitorBadge() {
           padding: 14, marginBottom: 0, marginLeft: 0,
           color: '#e2e8f0', fontSize: 12,
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
             <span style={{ fontWeight: 700, fontSize: 14 }}>📡 API Monitor</span>
             <button onClick={() => setOpen(false)}
               style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: 16 }}>
               ✕
+            </button>
+          </div>
+          <div style={{ marginBottom: 8, display: 'flex', gap: 6, alignItems: 'center' }}>
+            <button onClick={() => handleDayChange(yesterdayStr())}
+              style={quickBtnStyle}>
+              ◀ 前一天
+            </button>
+            <input
+              type="date"
+              value={day}
+              onChange={(e) => handleDayChange(e.target.value)}
+              max={todayStr()}
+              style={{
+                flex: 1, padding: '4px 6px',
+                background: '#0f172a', color: '#e2e8f0',
+                border: '1px solid #4ade80', borderRadius: 6,
+                fontSize: 12, cursor: 'pointer',
+                colorScheme: 'dark',
+              }}
+            />
+            <button onClick={() => handleDayChange(todayStr())}
+              style={quickBtnStyle}>
+              今天
             </button>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginBottom: 10 }}>
@@ -114,7 +167,7 @@ export default function ApiMonitorBadge() {
         </div>
       )}
       <button
-        onClick={() => setOpen(!open)}
+        onClick={handleToggle}
         style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           width: 36, height: 36,

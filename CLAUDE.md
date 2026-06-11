@@ -160,6 +160,52 @@ bash scripts/03-deploy.sh        # SSH 部署
 bash run_on_pc_daemon.sh start|stop|restart|status|logs
 ```
 
+---
+
+## SSH 远程连接（服务器 172.19.3.79）
+
+### 连接方式
+
+```bash
+# 方式 1: sshpass (推荐，免交互)
+sshpass -p '1' ssh -o StrictHostKeyChecking=no jz@172.19.3.79
+
+# 方式 2: 手动输入密码
+ssh jz@172.19.3.79
+# 密码: 1
+```
+
+### 服务器基本信息
+
+| 项目 | 值 |
+|------|-----|
+| 主机 | 172.19.3.79 |
+| 用户 | jz |
+| 密码 | 1 |
+| 应用路径 | /home/jz/zhr/tb_tool_bt/ |
+| MySQL | mysql -u root -p123456 tb_management |
+| 服务端口 | 5002 |
+| API 前缀 | http://172.19.3.79:5002/api/bt |
+
+### 常用远程操作
+
+```bash
+# 查看服务状态
+sshpass -p '1' ssh jz@172.19.3.79 "ps aux | grep python"
+
+# 查看实时日志
+sshpass -p '1' ssh jz@172.19.3.79 "tail -f /home/jz/zhr/tb_tool_bt/backend/runtime/tb_tool_bt_daemon.log"
+
+# 查询数据库
+sshpass -p '1' ssh jz@172.19.3.79 "mysql -u root -p123456 tb_management -e 'SELECT COUNT(*) FROM api_call_logs;'"
+
+# 检查 api-stats 状态
+curl -s http://172.19.3.79:5002/api/bt/monitor/api-stats | python3 -m json.tool
+
+# 服务管理
+sshpass -p '1' ssh jz@172.19.3.79 "cd /home/jz/zhr/tb_tool_bt/backend && bash run_on_pc_daemon.sh restart"
+```
+
 ## 数据库
 
 - **MySQL**: 项目任务、工时、用户角色、配置、锁 (`base/db/orm.py`)

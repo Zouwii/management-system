@@ -1,6 +1,6 @@
 # 同步功能临时禁用记录
 
-> 日期: 2026-06-09
+> 日期: 2026-06-09（更新: 2026-06-11）
 > 原因: 钉钉 API 调用量过高，暂时禁用所有同步功能
 > 预期解禁: **2026-06-23**（两周后）
 
@@ -11,7 +11,7 @@
 | # | 功能 | 触发方式 | 禁用效果 |
 |---|------|---------|---------|
 | 1 | 知识库同步（小/大） | daemon 周一/四 04:00 + HTTP 手动 | 直接返回 error，不调用钉钉 |
-| 2 | TB 任务全量同步 | daemon 每天 03:00 | 检测到标记文件即跳过 |
+| 2 | TB 任务全量同步 | daemon 每天 03:00 + `POST /api/bt/full_update` | 检测到标记文件即跳过 |
 | 3 | 个人工时数据刷新 | 前端 "刷新" 按钮 | 返回 503 提示 |
 
 ---
@@ -28,13 +28,28 @@ touch backend/runtime/sync_disabled
 rm backend/runtime/sync_disabled
 ```
 
-3 个检查点，文件存在即拦截：
+**4 个检查点**，文件存在即拦截：
 
-| 检查点 | 文件 | 代码 |
+| 检查点 | 文件 | 说明 |
 |--------|------|------|
-| `sync_all_and_embed()` | `ai/knowledge/auto_sync.py:220` | `if _is_sync_disabled(): return {"ok": False, ...}` |
-| `_auto_full_update_loop` | `base/app.py:160` | `if flag.exists(): print(SKIP); continue` |
-| `personal_hours_update()` | `workhour/personal/routes.py:371` | `if flag.exists(): return 503` |
+| `sync_all_and_embed()` | `ai/knowledge/auto_sync.py` | 知识库大小同步入口 |
+| `full_update_service()` | `base/sync/task_sync.py` | **全量同步核心入口**（API + daemon 都经过此函数） |
+| `_auto_full_update_loop` | `base/app.py` | daemon 定时触发，提前检查避免无效锁操作 |
+| `personal_hours_update()` | `workhour/personal/routes.py` | 个人工时刷新 |
+
+> ⚠️ **2026-06-11 修复**：此前 `full_update_service()` 和 `_auto_full_update_loop` 未检查标记文件，
+> 导致 6/11 凌晨 daemon 在禁用状态下仍触发全量同步（4,092 次 DingTalk API 调用）。现已补全检查。
+
+---
+
+## 三、API 调用监控
+
+监控面板位于页面左下角 📡 按钮，点击展开后：
+- 按日查询钉钉 API 调用量（支持日期选择）
+- 显示总调用数、错误率、各端点分布、平均延迟
+- 数据存储在 `api_call_logs` 表，按日聚合
+
+**API：** `GET /api/bt/monitor/api-stats?day=YYYY-MM-DD`
 
 ---
 
