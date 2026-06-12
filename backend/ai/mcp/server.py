@@ -185,6 +185,15 @@ def register_resources(mcp: FastMCP) -> None:
         """Keyword extraction rules: extract 10-15 technical terms from task list."""
         return _read_skill("1-1_keyword_extract/SKILL.md")
 
+    @mcp.resource("skill://ops/server")
+    def get_skill_server_ops() -> str:
+        """Server operations: SSH connection, log viewing, DB queries, restart.
+
+        Read when user says "connect to server" / "连接服务器" / "查看日志"
+        / "查数据库" / "restart service" / "重启服务".
+        """
+        return _read_skill("0_server_ops/SKILL.md")
+
 
 # ── Prompts ──────────────────────────────────────────────────────────────────
 

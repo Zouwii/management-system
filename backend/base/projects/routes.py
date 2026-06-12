@@ -1,13 +1,13 @@
-"""项目任务：搜索、列表查询、用户任务明细"""
+"""项目任务：列表查询、用户任务明细"""
 
 import time
+from pathlib import Path
 
 from flask import request, session
 
 from base.projects.task_service import (
     query_project_tasks_service,
     query_user_tasks_service,
-    search_project_tasks_service,
 )
 from base.sync.task_detail_extract import extract_task_detail_custom_fields_service
 from base.sync.lock import (
@@ -22,23 +22,15 @@ from base.sync.task_sync import (
 )
 
 
+def _is_sync_disabled() -> bool:
+    flag_path = Path(__file__).resolve().parent.parent.parent / "runtime" / "sync_disabled"
+    return flag_path.exists()
+
+
 def register(bp, ok, fail):
     def _require_login():
         user = session.get("auth_user")
         return user if isinstance(user, dict) else None
-
-    @bp.route("/project/tasks/search", methods=["POST"])
-    def search_project_tasks():
-        try:
-            payload = request.get_json(silent=True) or {}
-            if not (payload.get("userId") or payload.get("userid")):
-                return fail("missing userId", code=400, data={})
-            result = search_project_tasks_service(payload)
-            if result.get("success"):
-                return ok(result)
-            return fail(result.get("error", "search project tasks failed"), code=400, data=result)
-        except Exception as e:
-            return fail(str(e), code=500, data={})
 
     @bp.route("/query_project_tasks", methods=["POST"])
     def query_project_tasks():
@@ -49,6 +41,8 @@ def register(bp, ok, fail):
             if not (payload.get("projectId") or payload.get("projectid")):
                 return fail("missing projectId", code=400, data={})
             if str(payload.get("sync_ab_by_config_time_range") or "").strip().lower() in {"1", "true", "yes", "on"}:
+                if _is_sync_disabled():
+                    return fail("sync is temporarily disabled (offline mode)", code=503, data={})
                 user_id = str(payload.get("userId") or payload.get("userid") or "").strip()
                 owner = "{}@{}".format(user_id or "unknown", int(time.time()))
                 lock = _acquire_update_lock(DEFAULT_UPDATE_LOCK_KEY, owner)
@@ -62,6 +56,8 @@ def register(bp, ok, fail):
                 finally:
                     _release_update_lock(DEFAULT_UPDATE_LOCK_KEY, owner)
             if str(payload.get("sync_ab_by_time_range") or "").strip().lower() in {"1", "true", "yes", "on"}:
+                if _is_sync_disabled():
+                    return fail("sync is temporarily disabled (offline mode)", code=503, data={})
                 out = sync_project_details_in_time_range_service(payload)
                 if out.get("success"):
                     return ok(out.get("data") or {})
@@ -69,12 +65,13 @@ def register(bp, ok, fail):
 
             result = query_project_tasks_service(payload)
             if result.get("success"):
-                sync_out = sync_project_tasks_to_db(payload, query_result=result)
                 meta = dict(result.get("meta") or {})
-                if sync_out.get("success"):
-                    meta["db_sync"] = sync_out.get("data")
-                else:
-                    meta["db_sync_error"] = sync_out.get("error", "db sync failed")
+                if not _is_sync_disabled():
+                    sync_out = sync_project_tasks_to_db(payload, query_result=result)
+                    if sync_out.get("success"):
+                        meta["db_sync"] = sync_out.get("data")
+                    else:
+                        meta["db_sync_error"] = sync_out.get("error", "db sync failed")
                 result["meta"] = meta
                 return ok(result)
             status_code = ((result.get("data") or {}).get("status_code")) or 400

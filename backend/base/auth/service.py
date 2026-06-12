@@ -190,7 +190,7 @@ def _normalize_profile(base: Dict[str, Any], dingtalk_user: Dict[str, Any]) -> D
     profile = {
         "id": str(base.get("id") or (dingtalk_user.get("unionId") or dingtalk_user.get("openId") or dingtalk_user.get("userid") or "")),
         "user_id": str(base.get("user_id") or dingtalk_user.get("userid") or ""),
-        "character": int(base.get("character", 1) or 1),
+        "character": int(base.get("character", 0) if base.get("character") is not None else 1),
         "name": name,
         "team": team,
         "teamId": str(base.get("teamId") or ""),
@@ -249,6 +249,72 @@ def resolve_user_profile(dingtalk_user: Dict[str, Any]) -> Dict[str, Any]:
     }
 
     return {"ok": True, "source": "user_character", "profile": _normalize_profile(base, dingtalk_user)}
+
+
+def authenticate_local_user(user_id: str, password: str) -> Dict[str, Any]:
+    """离线模式：用本地 user_character 表中的 user_id + 固定密码登录。
+
+    密码固定为 123456。登录成功直接返回 profile，不走钉钉 API。
+    用户验证逻辑与 OAuth 登录（resolve_user_profile）完全一致：
+    - character 无额外过滤，所有值均接受
+    - 角色/权限通过 _derive_role_and_access 派生
+    """
+    user_id = str(user_id or "").strip()
+    password = str(password or "").strip()
+
+    if not user_id or not password:
+        return {"ok": False, "error": "missing user_id or password"}
+
+    if password != "123456":
+        return {"ok": False, "error": "invalid password"}
+
+    from base.db.engine import SessionLocal
+    from base.db.orm import UserCharacter as DbUserCharacter
+
+    session = SessionLocal()
+    try:
+        row = session.query(DbUserCharacter).filter(DbUserCharacter.user_id == user_id).first()
+        if not row:
+            return {"ok": False, "error": f"user not found: {user_id}"}
+
+        raw_char = getattr(row, "character", None)
+        if raw_char is None:
+            character = 1
+        else:
+            character = int(raw_char)
+
+        is_nav_lead = bool(getattr(row, "is_nav_lead", False))
+        is_servo_lead = bool(getattr(row, "is_servo_lead", False))
+        derived = _derive_role_and_access(character, is_nav_lead, is_servo_lead)
+        role = str(derived.get("role") or "employee")
+        team_name = _team_name_from_team_id(getattr(row, "team_id", None))
+        team_id = getattr(row, "team_id", "")
+        name = str(getattr(row, "name", "") or row.user_id)
+
+        base: Dict[str, Any] = {
+            "role": role,
+            "permissionCodes": derived.get("permissionCodes"),
+            "homePath": derived.get("homePath"),
+            "dataScope": derived.get("dataScope"),
+            "character": character,
+            "name": name,
+            "team": team_name or "未分组",
+            "teamId": str(team_id) if team_id is not None else "",
+            "id": row.user_id,
+            "user_id": row.user_id,
+        }
+
+        dingtalk_user = {
+            "nick": name,
+            "userid": row.user_id,
+            "unionId": getattr(row, "union_id", "") or "",
+            "openId": "",
+        }
+
+        profile = _normalize_profile(base, dingtalk_user)
+        return {"ok": True, "profile": profile, "source": "local"}
+    finally:
+        session.close()
 
 
 def authenticate_dingtalk_user(auth_code: str, payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:

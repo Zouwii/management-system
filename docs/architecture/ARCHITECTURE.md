@@ -204,6 +204,9 @@ from workhour.team import routes as _team
 
 ### 用户登录
 
+日常使用钉钉 OAuth 登录，钉钉 API 不可用时可通过离线模式登录。
+
+**钉钉 OAuth 登录：**
 ```
 GET  /api/bt/auth/dingtalk/url   → 获取钉钉 OAuth URL，前端跳转
 GET  /api/bt/auth/callback       → 钉钉回调，交换 authCode → 用户信息
@@ -214,7 +217,14 @@ GET  /api/bt/auth/me             → 返回当前 session 中的用户信息
 POST /api/bt/auth/logout         → 清除 session
 ```
 
-认证链路函数：`base/auth/routes.py` → `base/auth/service.py:authenticate_dingtalk_user()` → `resolve_user_profile()`
+**离线模式登录（钉钉 API 不可用时）：**
+```
+GET  /api/bt/auth/local/users    → 获取 user_character 表中可用用户列表
+POST /api/bt/auth/local/login    → user_id + password → authenticate_local_user()
+                                      → 查 user_character 表验证 → 建立 session
+```
+
+认证链路函数：`base/auth/routes.py` → `base/auth/service.py:authenticate_dingtalk_user()` 或 `authenticate_local_user()` → `resolve_user_profile()`
 
 ### 数据同步
 
@@ -226,6 +236,8 @@ POST /api/bt/db/sync/task-detail      → 同步单条 B 表记录
 POST /api/bt/db/sync/task-details-batch → 批量同步 B 表记录
 GET  /api/bt/update_lock_status       → 查询同步锁状态
 ```
+
+所有同步入口在 `runtime/sync_disabled` 标记文件存在时返回 503（离线模式保护），检查点在 `base/sync/routes.py` 和 `base/projects/routes.py` 的 `_is_sync_disabled()` 函数。
 
 full_update 流程：`base/sync/routes.py:full_update()` → 获取分布式锁 → `base/sync/task_sync.py:full_update_service()` → 释放锁
 

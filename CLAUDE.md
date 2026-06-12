@@ -4,7 +4,7 @@
 
 本体开发部数据管理平台。**数据驱动 · AI 驱动 · 研发效能提升**。
 
-Flask 后端 + React (Vite) 前端，支持钉钉 OAuth 登录，集成 AI 任务分析和 Teambition 自动创建。
+Flask 后端 + React (Vite) 前端，支持钉钉 OAuth 登录 + 离线本地登录，集成 AI 任务分析和 Teambition 自动创建。
 
 ## 技术栈
 
@@ -138,11 +138,17 @@ cd frontend-react && npm run dev:real
 
 Vite dev server 通过 proxy 将 `/api/bt` 转发到 Flask `:5001`。
 
-登录流程：
+登录方式：
+1. **钉钉 OAuth**（默认）：重定向到钉钉授权页，回调后写 session
+2. **离线本地登录**：登录页底部点击「离线模式登录」→ 下拉选用户 → 密码 123456 → `POST /api/bt/auth/local/login`
+
+钉钉 OAuth 登录流程：
 1. 前端 `GET /api/bt/auth/dingtalk/url` → 获取钉钉 OAuth 授权地址
 2. 浏览器重定向到钉钉授权
 3. 回调 `GET /api/bt/auth/callback` → Flask 建立 session
 4. `GET /api/bt/auth/me` → 获取当前用户信息/角色
+
+离线模式通过 `backend/runtime/sync_disabled` 标记文件拦截所有钉钉 API 同步，详见 `docs/ops/sync-disabled-record.md`。
 
 环境变量见 `backend/.env.example`：`DINGTALK_APPKEY`, `DINGTALK_APPSECRET`, `SECRET_KEY` 等。
 
@@ -164,53 +170,93 @@ bash run_on_pc_daemon.sh start|stop|restart|status|logs
 
 ## SSH 远程连接（服务器 172.19.3.79）
 
-### 连接方式
-
-```bash
-# 方式 1: sshpass (推荐，免交互)
-sshpass -p '1' ssh -o StrictHostKeyChecking=no jz@172.19.3.79
-
-# 方式 2: 手动输入密码
-ssh jz@172.19.3.79
-# 密码: 1
-```
-
-### 服务器基本信息
-
-| 项目 | 值 |
-|------|-----|
-| 主机 | 172.19.3.79 |
-| 用户 | jz |
-| 密码 | 1 |
-| 应用路径 | /home/jz/zhr/tb_tool_bt/ |
-| MySQL | mysql -u root -p123456 tb_management |
-| 服务端口 | 5002 |
-| API 前缀 | http://172.19.3.79:5002/api/bt |
-
-### 常用远程操作
-
-```bash
-# 查看服务状态
-sshpass -p '1' ssh jz@172.19.3.79 "ps aux | grep python"
-
-# 查看实时日志
-sshpass -p '1' ssh jz@172.19.3.79 "tail -f /home/jz/zhr/tb_tool_bt/backend/runtime/tb_tool_bt_daemon.log"
-
-# 查询数据库
-sshpass -p '1' ssh jz@172.19.3.79 "mysql -u root -p123456 tb_management -e 'SELECT COUNT(*) FROM api_call_logs;'"
-
-# 检查 api-stats 状态
-curl -s http://172.19.3.79:5002/api/bt/monitor/api-stats | python3 -m json.tool
-
-# 服务管理
-sshpass -p '1' ssh jz@172.19.3.79 "cd /home/jz/zhr/tb_tool_bt/backend && bash run_on_pc_daemon.sh restart"
-```
+详见 [backend/ai/skills/0_server_ops/SKILL.md](backend/ai/skills/0_server_ops/SKILL.md)
+和 [docs/ops/server-connection.md](docs/ops/server-connection.md)
 
 ## 数据库
 
 - **MySQL**: 项目任务、工时、用户角色、配置、锁 (`base/db/orm.py`)
 - **pgvector/PostgreSQL**: 语义向量存储（`docker compose -f pgvector-compose.yml up -d`）
 - **SQLite**: `performance/` 季度绩效考核数据
+
+## 钉钉 API 监控
+
+所有钉钉 API 调用已全面监控，数据写入 `api_call_logs` 表，通过 `/api/bt/monitor/api-stats` 查询。
+
+### 当前监控的 16 个接口
+
+**认证** (`base/dingtalk_client.py`，source=auth)
+
+| 接口 | 用途 |
+|------|------|
+| `GET /gettoken` | 获取 access_token |
+| `POST /v1.0/oauth2/userAccessToken` | OAuth 换 token |
+| `GET /v1.0/contact/users/me` | 获取当前用户 |
+| `GET /user/getUseridByUnionid` | UnionID 解析 |
+
+**任务同步** (`base/projects/task_service.py`)
+
+| 接口 | 用途 | source |
+|------|------|--------|
+| `GET .../project/users/{userId}/tasks` | 获取用户任务列表 | task_detail |
+| `GET .../project/users/{userId}/projectIds/{pid}/tasks` | 分页拉取项目任务 | task_list |
+
+**任务创建** (`ai/teambition/service.py`)
+
+| 接口 | 用途 | source |
+|------|------|--------|
+| `POST .../project/users/{userId}/tasks` | MCP 创建任务 | tb_create |
+
+**知识库同步** (`ai/knowledge/service.py`，source=kb_sync)
+
+| 接口 | 方法 |
+|------|------|
+| `GET /v2.0/wiki/workspaces` | list_workspaces |
+| `GET /v2.0/wiki/nodes` | list_nodes |
+| `GET /v2.0/wiki/nodes/{id}` | get_node_detail |
+| `GET /v1.0/doc/suites/documents/{id}/blocks` | get_document_blocks |
+| `GET /v1.0/doc/workbooks/{id}/sheets` | get_workbook_sheets |
+| `GET /v1.0/doc/workbooks/{id}/sheets/{sid}/ranges/{r}` | get_workbook_range |
+| `POST /v2.0/storage/dentries/search` | search_documents |
+| `GET /v1.0/doc/docs` | search_in_workspace |
+
+### 查看监控
+
+```bash
+# HTTP 接口（当天 UTC）
+curl -s http://172.19.3.79:5002/api/bt/monitor/api-stats | python3 -m json.tool
+
+# 指定日期
+curl -s "http://172.19.3.79:5002/api/bt/monitor/api-stats?day=2026-06-11" | python3 -m json.tool
+
+# 直查数据库
+sshpass -p '1' ssh jz@172.19.3.79 "mysql -u root -p123456 tb_management -e \"
+SELECT DATE(created_at) day, endpoint, source, COUNT(*) calls,
+  SUM(CASE WHEN status>=400 THEN 1 ELSE 0 END) errors,
+  ROUND(AVG(latency_ms)) avg_ms
+FROM api_call_logs GROUP BY day, endpoint, source ORDER BY day DESC;\"
+```
+
+### 同步禁用
+
+标记文件 `backend/runtime/sync_disabled` 存在时，以下操作被拦截：
+
+| 检查点 | 位置 | 效果 |
+|--------|------|------|
+| 知识库同步 | `auto_sync.py` `sync_all_and_embed()` | 直接拒绝 |
+| 全量同步 | `task_sync.py` `full_update_service()` | 直接拒绝 |
+| daemon 定时触发 | `base/app.py` `_auto_full_update_loop` | SKIP |
+| 个人工时刷新 | `workhour/personal/routes.py` | 返回 503 |
+
+管理命令：
+```bash
+# 禁用
+touch backend/runtime/sync_disabled
+
+# 恢复
+rm backend/runtime/sync_disabled
+bash run_on_pc_daemon.sh restart
+```
 
 ## 约定
 

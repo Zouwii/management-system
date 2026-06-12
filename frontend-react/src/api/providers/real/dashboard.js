@@ -781,3 +781,21 @@ export function realFetchWorkdays(payload = {}) {
     body: JSON.stringify(payload || {}),
   });
 }
+
+// ── 绩效导入 ──
+
+export function realFetchTeamImportUsers(params = {}) {
+  const qs = new URLSearchParams({
+    year: params.year || '',
+    quarter: params.quarter || '',
+    team: params.team || '',
+  }).toString();
+  return httpRequest(`/bt/perf/team-import-users?${qs}`);
+}
+
+export function realBatchImportScores(payload = {}) {
+  return httpRequest('/bt/perf/batch-import', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}

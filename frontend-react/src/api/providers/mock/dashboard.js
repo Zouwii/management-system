@@ -731,3 +731,18 @@ export function mockFetchWorkdayCosthourTaskDetail() {
 export function mockFetchWorkdays() {
   return delay({ code: 200, data: { workdays: 59 } });
 }
+
+// ── 绩效导入 Mock ──
+
+export function mockFetchTeamImportUsers() {
+  const members = [
+    { userId: 'u1', userName: '张三', isTeamLead: false, workHourScore: null, supervisorScore: null, calcStatus: null },
+    { userId: 'u2', userName: '李四', isTeamLead: false, workHourScore: 1.05, supervisorScore: 1.0, calcStatus: 'filled' },
+    { userId: 'u3', userName: '王五', isTeamLead: true, workHourScore: null, supervisorScore: null, calcStatus: null },
+  ];
+  return Promise.resolve({ code: 200, error: '', data: { members, count: members.length } });
+}
+
+export function mockBatchImportScores() {
+  return Promise.resolve({ code: 200, error: '', data: { ok: 3, fail: 0, errors: [] } });
+}

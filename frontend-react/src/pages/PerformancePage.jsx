@@ -474,6 +474,7 @@ export default function PerformancePage() {
           </div>
         </div>
       </Card>
+
     </EmployeeLayout>
   );
 }

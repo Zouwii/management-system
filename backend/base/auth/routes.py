@@ -1,4 +1,4 @@
-"""钉钉登录：网页 OAuth 回调、免登 get_token、会话 me/logout"""
+"""钉钉登录：网页 OAuth 回调、免登 get_token、会话 me/logout、离线本地登录"""
 
 import os
 from urllib.parse import urlencode
@@ -9,7 +9,7 @@ from base.dingtalk_client import (
     build_dingtalk_oauth_url,
     get_dingtalk_login_client_config,
 )
-from base.auth.service import authenticate_dingtalk_user
+from base.auth.service import authenticate_dingtalk_user, authenticate_local_user
 
 
 def _build_redirect_uri():
@@ -48,6 +48,49 @@ def register(bp, ok, fail):
                     "clientId": login_config.get("clientId", ""),
                 }
             )
+        except Exception as e:
+            return fail(str(e), code=500, data={})
+
+    @bp.route("/auth/local/users", methods=["GET"])
+    def auth_local_users():
+        """离线模式：返回本地 user_character 表中所有用户列表。"""
+        try:
+            from base.db.engine import SessionLocal
+            from base.db.orm import UserCharacter as DbUserCharacter
+
+            session_db = SessionLocal()
+            try:
+                rows = session_db.query(DbUserCharacter).order_by(DbUserCharacter.name).all()
+                users = []
+                for row in rows:
+                    users.append({
+                        "user_id": row.user_id,
+                        "name": row.name or row.user_id,
+                        "character": row.character,
+                        "team_id": row.team_id,
+                    })
+                return ok({"users": users})
+            finally:
+                session_db.close()
+        except Exception as e:
+            return fail(str(e), code=500, data={})
+
+    @bp.route("/auth/local/login", methods=["POST"])
+    def auth_local_login():
+        """离线模式登录：user_id + password（固定 123456），建立 session。"""
+        try:
+            payload = request.get_json(silent=True) or {}
+            user_id = str(payload.get("user_id") or payload.get("userId") or "").strip()
+            password = str(payload.get("password") or "").strip()
+
+            result = authenticate_local_user(user_id, password)
+            if not result.get("ok"):
+                return fail(result.get("error", "login failed"), code=400, data={})
+
+            profile = result.get("profile")
+            session["auth_user"] = profile
+            session.permanent = True
+            return ok(profile)
         except Exception as e:
             return fail(str(e), code=500, data={})
 

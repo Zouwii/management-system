@@ -19,14 +19,13 @@ trap cleanup SIGINT SIGTERM
 
 # 后端
 cd "${BACKEND_DIR}"
-echo "[dev] starting backend (port 5001)..."
+echo "[dev] backend starting..."
 poetry run python3 app.py &
 BACKEND_PID=$!
 
 # 等后端就绪
 for i in $(seq 1 15); do
   if curl -s http://127.0.0.1:5001/api/bt/health >/dev/null 2>&1; then
-    echo "[dev] backend ready."
     break
   fi
   sleep 1
@@ -34,13 +33,17 @@ done
 
 # MCP SSE Server
 cd "${BACKEND_DIR}"
-echo "[dev] starting MCP SSE server (port 5200)..."
 poetry run python3 -m ai.mcp --transport sse --port 5200 --host 127.0.0.1 &
 MCP_PID=$!
 
 # 前端
 cd "${FRONTEND_DIR}"
-echo "[dev] starting frontend (port 5173)..."
+echo ""
+echo "============================================"
+echo "  前端开发服务器已启动"
+echo "  登录地址: http://localhost:5173"
+echo "============================================"
+echo ""
 VITE_API_MODE=real npm run dev
 
 cleanup

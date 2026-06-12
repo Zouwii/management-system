@@ -28,3 +28,20 @@ export function realLogout() {
     skipSessionExpired: true,
   });
 }
+
+// 离线模式：获取本地用户列表
+export function realFetchLocalUsers() {
+  return httpRequest('/bt/auth/local/users', {
+    method: 'GET',
+    skipSessionExpired: true,
+  });
+}
+
+// 离线模式：本地登录
+export function realOfflineLogin(payload) {
+  return httpRequest('/bt/auth/local/login', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    skipSessionExpired: true,
+  });
+}

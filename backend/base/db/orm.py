@@ -342,61 +342,38 @@ class UserCharacter(Base):
 
 
 class _PerfQuarterResultMixin:
-    """nav/servo 两张绩效表共享的列定义。"""
+    """nav/servo 两张绩效表共享的列定义（21列：标识10 + 输入2 + 计算9）。"""
 
-    # 基本定位
+    # =========================
+    # 标识层（10 列）
+    # =========================
     year: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     quarter: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
-    user_name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
-    team_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
-    team_name: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
-
-    # 角色与规则口径
-    role_type: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)  # employee / manager
-    is_team_lead: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_team_lead: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)  # 身份快照
     rule_code: Mapped[str] = mapped_column(String(64), nullable=False, default="default_rule_code")
-
     calc_status: Mapped[str] = mapped_column(String(32), nullable=False, default="filled")
-
-    # 审计时间
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.now)
 
     # =========================
-    # 输入（主管填写/系统取数）
+    # 输入层（2 列）
     # =========================
     work_hour_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     supervisor_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    okr_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    team_avg_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
     # =========================
-    # 总体与区间辅助（用于 finalScore 解释）
+    # 计算层（9 列）
     # =========================
     overall_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    threshold_lower: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    threshold_upper: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    prev_carry_balance: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)   # 上季 new_carry
+    prev_decay_value: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)      # 上季 carry_decay
     compensation_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     overflow_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-
-    # =========================
-    # 跨季度结余衔接（用于下一季度 prev）
-    # =========================
-    prev_carry_balance: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    prev_decay_value: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-    carry_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    final_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     new_carry_balance: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     carry_decay_value: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
-
-    # =========================
-    # 最终输出（finalScore）
-    # =========================
-    final_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     company_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-
-    carry_calc_mode: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
-    calc_trace_json: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
 
 
 class NavPerfQuarterResult(_PerfQuarterResultMixin, Base):

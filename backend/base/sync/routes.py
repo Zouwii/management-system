@@ -10,6 +10,7 @@ Endpoints:
 """
 
 import time
+from pathlib import Path
 
 from flask import request
 
@@ -26,6 +27,12 @@ from base.sync.task_sync import (
     sync_task_detail_to_db,
     sync_task_details_batch_to_db,
 )
+
+
+def _is_sync_disabled() -> bool:
+    """检查 runtime/sync_disabled 标记文件是否存在（离线模式/维护模式）。"""
+    flag_path = Path(__file__).resolve().parent.parent.parent / "runtime" / "sync_disabled"
+    return flag_path.exists()
 
 
 def register(bp, ok, fail):
@@ -50,6 +57,8 @@ def register(bp, ok, fail):
 
         Request body: userId, projectId, startDate, endDate.
         """
+        if _is_sync_disabled():
+            return fail("sync is temporarily disabled (offline mode)", code=503, data={})
         try:
             payload = request.get_json(silent=True) or {}
             out = sync_project_details_in_time_range_service(payload)
@@ -65,6 +74,8 @@ def register(bp, ok, fail):
 
         Request body: userId, projectId. Optional: maxResults, maxPages, workHourFieldId, force_refresh.
         """
+        if _is_sync_disabled():
+            return fail("sync is temporarily disabled (offline mode)", code=503, data={})
         try:
             payload = request.get_json(silent=True) or {}
             user_id = str(payload.get("userId") or payload.get("userid") or "").strip()
@@ -90,6 +101,8 @@ def register(bp, ok, fail):
 
         Request body: userId, projectId.
         """
+        if _is_sync_disabled():
+            return fail("sync is temporarily disabled (offline mode)", code=503, data={})
         try:
             payload = request.get_json(silent=True) or {}
             if not (payload.get("userId") or payload.get("userid")):
@@ -109,6 +122,8 @@ def register(bp, ok, fail):
 
         Request body: userId, taskId.
         """
+        if _is_sync_disabled():
+            return fail("sync is temporarily disabled (offline mode)", code=503, data={})
         try:
             payload = request.get_json(silent=True) or {}
             if not (payload.get("userId") or payload.get("userid")):
@@ -125,6 +140,8 @@ def register(bp, ok, fail):
     @bp.route("/db/sync/task-details-batch", methods=["POST"])
     def db_sync_task_details_batch():
         """Batch sync B table records from an in-memory task list."""
+        if _is_sync_disabled():
+            return fail("sync is temporarily disabled (offline mode)", code=503, data={})
         try:
             payload = request.get_json(silent=True) or {}
             result = sync_task_details_batch_to_db(payload)

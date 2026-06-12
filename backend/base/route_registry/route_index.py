@@ -41,6 +41,22 @@ API_BT_ROUTE_INDEX: List[Dict[str, str]] = [
     {
         "module": "auth",
         "method": "GET",
+        "path": "/api/bt/auth/local/users",
+        "desc": "离线模式：获取本地 user_character 用户列表（用于登录下拉框）",
+        "handler": "base.auth.routes.auth_local_users",
+        "service": "base.auth.service (inline DB query)",
+    },
+    {
+        "module": "auth",
+        "method": "POST",
+        "path": "/api/bt/auth/local/login",
+        "desc": "离线模式本地登录：user_id + password，建立 session 不走钉钉 OAuth",
+        "handler": "base.auth.routes.auth_local_login",
+        "service": "base.auth.service.authenticate_local_user",
+    },
+    {
+        "module": "auth",
+        "method": "GET",
         "path": "/api/bt/auth/callback",
         "desc": "钉钉网页 OAuth 回调：用 authCode 建立 session 并重定向",
         "handler": "base.auth.routes.auth_dingtalk_callback",
@@ -86,14 +102,6 @@ API_BT_ROUTE_INDEX: List[Dict[str, str]] = [
         "desc": "全量更新：update_endtime + 最近一年窗口 + 同步 A + 3 线程同步 B/C",
         "handler": "route_registry.updates.full_update",
         "service": "base.sync.task_sync.full_update_service",
-    },
-    {
-        "module": "projects",
-        "method": "POST",
-        "path": "/api/bt/project/tasks/search",
-        "desc": "项目任务搜索（钉钉 tasks/search，偏搜索/检索）",
-        "handler": "base.projects.routes.search_project_tasks",
-        "service": "base.projects.task_service.search_project_tasks_service",
     },
     {
         "module": "projects",
