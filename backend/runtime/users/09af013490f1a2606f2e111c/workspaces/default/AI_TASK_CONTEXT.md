@@ -1,0 +1,1522 @@
+# 当前用户任务上下文
+
+## 说明
+- 这是一份只读上下文，用于聊天前给 AI 提供任务背景。
+- 这里只借鉴现有数据库中的文字描述和父子任务关系，不会修改任何任务单。
+
+## 基本信息
+- 用户：王睿
+- 用户 ID：010408241117947540
+- 读取时间：2026-06-15T06:34:35+00:00
+- 摘要：已读取 141 条任务：未完成 25 个，已完成 116 个，逾期 1 个。常见任务性质：未标注 96 个、69d4d037c253ef42e9c31b39 31 个、指派型 8 个。
+
+## 指标
+- taskCount: 141
+- completedTaskCount: 116
+- unfinishedTaskCount: 25
+- overdueTaskCount: 1
+- scheduledHours: 170.6
+
+## 最近任务
+- [未完成] 差分车优化速度规划算法
+  - taskId: 6a228200a164935151c54d90
+  - parent: 规控算法迭代二期
+  - dueDate: 2026-06-25T00:00:00
+  - workHour: 2.0
+  - taskNature: 指派型
+  - content: 差分车优化速度规划算法
+  - requirementDesc: 优化差分车速度规划算法，提高节拍性能和运动平滑性，满足项目需求
+  - taskOutputs: 1. 差分车速度规划算法优化（2.0天）
+- [未完成] 差分车提高绕障动作速度曲线平滑性
+  - taskId: 6a2283dc83d1f3eb69e4e40d
+  - parent: 规控算法迭代二期
+  - dueDate: 2026-06-25T00:00:00
+  - workHour: 1.5
+  - taskNature: 指派型
+  - content: 差分车提高绕障动作速度曲线平滑性
+  - requirementDesc: ● 提高绕障动作的稳定性与平滑性，测试可行域范围内的障碍物通过性，前提是不占用更高的硬件代价和车辆绕行流畅性。绕障速度本期可以限制在0.5m/s以下
+● 典型绕障场景详见：https://alidocs.dingtalk.com/i/nodes/ZgpG2NdyVXrGj3vRIGXEp5yN8MwvDqPk?utm_medium=dingdoc_doc_plugin_url&utm_scene=person_space&utm_source=dingdoc_doc（3.1回字形和3.4转弯绕障目前算法不支持，其他可以支持）
+  - taskOutputs: 1. 绕障性能优化，满足项目需求的定性与定量指标（1.0天）; 2. 自测通过（0.5天）
+- [未完成] 人形底盘定制功能适配业务节点
+  - taskId: 6a2239125887553594d76d12
+  - parent: 69549660156f5c03808a5709
+  - dueDate: 2026-06-11T10:00:00
+  - workHour: 1.5
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - content: 人形底盘定制功能适配业务节点
+  - requirementDesc: 前置任务单：https://www.teambition.com/task/69d70f2779998dedd0e75488人形定制功能直接合入主干后，由于导航和伺服的控制算法会绕过运动学库直接修改舵角，导致运动学库解算出来的下发舵角并非最终实际下发舵角，触发状态机异常。需要将该功能修改为单独的工具函数，业务节点在完成全部舵角修改后自行选择何时调用、是否调用。
+  - taskOutputs: 确定超限处理逻辑剥离出运动学主流程方案（0.5天）开发完成（0.5天）更新接口调用文档（0.2天）测试通过（0.3天）
+- [未完成] 全向车贝塞尔曲线导航调优
+  - taskId: 6a22842bcb8ba144e3f9c3bd
+  - parent: 规控算法迭代二期
+  - dueDate: 2026-06-25T00:00:00
+  - workHour: 1.5
+  - taskNature: 指派型
+  - content: 全向车贝塞尔曲线导航调优
+  - requirementDesc: ● 支持全向车贝塞尔曲线运行，包括横移和纵移两种模式，运行朝向为曲线切线方向
+    ○ 导航速度支持纵向max 0.8m/s，横向max 0.5m/s
+    ○ 负载测试倾覆抖动风险
+    ○ 车型测试需要支持全向重载舵轮车
+  - taskOutputs: 1. 全向车贝塞尔曲线导航调优（1.5天）
+- [未完成] 差分车控制器优化
+  - taskId: 6a2283828508b3f26ffae956
+  - parent: 规控算法迭代二期
+  - dueDate: 2026-06-25T00:00:00
+  - workHour: 1.5
+  - taskNature: 指派型
+  - content: 差分车控制器优化
+  - requirementDesc: 差分车控制器更换为lqr，导航精度与现有版本保持一致或更优，减少需要整定的控制器参数
+  - taskOutputs: 1. 控制器更换与适配优化（1.0天）; 2. 减少需要整定的控制参数（0.5天）
+- [未完成] 叉车弯道导航控制调优
+  - taskId: 6a227b1bfac1b3f120da5d46
+  - parent: 规控算法迭代二期
+  - dueDate: 2026-06-25T00:00:00
+  - workHour: 1.5
+  - taskNature: 指派型
+  - content: 叉车弯道导航控制调优
+  - requirementDesc: 优化当前叉车弯道控制算法，提高节拍与稳定性以满足项目需求
+  - taskOutputs: 1. 叉车控制算法优化开发（1.5天）
+- [未完成] 差分车标准场景测试
+  - taskId: 6a22841302d8a13c67815e7f
+  - parent: 规控算法迭代二期
+  - dueDate: 2026-06-25T00:00:00
+  - workHour: 1.0
+  - taskNature: 指派型
+  - content: 差分车标准场景测试
+  - requirementDesc: 差分车标准场景导航测试，满足项目节拍与精度要求
+  - taskOutputs: 1. 差分车标准场景测试（0.5天）; 2. 输出测试结果文档（0.5天）
+- [未完成] 差分车导航过程速度曲线与规划逻辑优化
+  - taskId: 6a2282d266684dbf70b6c386
+  - parent: 规控算法迭代二期
+  - dueDate: 2026-06-25T00:00:00
+  - workHour: 1.5
+  - taskNature: 指派型
+  - content: 差分车导航过程速度曲线与规划逻辑优化
+  - requirementDesc: 优化导航起步时左右扭动与导航加减速时前后卡顿
+  - taskOutputs: 空负载情况起步速度曲线优化（0.5天）速度重规划逻辑优化（1.0天）
+- [未完成] 过渡与平滑算法调研
+  - taskId: 6a224149795d1be7575fe392
+  - parent: 69549660156f5c03808a5709
+  - dueDate: 2026-06-11T10:00:00
+  - workHour: 2.0
+  - taskNature: 69d4d037c253ef42e9c31b3b
+  - content: 过渡与平滑算法调研
+  - requirementDesc: 当前业务逻辑与规控算法中，存在不少需要使用到过渡与平滑的功能，例如转盘旋转控制的末端处理，速度规划的末端处理，曲线与直线拼接等等。之前一直用比较暴力的方式，比如参数跳变切换或者死区等，导致任务可以完成但效率和稳定性不佳，需要调研更加稳定高效、符合工业界主流要求的方法
+  - taskOutputs: 过渡与平滑算法调研（1.5天）文档输出（0.5天）
+- [未完成] 叉车速度规划算法优化
+  - taskId: 6a227af1213ef72cc8da7492
+  - parent: 规控算法迭代二期
+  - dueDate: 2026-06-25T00:00:00
+  - workHour: 1.5
+  - taskNature: 指派型
+  - content: 叉车速度规划算法优化
+  - requirementDesc: 优化当前叉车速度规划算法，提高节拍与稳定性以满足项目需求
+  - taskOutputs: 1. 叉车速度规划算法优化开发（1.5天）
+- [创建中] 【更新中】2603二维码导航问题排查与适配
+  - taskId: 6a223cf9f25fc0913170067f
+  - parent: 69549660156f5c03808a5709
+  - dueDate: 2026-06-11T10:00:00
+  - workHour: 0.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - content: 【更新中】2603二维码导航问题排查与适配
+  - requirementDesc: 2603加入软急停逻辑后，二维码导航过弯速度异常，排查具体原因并适配开发
+- [未完成] PRG全向车适配
+  - taskId: 6a0ffac00d83b8de0d070951
+  - parent: 69549679f1e33c17c6b1ccb3
+  - dueDate: 2026-05-28T10:00:00
+  - workHour: 1.5
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - content: PRG全向车适配
+  - requirementDesc: https://www.teambition.com/task/6a017509652c4b389a341acaprg现场要求禁止斜向移动
+  - taskOutputs: 取消上道（0.1天）状态机适配，不使用预瞄角度作为purepursuit和near进入turnrotate的阈值判断（0.4天）进入旋转控制后，使用与道路实际的误差角度作为目标角度（0.3天）双舵轮Stanley控制算法改成先修横向再...
+- [已完成] 直线导航性能优化
+  - taskId: 6a10032ecbd2ab3b1cb2372a
+  - parent: 华为室外车导航适配26q2
+  - dueDate: 2026-05-28T10:00:00
+  - workHour: 1.5
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 2
+  - content: 直线导航性能优化
+  - requirementDesc: 排查直线导航过程中相关问题，并进行适配开发
+  - taskOutputs: 直线上开过头导致行为异常（0.5天）排查原因华为车禁用上道功能直线上速度规划异常导致车体在减速过程中出现先加速再减速现象（1.0天）速度规划器调参不同减速度下的导航过程测试结论：nav-manager 1.2412.175+hwout...
+- [已完成] 二期需求分解会
+  - taskId: 6a0fd19180dd574e14168e84
+  - parent: 规控算法迭代二期
+  - dueDate: 2026-05-28T10:00:00
+  - workHour: 1.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 1
+  - content: 二期需求分解会
+  - requirementDesc: 整理二期需求，输出文档，开展需求分解会议
+  - taskOutputs: 讨论并且整理需求分解内容（0.3天）根据整理内容汇总并且撰写需求分解文档（0.5天）开展会议（0.2天）结论：需求分解文档：​‬﻿﻿‍‍﻿​⁣⁢‌﻿﻿⁣‌⁢⁢‬⁡‬﻿​‍⁣﻿‍⁢‬‬‌⁡⁣‌⁡‌‍⁣‬⁢‍﻿‌⁢‌‬⁣​‍⁢​‌⁢‍​‍...
+- [已完成] 人形演示功能脚本开发与测试
+  - taskId: 6a0fefa9f08a4ceb542a447b
+  - parent: 浙江人形机器人
+  - dueDate: 2026-05-28T10:00:00
+  - workHour: 0.5
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 2
+  - content: 人形演示功能脚本开发与测试
+  - requirementDesc: 人形底盘演示需要使用脚本循环走包含前进全向运动与边走边转的路径
+  - taskOutputs: 更新之前的测试脚本，根据本次演示要求更改路线和动作，加入最后一次任务回到起点，任务循环功能（0.3天）自测通过，输出视频（0.2天）结论：测试视频：脚本：运行run_all_paths_cy后，按顺序执行各个到点脚本，全部完成后，回到起点
+- [已完成] 规控算法实习生招聘面试2026.5月
+  - taskId: 6a100f5f62bc8c55bd6cdc4d
+  - parent: 6687975a6790071f3b2742cb
+  - dueDate: 2026-05-28T10:00:00
+  - workHour: 0.5
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 1
+  - content: 规控算法实习生招聘面试2026.5月
+  - requirementDesc: 面试张振博、王俊博、徐江鹏
+  - taskOutputs: 面试张振博、王俊博、徐江鹏（0.5天）张振博 一面：1. 规控算法：尚可，接触过pid和mpc2. 编程基础：一般，没怎么用过c++3. 到岗时间：五月准备不足，对公司业务方向完全不了解结论：不通过王俊博 一面：1. 规控算法：接触过...
+- [已完成] 底盘电机相关异常排查
+  - taskId: 6a1001f0103f0e5238dc09ae
+  - parent: 华为室外车导航适配26q2
+  - dueDate: 2026-05-28T10:00:00
+  - workHour: 2.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 2
+  - content: 底盘电机相关异常排查
+  - requirementDesc: 排查华为室外车导航过程中出现的底盘电机相关问题，收集信息汇总并向现场人员反馈
+  - taskOutputs: 排查标定过程中出现的异常问题（1.0天）排查过弯偏离路线问题（0.5天）排查直线上速度过快时的扭动问题（0.5天）结论：标定问题总结文档，已给到现场持续跟踪：​‬﻿⁡​‌⁡‌⁣⁣⁡﻿‌⁡‍‌⁢﻿﻿⁡⁣﻿﻿⁢﻿⁣﻿‌⁡⁢​⁣‍﻿⁡‬‌‬...
+- [未完成] 华为室外车导航适配26q2
+  - taskId: 6a0ffae4ed4b75de38222e70
+  - parent: 69549679f1e33c17c6b1ccb3
+  - dueDate: 2026-05-28T10:00:00
+  - workHour: 0.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - content: 华为室外车导航适配26q2
+- [已完成] 弯道导航性能优化
+  - taskId: 6a10080392e9b694cbc3b7f4
+  - parent: 华为室外车导航适配26q2
+  - dueDate: 2026-05-28T10:00:00
+  - workHour: 3.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 2
+  - content: 弯道导航性能优化
+  - requirementDesc: 华为室外车导航过弯问题排查与适配开发
+  - taskOutputs: 弯道上外切问题排查高速情况下加入vx_proj_max，防止横向调节能力大幅减弱（1.0天）增加后舵轮调节能力，防止出现前舵轮打死后舵轮基本不动导致开出的情况（0.5天）弯道上停车问题排查控制器内部新增最小速度限制在轮速上的功能（0....
+- [未完成] 一期motion-common功能合入三期的pnc
+  - taskId: 6a0ff594b48b18815d3b30ae
+  - parent: 三期
+  - dueDate: 2026-05-28T10:00:00
+  - workHour: 1.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - content: 一期motion-common功能合入三期的pnc
+  - requirementDesc: ce专项一期基于b+版本开发，最终打包也是定制分支，三期需要合入主干，之前的一些功能需要和主干做兼容
+  - taskOutputs: 舵角上下限不对称情况适配开发（0.8天）联系嵌入式在三代车型中加入不对称舵角上下限参数导航适配联系伺服与安全，确认这两个节点是否需要对应修改车型为ce车时，导航收到舵轮直行电机转速完全为0的信号后再下发舵轮角度（0.2天）
+- [未完成] 浙江人形机器人
+  - taskId: 6a0feea77ddfd39dcfdc24d4
+  - parent: 69549679f1e33c17c6b1ccb3
+  - dueDate: 2026-06-25T10:00:00
+  - workHour: 0.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - content: 浙江人形机器人
+- [未完成] 导航过程中禁止斜向和曲线移动
+  - taskId: 6a0ff34108353f05fd302e4f
+  - parent: 三期
+  - dueDate: 2026-05-28T10:00:00
+  - workHour: 0.5
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - content: 导航过程中禁止斜向和曲线移动
+  - requirementDesc: 全向车导航过程中，禁止斜向运动和曲线移动
+  - taskOutputs: bistanley控制器适配开发，横向误差不通过朝向+纵向移动修正，而是通过横向移动修正（0.5天）
+- [已完成] 2603转盘遥控适配开发
+  - taskId: 6a0fd3c70d3faecbdbb07546
+  - parent: 69549660156f5c03808a5709
+  - dueDate: 2026-05-28T10:00:00
+  - workHour: 0.5
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 1
+  - content: 2603转盘遥控适配开发
+  - requirementDesc: 模块节点性能优化项目中，原motion-common库中的转盘线程被删掉，导致遥控无法调用转盘旋转的rosservice，需要把该服务放到nav-net的线程中并删除与遥控无关的冗余功能
+  - taskOutputs: nav-net转盘遥控rosservice开发并测试通过（0.5天）结论：遥控需要调用set_rotate_angle服务，转盘重构后，原转盘库内线程被干掉了，需要在nav-net里重新实现一份，并删掉冗余代码版本：nav-net 1...
+- [已完成] 规控算法实习生招聘面试2026.4月
+  - taskId: 69eeca0d89eaef23339086d0
+  - parent: 6687975a6790071f3b2742cb
+  - dueDate: 2026-04-30T10:00:00
+  - workHour: 0.5
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 1
+  - content: 规控算法实习生招聘面试2026.4月
+  - requirementDesc: 面试关越、朱烜辉、王一清
+  - taskOutputs: 面试关越、朱烜辉、王一清（0.3天）结论：关越 一面：1. 规控算法：良好，pid、lqr和mpc在项目中对比使用过，mpc使用的比较深入，运动学模型方面理论掌握得还可以但轮式模型基本没怎么接触过，机器学习个人简单学习过2. 编程基础...
+- [已完成] 高速小车车体性能测试工具开发
+  - taskId: 69e986206c97f05aaf9e8c85
+  - parent: 69e985959de53b35ce1a8425
+  - dueDate: 2026-04-30T10:00:00
+  - workHour: 0.5
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 0
+  - content: 高速小车车体性能测试工具开发
+  - requirementDesc: 高速小车车体性能测试工具开发
+  - taskOutputs: 高速小车车体性能测试工具开发（0.5天）结论：版本：caliber 2.9.34+flashagv5直接发送udp数据到io，并解析io数据转换为轮速与质心速度 [图片]
+- [未完成] 导航模块约束导航期间舵轮角度
+  - taskId: 69e984f9b527ee04ff33259e
+  - parent: 三期
+  - dueDate: 2026-04-30T10:00:00
+  - workHour: 1.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - content: 导航模块约束导航期间舵轮角度
+  - requirementDesc: ce全向车导航模块约束导航期间舵轮角度
+  - taskOutputs: ce全向车导航模块约束导航期间舵轮角度（1.0天）
+- [未完成] 三期
+  - taskId: 69e9848da9226079f32e345d
+  - parent: 【产品专项】国产化ce
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 0
+  - content: 三期
+- [未完成] 规控算法迭代二期
+  - taskId: 69e98a05a13df96deedcf1a5
+  - parent: 681dc5711af772b6e7497f5a
+  - dueDate: 2026-05-31T10:00:00
+  - workHour: 0.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - content: 规控算法迭代二期
+- [未完成] 导航性能调优
+  - taskId: 69e985eb6fcabb92711f4174
+  - parent: 69e985959de53b35ce1a8425
+  - dueDate: 2026-04-30T10:00:00
+  - workHour: 1.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - content: 导航性能调优
+  - requirementDesc: 高速小车导航性能调优
+  - taskOutputs: 高速小车导航性能调优（1.0天）
+- [未完成] 【产品专项】国产化ce
+  - taskId: 69e984581cb62a8a1312fb90
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - content: 【产品专项】国产化ce
+- [已完成] 二期需求导入会
+  - taskId: 69e9882eb5e41c38a38034da
+  - parent: 规控算法迭代二期
+  - dueDate: 2026-04-30T10:00:00
+  - workHour: 1.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 1
+  - content: 二期需求导入会
+  - requirementDesc: 整理二期需求，输出文档，开展需求导入会议
+  - taskOutputs: 讨论并且整理需求导入内容（0.3天）根据整理内容汇总并且撰写需求导入文档（0.5天）开展会议（0.2天）结论：需求导入文档：​‬﻿⁣﻿‬⁣‌​﻿⁡​⁢‬⁡‌⁡‍⁢⁣‬⁢﻿‬⁢⁢‬‌​‬⁡﻿⁡‍‍‍​‍‍‌​﻿﻿⁡﻿‍‬⁢​﻿‌‬﻿‬‬...
+- [已完成] 步态切换：线路属性步态切换开发
+  - taskId: 69e083466bcf68d822502116
+  - parent: 69b8c0c24039169f885f2228
+  - dueDate: 2026-04-23T10:00:00
+  - workHour: 0.5
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 1
+  - content: 步态切换：线路属性步态切换开发
+  - requirementDesc: 机器狗线路属性步态切换开发
+  - taskOutputs: 机器狗线路属性步态切换开发（0.5天）结论：版本：nav-manager 1.2506.71+unitree23
+- [已完成] 离线地图编辑器：在线建图调测
+  - taskId: 69e0569bfc34209ec35b819e
+  - parent: 69b8c0c24039169f885f2228
+  - dueDate: 2026-04-23T10:00:00
+  - workHour: 1.5
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 1
+  - content: 离线地图编辑器：在线建图调测
+  - requirementDesc: 在线建图调测，排查并解决相关问题
+  - taskOutputs: 排查打开地图和手动定位失败原因（0.5天）联调通过（1.0天）结论：打开地图和手动定位失败原因为此前软件版本未区分地图组名与地图名，导致这两个参数不一致时出现错误，更新map-master 3.2506.5+uni34，nav-net...
+- [已完成] 速度规划算法技术交底书撰写
+  - taskId: 69e04c2a64ab02b22d4a758d
+  - parent: 69549660156f5c03808a5709
+  - dueDate: 2026-04-23T10:00:00
+  - workHour: 2.0
+  - taskNature: 69d4d037c253ef42e9c31b3a
+  - businessType: 1
+  - content: 速度规划算法技术交底书撰写
+  - requirementDesc: 梳理当前速度规划算法的技术创新，与知识产权工程师沟通并撰写交底书初稿
+  - taskOutputs: 梳理当前规划算法的技术创新（0.5天）提供方案初稿，并提供给知识产权工程师（0.5天）根据说明撰写技术交底书（1.0天）结论： [图片]
+- [已完成] 大前移导航适配
+  - taskId: 69d71274aa36bda66716fb68
+  - parent: 69e98246d511376b8cc8367c
+  - dueDate: 2026-04-14T10:00:00
+  - workHour: 1.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 0
+  - content: 大前移导航适配
+  - requirementDesc: 适配大前移叉车导航功能，按需调试规控参数
+  - taskOutputs: 大前移叉车导航正常，且精度满足产品要求（1.0天）结论：大前移叉车导航过程中问题如下：激光外参标定不准，已重新标定每次舵角归零时不一致，供应商已修改当前导航精度已满足要求​‬﻿‍‍⁣⁡﻿⁢⁢‬⁣‌﻿﻿﻿⁡⁡﻿⁡⁣⁡​⁣​‬⁢‬‬⁢⁢‌...
+- [已完成] 多段速度规划算法实车测试（贝塞尔曲线-叉车）
+  - taskId: 69e049167cdef1f3306a4203
+  - parent: 规划算法优化
+  - dueDate: 2026-04-30T10:00:00
+  - workHour: 2.0
+  - taskNature: 69d4d037c253ef42e9c31b3a
+  - businessType: 1
+  - content: 多段速度规划算法实车测试（贝塞尔曲线-叉车）
+  - requirementDesc: 在叉车上实测贝塞尔曲线效果，排查解决相关问题，得到2603的初步导航指标
+  - taskOutputs: 排查优化舵角震荡问题，调参以适配当前速度规划逻辑（1.0天）自测并输出2603初步的导航结果数据（1.0天）过程跟踪精度（横向偏差和角度偏差），速度平滑性，到点控制误差，舵角震荡程度，节拍（描述场景并计算直线和弯道的平均速度）结论：​...
+- [已完成] 离线地图编辑器支持部署：在线模式后台适配
+  - taskId: 69e053b59f39132edee5f205
+  - parent: 69b8c0c24039169f885f2228
+  - dueDate: 2026-04-23T10:00:00
+  - workHour: 0.5
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 1
+  - content: 离线地图编辑器支持部署：在线模式后台适配
+  - requirementDesc: map-master查询地图服务中新增地图名，nav-net适配发布地图名的vtr/path
+  - taskOutputs: map-master查询地图服务中新增地图名（0.2天）nav-net适配发布地图名的vtr/path（0.2天）自测通过（0.1天）结论：版本：map-master 3.2506.5+uni34，nav-net 1.2506.9+u...
+- [已完成] 轨迹控制优化：曲线跟踪控制器优化
+  - taskId: 69e0831d05e1651e4f517c73
+  - parent: 69b8c0c24039169f885f2228
+  - dueDate: 2026-04-23T10:00:00
+  - workHour: 1.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 1
+  - content: 轨迹控制优化：曲线跟踪控制器优化
+  - requirementDesc: 机器狗曲线跟踪控制器优化
+  - taskOutputs: 机器狗(3条机器狗)曲线跟踪控制器优化（1.0天）结论：版本：jz-pnc 1.2506.11+uni7优化内容：宇树狗的曲率限速部分单独处理
+- [已完成] 转盘block支持任务停止
+  - taskId: 69e09900f6bf52adc94bc82d
+  - parent: 69549660156f5c03808a5709
+  - dueDate: 2026-04-23T10:00:00
+  - workHour: 1.0
+  - taskNature: 69d4d037c253ef42e9c31b3a
+  - businessType: 0
+  - content: 转盘block支持任务停止
+  - requirementDesc: 转盘block在设计时未考虑停止字段与响应，需要与前端确定方案并开发自测
+  - taskOutputs: 与前端确定方案与协议（0.5天）开发与联调（0.5天）结论：版本：nav-net 1.2603.25通过订阅/webService/state_machin判断任务是否被中止，研发测试验证通过，可见关联单
+- [已完成] 多段速度规划算法实车测试（贝塞尔曲线-差分车）
+  - taskId: 69e048ed9fa4a4ac5e98944d
+  - parent: 规划算法优化
+  - dueDate: 2026-04-30T10:00:00
+  - workHour: 2.0
+  - taskNature: 69d4d037c253ef42e9c31b3a
+  - businessType: 1
+  - content: 多段速度规划算法实车测试（贝塞尔曲线-差分车）
+  - requirementDesc: 在差分车上实测贝塞尔曲线效果，排查解决相关问题，得到2603的初步导航指标
+  - taskOutputs: 排查并解决当前新规划和控制算法存在的问题（1.0天）自测并输出2603初步的导航结果数据（1.0天）过程跟踪精度（横向偏差和角度偏差），速度平滑性，到点控制误差，节拍（描述场景并计算直线和弯道的平均速度）结论：修复问题：底盘结构参数读...
+- [已完成] nav-net适配重构后的motion-common
+  - taskId: 69e08554f386757c35cc4009
+  - parent: 69549660156f5c03808a5709
+  - dueDate: 2026-04-23T10:00:00
+  - workHour: 0.5
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 0
+  - content: nav-net适配重构后的motion-common
+  - requirementDesc: nav-net依赖的的motion-common为写死的版本而不是gen_my_jz_deps，需要改成依赖gen_my_jz_deps中设置的版本，并适配重构后的motion-common
+  - taskOutputs: nav-net适配重构后的motion-common并自测通过（0.5天）结论：版本：nav-net 1.2603.25此前nav-net依赖的pnc版本写死为0.1.7+t7，改为读取gen_my_jz_deps中的版本。 [图片]
+- [已完成] 机器狗车型参数集成：机型特调控制参数迁移到三代车型
+  - taskId: 69e082ddb65a7debda7631b0
+  - parent: 69b8c0c24039169f885f2228
+  - dueDate: 2026-04-23T10:00:00
+  - workHour: 0.5
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 1
+  - content: 机器狗车型参数集成：机型特调控制参数迁移到三代车型
+  - requirementDesc: 机型特调控制参数迁移到三代车型
+  - taskOutputs: 机型特调控制参数迁移到三代车型（0.5天）结论：版本：nav-manager 1.2506.71+unitree21；jcar3-params 1.2509.10+jzdog1迁移参数：204913:default: 2.0descr...
+- [未完成] 转盘拖尾控制算法优化
+  - taskId: 69e04db288a4054d4be7d97d
+  - parent: 控制算法优化
+  - dueDate: 2026-04-23T10:00:00
+  - workHour: 1.5
+  - taskNature: 69d4d037c253ef42e9c31b3a
+  - content: 转盘拖尾控制算法优化
+  - requirementDesc: 转盘在末端由于误差较小，即使提高积分增益还是有概率出现拖尾，需要进行优化
+  - taskOutputs: 梳理当前拖尾原因、频率和拖尾时间（0.2天）调研并输出拖尾优化算法方案（0.5天）开发并自测通过（0.5天）输出测试文档（0.3天）空载和满载
+- [已完成] 人形底盘功能合入主干
+  - taskId: 69d70f2779998dedd0e75488
+  - parent: 69549660156f5c03808a5709
+  - dueDate: 2026-04-14T10:00:00
+  - workHour: 0.5
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 0
+  - content: 人形底盘功能合入主干
+  - requirementDesc: 梳理人形底盘相关开发内容，将其中的通用部分合入主干
+  - taskOutputs: 人形底盘相关开发内容合入motion-common主干（0.5天）结论：人形底盘改动及需要合入的功能如下：​‬﻿⁢​⁡​﻿﻿‌⁡‍﻿⁣‌﻿⁢​⁣⁡⁣﻿⁢​⁢⁡‍⁢‬​⁡﻿⁡‌‌‍​⁢‬⁣‍﻿‍‌﻿‍‍⁡﻿⁢﻿⁣‬﻿‍‍‬⁢﻿​‍‬⁢‌...
+- [未完成] 控制算法优化
+  - taskId: 69cba83c0f38cde448843ceb
+  - parent: 698d339e9270bf3d5f2b6f31
+  - dueDate: 2026-04-28T10:00:00
+  - workHour: 0.0
+  - content: 控制算法优化
+- [未完成] 规划算法优化
+  - taskId: 69cba8178b6dbcf36847cda1
+  - parent: 698d339e9270bf3d5f2b6f31
+  - dueDate: 2026-04-28T10:00:00
+  - workHour: 0.0
+  - content: 规划算法优化
+- [已完成] 规控算法实习生招聘面试2026Q1
+  - taskId: 69cb659f2c53b32abe0f7042
+  - parent: 6687975a6790071f3b2742cb
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 0.3
+  - businessType: 1
+  - content: 规控算法实习生招聘面试2026Q1
+  - requirementDesc: 规控算法实习生招聘面试
+  - taskOutputs: 赵文哲面试（0.1天）董卓林面试（0.1天）林保航面试（0.1天）结论：赵文哲 一面： 1. 规控算法：没接触过，主要是做大模型仿真2. 编程基础： 一般，没有对简历中提到的源码进行二次开发3. 表达能力： 较差，自我介绍说不下去4....
+- [已完成] lqr控制器优化
+  - taskId: 69cb3c533976111b3d660704
+  - parent: 控制算法优化
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 0.5
+  - businessType: 1
+  - content: lqr控制器优化
+  - requirementDesc: 在实车上测试lqr控制器，针对出现的问题进行适配开发
+  - taskOutputs: lqr偶现到点超调问题，排查原因并解决（0.2天）lqr横向误差略高于原有控制器，排查原因并解决（0.3天）结论：超调原因为lqr控制器为防止在速度极小时A[0][1] = v*dt因此加了一层保护，但实测这层保护非必需，但会在即将到...; ​ [图片] 目前lqr控制器中没有加入积分环节，导致模型略有误差时较小的横向误差无法收敛，需要加入积分环节 [图片]
+- [已完成] emma-safe 2512版本code review
+  - taskId: 69c66bdfe902970006ed3b99
+  - parent: 69c9e6055f76d6c66f99187b
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 1.0
+  - businessType: 1
+  - content: emma-safe 2512版本code review
+  - requirementDesc: 使用ai提示词与cursor对emma-safe进行code review
+  - taskOutputs: 输出review文档（1.0天）结论：版本分支：emma-safe feat/code-reviewreview文档： code-review-AI/review-docs/nav_checker_code_review.md · f...
+- [已完成] 【华为室外车】导航相关问题排查与适配26q1
+  - taskId: 69c671d08cb4c58199675043
+  - parent: 69549679f1e33c17c6b1ccb3
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 1.0
+  - businessType: 2
+  - content: 【华为室外车】导航相关问题排查与适配26q1
+  - requirementDesc: 配合测试人员排查华为室外车导航相关问题
+  - taskOutputs: 排查导航走歪与地图无法打开问题，指导测试人员填写三代车型参数（0.7天）排查速度下发后车体不动问题（0.3天）结论：该车的车型参数沿用了国唐蓬翔室外车，导致结构参数不正确，且图纸上的参数为正式车，当前为测试车，两者参数并不对应，需要手...
+- [已完成] 二期已实现功能的复盘与修正
+  - taskId: 69c656a3c7d259970a85b6b5
+  - parent: 695cd4f5c668ab4332fd9434
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 1.0
+  - businessType: 0
+  - content: 二期已实现功能的复盘与修正
+  - requirementDesc: 手柄驱动接口的设计与实现统一，电机驱动增加启动时复位和底盘初始化功能
+  - taskOutputs: DriverManager移除手柄控制部分，只保留驱动管理与数据分发，原手柄相关功能移动到手柄驱动中。（0.5天）开机时通过udp发送电机复位指令与底盘初始化命令（0.5天）结论：版本：flash-agv 1.2512.2+drive...
+- [已完成] 【博格华纳】电机误差报错功能适配
+  - taskId: 69c66c9c64f4ac6c2f6f794c
+  - parent: 69549679f1e33c17c6b1ccb3
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 0.5
+  - businessType: 2
+  - content: 【博格华纳】电机误差报错功能适配
+  - requirementDesc: 博格华纳现场使用的软件版本没有电机误差超出阈值的报错功能，需要定制开发
+  - taskOutputs: 在speed-manager中新增电机误差超出阈值报错功能，并同步修改kcar3-params（0.5天）结论：需求单：https://www.teambition.com/task/69b1146519d7088c307feb5d软...
+- [已完成] motion-common重构后的模块适配开发与自测
+  - taskId: 69c66d2cbd96e43b9ff5edec
+  - parent: 69549660156f5c03808a5709
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 1.5
+  - businessType: 0
+  - content: motion-common重构后的模块适配开发与自测
+  - requirementDesc: motion-common重构后，依赖该软件包的相关节点需要适配，并在标车上进行自测，导航能够正常运行
+  - taskOutputs: jz-pnc适配（0.5天）nav-manager适配（0.2天）emma-safe适配（0.2天）servo-action适配（0.2天）speed-manager适配（0.2天）自测通过（0.2天）结论： [图片] jz-pnc：...
+- [已完成] 多段速度规划算法实车测试（直线导航）
+  - taskId: 69c662e99539a81becad2677
+  - parent: 规划算法优化
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 0.5
+  - businessType: 1
+  - content: 多段速度规划算法实车测试（直线导航）
+  - requirementDesc: 在标车上测试多段速度规划算法
+  - taskOutputs: 输出测试说明文档，指导潘铮进行实车测试，与旧版本进行对比，对测试完成输出的测试文档进行评估和总结（0.5天）结论：测试说明文档与测试结果见附件文档。直线导航，新版算法节拍较旧版更好，节拍从10s缩短到7s，精度无明显区别轨迹+直线导航...
+- [已完成] 多段速度规划算法实车开发
+  - taskId: 69c659e053159b65d5eae27e
+  - parent: 规划算法优化
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 3.0
+  - businessType: 1
+  - content: 多段速度规划算法实车开发
+  - requirementDesc: 在实车上验证最新的多段速度规划算法，对相关问题进行排查和适配
+  - taskOutputs: 速度规划曲线末端平滑处理（1.0天）最小速度处理（0.5天）速度规划插点策略优化（1.0天）速度重规划策略优化（0.5天）结论：软件版本：jz-pnc 1.2512.1+control7，nav-manager 1.2512.33+t...
+- [已完成] 二期已实现功能冗余线程清理合并
+  - taskId: 69c652f62dbc251549412bc5
+  - parent: 695cd4f5c668ab4332fd9434
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 1.0
+  - businessType: 0
+  - content: 二期已实现功能冗余线程清理合并
+  - requirementDesc: 二期已实现的导航与驱动管理模块冗余线程需要进行清理合并
+  - taskOutputs: 导航规划线程planner_thrd_与任务处理模块线程合并（0.3天）清理驱动管理模块的驱动数据发布线程，通过该线程获得驱动数据的模块改为直接通过驱动本身线程获取数据（0.7天）结论：版本：flash-agv 1.2512.2+dr...
+- [已完成] 26年1季度季度考核表书写【王睿】
+  - taskId: 69c63af62c53b32abea3529e
+  - parent: 69c63af52c53b32abea3524f
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 0.5
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 1
+  - content: 26年1季度季度考核表书写【王睿】
+  - requirementDesc: 完成季度考核表的书写
+  - taskOutputs: 见关联文档
+- [已完成] 导航遥控速度下发速度适配速度仲裁开发与联调
+  - taskId: 69c651ae9a5788b8a545b977
+  - parent: 695cd4f5c668ab4332fd9434
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 1.5
+  - businessType: 0
+  - content: 导航遥控速度下发速度适配速度仲裁开发与联调
+  - requirementDesc: 高速小车三期增加速度仲裁模块，需要导航与遥控下发速度进行适配开发与联调
+  - taskOutputs: 导航与遥控适配速度仲裁（1.0天）联调通过（0.5天）软件版本：flash-agv 1.2512.2-1+drivertest1测试通过视频：
+- [已完成] jz-pnc分段速度曲线生成仿真开发与测试
+  - taskId: 69a8ef8aef3fc6e9fefd5a24
+  - parent: 仿真系统优化
+  - dueDate: 2026-03-10T10:00:00
+  - workHour: 0.5
+  - businessType: 1
+  - content: jz-pnc分段速度曲线生成仿真开发与测试
+  - requirementDesc: 当前速度规划算法支持多段速度规划，适配仿真程序，以支持多段速度算法的可视化仿真
+  - taskOutputs: 仿真程序支持多段速度算法（0.3天）自测通过（0.2天）结论：版本：jz-pnc 1.2512.1+trajsim2可视化仿真 [图片]
+- [已完成] topp曲线开发与速度规划算法优化
+  - taskId: 69a8e929ea8f12d2c5d29742
+  - parent: 规划算法优化
+  - dueDate: 2026-03-10T10:00:00
+  - workHour: 1.5
+  - businessType: 1
+  - content: topp曲线开发与速度规划算法优化
+  - requirementDesc: 在当前的速度曲线规划算法中，加入topp算法；同时优化原SpeedProfilePlannerImpl类，拆分具体算法部分
+  - taskOutputs: topp算法开发与自测（1.0天）优化SpeedProfilePlannerImpl类，拆分业务逻辑、算法部分和工具类（0.5天）结论：版本：jz-pnc 1.2512.1+trajsim2可视化仿真 [图片] 重构说明：jz-pnc...
+- [已完成] 控制算法仿真开发
+  - taskId: 69a8e6e22640c22d1744e497
+  - parent: 仿真系统优化
+  - dueDate: 2026-03-10T10:00:00
+  - workHour: 2.0
+  - businessType: 1
+  - content: 控制算法仿真开发
+  - requirementDesc: 参考速度曲线规划，开发控制算法可视化仿真，并尝试加入gtest仿真
+  - taskOutputs: 可视化仿真开发（0.5天）gtest仿真开发（1.0天）测试通过（0.5天）结论：版本：jz-pnc 1.2512.1+trajsim2可视化仿真 [图片] gtest [图片]
+- [已完成] 转盘测试规划与指导
+  - taskId: 69a8e9fc70a52b9f26847e49
+  - parent: 转盘速度曲线快速验证测试
+  - dueDate: 2026-03-10T10:00:00
+  - workHour: 1.0
+  - businessType: 1
+  - content: 转盘测试规划与指导
+  - requirementDesc: 目前需要测试不同速度规划曲线下转盘不转底盘转的运动效能，以便后续算法开发和优化
+  - taskOutputs: 规划转盘不转底盘转速度曲线规划的测试方案，指导何华进行测试（1.0天）空载测试满载测试跟踪测试结论
+- [已完成] nav-manager速度规划仿真开发与测试
+  - taskId: 69a8efd0e528ce15bdc4216f
+  - parent: 仿真系统优化
+  - dueDate: 2026-03-10T10:00:00
+  - workHour: 1.5
+  - businessType: 1
+  - content: nav-manager速度规划仿真开发与测试
+  - requirementDesc: 开发导航速度规划的可视化仿真，验证当前导航调用速度重规划的逻辑
+  - taskOutputs: 仿真程序开发（1.0天）自测通过（0.5天）结论：版本：nav-manager 1.2512.33+trajsim1可视化仿真： [图片]  [图片]
+- [已完成] 转盘速度曲线快速验证测试
+  - taskId: 69a0faa6a6480cce21c552ef
+  - parent: 控制算法优化
+  - dueDate: 2026-03-03T10:00:00
+  - workHour: 0.0
+  - content: 转盘速度曲线快速验证测试
+- [已完成] 仿真系统优化
+  - taskId: 698d35639c7cab95b514df41
+  - parent: 698d339e9270bf3d5f2b6f31
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 0.0
+  - content: 仿真系统优化
+- [已完成] 仿真平台中加入环境扰动与s曲线验证
+  - taskId: 698d3677cbe6d15667549d11
+  - parent: 仿真系统优化
+  - dueDate: 2026-02-12T10:00:00
+  - workHour: 1.5
+  - businessType: 1
+  - content: 仿真平台中加入环境扰动与s曲线验证
+  - requirementDesc: 当前仿真平台为理想环境，无法测试定位跳动和执行器抖动下的控制效果，需要加入相应模块。并通过对比powerbase和s曲线进行验证
+  - taskOutputs: 仿真平台加入定位跳动和执行器抖动效果（1.0天）验证s曲线和powerbase曲线在上述条件下的仿真效果（0.5天）结论：版本：jz-pnc 1.2512.1+vttest3powerbase曲线在接近终点时有明显速度抖动，但由于拖尾...
+- [已完成] 导航规控问题梳理
+  - taskId: 698d353228c8db1b195d4479
+  - parent: 规划算法优化
+  - dueDate: 2026-02-12T10:00:00
+  - workHour: 1.0
+  - businessType: 1
+  - content: 导航规控问题梳理
+  - requirementDesc: 梳理当前规控算法存在的主要问题，为后续工作提供方向
+  - taskOutputs: 梳理当前从主干和订单中发现的规控算法问题，并简述原因和可能的解决方案，并按照优先级进行排序（1.0天）结论：当前共整理问题10个，其中高优先级2个，中优先级2个，低优先级6个。规划问题4个，控制问题6个https://alidocs....
+- [已完成] 自研叉车控制适配
+  - taskId: 698d3207979ed4c6b298c76c
+  - parent: 69e98246d511376b8cc8367c
+  - dueDate: 2026-02-12T10:00:00
+  - workHour: 1.0
+  - businessType: 0
+  - content: 自研叉车控制适配
+  - requirementDesc: 据项目要求，需要适配导航控制，使得自研叉车导航无问题，满足精度要求
+  - taskOutputs: 优化自研叉车过0.5*0.5弯道时的卡顿问题（0.5天）排查精度不足原因（0.5天）结论：卡顿原因为速度过小线速度过小反复触发boost逻辑，改为存在角速度时也不触发boost，软件版本：nav-manager 1.2506.74精度...
+- [已完成] 转盘保持与跟车合入主干
+  - taskId: 698d306ff068bfb947dccaef
+  - parent: 692e88e854dc2092e75e2903
+  - dueDate: 2026-02-12T10:00:00
+  - workHour: 0.4
+  - businessType: 1
+  - content: 转盘保持与跟车合入主干
+  - requirementDesc: PRG项目定制的转盘保持和跟车功能合入主干
+  - taskOutputs: 转盘保持合入主干（0.2）跟车合入主干（0.2）总结：软件版本：nav-manager 1.2509+nc29
+- [已完成] 人形机器人起步复位功能开发测试
+  - taskId: 698d30de5af9763287347b5c
+  - parent: 人形机器人底盘项目
+  - dueDate: 2026-02-12T10:00:00
+  - workHour: 1.5
+  - businessType: 2
+  - content: 人形机器人起步复位功能开发测试
+  - requirementDesc: 按照客户需求，人形机器人接收到新任务起步时舵角需要先复位
+  - taskOutputs: 在原有状态机中加入reset状态，支持起步复位功能（1.0天）缓停逻辑按照反馈速度而不是下发速度来触发（0.3天）指导何华进行联调测试（0.2天）总结：软件版本：jz-motion-common 1.2412.20+t36
+- [已完成] s曲线实车测试
+  - taskId: 698d35821c34299c92950b5c
+  - parent: 规划算法优化
+  - dueDate: 2026-02-12T10:00:00
+  - workHour: 1.0
+  - businessType: 1
+  - content: s曲线实车测试
+  - requirementDesc: 实车测试s速度曲线（使用7段式基于时间t生成的速度曲线，然后映射到s上）性能，验证速度曲线优化的可行性
+  - taskOutputs: 实车测试s曲线性能（1.0天）结论：软件版本：jz-pnc 1.2512.1+vttest3走直线的速度曲线如下：powerbase曲线 [图片] s曲线 [图片] 可以看到，s曲线由于加减速度比较恒定，电机性能更加稳定，在加减速度时...
+- [已完成] 宇树狗建图定位增补单
+  - taskId: 69720b8c7043e8ed6bcad833
+  - parent: 690972ae1c8ca2ae4678167d
+  - dueDate: 2026-01-22T10:00:00
+  - workHour: 3.0
+  - businessType: 1
+  - content: 宇树狗建图定位增补单
+  - requirementDesc: 宇树狗建图定位开发和联调过程中，存在部分遗漏需求，需要进行增补
+  - taskOutputs: 预期：map-master编译使用本地库，无法使用定位提供的库，依赖方面需要适配（0.5天）建图后向地图db（laser_map_png，layer_info，laser_submap_info）写入地图信息（1.5天）linux下保...
+- [已完成] 宇树狗导航优化
+  - taskId: 6972102b9c12a3dfa5c35bf1
+  - parent: 690972ae1c8ca2ae4678167d
+  - dueDate: 2026-01-22T10:00:00
+  - workHour: 2.0
+  - businessType: 1
+  - content: 宇树狗导航优化
+  - requirementDesc: 一期宇树狗到点和起步时存在冗余动作，需要优化，运动逻辑需要与小车一致，即参考小车的导航过程，不存在多余动作
+  - taskOutputs: 预期：jz-pnc新增足式狗专用控制器(1.0天)go2edu调试(0.5天)go2w调试(0.5天)结论：软件版本：jz-pnc 1.2506.11+uni4，nav-manager 1.2506.71+unitree17新增足式狗...
+- [已完成] 王睿年终述职报告
+  - taskId: 6969d8d40ce996c3c8d3af35
+  - parent: 6969d7ca23f3f51138227a31
+  - dueDate: 2026-01-16T10:00:00
+  - workHour: 1.5
+  - businessType: 1
+  - content: 王睿年终述职报告
+  - requirementDesc: 按照研发体系要求完成年终述职。
+  - taskOutputs: 输出年终述职文档（1天）参加年终述职报告（0.5天）
+- [已完成] 宇树狗建图联调增补-协议对齐
+  - taskId: 6954c9eb3fef641710b6efa5
+  - parent: 690972ae1c8ca2ae4678167d
+  - dueDate: 2025-12-31T10:00:00
+  - workHour: 0.5
+  - businessType: 1
+  - content: 宇树狗建图联调增补-协议对齐
+  - requirementDesc: 宇树狗二期建图相关开发期间，由于前期数据协议不明确，导致定位发送的rostopic前端无法解析，需要额外花费时间排查原因，拉会对齐需求，确定开发方案
+  - taskOutputs: 确定建图数据格式，明确需求与建图数据收发方案（0.5天）结论：此前定位发送的rostopic无法满足当前需求，需要定位节点发送新的符合mappingdata格式的rostopic前端才能正常解析。新方案可见任务单：https://ww...
+- [已完成] 宇树与云深处狗自启动脚本开发
+  - taskId: 6954d77c4d9cf018dd44c64b
+  - parent: 690972ae1c8ca2ae4678167d
+  - dueDate: 2025-12-31T10:00:00
+  - workHour: 0.5
+  - businessType: 1
+  - content: 宇树与云深处狗自启动脚本开发
+  - requirementDesc: 宇树狗与云深处需要通过自启动脚本进行虚拟环境激活与python/bash脚本运行
+  - taskOutputs: 自启动脚本开发（0.5天）结论：版本：nav-manager 1.2506.71+unitree3实现方式：在nav_manager_bashfunction.sh中读取三代车型参数获取狗的型号 [图片] 在run_nav_manag...
+- [已完成] 宇树狗建图联调-建图数据收发
+  - taskId: 6954c95326b3e24ac79fbb11
+  - parent: 690972ae1c8ca2ae4678167d
+  - dueDate: 2025-12-31T10:00:00
+  - workHour: 0.5
+  - businessType: 1
+  - content: 宇树狗建图联调-建图数据收发
+  - requirementDesc: 宇树狗二期建图相关开发，接收定位修改后的mappingdata，使得前端能够正常解析
+  - taskOutputs: 接收定位发送的新rostopic，转发给前端并成功解析（0.5天）结论：软件版本：map-master 3.2506.5+uni32当前为定位直接发送完整建图数据，由map-master通过http发送到前端
+- [已完成] 25年4季度季度考核表书写【王睿】
+  - taskId: 694e71f11f64f263fb99c70c
+  - parent: 694e713f91a3e532d86e6d2c
+  - dueDate: 2025-12-31T10:00:00
+  - workHour: 0.5
+  - businessType: 1
+  - content: 25年4季度季度考核表书写【王睿】
+  - requirementDesc: 完成季度考核表的书写
+  - taskOutputs: 见关联文档
+- [已完成] 人形机器人舵角超限缓停功能开发测试
+  - taskId: 694e3b6fd938eecc08006e44
+  - parent: 人形机器人底盘项目
+  - dueDate: 2025-12-30T10:00:00
+  - workHour: 3.0
+  - businessType: 0
+  - content: 人形机器人舵角超限缓停功能开发测试
+  - requirementDesc: 人形机器人超限后目前逻辑为速度直接降到0，会导致底盘急刹震荡，需要按需求方需求改成缓停后再进行舵角超限调整，最后再正常响应的逻辑。并进行离散随机路径点的压力测试。
+  - taskOutputs: 确定舵角缓停实现方案（0.5天）实现舵角超限缓停功能并自测通过（1.5天）开发压力测试脚本（0.5天）压力测试（0.5天）结论：原有实现未考虑缓停，逻辑较为简单，不适合直接增加缓停功能。将原有的舵角超限逻辑改为状态机实现再加入缓停状态...
+- [已完成] 宇树狗手动定位适配开发
+  - taskId: 694e40803633d9b231aae105
+  - parent: 690972ae1c8ca2ae4678167d
+  - dueDate: 2025-12-30T10:00:00
+  - workHour: 1.5
+  - businessType: 0
+  - content: 宇树狗手动定位适配开发
+  - requirementDesc: 宇树狗适配手动定位功能
+  - taskOutputs: nav-net 2412版本的3D激光手动定位相关优化合入该项目版本（1.0天）nav-net调用定位模块的手动定位接口（0.5天）结论：将下述优化合入2506，并进行冲突处理和适配 [图片] 增加Set /vtr/path para...
+- [已完成] 宇树狗驱动开发指导
+  - taskId: 694e44296559ff61bbcb6fad
+  - parent: 690972ae1c8ca2ae4678167d
+  - dueDate: 2025-12-30T10:00:00
+  - workHour: 1.5
+  - businessType: 0
+  - content: 宇树狗驱动开发指导
+  - requirementDesc: 指导何华进行宇树狗和云深处相关驱动开发，确定驱动开发方案
+  - taskOutputs: 指导何华进行sdk联调与定制功能（合入imu速度估计，rostopic转换与发布）开发（0.5天）指导何华确定驱动开发方案（1.0天）结论：测试文档：​‬﻿‍﻿⁡​⁡‌‬‍⁢​​‍‌‌‌⁣‬﻿⁢​‍⁢‌⁢‬⁣​‌⁣⁡⁢﻿﻿‬⁡﻿‌‌⁢...
+- [已完成] 宇树狗建图适配开发
+  - taskId: 694e3f48be4211181e7f020c
+  - parent: 690972ae1c8ca2ae4678167d
+  - dueDate: 2025-12-30T10:00:00
+  - workHour: 3.0
+  - businessType: 0
+  - content: 宇树狗建图适配开发
+  - requirementDesc: 宇树狗的map-master需要接受http的开始建图、结束建图和保存地图请求，接收定位节点的rostopic并转为websocket发送给前端
+  - taskOutputs: 接收前端http的开始建图、结束建图和保存地图请求（1.0天）建图开始和结束时call定位节点对应rosservice（0.5天）建图过程中接收相关rostopic并转为json（0.5天）建图数据通过websocket发到前端（1....
+- [已完成] 宇树狗手动定位联调
+  - taskId: 694e42cb80a75dfd1ae29b21
+  - parent: 690972ae1c8ca2ae4678167d
+  - dueDate: 2025-12-30T10:00:00
+  - workHour: 1.0
+  - businessType: 1
+  - content: 宇树狗手动定位联调
+  - requirementDesc: 宇树狗手动定位功能联调
+  - taskOutputs: 宇树狗手动定位功能联调通过（1.0天）结论：最新软件版本：nav-net 1.2506.9+uni10手动定位已测试通过，具体见关联单
+- [已完成] 人形机器人舵角超限功能开发测试
+  - taskId: 694e3b112ace3513e5f63382
+  - parent: 人形机器人底盘项目
+  - dueDate: 2025-12-30T10:00:00
+  - workHour: 3.0
+  - businessType: 2
+  - content: 人形机器人舵角超限功能开发测试
+  - requirementDesc: 人形机器人当前舵角超限后出现舵角震荡，需要排查原因并按照需求方需求方案进行适配开发
+  - taskOutputs: 确定舵角超出上限后震荡原因（0.5天）舵角超限等待功能开发（1.5天）适配新的舵角限幅，进行指定路线任务（1.0天）结论：舵角超出上限后震荡原因为当前舵角超限后，继续响应上层任务，导致舵角来回震荡。按照需求方需求，修改成舵角超限后，停...
+- [已完成] 宇树狗建图联调-通讯链路
+  - taskId: 694e403fd938eecc080287da
+  - parent: 690972ae1c8ca2ae4678167d
+  - dueDate: 2025-12-30T10:00:00
+  - workHour: 1.5
+  - businessType: 1
+  - content: 宇树狗建图联调-通讯链路
+  - requirementDesc: 宇树狗建图功能联调
+  - taskOutputs: 通过http接收建图命令（0.5天）调用定位服务开启与关闭建图数据的收发（0.5天）通过websocket向前端发送建图数据（0.5天）结论：map-master已成功接收建图命令并发送建图数据; [图片] ​carly收到建图数据截图：; ​ [图片]
+- [已完成] 宇树狗车型配置与导航版本适配
+  - taskId: 694e437f1fa9b795566501e3
+  - parent: 690972ae1c8ca2ae4678167d
+  - dueDate: 2025-12-30T10:00:00
+  - workHour: 1.5
+  - businessType: 1
+  - content: 宇树狗车型配置与导航版本适配
+  - requirementDesc: 宇树狗三代车型配置文档输出与nav-manager适配
+  - taskOutputs: 输出三代车型配置说明文档（0.3天）2506版本nav-manager根据车型合入一期宇树狗相关修改（1.2天）结论：车型配置文档：​‬﻿‬‬‬‍⁢﻿‬⁡​⁣‌‌​⁡⁣⁡⁡⁣‬‍⁢⁣⁣﻿⁢​​‍‬⁢‌​‌‍​⁣‌﻿⁣​⁢⁢​⁡‍‌⁢‬...
+- [已完成] 适配基线修改后的转盘反馈频率
+  - taskId: 6931028e396411370465602f
+  - parent: 677f4bc8fcff03e29681c511
+  - dueDate: 2025-12-09T10:00:00
+  - workHour: 1.0
+  - businessType: 1
+  - content: 适配基线修改后的转盘反馈频率
+  - requirementDesc: 基线为优化cpu，将静息时的转盘反馈频率由50hz改为1hz，导致伺服转盘任务出现异常，需要进行适配开发
+  - taskOutputs: 伺服转盘任务正常，自测通过并合入主干（1.0天）结论：最终版本：“emma-safe 1.2509.7jz-motion-common 1.2509.6iosys 2.2509.7”目前修改为：伺服转盘任务在初始化转盘后，需要等待至多...
+- [已完成] 人形机器人底盘项目
+  - taskId: 69312bbcc70d9a7d4fd03dff
+  - parent: 677f4bd01eb5e811f19c76e2
+  - dueDate: 2025-12-30T10:00:00
+  - workHour: 0.0
+  - content: 人形机器人底盘项目
+  - requirementDesc: [{'title': ''}]
+  - taskOutputs: [{'title': ''}]
+- [已完成] 试用期答辩指导
+  - taskId: 693103f423d3ddeda5e45ccb
+  - parent: 算法实习生 -- 李建威
+  - dueDate: 2025-12-09T10:00:00
+  - workHour: 0.5
+  - businessType: 1
+  - content: 试用期答辩指导
+  - requirementDesc: 李建威申请提前答辩，进行答辩报告的指导工作
+  - taskOutputs: 指导文档输出，完成答辩报告输出（0.5天）总结报告：​‬﻿‌​﻿⁡‌⁡⁡﻿‬⁡⁣​‌‌﻿​‬﻿‬⁢⁢⁣​⁡​⁢‬‍⁢⁢‬⁡‌‍⁢⁣‍‍​‌‍‌‌﻿﻿​⁣‍⁢‍﻿‍‬⁢‌⁢⁡‌⁢​‍‬⁢⁡‍‌⁡工作总结报告 · 钉钉文档
+- [已完成] 宇树狗底层接口文档整理与工作规划
+  - taskId: 691ae65fc177eb1023df987e
+  - parent: 690972ae1c8ca2ae4678167d
+  - dueDate: 2025-11-20T10:00:00
+  - workHour: 0.7
+  - businessType: 1
+  - content: 宇树狗底层接口文档整理与工作规划
+  - requirementDesc: 整理当前宇树狗可能使用到的sdk接口，输出文档，并规划本体开发部嵌入式新人的相关工作
+  - taskOutputs: 输出接口整理文档（0.5天）规划新人工作并创建tb任务单（0.2天）结论：接口文档：​‬﻿⁡​‌⁡‌⁣⁣⁡﻿‌⁡‍‌⁢﻿﻿⁡⁣﻿﻿⁢﻿⁣﻿‌⁡⁢​⁣‍﻿⁡‬‌⁣‌⁣‌‬⁢​‍⁢﻿‍⁢‍‌⁡⁣⁢⁡﻿⁡‬‬⁢‬‍⁢⁣​‌﻿‍‌⁡宇树狗底盘...
+- [已完成] 算法实习生 -- 李建威
+  - taskId: 691ae7ec6a32ca114509f1a8
+  - parent: 690d93fb9133d5ef8ae07892
+  - dueDate: 2025-11-28T10:00:00
+  - workHour: 0.0
+  - content: 算法实习生 -- 李建威
+- [已完成] 执行器跟踪工作指导
+  - taskId: 691ae5ee041499d481ae943c
+  - parent: 算法实习生 -- 李建威
+  - dueDate: 2025-11-20T10:00:00
+  - workHour: 1.0
+  - businessType: 1
+  - content: 执行器跟踪工作指导
+  - requirementDesc: 指导算法实习生进行执行器跟踪工作，输出文档
+  - taskOutputs: 指导实习生使用并优化驱动器测试工具，进行底盘性能测试（0.5天）修改实习生输出的测试结果文档（0.5天）结论：测试结果文档：​‬﻿⁡‌⁣﻿⁡​‬‍⁣‍⁢​​⁣⁢⁢‬﻿‌⁣⁣﻿﻿⁡‌﻿‬⁡⁣‌​⁣‍⁣⁢⁡﻿​⁢​⁣⁡‌⁣﻿﻿‌⁢⁡⁣⁣⁡...
+- [已完成] 遥控增补开发：手柄遥控业务与驱动分离
+  - taskId: 691ae8a84fc98716f2278db2
+  - parent: 68902959835d3061b66c303a
+  - dueDate: 2025-11-20T10:00:00
+  - workHour: 1.0
+  - businessType: 0
+  - content: 遥控增补开发：手柄遥控业务与驱动分离
+  - requirementDesc: 根据新的增补意见，遥控的业务与驱动需要分离
+  - taskOutputs: 遥控的业务与驱动分离开发（0.5天）文档更新（0.3天）自测通过（0.2天）结论：接口文档更新：​‬﻿⁣﻿‬⁣‌​﻿⁡​⁢‬⁡‌⁡‍⁢⁣‬⁢﻿‬⁢⁢‬‌​‬⁡﻿⁡‍‍‍​‌‌‌⁡‍‍‌⁢﻿⁡⁢⁡‌﻿‬﻿‬‬‬⁢﻿⁢​⁡⁢﻿﻿﻿⁢​‍‌...
+- [已完成] 杭叉3.5T车导航适配
+  - taskId: 6914603f420b05f2ef17d7a9
+  - parent: 677f4bd01eb5e811f19c76e2
+  - dueDate: 2025-11-18T10:00:00
+  - workHour: 0.5
+  - businessType: 2
+  - content: 杭叉3.5T车导航适配
+  - requirementDesc: 导航适配杭叉3.5t车，能正常执行任务，满足精度要求
+  - taskOutputs: 导航配置参数适配（0.3天）将修复内容合入主干（2412之后的主干）调整控制参数以满足到点精度要求（0.2天）结论：四舵轮配置文件nav_config_tetrasteer.json中新增字段 [图片] 精度阈值增加下述字段; ​ [图片]
+- [已完成] 执行器跟踪与速度曲线优化工作规划
+  - taskId: 691ae5207002d3740e74eccb
+  - parent: 算法实习生 -- 李建威
+  - dueDate: 2025-11-20T10:00:00
+  - workHour: 0.5
+  - businessType: 1
+  - content: 执行器跟踪与速度曲线优化工作规划
+  - requirementDesc: 输出执行器跟踪与速度曲线优化工作规划文案，确定算法实习生每周工作事项
+  - taskOutputs: 工作规划与文档输出（0.5天）结论：​‬﻿⁣﻿‬⁣‌​﻿⁡​⁢‬⁡‌⁡‍⁢⁣‬⁢﻿‬⁢⁢‬‌​‬⁡﻿⁡‍‍‍​‍‬⁡​﻿​‍‌⁣‌⁣‌‌⁢‬﻿‬‬‬⁢﻿⁢​⁡⁢﻿﻿﻿⁢​‍‌⁡实习生工作规划 · 钉钉文档
+- [已完成] 人形机器人定制开发
+  - taskId: 691460a9f8aad7cfaf4f5d90
+  - parent: 人形机器人底盘项目
+  - dueDate: 2025-11-18T10:00:00
+  - workHour: 2.5
+  - businessType: 2
+  - content: 人形机器人定制开发
+  - requirementDesc: 导航适配人形机器人，满足订单需求
+  - taskOutputs: 适配舵角计算逻辑（0.5天）舵角超限信息上报（0.5天）输出人形底盘测试脚本（先变舵角-再直线运动脚本，圆形运动脚本，数据接收脚本，绘图脚本）（0.5天）测试舵角硬件修改后的结果（1.0天）结论：目前采取在阈值附近采取滞后逻辑（宽进严...
+- [已完成] 乐美4T叉车导航适配
+  - taskId: 69145fa8eae47de53fd7b14a
+  - parent: 677f4bd01eb5e811f19c76e2
+  - dueDate: 2025-11-18T10:00:00
+  - workHour: 1.2
+  - businessType: 2
+  - content: 乐美4T叉车导航适配
+  - requirementDesc: 导航适配乐美4t叉车，能正常执行任务，满足订单精度要求https://www.teambition.com/task/689aa1957525e7908cf6ba14
+  - taskOutputs: 排查并适配直线上开出点位问题（0.2天）适配速度曲线参数（0.3天）适配boost逻辑与参数（0.5天）控制参数整定以满足精度要求（0.2天）结论：开出点位原因为三代车型填写异常，与电机性能不符速度曲线参数修改包：jz-pnc 0.2...; ​ [图片] 修改后 [图片] 4.去除near的boost逻辑后到点精度满足要求 [图片]
+- [已完成] jz-pnc模块说明书
+  - taskId: 690d67f06f33f5db944aec3e
+  - parent: 690d655a16f6b91df1b9252c
+  - dueDate: 2025-11-27T10:00:00
+  - workHour: 2.0
+  - businessType: 1
+  - content: jz-pnc模块说明书
+  - requirementDesc: 输出jz-pnc的模块说明书
+  - taskOutputs: 在主干版本新增模块说明书，提供对应分支名（2.0天）分支名：feat/doc-optim
+- [已完成] motion-common模块说明书与doxygen配置
+  - taskId: 690d67e0a11dc5b89eead6b9
+  - parent: 69c9e41a05deebed5e1f8ed5
+  - dueDate: 2025-11-27T10:00:00
+  - workHour: 0.7
+  - businessType: 1
+  - content: motion-common模块说明书与doxygen配置
+  - requirementDesc: 输出jz-motion-common的模块说明书，并配置doxygen
+  - taskOutputs: 在主干版本新增模块说明书，提供对应分支名（0.2天）在主干版本配置doxygen（0.5天）结论：软件版本：分支RC/1.2603.xdoxygen：JZ-Motion-Common: motion-common 模块说明
+- [已完成] speed-manager模块说明书
+  - taskId: 690d67a5027ac41d5c2c73c3
+  - parent: 690d655a16f6b91df1b9252c
+  - dueDate: 2025-11-27T10:00:00
+  - workHour: 1.5
+  - businessType: 1
+  - content: speed-manager模块说明书
+  - requirementDesc: 输出speed-manager的模块说明书
+  - taskOutputs: 在主干版本新增模块说明书，提供对应分支名（1.5天）分支名：RC/1.2512.x
+- [已完成] 导航接收处理任务引擎信息开发与测试
+  - taskId: 6901e63ec4f20cf20776b1d3
+  - parent: 68902959835d3061b66c303a
+  - dueDate: 2025-11-04T10:00:00
+  - workHour: 3.0
+  - businessType: 0
+  - content: 导航接收处理任务引擎信息开发与测试
+  - requirementDesc: 高速小车需要能够接收内部接口发布的导航任务，并按预期进行导航
+  - taskOutputs: 与上层统一协议，接收内部接口发布的任务（0.2天）在高速小车的nav_base内部进行任务执行、反馈、取消和结果返回（0.5天）删除上一期残留的冗余代码（0.3天）联调通过（2.0天）结论：当前测试通过版本：1.2506.21测试文档...
+- [已完成] 宇树狗导航适配
+  - taskId: 68faf5cc1a5c17962d1d25c6
+  - parent: 机器狗接入迦智一期
+  - dueDate: 2025-10-30T10:00:00
+  - workHour: 2.5
+  - businessType: 1
+  - content: 宇树狗导航适配
+  - requirementDesc: 导航节点适配宇树狗，可以正常进行导航任务
+  - taskOutputs: 工控机环境适配与文档更新（0.5天）脚本支持发送emma_odom与emma_odom_vel（0.5天）导航状态机适配（0.5天）旋转控制器适配（0.5天）到点阈值、控制精度适配（0.5天）结论：文档：​‬﻿‬⁣⁢﻿⁡​⁢​‌⁣​‌...
+- [已完成] 国产ce双舵轮车导航适配
+  - taskId: 68faf2ff9f6f9b75516d267d
+  - parent: 677f4bc8fcff03e29681c511
+  - dueDate: 2025-10-30T10:00:00
+  - workHour: 2.0
+  - businessType: 0
+  - content: 国产ce双舵轮车导航适配
+  - requirementDesc: 国产ce双舵轮新增-17°-100°的舵角硬限位，运行过程中±5°限位，舵轮电机转速为0时才能旋转舵角等逻辑，需要导航适配
+  - taskOutputs: 运动学库适配-17°-100°的不对称限位舵轮角度的运动学解算(0.5天)导航适配前进，横移，旋转角度各有±5°的舵轮角度限位(1.0天)导航收到舵轮直行电机转速完全为0的信号后再下发舵轮角度 (0.5天)结论运动学库计算舵角时，当旋...
+- [已完成] 宇树狗导航联调
+  - taskId: 68faf951adf917351a38bed5
+  - parent: 机器狗接入迦智一期
+  - dueDate: 2025-10-30T10:00:00
+  - workHour: 1.0
+  - businessType: 1
+  - content: 宇树狗导航联调
+  - requirementDesc: 宇树狗导航联调，能够循环进行L型路线导航
+  - taskOutputs: 宇树狗循环任务联调通过，输出测试视频（1.0天）
+- [搁置] 速度曲线优化预研
+  - taskId: 68f09efdfc148a0f01168111
+  - parent: 规划算法优化
+  - dueDate: 2025-12-31T10:00:00
+  - workHour: 0.0
+  - content: 速度曲线优化预研
+  - requirementDesc: 本系统旨在对差速小车进行高精度、快速响应的速度控制测试，通过设计多种速度曲线实现车辆在不同运动节奏下的高效运行。测试重点在于节拍快、到点准、过程稳，即在较短的加减速时间内，确保车辆能够准确到达目标位置，同时运动过程平滑稳定，无明显震荡或滞后。
+- [已完成] 国唐速度曲线参数适配
+  - taskId: 68f1bd29b5aa1cef0bddc4d2
+  - parent: 677f4bd01eb5e811f19c76e2
+  - dueDate: 2025-10-23T10:00:00
+  - workHour: 0.5
+  - businessType: 2
+  - content: 国唐速度曲线参数适配
+  - requirementDesc: 国唐室外车电机超调过大，减速响应慢，容易出现到点开过并报错超过可行域的问题，需要适配速度曲线
+  - taskOutputs: 速度曲线适配，导航不出现超过可行域报错（0.5天）当前采用的优化后策略为减小减速度减速曲线采取一开始减速度大，使电机响应，而后减速度缓慢下降（此前的策略是减速度在减速过程中间最大，修改后即减速度曲线的极值点整体左移）问题单：https...
+- [已完成] 二维码七期曲线转弯说明
+  - taskId: 68f1f9ec4a46580d036ae660
+  - parent: 68a2e26c1b2775974a8e6fdd
+  - dueDate: 2025-10-23T10:00:00
+  - workHour: 0.5
+  - businessType: 0
+  - content: 二维码七期曲线转弯说明
+  - requirementDesc: 二维码七期导航转弯结果需要输出结论文档，附上相关指标情况
+  - taskOutputs: 测试数据整理（0.1天）曲线脚本开发（0.2天）文档输出（0.2天）结论：角速度误差在匀速时满足要求。其余各项指标均满足要求。​‬﻿⁢‌⁡‌​⁢‌​⁢​‬‍​⁣⁢﻿⁡⁣⁢⁣⁡﻿‌​​⁡⁢﻿‌‌⁣‍﻿‬﻿‍⁣‌‌​‬⁢⁢​⁢⁡​⁣⁢‍﻿...
+- [已完成] 国唐室外车新驻车功能开发测试
+  - taskId: 68f1bd036ec49a22bc6179fa
+  - parent: 677f4bd01eb5e811f19c76e2
+  - dueDate: 2025-10-23T10:00:00
+  - workHour: 1.0
+  - businessType: 2
+  - content: 国唐室外车新驻车功能开发测试
+  - requirementDesc: 蓬翔室外车根据【室外车蓬翔】2025导航控制策略进行驻车行为适配
+  - taskOutputs: 导航到点过程中检测到安全模块已经进入驻车状态了，才退出当前导航任务，退出后不再下发刹车和0速指令（0.5天）联调通过（0.5天）结论测试通过，版本：nav-manager 1.2412+guotang18需求单：https://www...
+- [已完成] henkel现场导航转盘与turnrotate功能定制
+  - taskId: 68f19fdb7bb7a393d340620b
+  - parent: 677f4bd01eb5e811f19c76e2
+  - dueDate: 2025-10-23T10:00:00
+  - workHour: 1.5
+  - businessType: 2
+  - content: henkel现场导航转盘与turnrotate功能定制
+  - requirementDesc: henkel现场转盘相对地面转动容易导致碰撞，需要重新开发该部分逻辑
+  - taskOutputs: 梳理turnrotate逻辑，根据实际碰撞可能进行删改（0.5天）转盘任务被中止时需要相对地面不动（0.5天）联调通过（0.5天）结论梳理后的turnrotate逻辑：​‬﻿‍⁢​⁡‬⁣‬‍⁣‍⁢​⁢﻿⁣﻿‬﻿‌⁡‍‬​⁡⁣‌⁡‌﻿﻿...
+- [已完成] 25年3季度季度考核表书写【王睿】
+  - taskId: 68d931b056fbb0eeac458fee
+  - parent: 68d931b056fbb0eeac458fad
+  - dueDate: 2025-09-30T10:00:00
+  - workHour: 0.5
+  - businessType: 1
+  - content: 25年3季度季度考核表书写【王睿】
+  - requirementDesc: 完成季度考核表的书写
+  - taskOutputs: 见关联文档
+- [已完成] 国唐室外车溜坡与到点精度异常适配
+  - taskId: 68d91ed00c67045390bf32ee
+  - parent: 677f4bd01eb5e811f19c76e2
+  - dueDate: 2025-09-29T10:00:00
+  - workHour: 1.0
+  - businessType: 2
+  - content: 国唐室外车溜坡与到点精度异常适配
+  - requirementDesc: 国唐室外车起步和到点存在溜坡，以及轨迹上到点精度异常，需要导航排查适配
+  - taskOutputs: 排查并适配起步和到点溜坡（0.5天）排查并适配轨迹上到点精度异常（0.3天）排查适配上道异常问题（0.2天）结论：溜坡原因为brake协议不一致，导致刹车未正常执行；同时由于安全在起步时限速，导致起步油门的动作未能执行。同步协议且去除...
+- [已完成] 国唐室外车贝塞尔曲线导航排查适配
+  - taskId: 68d254b8e0ef57d5b7af8d5d
+  - parent: 677f4bd01eb5e811f19c76e2
+  - dueDate: 2025-09-25T10:00:00
+  - workHour: 1.0
+  - businessType: 0
+  - content: 国唐室外车贝塞尔曲线导航排查适配
+  - requirementDesc: 国唐室外车由于自身舵角限幅与定位环境等问题，在过弯时频繁出现外切问题，需要导航适配
+  - taskOutputs: 排查轨迹外切原因并适配（1.0天）结论：轨迹外切原因为车体自身转向能力不足，最小转弯半径在6m左右车体在偏移轨迹横向距离5cm以上时，会触发限速，该阈值适用于非室外车上，在室外车上，由于本身转向能力不足，车体较大，定位跳动等原因，容易...
+- [已完成] 机器狗接入迦智一期
+  - taskId: 68ca4b9fd1b11573be553652
+  - parent: 6909726f482487f2daccd6e8
+  - dueDate: 2025-10-31T10:00:00
+  - workHour: 0.0
+  - content: 机器狗接入迦智一期
+- [已完成] 600k&1500k&400k直行效果优化
+  - taskId: 68ca4d915eb5e4cca85a37ef
+  - parent: 677f4bc8fcff03e29681c511
+  - dueDate: 2025-09-25T10:00:00
+  - workHour: 2.2
+  - businessType: 1
+  - content: 600k&1500k&400k直行效果优化
+  - requirementDesc: 新的控制器和曲线生成器在600k，1500k和400k上出现到点卡顿，加速度超出设定值，以及节拍变长的问题，需要优化
+  - taskOutputs: 根据现有代码，输出曲线绘制脚本，排查问题出现原因（0.5天）各车型卡顿与节拍优化采用加速度适配后的减速曲线（0.1天）调整控制逻辑与控制器参数（0.3天）优化速度规划点搜索方式，点位的idx改为单调搜索，即idx不可回退（0.1）40...
+- [已完成] 宇树狗sdk编译调试
+  - taskId: 68ca2ee3bca83f95a76f0fd0
+  - parent: 机器狗接入迦智一期
+  - dueDate: 2025-09-25T10:00:00
+  - workHour: 3.0
+  - businessType: 0
+  - content: 宇树狗sdk编译调试
+  - requirementDesc: 使用python脚本完成接口调用自测，支持宇树狗移动
+  - taskOutputs: sdk编译通过（1.0天）使用python脚本完成接口调用（1.0天）自测（1.0天）结论：172.19.10.71工控机测试通过测试流程：修改工控机网口ip：192.168.123.222source ~/unitree_env/b...
+- [已完成] 驱动的运行时状态管理设计与实现
+  - taskId: 68ca18fbf9cbfefdb838a1bf
+  - parent: 68902959835d3061b66c303a
+  - dueDate: 2025-09-25T10:00:00
+  - workHour: 3.0
+  - businessType: 0
+  - content: 驱动的运行时状态管理设计与实现
+  - requirementDesc: io板，电机，odom驱动运行时需要报出错误码；需要统一驱动启动、配置传入和重试机制
+  - taskOutputs: 设计运行时状态的返回，便于排查错误(1.0天)机型中增加各驱动模块的机型配置（io板，电机，odom、imu、相机）指导完成功能开发（0.5天）程序启动时，统一启动各驱动（1.0天）启动失败时，具备一定的重试机制（0.5天）结论：当前...
+- [已完成] 国唐室外车导航适配
+  - taskId: 68ca30b1b4fdc80e40843cb8
+  - parent: 677f4bd01eb5e811f19c76e2
+  - dueDate: 2025-09-25T10:00:00
+  - workHour: 1.5
+  - businessType: 2
+  - content: 国唐室外车导航适配
+  - requirementDesc: 国唐室外车能够正常导航，精度满足要求
+  - taskOutputs: 排查导航速度无法下发问题（0.2天）排查搜路失败问题（0.1天）适配室外车导航配置参数（0.2天）调参以满足精度要求（1.0天）结论：速度无法下发原因为三代车型参数不全，需要进行延迟标定搜路失败原因为搜路库更新地图时间过长，调度搜路库...
+- [已完成] 里程计文件中记录总里程记录开始时间
+  - taskId: 68ca4f066a2b74e3b64039ce
+  - parent: 677f4bc8fcff03e29681c511
+  - dueDate: 2025-09-25T10:00:00
+  - workHour: 0.3
+  - businessType: 0
+  - content: 里程计文件中记录总里程记录开始时间
+  - requirementDesc: 产品在车端交互增强项目中提出新需求：总运行时间和总运行里程当前只记录累计数据，需要在后台可查从什么时间开始累计的，考虑记录文件创建时间https://www.teambition.com/task/68c778c2ed2a3c8430b6a3bc
+  - taskOutputs: 里程文件中增加记录开始时间并自测通过（0.3天）版本：speed-manager 1.2506.9 [图片]
+- [已完成] 转盘-底盘协同控制曲线优化
+  - taskId: 68ca25da2eb922884820fed7
+  - parent: 677f4bc8fcff03e29681c511
+  - dueDate: 2025-09-25T10:00:00
+  - workHour: 1.0
+  - businessType: 1
+  - content: 转盘-底盘协同控制曲线优化
+  - requirementDesc: 当前转盘不转底盘转时，由于底盘和转盘的期望角度并不是严格的绝对值相等，导致两者规划出来的旋转曲线在时间上并不一致，旋转表现不同步，需要优化
+  - taskOutputs: 设计优化转盘不转底盘转时的旋转曲线（0.5天）开发自测（0.5天）结论优化逻辑为：转盘不转底盘转，但旋转角度不一致时，旋转角度大的一方乘以角度比例系数，使两者旋转时间一致。优化前 [图片]  [图片] 优化后 [图片]  [图片] 2...
+- [已完成] 宇树狗信息上报开发测试
+  - taskId: 68ca2f43c1bc90aa42589756
+  - parent: 机器狗接入迦智一期
+  - dueDate: 2025-09-25T10:00:00
+  - workHour: 1.0
+  - businessType: 0
+  - content: 宇树狗信息上报开发测试
+  - requirementDesc: 宇树狗支持上报电池信息和遥控状态，支持前端显示，尽量复用现有接口
+  - taskOutputs: 宇树狗支持上报电池信息（0.5天）宇树狗支持上报遥控信息（0.5天）.结论：脚本文件电池信息输出jzhw/battery [图片] 遥控信息输出iobox/run_mode [图片]
+- [已完成] 宇树狗操作熟悉与部分功能调研
+  - taskId: 68ca2eaa57deda0a22117c23
+  - parent: 机器狗接入迦智一期
+  - dueDate: 2025-09-18T10:00:00
+  - workHour: 1.0
+  - businessType: 0
+  - content: 宇树狗操作熟悉与部分功能调研
+  - requirementDesc: 熟悉宇树狗基本操作，调研go2w实现不同高度前进的方式以及接入公司内网的可行性
+  - taskOutputs: 熟悉宇树狗操作（0.5天）调研go2w不同高度前进的方式（0.3天）调研go2w接入无线网络的可行性（0.2天）结论：操作方面，有如下注意事项开机起步有概率不受控前进，目前原因未知，需要反复重启手柄控制时，有时无法进入高速移动模式，且...
+- [已完成] Seminar分享会：标车性能点检流程
+  - taskId: 68ca1849bca83f95a7691d68
+  - parent: 65fbafb4dc48652e8326b78b
+  - dueDate: 2025-09-18T10:00:00
+  - workHour: 0.5
+  - businessType: 1
+  - content: Seminar分享会：标车性能点检流程
+  - requirementDesc: 输出标车性能点检流程分享文档，组织分享会
+  - taskOutputs: 输出文档，组织分享会（0.5天）结论：文档链接：标车运动性能点检流程分享 · 钉钉文档
+- [已完成] 导航配置文件修改说明整理
+  - taskId: 68c77d40f9cbfefdb8d2f706
+  - parent: 677f4bc8fcff03e29681c511
+  - dueDate: 2025-09-18T10:00:00
+  - workHour: 1.0
+  - businessType: 1
+  - content: 导航配置文件修改说明整理
+  - requirementDesc: 整理当前导航修改较为频繁的配置文件项目，输出文档，方便后续组内人员及测试人员参考
+  - taskOutputs: 整理2406及后续版本中，精度报错阈值与控制器简单调参的方法（1.0天）结论：说明文档中已整理2406及后续版本精度报错阈值、激光导航与二维码导航参数修改方式，具体可见导航相关配置文件修改说明 · 钉钉文档
+- [已完成] 导航联调
+  - taskId: 68c77bbe70a022a422db6bc3
+  - parent: 6870747a0509e251d616ad3a
+  - dueDate: 2025-09-18T10:00:00
+  - workHour: 2.5
+  - businessType: 0
+  - content: 导航联调
+  - requirementDesc: 高速小车持续稳定导航，无偏移路线和明显超调现象
+  - taskOutputs: 排查下发速度后电机无响应问题（1.0天）配合测试、定位、感知排查车体偏移路线问题（1.0天）调整控制器参数，优化线路上速度不连贯与超调问题（0.5天）结论：电机无响应原因为当前高速小车代码内没有电机复位功能，需要输入命令手动复位，命令...
+- [已完成] 二维码转弯功能控制器适配，调参与联调
+  - taskId: 68b66c11aac407b64ee0ad12
+  - parent: 68a2e26c1b2775974a8e6fdd
+  - dueDate: 2025-09-11T10:00:00
+  - workHour: 2.0
+  - businessType: 0
+  - content: 二维码转弯功能控制器适配，调参与联调
+  - requirementDesc: 差分车控制器适配二维码转弯功能，实现根据曲率自适应增益功能。该功能开发完成后，进行控制器调参并自测。
+  - taskOutputs: bangbang控制器新增自适应增益功能（0.5天）开发指标输出脚本，供测试与产品使用（0.5天）; ​ [图片] 调参与联调（1.0天）结论：bangbang控制器新增自适应增益，字段名与当前数值如下 [图片] 脚本文件及使用示例 [图片] 二维码转弯实际运行视频 [图片]
+- [已完成] 遥控驱动方案设计，开发与自测
+  - taskId: 68b66b2b35a16fc7704dde60
+  - parent: 68902959835d3061b66c303a
+  - dueDate: 2025-09-11T10:00:00
+  - workHour: 3.0
+  - businessType: 0
+  - content: 遥控驱动方案设计，开发与自测
+  - requirementDesc: 高速小车实现遥控普通速度前进，高速前进与刹车功能
+  - taskOutputs: 设计方案，补全FSD类图（0.5天）遥控驱动开发解析手柄数据并下发速度（1.0天）支持三代车型配置以自定义速度参数（0.5天）与安全确定速度下发协议，本期速度直接下发到安全模块（0.5天）自测通过（0.5天）结论：设计方案参见文档：3...
+- [已完成] speed-manager code-review代码优化
+  - taskId: 68b669c99e2720f58494cf5b
+  - parent: 677f4bc8fcff03e29681c511
+  - dueDate: 2025-09-04T10:00:00
+  - workHour: 0.5
+  - businessType: 1
+  - content: speed-manager code-review代码优化
+  - requirementDesc: 根据code-review要求，优化speed-manager代码
+  - taskOutputs: 优化代码并合入主干分支(0.5天)结论：已合入主干分支 [图片]
+- [已完成] 转盘曲线生成脚本开发
+  - taskId: 68b66a7bee7efa0517c956ca
+  - parent: 677f4bc8fcff03e29681c511
+  - dueDate: 2025-09-04T10:00:00
+  - workHour: 0.7
+  - businessType: 1
+  - content: 转盘曲线生成脚本开发
+  - requirementDesc: 目前motion-share中已包含针对底盘运动控制分析的脚本工具，用于输出相关曲线，但尚缺少转盘相关曲线生成脚本，需要额外开发
+  - taskOutputs: 脚本开发，支持绘制转盘下发角速度与反馈角速度，下发角度与反馈角度曲线（0.5天）自测通过（0.2天）结论：已合入release [图片]  [图片]
+- [已完成] 山西太重-DN3030导航适配
+  - taskId: 689bffe780cc89bcc08cc0a9
+  - parent: 677f4bd01eb5e811f19c76e2
+  - dueDate: 2025-08-14T10:00:00
+  - workHour: 0.7
+  - businessType: 2
+  - content: 山西太重-DN3030导航适配
+  - requirementDesc: 山西太重新车型DN3030导航适配，要求导航时无明显异常，满足精度要求。需求单链接：https://www.teambition.com/task/68464c02da1e81b28837e27f
+  - taskOutputs: 导航限速排查轨迹导航时偏离路径排查结论：该车型最终导航版本为nav-manager  1.2412.141+yutou4限速问题为举升高度超过阈值，排查为硬件问题导致数据异常（0.2天）偏离路径原因为（0.5天）转向驱动器参数配置错误...
+- [已完成] 转盘业务拆分与迁移开发
+  - taskId: 689c02fdfe2ccc4fe7c41548
+  - parent: 68391de706dbd02fcd3d13f5
+  - dueDate: 2025-08-14T10:00:00
+  - workHour: 3.0
+  - businessType: 1
+  - content: 转盘业务拆分与迁移开发
+  - requirementDesc: 根据设计方案转盘重构方案 · 钉钉文档，将jz-motion-common中导航与block相关的转盘业务迁移到nav-manager与nav-net，并去掉原先的转盘loop()线程
+  - taskOutputs: 转盘相关消息订阅迁移到nav-core的RosDatastore类中（0.2天）转盘原精度控制移入precisionKeeper类中（0.3天）转盘原状态机机制删去，统一在nav-controller状态机中处理（0.5天）unloc...
+- [已完成] io板驱动开发
+  - taskId: 688885c33f4e26f7091c2383
+  - parent: 6870747a0509e251d616ad3a
+  - dueDate: 2025-07-31T10:00:00
+  - workHour: 1.0
+  - businessType: 0
+  - content: io板驱动开发
+  - requirementDesc: 高速小车电机io板开发，能够接收io板发送的udp数据并从中解析与发送io驱动数据
+  - taskOutputs: 支持io驱动接收解析io板的udp数据并发送io驱动数据（0.5天）自测通过（0.5天）结论：测试通过版本：flash-agv 1.2506+motortest11 [图片]
+- [已完成] 里程计驱动开发
+  - taskId: 688886826fb5b5e211c09ffb
+  - parent: 6870747a0509e251d616ad3a
+  - dueDate: 2025-07-31T10:00:00
+  - workHour: 1.5
+  - businessType: 0
+  - content: 里程计驱动开发
+  - requirementDesc: 高速小车里程计驱动开发，能够接收电机驱动发送的数据，将电机数据转化为里程计数据并发送
+  - taskOutputs: 里程计驱动订阅电机驱动数据，转化为里程计数据并发送（1.0天）自测通过（0.5天）结论：版本：1.2506.5+cdt-7测试通过截图 [图片]
+- [已完成] 电机驱动方案设计
+  - taskId: 687605bf6d98e06c4f598037
+  - parent: 6870747a0509e251d616ad3a
+  - dueDate: 2025-07-17T10:00:00
+  - workHour: 1.0
+  - businessType: 0
+  - content: 电机驱动方案设计
+  - requirementDesc: 根据专项需求，设计电机驱动方案，补充文档9-高速小车 I FSD中相应的接口和类图等内容。
+  - taskOutputs: 方案设计（0.5天）文档内容补充（0.5天）结论：电机支持初始化时读取轮径、轮距和减速比等配置参数电机支持下发轮速和质心速度确定下发速度结构体、里程计数据结构体和电机数据（包含电流，错误码）结构体具体内容及格式可见9-高速小车 I FSD
+- [已完成] 驱动器性能测试
+  - taskId: 687606620e64b5b719d7c927
+  - parent: 6870747a0509e251d616ad3a
+  - dueDate: 2025-07-17T10:00:00
+  - workHour: 2.5
+  - businessType: 0
+  - content: 驱动器性能测试
+  - requirementDesc: 根据专项需求，协助测试进行驱动器性能测试，排查已有问题，输出测试结果文档。
+  - taskOutputs: 排查电机频繁过流问题，调试电机pid参数（1.0天）协助测试人员使用驱动器测试工具测试电机速度与加减速度上限是否满足需求，测试直行与旋转运动性能，并输出结果文档（1.0天）协助测试进行盲走精度测试，并输出结果文档（0.5天）结论：过流...; [图片]  [图片] ​; ​; ​调参后效果如下; ​ [图片]  [图片]  [图片] 2）性能测试，加减速度为1m/s^2的情况下，速度能达到4m/s；角加速度能达到6rad/s^2，同时角速度能达到6.5rad/s，具体可见高速小车性能摸底测试结论 · 钉钉文档3) 盲走精度，直...
+- [已完成] 远舢舵轮行为优化与调参接口开放
+  - taskId: 686f5d26ad8e3c6640eda518
+  - parent: 677f4bd01eb5e811f19c76e2
+  - dueDate: 2025-07-17T10:00:00
+  - workHour: 1.2
+  - businessType: 2
+  - content: 远舢舵轮行为优化与调参接口开放
+  - requirementDesc: 针对远舢叉车出现的舵轮异常行为问题，协助应用工程师排查并优化
+  - taskOutputs: 排查舵轮舵角跳变问题（0.2天）调整Stanley参数，优化前进卡顿和直线上不调整误差的问题（0.5天）部分控制参数（自适应增益上下限，积分值）支持三代车型中修改（0.5天）结论：舵角跳变原因为最大舵角不合理，导致舵角接近1.57时，...; ​ [图片] 更包jcar3-params 1.3.17+ys1；nav-submodules 0.5.24+yslearning4；jz-motion-common 0.2.68+ys1支持读取三代车型; ​ [图片]; ​ [图片]  [图片]
+- [已完成] 电机驱动开发
+  - taskId: 6870748d42e743278dc179d4
+  - parent: 6870747a0509e251d616ad3a
+  - dueDate: 2025-07-24T10:00:00
+  - workHour: 3.0
+  - businessType: 0
+  - content: 电机驱动开发
+  - requirementDesc: 高速小车电机驱动开发，能够接收io驱动发送的数据并从中解析与发送电机数据，能够接收motionspeed格式的速度并下发给io板
+  - taskOutputs: 支持电机驱动接收解析io板驱动数据并发送电机驱动数据（1.5天）支持电机驱动接收motionspeed数据并发送（0.5天）自测通过（1.0天）结论：版本：1.2506.5+cdt-6测试视频：
+- [已完成] 货架偏移检测适配最新货架数据结构
+  - taskId: 6865e27d66359a4a22df2152
+  - parent: 6822f55cb6869b0a6e99e7c0
+  - dueDate: 2025-07-10T10:00:00
+  - workHour: 0.7
+  - businessType: 0
+  - content: 货架偏移检测适配最新货架数据结构
+  - requirementDesc: 货架对接专项中，前端修改了货架数据结构，导致原有的货架偏移检测不再适用，需要进行适配。问题单：https://www.teambition.com/task/68635b3a6f82dc3d9e462a8a
+  - taskOutputs: 货架偏移检测适配最新货架数据结构（0.5天）自测通过（0.2天）结论：目前根据货架模板创建业务流程说明中描述适配货架偏移检测，软件版本：nav-net 1.2412.44+sd5
+- [已完成] 导航控制参数设置多个档位
+  - taskId: 6865e1aee8531b10938035af
+  - parent: 677f4bc8fcff03e29681c511
+  - dueDate: 2025-07-10T10:00:00
+  - workHour: 2.5
+  - businessType: 1
+  - content: 导航控制参数设置多个档位
+  - requirementDesc: 当前部分车型由于电机型号、电机参数不同导致性能差异，同时不同订单和现场对导航精度和节拍的要求也各有差异，导致同一套参数难以兼顾不同场景下的需求，需要导航频繁手动调参。这一现象在叉车中尤为明显，需要开发多档位控制参数，根据实际需求，由测试或现场人员自行设置档位，降低研发调参的频率，提高整体效率。
+  - taskOutputs: 控制档位切换方案设计（0.5天）整理当前主要叉车项目的控制器参数（1.0天）档位切换开发（0.5天）自测（0.5天）结论：根据当前山西太重、远舢、杭自院、自研搬运车、自研堆垛车等的参数适配经验，当前调整的参数主要集中在叉车的stanl...
+- [已完成] 杭自院室外车导航适配
+  - taskId: 686b2e1354e68b009b719f95
+  - parent: 677f4bd01eb5e811f19c76e2
+  - dueDate: 2025-07-10T10:00:00
+  - workHour: 2.5
+  - businessType: 2
+  - content: 杭自院室外车导航适配
+  - requirementDesc: 预期：需求描述：导航适配杭自院室外车，使该车型能正常导航，并满足精度要求
+  - taskOutputs: 任务产出：里程计发布适配阿克曼转向机构（1.0天）适配导航相关问题室外车配置文件适配（0.2天）导航控制器参数调试（0.5天）优化线路外切问题（0.2天）优化轨迹上卡顿与停车问题（0.1天）测试通过（0.5天）结论：阿克曼转向适配包：...
+- [已完成] speed-manager依赖jz-motion-common部分代码整理与适配
+  - taskId: 686796bf6c2ea1469797bb00
+  - parent: 677f4bc8fcff03e29681c511
+  - dueDate: 2025-07-10T10:00:00
+  - workHour: 1.5
+  - businessType: 1
+  - content: speed-manager依赖jz-motion-common部分代码整理与适配
+  - requirementDesc: 后续jz-motion-common除jz_common外所有代码都将移除，speed-manager需要处理原本依赖旧版运动学库、jzsspdlog、jz_motion_utils、nav_inner_config部分的代码。
+  - taskOutputs: 处理原本依赖nav_inner_config部分代码，改为内部自行读取三代车型并处理（0.3天）处理原本依赖jzsspdlog和旧版json代码，改为依赖jz_common中的对应库（0.3天）处理原本依赖jz_motion_util...
+- [已完成] 规划控制
+  - taskId: 68623db118b3b5dac7a35ff5
+  - parent: 68623bcd35b6451ffe47de4f
+  - dueDate: 2025-07-22T10:00:00
+  - workHour: 3.0
+  - businessType: 1
+  - content: 规划控制
+  - requirementDesc: 整理nav-manager中，navigation子包，nav_core子包与router_interface子包的功能，并汇总公共接口
+  - taskOutputs: navigation部分文档整理功能整理（0.5天）接口汇总成多维表（1.0天）nav_core部分文档整理功能整理（0.5天）接口汇总成多维表（0.7天）router_interface部分文档整理（0.3天）结论：navigati...
+
+## 父子任务关系
+- [未完成] 【产品专项】国产化ce
+  - taskId: 69e984581cb62a8a1312fb90
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - content: 【产品专项】国产化ce
+  - [未完成] 三期
+    - taskId: 69e9848da9226079f32e345d
+    - parent: 【产品专项】国产化ce
+    - dueDate: 2026-06-30T10:00:00
+    - workHour: 0.0
+    - taskNature: 69d4d037c253ef42e9c31b39
+    - businessType: 0
+    - content: 三期
+    - [未完成] 导航模块约束导航期间舵轮角度
+      - taskId: 69e984f9b527ee04ff33259e
+      - parent: 三期
+      - dueDate: 2026-04-30T10:00:00
+      - workHour: 1.0
+      - taskNature: 69d4d037c253ef42e9c31b39
+      - content: 导航模块约束导航期间舵轮角度
+      - requirementDesc: ce全向车导航模块约束导航期间舵轮角度
+      - taskOutputs: ce全向车导航模块约束导航期间舵轮角度（1.0天）
+    - [未完成] 导航过程中禁止斜向和曲线移动
+      - taskId: 6a0ff34108353f05fd302e4f
+      - parent: 三期
+      - dueDate: 2026-05-28T10:00:00
+      - workHour: 0.5
+      - taskNature: 69d4d037c253ef42e9c31b39
+      - content: 导航过程中禁止斜向和曲线移动
+      - requirementDesc: 全向车导航过程中，禁止斜向运动和曲线移动
+      - taskOutputs: bistanley控制器适配开发，横向误差不通过朝向+纵向移动修正，而是通过横向移动修正（0.5天）
+    - [未完成] 一期motion-common功能合入三期的pnc
+      - taskId: 6a0ff594b48b18815d3b30ae
+      - parent: 三期
+      - dueDate: 2026-05-28T10:00:00
+      - workHour: 1.0
+      - taskNature: 69d4d037c253ef42e9c31b39
+      - content: 一期motion-common功能合入三期的pnc
+      - requirementDesc: ce专项一期基于b+版本开发，最终打包也是定制分支，三期需要合入主干，之前的一些功能需要和主干做兼容
+      - taskOutputs: 舵角上下限不对称情况适配开发（0.8天）联系嵌入式在三代车型中加入不对称舵角上下限参数导航适配联系伺服与安全，确认这两个节点是否需要对应修改车型为ce车时，导航收到舵轮直行电机转速完全为0的信号后再下发舵轮角度（0.2天）
+
+## 孤立子任务
+- 人形底盘定制功能适配业务节点
+  - parentTaskId: 69549660156f5c03808a5709
+- 过渡与平滑算法调研
+  - parentTaskId: 69549660156f5c03808a5709
+- 【更新中】2603二维码导航问题排查与适配
+  - parentTaskId: 69549660156f5c03808a5709
+- PRG全向车适配
+  - parentTaskId: 69549679f1e33c17c6b1ccb3
+- 规控算法实习生招聘面试2026.5月
+  - parentTaskId: 6687975a6790071f3b2742cb
+- 华为室外车导航适配26q2
+  - parentTaskId: 69549679f1e33c17c6b1ccb3
+- 浙江人形机器人
+  - parentTaskId: 69549679f1e33c17c6b1ccb3
+- 2603转盘遥控适配开发
+  - parentTaskId: 69549660156f5c03808a5709
+- 规控算法实习生招聘面试2026.4月
+  - parentTaskId: 6687975a6790071f3b2742cb
+- 高速小车车体性能测试工具开发
+  - parentTaskId: 69e985959de53b35ce1a8425
+- 规控算法迭代二期
+  - parentTaskId: 681dc5711af772b6e7497f5a
+- 导航性能调优
+  - parentTaskId: 69e985959de53b35ce1a8425
+- 步态切换：线路属性步态切换开发
+  - parentTaskId: 69b8c0c24039169f885f2228
+- 离线地图编辑器：在线建图调测
+  - parentTaskId: 69b8c0c24039169f885f2228
+- 速度规划算法技术交底书撰写
+  - parentTaskId: 69549660156f5c03808a5709
+- 大前移导航适配
+  - parentTaskId: 69e98246d511376b8cc8367c
+- 离线地图编辑器支持部署：在线模式后台适配
+  - parentTaskId: 69b8c0c24039169f885f2228
+- 轨迹控制优化：曲线跟踪控制器优化
+  - parentTaskId: 69b8c0c24039169f885f2228
+- 转盘block支持任务停止
+  - parentTaskId: 69549660156f5c03808a5709
+- nav-net适配重构后的motion-common
+  - parentTaskId: 69549660156f5c03808a5709
+- 机器狗车型参数集成：机型特调控制参数迁移到三代车型
+  - parentTaskId: 69b8c0c24039169f885f2228
+- 人形底盘功能合入主干
+  - parentTaskId: 69549660156f5c03808a5709
+- 控制算法优化
+  - parentTaskId: 698d339e9270bf3d5f2b6f31
+- 规划算法优化
+  - parentTaskId: 698d339e9270bf3d5f2b6f31
+- 规控算法实习生招聘面试2026Q1
+  - parentTaskId: 6687975a6790071f3b2742cb
+- emma-safe 2512版本code review
+  - parentTaskId: 69c9e6055f76d6c66f99187b
+- 【华为室外车】导航相关问题排查与适配26q1
+  - parentTaskId: 69549679f1e33c17c6b1ccb3
+- 二期已实现功能的复盘与修正
+  - parentTaskId: 695cd4f5c668ab4332fd9434
+- 【博格华纳】电机误差报错功能适配
+  - parentTaskId: 69549679f1e33c17c6b1ccb3
+- motion-common重构后的模块适配开发与自测
+  - parentTaskId: 69549660156f5c03808a5709
+- 二期已实现功能冗余线程清理合并
+  - parentTaskId: 695cd4f5c668ab4332fd9434
+- 26年1季度季度考核表书写【王睿】
+  - parentTaskId: 69c63af52c53b32abea3524f
+- 导航遥控速度下发速度适配速度仲裁开发与联调
+  - parentTaskId: 695cd4f5c668ab4332fd9434
+- 仿真系统优化
+  - parentTaskId: 698d339e9270bf3d5f2b6f31
+- 自研叉车控制适配
+  - parentTaskId: 69e98246d511376b8cc8367c
+- 转盘保持与跟车合入主干
+  - parentTaskId: 692e88e854dc2092e75e2903
+- 宇树狗建图定位增补单
+  - parentTaskId: 690972ae1c8ca2ae4678167d
+- 宇树狗导航优化
+  - parentTaskId: 690972ae1c8ca2ae4678167d
+- 王睿年终述职报告
+  - parentTaskId: 6969d7ca23f3f51138227a31
+- 宇树狗建图联调增补-协议对齐
+  - parentTaskId: 690972ae1c8ca2ae4678167d
+- 宇树与云深处狗自启动脚本开发
+  - parentTaskId: 690972ae1c8ca2ae4678167d
+- 宇树狗建图联调-建图数据收发
+  - parentTaskId: 690972ae1c8ca2ae4678167d
+- 25年4季度季度考核表书写【王睿】
+  - parentTaskId: 694e713f91a3e532d86e6d2c
+- 宇树狗手动定位适配开发
+  - parentTaskId: 690972ae1c8ca2ae4678167d
+- 宇树狗驱动开发指导
+  - parentTaskId: 690972ae1c8ca2ae4678167d
+- 宇树狗建图适配开发
+  - parentTaskId: 690972ae1c8ca2ae4678167d
+- 宇树狗手动定位联调
+  - parentTaskId: 690972ae1c8ca2ae4678167d
+- 宇树狗建图联调-通讯链路
+  - parentTaskId: 690972ae1c8ca2ae4678167d
+- 宇树狗车型配置与导航版本适配
+  - parentTaskId: 690972ae1c8ca2ae4678167d
+- 适配基线修改后的转盘反馈频率
+  - parentTaskId: 677f4bc8fcff03e29681c511
+- 人形机器人底盘项目
+  - parentTaskId: 677f4bd01eb5e811f19c76e2
+- 宇树狗底层接口文档整理与工作规划
+  - parentTaskId: 690972ae1c8ca2ae4678167d
+- 算法实习生 -- 李建威
+  - parentTaskId: 690d93fb9133d5ef8ae07892
+- 遥控增补开发：手柄遥控业务与驱动分离
+  - parentTaskId: 68902959835d3061b66c303a
+- 杭叉3.5T车导航适配
+  - parentTaskId: 677f4bd01eb5e811f19c76e2
+- 乐美4T叉车导航适配
+  - parentTaskId: 677f4bd01eb5e811f19c76e2
+- jz-pnc模块说明书
+  - parentTaskId: 690d655a16f6b91df1b9252c
+- motion-common模块说明书与doxygen配置
+  - parentTaskId: 69c9e41a05deebed5e1f8ed5
+- speed-manager模块说明书
+  - parentTaskId: 690d655a16f6b91df1b9252c
+- 导航接收处理任务引擎信息开发与测试
+  - parentTaskId: 68902959835d3061b66c303a
+- 国产ce双舵轮车导航适配
+  - parentTaskId: 677f4bc8fcff03e29681c511
+- 国唐速度曲线参数适配
+  - parentTaskId: 677f4bd01eb5e811f19c76e2
+- 二维码七期曲线转弯说明
+  - parentTaskId: 68a2e26c1b2775974a8e6fdd
+- 国唐室外车新驻车功能开发测试
+  - parentTaskId: 677f4bd01eb5e811f19c76e2
+- henkel现场导航转盘与turnrotate功能定制
+  - parentTaskId: 677f4bd01eb5e811f19c76e2
+- 25年3季度季度考核表书写【王睿】
+  - parentTaskId: 68d931b056fbb0eeac458fad
+- 国唐室外车溜坡与到点精度异常适配
+  - parentTaskId: 677f4bd01eb5e811f19c76e2
+- 国唐室外车贝塞尔曲线导航排查适配
+  - parentTaskId: 677f4bd01eb5e811f19c76e2
+- 机器狗接入迦智一期
+  - parentTaskId: 6909726f482487f2daccd6e8
+- 600k&1500k&400k直行效果优化
+  - parentTaskId: 677f4bc8fcff03e29681c511
+- 驱动的运行时状态管理设计与实现
+  - parentTaskId: 68902959835d3061b66c303a
+- 国唐室外车导航适配
+  - parentTaskId: 677f4bd01eb5e811f19c76e2
+- 里程计文件中记录总里程记录开始时间
+  - parentTaskId: 677f4bc8fcff03e29681c511
+- 转盘-底盘协同控制曲线优化
+  - parentTaskId: 677f4bc8fcff03e29681c511
+- Seminar分享会：标车性能点检流程
+  - parentTaskId: 65fbafb4dc48652e8326b78b
+- 导航配置文件修改说明整理
+  - parentTaskId: 677f4bc8fcff03e29681c511
+- 导航联调
+  - parentTaskId: 6870747a0509e251d616ad3a
+- 二维码转弯功能控制器适配，调参与联调
+  - parentTaskId: 68a2e26c1b2775974a8e6fdd
+- 遥控驱动方案设计，开发与自测
+  - parentTaskId: 68902959835d3061b66c303a
+- speed-manager code-review代码优化
+  - parentTaskId: 677f4bc8fcff03e29681c511
+- 转盘曲线生成脚本开发
+  - parentTaskId: 677f4bc8fcff03e29681c511
+- 山西太重-DN3030导航适配
+  - parentTaskId: 677f4bd01eb5e811f19c76e2
+- 转盘业务拆分与迁移开发
+  - parentTaskId: 68391de706dbd02fcd3d13f5
+- io板驱动开发
+  - parentTaskId: 6870747a0509e251d616ad3a
+- 里程计驱动开发
+  - parentTaskId: 6870747a0509e251d616ad3a
+- 电机驱动方案设计
+  - parentTaskId: 6870747a0509e251d616ad3a
+- 驱动器性能测试
+  - parentTaskId: 6870747a0509e251d616ad3a
+- 远舢舵轮行为优化与调参接口开放
+  - parentTaskId: 677f4bd01eb5e811f19c76e2
+- 电机驱动开发
+  - parentTaskId: 6870747a0509e251d616ad3a
+- 货架偏移检测适配最新货架数据结构
+  - parentTaskId: 6822f55cb6869b0a6e99e7c0
+- 导航控制参数设置多个档位
+  - parentTaskId: 677f4bc8fcff03e29681c511
+- 杭自院室外车导航适配
+  - parentTaskId: 677f4bd01eb5e811f19c76e2
+- speed-manager依赖jz-motion-common部分代码整理与适配
+  - parentTaskId: 677f4bc8fcff03e29681c511
+- 规划控制
+  - parentTaskId: 68623bcd35b6451ffe47de4f
+
+## 给 AI 的使用规则
+- 优先参考任务标题、content、note 和父子任务结构。
+- 生成新任务草稿时，只做归纳整理，不要改写既有任务内容。
+- 如果历史任务信息不足，可以追问用户，而不是猜测数据库里不存在的事实。

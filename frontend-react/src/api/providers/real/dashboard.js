@@ -799,3 +799,32 @@ export function realBatchImportScores(payload = {}) {
     body: JSON.stringify(payload),
   });
 }
+
+export function realUpdateMemberPerformance(payload = {}) {
+  return httpRequest('/bt/perf/update-quarter-member', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+// ── 统一团队/成员下拉接口 ──
+
+export function realFetchTeams() {
+  return httpRequest('/bt/perf/teams');
+}
+
+export function realFetchMembers(team = '') {
+  const qs = team ? `?team=${encodeURIComponent(team)}` : '';
+  return httpRequest(`/bt/perf/members${qs}`);
+}
+
+export function realRecalcMemberPerformance(payload = {}) {
+  return httpRequest('/bt/perf/calculate-quarter-member', {
+    method: 'POST',
+    body: JSON.stringify({
+      year: payload.year,
+      quarter: payload.quarter,
+      user_id: payload.userId,
+    }),
+  });
+}

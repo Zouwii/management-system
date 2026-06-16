@@ -141,6 +141,7 @@ export function mockFetchDepartmentOverview(user) {
     return {
       stats: buildDepartmentStats(rows),
       rows,
+      lastUpdatedAt: new Date().toISOString(),
     };
   });
 }
@@ -151,6 +152,7 @@ export function mockFetchNavTeamDetail(user) {
       navTeam.map((item) => ({ ...item, team: '导航组' })),
       user,
     ),
+    lastUpdatedAt: new Date().toISOString(),
   }));
 }
 
@@ -160,6 +162,7 @@ export function mockFetchIntegrationTeamDetail(user) {
       integrationTeam.map((item) => ({ ...item, team: '对接组' })),
       user,
     ),
+    lastUpdatedAt: new Date().toISOString(),
   }));
 }
 
@@ -736,13 +739,51 @@ export function mockFetchWorkdays() {
 
 export function mockFetchTeamImportUsers() {
   const members = [
-    { userId: 'u1', userName: '张三', isTeamLead: false, workHourScore: null, supervisorScore: null, calcStatus: null },
-    { userId: 'u2', userName: '李四', isTeamLead: false, workHourScore: 1.05, supervisorScore: 1.0, calcStatus: 'filled' },
-    { userId: 'u3', userName: '王五', isTeamLead: true, workHourScore: null, supervisorScore: null, calcStatus: null },
+    { userId: 'u2', userName: '李四', isTeamLead: false, workHourScore: 1.05, supervisorScore: 1.0, calcStatus: 'filled',
+      prevCarryBalance: 0.25, prevDecayValue: 0.062 },
+    { userId: 'u3', userName: '王五', isTeamLead: true, workHourScore: null, supervisorScore: null, calcStatus: null,
+      prevCarryBalance: 0.0, prevDecayValue: 0.0 },
   ];
   return Promise.resolve({ code: 200, error: '', data: { members, count: members.length } });
 }
 
 export function mockBatchImportScores() {
   return Promise.resolve({ code: 200, error: '', data: { ok: 3, fail: 0, errors: [] } });
+}
+
+export function mockUpdateMemberPerformance() {
+  return Promise.resolve({ code: 200, error: '', data: { success: true } });
+}
+
+export function mockFetchTeams() {
+  return Promise.resolve({
+    code: 200, error: '',
+    data: {
+      teams: [
+        { key: 'nav', label: '导航组' },
+        { key: 'servo', label: '对接组' },
+      ],
+    },
+  });
+}
+
+export function mockFetchMembers() {
+  return Promise.resolve({
+    code: 200, error: '',
+    data: {
+      members: [
+        { userId: 'u2', userName: '李四', teamKey: 'nav', teamLabel: '导航组', character: 0, isTeamLead: true, isNavLead: true, isServoLead: false },
+        { userId: 'u3', userName: '王五', teamKey: 'servo', teamLabel: '对接组', character: 2, isTeamLead: false, isNavLead: false, isServoLead: false },
+        { userId: 'u4', userName: '赵六', teamKey: 'servo', teamLabel: '对接组', character: 0, isTeamLead: true, isNavLead: false, isServoLead: true },
+      ],
+      count: 3,
+    },
+  });
+}
+
+export function mockRecalcMemberPerformance(_payload = {}) {
+  return Promise.resolve({
+    code: 200,
+    data: { success: true },
+  });
 }

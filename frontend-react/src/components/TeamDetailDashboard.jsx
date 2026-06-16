@@ -6,6 +6,8 @@ import ManagerLayout from '../layouts/ManagerLayout';
 import { ROUTE_PATHS } from '../constants/routes';
 import { useAuthStore } from '../store/authStore';
 import { formatDateTime } from '../utils/workHours';
+import { fetchMembers } from '../api/dashboard';
+import { shouldHideMemberInSelector } from '../utils/memberVisibility';
 
 function formatRawDays(value) {
   const n = Number(value || 0);
@@ -141,6 +143,7 @@ function getCurrentQuarterLabel() {
 export default function TeamDetailDashboard({
   title,
   desc,
+  teamKey,
   fetcher,
   fallbackRows,
 }) {
@@ -188,16 +191,20 @@ export default function TeamDetailDashboard({
 
       const nextRows = response.data.rows ?? fallbackRows;
       setRows(nextRows);
-      const fromMembers = Array.isArray(response?.data?.memberOptions)
-        ? response.data.memberOptions.map((m) => String(m?.name || '').trim()).filter(Boolean)
-        : [];
-      if (fromMembers.length) {
-        setMemberOptions(['全部', ...fromMembers]);
-      } else {
-        setMemberOptions(['全部', ...nextRows.map((row) => row.name)]);
-      }
       setLastUpdatedAt(String(response?.data?.lastUpdatedAt || ''));
     });
+
+    // 下拉成员列表：统一从 /perf/members?team= 获取，排除管理员
+    if (teamKey) {
+      fetchMembers(teamKey).then((res) => {
+        if (!active) return;
+        const names = (res?.data?.members || [])
+          .filter((m) => !shouldHideMemberInSelector(m))
+          .map((m) => m.userName)
+          .filter(Boolean);
+        setMemberOptions(names.length ? ['全部', ...names] : ['全部']);
+      }).catch(() => {});
+    }
 
     return () => {
       active = false;

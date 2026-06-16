@@ -136,6 +136,7 @@ class ProjectTaskDetail(Base):
     task_stage_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     unique_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     task_nature: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    need_statistic: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)
     workday_costhour: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
     # 是否逾期（由 tagIds 判断）
@@ -176,6 +177,7 @@ class ProgramIssueDetail(Base):
     unique_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     parent_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     task_nature: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    need_statistic: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)
     workday_costhour: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
     work_hour_field_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
@@ -236,6 +238,7 @@ class ProjectTaskOverdueDetail(Base):
     task_flow_status_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
     parent_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     task_nature: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    need_statistic: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)
     workday_costhour: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     custom_fields_json: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
     raw_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)

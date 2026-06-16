@@ -8,6 +8,9 @@ from performance.service import (
     query_quarter_performance_service,
     list_team_import_users_service,
     batch_import_service,
+    update_member_performance_service,
+    list_teams_service,
+    list_members_service,
 )
 
 
@@ -72,5 +75,37 @@ def register(bp, ok, fail):
             if out.get("success"):
                 return ok(out.get("data") or {})
             return fail(out.get("error", "import failed"), code=400, data=out.get("data") or {})
+        except Exception as e:
+            return fail(str(e), code=500, data={})
+
+    @bp.route("/perf/update-quarter-member", methods=["POST"])
+    def perf_update_quarter_member():
+        try:
+            payload = request.get_json(silent=True) or {}
+            out = update_member_performance_service(payload)
+            if out.get("success"):
+                return ok(out.get("data") or {})
+            return fail(out.get("error", "update failed"), code=400, data=out.get("data") or {})
+        except Exception as e:
+            return fail(str(e), code=500, data={})
+
+    @bp.route("/perf/teams", methods=["GET"])
+    def perf_teams():
+        try:
+            out = list_teams_service()
+            if out.get("success"):
+                return ok(out.get("data") or {})
+            return fail(out.get("error", "list teams failed"), code=400, data=out.get("data") or {})
+        except Exception as e:
+            return fail(str(e), code=500, data={})
+
+    @bp.route("/perf/members", methods=["GET"])
+    def perf_members():
+        try:
+            payload = {"team": request.args.get("team", "")}
+            out = list_members_service(payload)
+            if out.get("success"):
+                return ok(out.get("data") or {})
+            return fail(out.get("error", "list members failed"), code=400, data=out.get("data") or {})
         except Exception as e:
             return fail(str(e), code=500, data={})

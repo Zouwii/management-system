@@ -42,7 +42,7 @@ const QUARTER_OPTIONS = generateQuarterOptions();
 function formatDays(hours) {
   const n = Number(hours);
   if (!Number.isFinite(n)) return '-';
-  return n.toFixed(1);
+  return n.toFixed(2);
 }
 
 // ── 小组选择器 ──

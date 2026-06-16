@@ -8,6 +8,7 @@ export default function IntegrationTeamDetail() {
       title="对接组"
       desc=""
       teamName="对接组"
+      teamKey="servo"
       fetcher={fetchIntegrationTeamDetail}
       fallbackRows={integrationTeam.map((item) => ({ ...item, team: '对接组' }))}
     />

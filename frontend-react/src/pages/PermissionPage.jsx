@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchPermissionMatrix } from '../api/dashboard';
+import { fetchPermissionMatrix, fetchTeams } from '../api/dashboard';
 import Card from '../components/Card';
 import SectionTitle from '../components/SectionTitle';
 import { PAGE_PERMISSION_CODES } from '../constants/permissionCodes';
@@ -20,6 +20,7 @@ export default function PermissionPage() {
   const [visiblePasswords, setVisiblePasswords] = useState({});
   const [roleFilter, setRoleFilter] = useState('全部角色');
   const [teamFilter, setTeamFilter] = useState('全部团队');
+  const [teamOptions, setTeamOptions] = useState(['全部团队']);
   const [copyMessage, setCopyMessage] = useState('');
 
   useEffect(() => {
@@ -31,6 +32,13 @@ export default function PermissionPage() {
       }
     });
 
+    fetchTeams().then((res) => {
+      if (active) {
+        const list = (res?.data?.teams || []).map((t) => t.label);
+        setTeamOptions(['全部团队', ...list]);
+      }
+    }).catch(() => {});
+
     return () => {
       active = false;
     };
@@ -41,7 +49,6 @@ export default function PermissionPage() {
     .filter((item) => teamFilter === '全部团队' || item.team === teamFilter);
 
   const roleOptions = ['全部角色', ...Array.from(new Set(accounts.map((item) => item.roleLabel)))];
-  const teamOptions = ['全部团队', ...Array.from(new Set(accounts.map((item) => item.team)))];
 
   async function handleCopy(value, label) {
     try {

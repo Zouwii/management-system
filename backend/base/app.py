@@ -153,15 +153,14 @@ def create_app() -> Flask:
                     return str(next(iter(userids.values())) or "").strip()
                 return ""
 
+            # sync_disabled：若标记文件存在，直接退出定时循环，不轮询
+            _flag_path = Path(__file__).resolve().parent.parent / "runtime" / "sync_disabled"
+            if _flag_path.exists():
+                print("[auto_full_update_loop] SKIP — sync is disabled (runtime/sync_disabled exists)")
+                return
+
             while True:
                 try:
-                    # sync_disabled 检查：若标记文件存在，跳过全量同步
-                    _flag_path = Path(__file__).resolve().parent.parent / "runtime" / "sync_disabled"
-                    if _flag_path.exists():
-                        print("[auto_full_update_loop] SKIP — sync is disabled (runtime/sync_disabled exists)")
-                        _time.sleep(30)
-                        continue
-
                     now_bj = datetime.now(bj_tz)
                     today = now_bj.strftime("%Y-%m-%d")
 

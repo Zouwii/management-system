@@ -26,6 +26,12 @@ import {
   mockFetchWorkdayCosthourDeptAggregate,
   mockFetchWorkdayCosthourTaskDetail,
   mockFetchWorkdays,
+  mockFetchTeamImportUsers,
+  mockBatchImportScores,
+  mockUpdateMemberPerformance,
+  mockFetchTeams,
+  mockFetchMembers,
+  mockRecalcMemberPerformance,
 } from './providers/mock/dashboard';
 import {
   realFetchAIInsightList,
@@ -54,6 +60,12 @@ import {
   realFetchWorkdayCosthourDeptAggregate,
   realFetchWorkdayCosthourTaskDetail,
   realFetchWorkdays,
+  realFetchTeamImportUsers,
+  realBatchImportScores,
+  realUpdateMemberPerformance,
+  realFetchTeams,
+  realFetchMembers,
+  realRecalcMemberPerformance,
 } from './providers/real/dashboard';
 
 export const fetchDepartmentOverview = createApiSwitch(mockFetchDepartmentOverview, realFetchDepartmentOverview);
@@ -94,4 +106,13 @@ export const fetchWorkdayCosthourTeamSummary = createApiSwitch(mockFetchWorkdayC
 export const fetchWorkdayCosthourDeptAggregate = createApiSwitch(mockFetchWorkdayCosthourDeptAggregate, realFetchWorkdayCosthourDeptAggregate);
 export const fetchWorkdayCosthourTaskDetail = createApiSwitch(mockFetchWorkdayCosthourTaskDetail, realFetchWorkdayCosthourTaskDetail);
 export const fetchWorkdays = createApiSwitch(mockFetchWorkdays, realFetchWorkdays);
+
+export const fetchTeamImportUsers = createApiSwitch(mockFetchTeamImportUsers, realFetchTeamImportUsers);
+export const batchImportScores = createApiSwitch(mockBatchImportScores, realBatchImportScores);
+export const updateMemberPerformance = createApiSwitch(mockUpdateMemberPerformance, realUpdateMemberPerformance);
+
+export const fetchTeams = createApiSwitch(mockFetchTeams, realFetchTeams);
+export const fetchMembers = createApiSwitch(mockFetchMembers, realFetchMembers);
+
+export const recalcMemberPerformance = createApiSwitch(mockRecalcMemberPerformance, realRecalcMemberPerformance);
 

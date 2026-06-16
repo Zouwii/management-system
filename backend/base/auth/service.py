@@ -70,27 +70,54 @@ def _role_from_character(character: int) -> str:
     """
     基础规则：
     - character == 0 -> 主管端（manager，后续再结合 lead 标记细分权限）
-    - character in {1,2,3} -> 员工端（employee）
+    - character == 9 -> 内置管理员（admin，自动等效 character=0 + 双组 lead）
+    - character in {1,2,3,4} -> 员工端（employee）
     其余值默认 employee。
     """
     try:
         c = int(character)
     except Exception:
         c = 0
-    return "manager" if c == 0 else "employee"
+    if c in (0, 9):
+        return "manager"  # 9 在 _derive_role_and_access 中会被提升为 admin
+    return "employee"
 
 
 def _derive_role_and_access(character: int, is_nav_lead: bool, is_servo_lead: bool) -> Dict[str, Any]:
     """
     角色/权限细分规则：
-    1) character == 0:
+    1) character == 9 -> 内置管理员 admin，无需依赖 lead 标记
+    2) character == 0:
        - is_nav_lead && is_servo_lead -> admin
        - is_servo_lead -> manager（仅对接组分栏）
        - is_nav_lead -> manager（仅导航组分栏）
        - 两者都不是 -> manager（保留默认 manager 权限）
-    2) character in {1,2,3} -> employee
-    3) 其它 -> employee
+    3) character in {1,2,3,4} -> employee
+    4) 其它 -> employee
     """
+    # character=9: 内置管理员，等效 character=0 + 双组 lead
+    if character == 9:
+        return {
+            "role": "admin",
+            "permissionCodes": [
+                "page.department_overview",
+                "page.nav_team_detail",
+                "page.integration_team_detail",
+                "page.personal_hours",
+                "page.performance",
+                "page.ai_analysis",
+                "page.permissions",
+                "page.workday_costhour",
+                "button.export_report",
+                "button.view_ai_suggestions",
+                "button.configure_role",
+                "button.configure_data_scope",
+                "button.review_member",
+            ],
+            "homePath": "/manager/department-overview",
+            "dataScope": "all",
+        }
+
     role = _role_from_character(character)
     if role != "manager":
         return {"role": role}
@@ -252,21 +279,18 @@ def resolve_user_profile(dingtalk_user: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def authenticate_local_user(user_id: str, password: str) -> Dict[str, Any]:
-    """离线模式：用本地 user_character 表中的 user_id + 固定密码登录。
+    """离线模式：用本地 user_character 表中的 user_id + 密码登录。
 
-    密码固定为 123456。登录成功直接返回 profile，不走钉钉 API。
-    用户验证逻辑与 OAuth 登录（resolve_user_profile）完全一致：
-    - character 无额外过滤，所有值均接受
-    - 角色/权限通过 _derive_role_and_access 派生
+    密码规则：
+    - character 0 或 9 → 密码 JZ123456
+    - character 1/2/3/4 → 密码 123456
+    登录成功直接返回 profile，不走钉钉 API。
     """
     user_id = str(user_id or "").strip()
     password = str(password or "").strip()
 
     if not user_id or not password:
         return {"ok": False, "error": "missing user_id or password"}
-
-    if password != "123456":
-        return {"ok": False, "error": "invalid password"}
 
     from base.db.engine import SessionLocal
     from base.db.orm import UserCharacter as DbUserCharacter
@@ -282,6 +306,15 @@ def authenticate_local_user(user_id: str, password: str) -> Dict[str, Any]:
             character = 1
         else:
             character = int(raw_char)
+
+        # 根据 character 校验不同密码
+        if character in (0, 9):
+            expected_password = "JZ123456"
+        else:
+            expected_password = "123456"
+
+        if password != expected_password:
+            return {"ok": False, "error": "invalid password"}
 
         is_nav_lead = bool(getattr(row, "is_nav_lead", False))
         is_servo_lead = bool(getattr(row, "is_servo_lead", False))

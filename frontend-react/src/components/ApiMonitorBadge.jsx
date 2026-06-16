@@ -5,12 +5,6 @@ function todayStr() {
   return fmtDate(d);
 }
 
-function yesterdayStr() {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  return fmtDate(d);
-}
-
 function fmtDate(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -84,7 +78,11 @@ export default function ApiMonitorBadge() {
             </button>
           </div>
           <div style={{ marginBottom: 8, display: 'flex', gap: 6, alignItems: 'center' }}>
-            <button onClick={() => handleDayChange(yesterdayStr())}
+            <button onClick={() => {
+              const d = new Date(day);
+              d.setDate(d.getDate() - 1);
+              handleDayChange(fmtDate(d));
+            }}
               style={quickBtnStyle}>
               ◀ 前一天
             </button>
@@ -156,7 +154,7 @@ export default function ApiMonitorBadge() {
             </>
           )}
           {error && <div style={{ color: '#f87171', marginTop: 8 }}>⚠ {error}</div>}
-          <button onClick={fetchStats}
+          <button onClick={() => fetchStats(day)}
             style={{
               marginTop: 8, width: '100%', padding: '4px 0',
               background: '#334155', border: 'none', borderRadius: 6,

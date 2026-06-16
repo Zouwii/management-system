@@ -38,6 +38,7 @@ REQUIREMENT_DESC_CUSTOMFIELD_ID = "686273700d15b3f835491a2e"  #需求描述
 TASK_OUTPUT_CUSTOMFIELD_ID = "6862737e3b781c68b3181925"       #任务产出
 WORKDAY_DURATION_CUSTOMFIELD_ID = "665ee4b95b46f34b3e04634f"
 WORKDAY_FLAG_CUSTOMFIELD_ID = "667a65e618aebd88f98d4896"
+NEED_STATISTIC_CUSTOMFIELD_ID = "667a65e618aebd88f98d4896"  # 是/否 标记（与 WORKDAY_FLAG 同一字段）
 CASCADING_PROJECT_FIELD_ID = "665ee4b45b46f34b3e045af2"       # 级联：项目分类 / 车型 / 项目名称
 DEFAULT_BUSINESS_TYPE_TAG_MAPPING = {
     "65264cfd697b6b909485bcbc": 0,  # 产品
@@ -219,6 +220,7 @@ def _extract_task_nature(item: Dict[str, Any]) -> Optional[str]:
     return None
 
 
+
 def _custom_fields_list(item_or_fields: Any) -> List[Dict[str, Any]]:
     if isinstance(item_or_fields, list):
         return [cf for cf in item_or_fields if isinstance(cf, dict)]
@@ -335,7 +337,9 @@ def _extract_workday_costhour(item: Dict[str, Any]) -> Optional[float]:
 
 def _extract_cascading_project_fields(item: Dict[str, Any]) -> Dict[str, Optional[str]]:
     """
-    从 customFieldId=CASCADING_PROJECT_FIELD_ID 的级联字段中解析三级数据。
+    从 customFields 中一次遍历同时解析：
+      - CASCADING_PROJECT_FIELD_ID → project_category_1 / vehicle_type_2 / project_name_3
+      - NEED_STATISTIC_CUSTOMFIELD_ID → need_statistic（"是"/"否"）
 
     Teambition 数据格式:
       {
@@ -346,12 +350,18 @@ def _extract_cascading_project_fields(item: Dict[str, Any]) -> Dict[str, Optiona
         ]
       }
 
-    返回: { project_category_1: str|None, vehicle_type_2: str|None, project_name_3: str|None }
+    返回: {
+        project_category_1: str|None,
+        vehicle_type_2: str|None,
+        project_name_3: str|None,
+        need_statistic: str|None,   # "是" / "否" / None
+    }
     """
     result = {
         "project_category_1": None,
         "vehicle_type_2": None,
         "project_name_3": None,
+        "need_statistic": None,
     }
     cfs = item.get("customFields") or item.get("customfields") or []
     if not isinstance(cfs, list):
@@ -361,26 +371,32 @@ def _extract_cascading_project_fields(item: Dict[str, Any]) -> Dict[str, Optiona
         if not isinstance(cf, dict):
             continue
         cfid = str(cf.get("customFieldId") or cf.get("customfieldId") or "").strip()
-        if cfid != CASCADING_PROJECT_FIELD_ID:
-            continue
-        values = cf.get("value") or []
-        if not isinstance(values, list) or not values:
-            return result
-        first = values[0]
-        if not isinstance(first, dict):
-            return result
-        title = str(first.get("title") or "").strip()
-        if not title:
-            return result
-        # 按 " / " 分割三级
-        parts = [p.strip() for p in title.split("/")]
-        if len(parts) >= 1 and parts[0]:
-            result["project_category_1"] = parts[0]
-        if len(parts) >= 2 and parts[1]:
-            result["vehicle_type_2"] = parts[1]
-        if len(parts) >= 3 and parts[2]:
-            result["project_name_3"] = parts[2]
-        return result
+
+        # ── 级联字段：项目分类 / 车型 / 项目名称 ──
+        if cfid == CASCADING_PROJECT_FIELD_ID:
+            values = cf.get("value") or []
+            if isinstance(values, list) and values:
+                first = values[0]
+                if isinstance(first, dict):
+                    title = str(first.get("title") or "").strip()
+                    if title:
+                        parts = [p.strip() for p in title.split("/")]
+                        if len(parts) >= 1 and parts[0]:
+                            result["project_category_1"] = parts[0]
+                        if len(parts) >= 2 and parts[1]:
+                            result["vehicle_type_2"] = parts[1]
+                        if len(parts) >= 3 and parts[2]:
+                            result["project_name_3"] = parts[2]
+
+        # ── 是否计入统计（与 WORKDAY_FLAG 同一字段）──
+        elif cfid == NEED_STATISTIC_CUSTOMFIELD_ID:
+            values = cf.get("value") or []
+            if isinstance(values, list) and values:
+                first = values[0]
+                if isinstance(first, dict):
+                    title = str(first.get("title") or "").strip()
+                    if title in ("是", "否"):
+                        result["need_statistic"] = title
 
     return result
 
@@ -454,6 +470,7 @@ def _sync_one_detail_to_b_and_c(
             row.task_stage_id = str(item.get("taskStageId") or item.get("stageId") or "") or None
             row.unique_id = unique_id
             row.task_nature = task_nature
+            row.need_statistic = cascading["need_statistic"]
             row.workday_costhour = workday_costhour
             row.requirement_desc = _extract_requirement_desc(item)
             row.task_outputs = _serialize_outputs(_extract_task_outputs(item))
@@ -483,6 +500,7 @@ def _sync_one_detail_to_b_and_c(
                     task_stage_id=str(item.get("taskStageId") or item.get("stageId") or "") or None,
                     unique_id=unique_id,
                     task_nature=task_nature,
+                    need_statistic=cascading["need_statistic"],
                     workday_costhour=workday_costhour,
                     requirement_desc=_extract_requirement_desc(item),
                     task_outputs=_serialize_outputs(_extract_task_outputs(item)),
@@ -513,6 +531,7 @@ def _sync_one_detail_to_b_and_c(
                 row2.task_flow_status_id = task_flow_status_id
                 row2.parent_id = parent_id
                 row2.task_nature = task_nature
+                row2.need_statistic = cascading["need_statistic"]
                 row2.workday_costhour = workday_costhour
                 row2.custom_fields_json = cfs if cfs is not None else None
                 row2.raw_json = raw_blob
@@ -534,6 +553,7 @@ def _sync_one_detail_to_b_and_c(
                         task_flow_status_id=task_flow_status_id,
                         parent_id=parent_id,
                         task_nature=task_nature,
+                        need_statistic=cascading["need_statistic"],
                         workday_costhour=workday_costhour,
                         custom_fields_json=cfs if cfs is not None else None,
                         raw_json=raw_blob,
@@ -603,6 +623,7 @@ def _sync_one_issue_detail(
         row.unique_id = unique_id
         row.parent_id = parent_id
         row.task_nature = task_nature
+        row.need_statistic = cascading["need_statistic"]
         row.workday_costhour = workday_costhour
         row.work_hour_field_id = field_id
         row.work_hour = wh
@@ -638,6 +659,7 @@ def _sync_one_issue_detail(
                 unique_id=unique_id,
                 parent_id=parent_id,
                 task_nature=task_nature,
+                need_statistic=cascading["need_statistic"],
                 workday_costhour=workday_costhour,
                 work_hour_field_id=field_id,
                 work_hour=wh,
@@ -1342,6 +1364,7 @@ def _all_time_download_impl(payload: Dict[str, Any]) -> Dict[str, Any]:
             unique_id = None
 
         now = datetime.now(timezone.utc)
+        casc = _extract_cascading_project_fields(item)
         stmt = select(ProjectTaskDetail).where(
             ProjectTaskDetail.task_id == task_id,
             ProjectTaskDetail.query_user_id == user_id,
@@ -1360,11 +1383,11 @@ def _all_time_download_impl(payload: Dict[str, Any]) -> Dict[str, Any]:
             row.task_stage_id = str(item.get("taskStageId") or item.get("stageId") or "") or None
             row.unique_id = unique_id
             row.task_nature = _extract_task_nature(item)
+            row.need_statistic = casc["need_statistic"]
             row.workday_costhour = _extract_workday_costhour(item)
             row.is_overdue = is_overdue
             row.business_type = business_type
             row.task_flow_status_id = task_flow_status_id
-            casc = _extract_cascading_project_fields(item)
             row.project_category_1 = casc["project_category_1"]
             row.vehicle_type_2 = casc["vehicle_type_2"]
             row.project_name_3 = casc["project_name_3"]
@@ -1385,6 +1408,7 @@ def _all_time_download_impl(payload: Dict[str, Any]) -> Dict[str, Any]:
                     task_stage_id=str(item.get("taskStageId") or item.get("stageId") or "") or None,
                     unique_id=unique_id,
                     task_nature=_extract_task_nature(item),
+                    need_statistic=casc["need_statistic"],
                     workday_costhour=_extract_workday_costhour(item),
                     requirement_desc=_extract_requirement_desc(item),
                     task_outputs=_serialize_outputs(_extract_task_outputs(item)),
@@ -1418,6 +1442,7 @@ def _all_time_download_impl(payload: Dict[str, Any]) -> Dict[str, Any]:
             raw_blob = None
 
         now = datetime.now(timezone.utc)
+        casc = _extract_cascading_project_fields(item)
         stmt = select(ProjectTaskOverdueDetail).where(
             ProjectTaskOverdueDetail.task_id == task_id,
             ProjectTaskOverdueDetail.query_user_id == user_id,
@@ -1430,13 +1455,12 @@ def _all_time_download_impl(payload: Dict[str, Any]) -> Dict[str, Any]:
             row.task_flow_status_id = task_flow_status_id
             row.custom_fields_json = cfs if cfs is not None else None
             row.raw_json = raw_blob
-            casc = _extract_cascading_project_fields(item)
+            row.need_statistic = casc["need_statistic"]
             row.project_category_1 = casc["project_category_1"]
             row.vehicle_type_2 = casc["vehicle_type_2"]
             row.project_name_3 = casc["project_name_3"]
             row.fetched_at = now
         else:
-            casc = _extract_cascading_project_fields(item)
             one_session.add(
                 ProjectTaskOverdueDetail(
                     project_id=project_id_val,
@@ -1447,6 +1471,7 @@ def _all_time_download_impl(payload: Dict[str, Any]) -> Dict[str, Any]:
                     task_flow_status_id=task_flow_status_id,
                     custom_fields_json=cfs if cfs is not None else None,
                     raw_json=raw_blob,
+                    need_statistic=casc["need_statistic"],
                     project_category_1=casc["project_category_1"],
                     vehicle_type_2=casc["vehicle_type_2"],
                     project_name_3=casc["project_name_3"],
@@ -1726,6 +1751,7 @@ def sync_task_detail_to_db(payload: Dict[str, Any]) -> Dict[str, Any]:
     content = str(item.get("content") or "")
     due_date = _parse_iso_dt(item.get("dueDate"))
     try:
+        casc = _extract_cascading_project_fields(item)
         stmt = select(ProjectTaskDetail).where(
             ProjectTaskDetail.task_id == task_id,
             ProjectTaskDetail.query_user_id == user_id,
@@ -1747,16 +1773,15 @@ def sync_task_detail_to_db(payload: Dict[str, Any]) -> Dict[str, Any]:
             row.task_stage_id = str(item.get("taskStageId") or item.get("stageId") or "") or None
             row.unique_id = unique_id
             row.task_nature = _extract_task_nature(item)
+            row.need_statistic = casc["need_statistic"]
             row.is_overdue = is_overdue
             row.business_type = business_type
             row.task_flow_status_id = task_flow_status_id
-            casc = _extract_cascading_project_fields(item)
             row.project_category_1 = casc["project_category_1"]
             row.vehicle_type_2 = casc["vehicle_type_2"]
             row.project_name_3 = casc["project_name_3"]
             row.fetched_at = now
         else:
-            casc = _extract_cascading_project_fields(item)
             session.add(
                 ProjectTaskDetail(
                     project_id=project_id,
@@ -1775,6 +1800,7 @@ def sync_task_detail_to_db(payload: Dict[str, Any]) -> Dict[str, Any]:
                     task_stage_id=str(item.get("taskStageId") or item.get("stageId") or "") or None,
                     unique_id=unique_id,
                     task_nature=_extract_task_nature(item),
+                    need_statistic=casc["need_statistic"],
                     requirement_desc=_extract_requirement_desc(item),
                     task_outputs=_serialize_outputs(_extract_task_outputs(item)),
                     is_overdue=is_overdue,
@@ -2047,6 +2073,7 @@ def sync_project_details_in_time_range_service(payload: Dict[str, Any]) -> Dict[
                     unique_id = None
 
                 now = datetime.now(timezone.utc)
+                casc = _extract_cascading_project_fields(item)
                 stmt = select(ProjectTaskDetail).where(
                     ProjectTaskDetail.task_id == spec["task_id"],
                     ProjectTaskDetail.query_user_id == spec["executor_id"],
@@ -2065,17 +2092,16 @@ def sync_project_details_in_time_range_service(payload: Dict[str, Any]) -> Dict[
                     row.task_stage_id = str(item.get("taskStageId") or item.get("stageId") or "") or None
                     row.unique_id = unique_id
                     row.task_nature = _extract_task_nature(item)
+                    row.need_statistic = casc["need_statistic"]
                     row.workday_costhour = _extract_workday_costhour(item)
                     row.is_overdue = is_overdue
                     row.business_type = business_type
                     row.task_flow_status_id = task_flow_status_id
-                    casc = _extract_cascading_project_fields(item)
                     row.project_category_1 = casc["project_category_1"]
                     row.vehicle_type_2 = casc["vehicle_type_2"]
                     row.project_name_3 = casc["project_name_3"]
                     row.fetched_at = now
                 else:
-                    casc = _extract_cascading_project_fields(item)
                     one_session.add(
                         ProjectTaskDetail(
                             project_id=spec["project_id"],
@@ -2091,6 +2117,7 @@ def sync_project_details_in_time_range_service(payload: Dict[str, Any]) -> Dict[
                             task_stage_id=str(item.get("taskStageId") or item.get("stageId") or "") or None,
                             unique_id=unique_id,
                             task_nature=_extract_task_nature(item),
+                            need_statistic=casc["need_statistic"],
                             workday_costhour=_extract_workday_costhour(item),
                             is_overdue=is_overdue,
                             business_type=business_type,

@@ -14,6 +14,7 @@ from base.db.orm import ProjectTaskDetail
 from base.sync.task_sync import (
     REQUIREMENT_DESC_CUSTOMFIELD_ID,
     TASK_OUTPUT_CUSTOMFIELD_ID,
+    NEED_STATISTIC_CUSTOMFIELD_ID,
     _extract_custom_field_value_titles,
 )
 
@@ -45,6 +46,8 @@ def _normalize_row(row: ProjectTaskDetail) -> Dict[str, Any]:
 
     requirement_desc = _extract_custom_field_value_titles(custom_fields, REQUIREMENT_DESC_CUSTOMFIELD_ID)
     task_outputs = _extract_custom_field_value_titles(custom_fields, TASK_OUTPUT_CUSTOMFIELD_ID)
+    need_statistic_titles = _extract_custom_field_value_titles(custom_fields, NEED_STATISTIC_CUSTOMFIELD_ID)
+    need_statistic = need_statistic_titles[0] if need_statistic_titles else None
 
     return {
         "projectId": _clean_str(row.project_id),
@@ -62,6 +65,7 @@ def _normalize_row(row: ProjectTaskDetail) -> Dict[str, Any]:
         "requirementDesc": requirement_desc[0] if requirement_desc else "",
         "taskOutputs": task_outputs,
         "taskOutputText": "\n".join(task_outputs),
+        "needStatistic": need_statistic,
         "matchedCustomFields": {
             "requirementDesc": {
                 "customFieldId": REQUIREMENT_DESC_CUSTOMFIELD_ID,
@@ -70,6 +74,10 @@ def _normalize_row(row: ProjectTaskDetail) -> Dict[str, Any]:
             "taskOutput": {
                 "customFieldId": TASK_OUTPUT_CUSTOMFIELD_ID,
                 "titles": task_outputs,
+            },
+            "needStatistic": {
+                "customFieldId": NEED_STATISTIC_CUSTOMFIELD_ID,
+                "title": need_statistic,
             },
         },
     }

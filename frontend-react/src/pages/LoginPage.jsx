@@ -121,7 +121,6 @@ export default function LoginPage() {
                   value={selectedUserId}
                   onChange={(e) => {
                     setSelectedUserId(e.target.value);
-                    setPassword('123456');
                   }}
                   className="w-full h-12 rounded-2xl border border-slate-300 bg-white px-4 text-base text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400"
                 >

@@ -92,13 +92,13 @@ def _select_model_by_team_id(user_id: str):
 
 
 def _get_is_team_lead(user_id: str) -> bool:
-    """从主库 UserCharacter.character 读取身份快照。0=组长，其他=成员。"""
+    """从主库 UserCharacter.character 读取身份快照。0=组长, 9=管理员(组长等效)。"""
     uc_sess = SessionLocal()
     try:
         c_row = uc_sess.query(UserCharacter).filter(UserCharacter.user_id == user_id).first()
         if not c_row:
             return False
-        return str(getattr(c_row, "character", "")) == "0"
+        return str(getattr(c_row, "character", "")) in ("0", "9")
     finally:
         uc_sess.close()
 
@@ -128,14 +128,23 @@ def fill_member_input_service(payload: Dict[str, Any]) -> Dict[str, Any]:
         Model = _select_model_by_team_id(user_id)
         is_lead = _get_is_team_lead(user_id)
 
-        # ── 查询上季度结余 / 衰减 ──
-        prev_year, prev_q = _prev_year_quarter(year, quarter)
-        prev_stmt = select(Model).where(
-            Model.year == prev_year, Model.quarter == prev_q, Model.user_id == user_id
-        )
-        prev_row = session.scalars(prev_stmt).first()
-        prev_carry = float(_round3(prev_row.new_carry_balance if prev_row else 0.0))
-        prev_decay = float(_round3(prev_row.carry_decay_value if prev_row else 0.0))
+        # ── 上季度结余：优先用手动覆盖值，否则自动查询上季 new_carry ──
+        need_auto = ("prev_carry_balance" not in payload or payload["prev_carry_balance"] is None)
+        prev_row = None
+        if need_auto:
+            prev_year, prev_q = _prev_year_quarter(year, quarter)
+            prev_stmt = select(Model).where(
+                Model.year == prev_year, Model.quarter == prev_q, Model.user_id == user_id,
+            )
+            prev_row = session.scalars(prev_stmt).first()
+
+        if "prev_carry_balance" in payload and payload["prev_carry_balance"] is not None:
+            prev_carry = float(payload["prev_carry_balance"])
+        else:
+            prev_carry = float(_round3(prev_row.new_carry_balance if prev_row else 0.0))
+
+        # prev_decay_value 恒为 prev_carry_balance * 0.25，无需手动输入
+        prev_decay = float(_round3(Decimal(str(prev_carry)) * Decimal("0.25")))
 
         stmt = select(Model).where(Model.year == year, Model.quarter == quarter, Model.user_id == user_id)
         row = session.scalars(stmt).first()
@@ -166,6 +175,25 @@ def fill_member_input_service(payload: Dict[str, Any]) -> Dict[str, Any]:
             session.add(row)
 
         session.commit()
+
+        # 非组长 + 有输入 → 自动触发计算
+        if not is_lead and hour_score is not None and manager_score is not None:
+            calc_result = calculate_member_quarter_performance_service({
+                "year": year, "quarter": quarter, "user_id": user_id,
+            })
+            # calculate 共享 scoped_session，提交后 row 可能过期，重新查询
+            row = session.scalars(
+                select(Model).where(Model.year == year, Model.quarter == quarter, Model.user_id == user_id)
+            ).first()
+            return {
+                "success": True,
+                "data": {
+                    "id": row.id if row else None,
+                    "calc_status": "calculated" if calc_result.get("success") else "filled",
+                    "calc_error": calc_result.get("error"),
+                },
+            }
+
         return {"success": True, "data": {"id": row.id, "calc_status": row.calc_status}}
     except Exception as e:
         session.rollback()
@@ -320,7 +348,8 @@ _TEAM_ID_MAP = {
 def list_team_import_users_service(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
     查某组某季度的所有成员及其 import 状态。
-    返回: [{userId, userName, workHourScore, supervisorScore, calcStatus, isTeamLead}, ...]
+    返回: [{userId, userName, workHourScore, supervisorScore, calcStatus,
+             isTeamLead, prevCarryBalance, prevDecayValue}, ...]
     """
     payload = payload or {}
     year = int(payload.get("year"))
@@ -335,29 +364,62 @@ def list_team_import_users_service(payload: Dict[str, Any]) -> Dict[str, Any]:
     uc_sess = SessionLocal()
     perf_sess = PerfSessionLocal()
     try:
-        all_users = uc_sess.query(UserCharacter).all()
-        members = [
-            u for u in all_users
-            if str(getattr(u, "team_id", "")).strip() in team_ids
-        ]
-        members.sort(key=lambda u: str(getattr(u, "character", "")) == "0", reverse=True)
+        # ── SQL 下推：按 team_id IN (...) 过滤，排除 character=9 ──
+        members = (
+            uc_sess.query(UserCharacter)
+            .filter(UserCharacter.team_id.in_(team_ids))
+            .filter(UserCharacter.character != "9")
+            .all()
+        )
+        members.sort(key=lambda u: str(getattr(u, "character", "")) in ("0", "9"), reverse=True)
 
+        # ── 本季度绩效记录 ──
         perf_rows = perf_sess.query(Model).filter(
             Model.year == year, Model.quarter == quarter,
         ).all()
         perf_map = {r.user_id: r for r in perf_rows}
 
+        # ── 上季度绩效记录（用于预填 prev_carry / prev_decay）──
+        prev_year, prev_q = _prev_year_quarter(year, quarter)
+        prev_rows = perf_sess.query(Model).filter(
+            Model.year == prev_year, Model.quarter == prev_q,
+        ).all()
+        prev_map = {r.user_id: r for r in prev_rows}
+
         result = []
         for u in members:
             uid = u.user_id
             pr = perf_map.get(uid)
+            pv = prev_map.get(uid)
+
+            # 优先用本行已存值，否则取上季计算的 new_carry
+            if pr and pr.prev_carry_balance != 0:
+                prev_carry = float(_round3(pr.prev_carry_balance))
+            elif pv:
+                prev_carry = float(_round3(pv.new_carry_balance))
+            else:
+                prev_carry = 0.0
+
+            # prev_decay 恒为 prev_carry * 0.25，无需存多份
+            prev_decay = float(_round3(Decimal(str(prev_carry)) * Decimal("0.25")))
+
             result.append({
                 "userId": uid,
                 "userName": u.name or uid,
-                "isTeamLead": str(getattr(u, "character", "")) == "0",
+                "isTeamLead": str(getattr(u, "character", "")) in ("0", "9"),
                 "workHourScore": pr.work_hour_score if pr else None,
                 "supervisorScore": pr.supervisor_score if pr else None,
                 "calcStatus": pr.calc_status if pr else None,
+                "prevCarryBalance": prev_carry,
+                "prevDecayValue": prev_decay,
+                # 已计算字段（有则返回）
+                "overallScore": pr.overall_score if pr else None,
+                "compensationValue": pr.compensation_value if pr else None,
+                "overflowValue": pr.overflow_value if pr else None,
+                "finalScore": pr.final_score if pr else None,
+                "newCarryBalance": pr.new_carry_balance if pr else None,
+                "carryDecayValue": pr.carry_decay_value if pr else None,
+                "companyScore": pr.company_score if pr else None,
             })
         return {"success": True, "data": {"members": result, "count": len(result)}}
     finally:
@@ -386,13 +448,19 @@ def batch_import_service(payload: Dict[str, Any]) -> Dict[str, Any]:
         if not uid:
             fail += 1
             continue
-        r = fill_member_input_service({
+        fill_payload = {
             "year": year,
             "quarter": quarter,
             "user_id": uid,
             "work_hour_score": m.get("workHourScore"),
             "supervisor_score": m.get("supervisorScore"),
-        })
+        }
+        # 支持手动覆盖上季结余/衰减
+        if "prevCarryBalance" in m:
+            fill_payload["prev_carry_balance"] = m.get("prevCarryBalance")
+        if "prevDecayValue" in m:
+            fill_payload["prev_decay_value"] = m.get("prevDecayValue")
+        r = fill_member_input_service(fill_payload)
         if r.get("success"):
             ok += 1
         else:
@@ -404,3 +472,228 @@ def batch_import_service(payload: Dict[str, Any]) -> Dict[str, Any]:
         "data": {"ok": ok, "fail": fail, "errors": errors},
         "error": None if fail == 0 else f"{fail} members failed",
     }
+
+
+def update_member_performance_service(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    全字段更新：输入字段 + 计算字段 + calcStatus，全部可改。
+    传入哪个字段就更新哪个字段（null 视为清空该字段）。
+    """
+    payload = payload or {}
+    year = int(payload.get("year"))
+    quarter = int(payload.get("quarter"))
+    user_id = str(payload.get("user_id") or payload.get("userId") or "").strip()
+    if not user_id:
+        return {"success": False, "error": "missing user_id", "data": {}}
+
+    session = PerfSessionLocal()
+    now = datetime.now(timezone.utc)
+    try:
+        Model = _select_model_by_team_id(user_id)
+
+        stmt = select(Model).where(Model.year == year, Model.quarter == quarter, Model.user_id == user_id)
+        row = session.scalars(stmt).first()
+        if not row:
+            return {"success": False, "error": "record not found", "data": {}}
+
+        # 字段名映射：前端 camelCase → 后端 ORM snake_case
+        FIELD_MAP = {
+            "workHourScore":     ("work_hour_score",     float),
+            "supervisorScore":   ("supervisor_score",    float),
+            "overallScore":      ("overall_score",       float),
+            "prevCarryBalance":  ("prev_carry_balance",  float),
+            "prevDecayValue":    ("prev_decay_value",    float),
+            "compensationValue": ("compensation_value",  float),
+            "overflowValue":     ("overflow_value",      float),
+            "finalScore":        ("final_score",         float),
+            "newCarryBalance":    ("new_carry_balance",   float),
+            "carryDecayValue":   ("carry_decay_value",   float),
+            "companyScore":      ("company_score",       float),
+        }
+
+        updated = 0
+        for front_key, (col, cast) in FIELD_MAP.items():
+            if front_key in payload:
+                val = payload[front_key]
+                setattr(row, col, cast(val) if val is not None else None)
+                updated += 1
+
+        # calcStatus 单独处理
+        if "calcStatus" in payload:
+            row.calc_status = str(payload["calcStatus"])
+            updated += 1
+
+        # prev_decay_value 恒为 prev_carry_balance * 0.25
+        if row.prev_carry_balance is not None:
+            row.prev_decay_value = float(_round3(Decimal(str(row.prev_carry_balance)) * Decimal("0.25")))
+
+        if updated == 0:
+            return {"success": False, "error": "no fields to update", "data": {}}
+
+        row.updated_at = now
+        session.commit()
+        return {"success": True, "data": _row_to_dict(row)}
+    except Exception as e:
+        session.rollback()
+        return {"success": False, "error": str(e), "data": {}}
+    finally:
+        session.close()
+
+
+# ── 统一团队 / 成员查询（供所有下拉条使用）──
+
+_TEAM_LABELS = {
+    "0": "导航组", "nav": "导航组", "navigation": "导航组",
+    "1": "对接组", "servo": "对接组", "service": "对接组",
+}
+
+_ALL_TEAM_KEYS = {"nav": ["导航组"], "servo": ["对接组"]}
+
+
+def _normalize_team_key(team_id_raw) -> str:
+    tid = str(team_id_raw or "").strip()
+    label = _TEAM_LABELS.get(tid)
+    if label == "导航组":
+        return "nav"
+    if label == "对接组":
+        return "servo"
+    return tid  # fallback: 原样返回
+
+
+def list_teams_service() -> Dict[str, Any]:
+    """获取所有团队列表（从 user_character.team_id 去重）。"""
+    uc_sess = SessionLocal()
+    try:
+        rows = uc_sess.query(UserCharacter.team_id).distinct().all()
+        seen = set()
+        teams = []
+        for (tid,) in rows:
+            key = str(tid).strip() if tid else ""
+            if not key or key in seen:
+                continue
+            label = _TEAM_LABELS.get(key, key)
+            tk = _normalize_team_key(key)
+            seen.add(key)
+            teams.append({"key": tk, "label": label})
+        return {"success": True, "data": {"teams": teams}}
+    finally:
+        uc_sess.close()
+
+
+def list_members_service(payload: Dict[str, Any] = None) -> Dict[str, Any]:
+    """
+    统一成员列表接口。可选 ?team=nav 过滤。
+    返回: [{userId, userName, teamKey, teamLabel, character, isTeamLead}, ...]
+    """
+    payload = payload or {}
+    team_filter = str(payload.get("team", "")).strip().lower() or None
+
+    uc_sess = SessionLocal()
+    try:
+        query = uc_sess.query(UserCharacter).filter(UserCharacter.character != "9").order_by(UserCharacter.user_id.asc())
+        if team_filter:
+            allowed_ids = _TEAM_ID_MAP.get(team_filter)
+            if not allowed_ids:
+                return {"success": False, "error": f"unknown team: {team_filter}", "data": {}}
+            query = query.filter(UserCharacter.team_id.in_(allowed_ids))
+
+        rows = query.all()
+        members = []
+        for row in rows:
+            uid = str(getattr(row, "user_id", "") or "").strip()
+            if not uid:
+                continue
+            raw_team_id = str(getattr(row, "team_id", "") or "").strip()
+            char_val = str(getattr(row, "character", "") or "").strip()
+            members.append({
+                "userId": uid,
+                "userName": str(getattr(row, "name", "") or uid).strip() or uid,
+                "teamKey": _normalize_team_key(raw_team_id),
+                "teamLabel": _TEAM_LABELS.get(raw_team_id, raw_team_id or "未分组"),
+                "character": int(char_val) if char_val.isdigit() else 0,
+                "isTeamLead": char_val in ("0", "9"),
+                "isNavLead": bool(getattr(row, "is_nav_lead", False)),
+                "isServoLead": bool(getattr(row, "is_servo_lead", False)),
+            })
+        return {"success": True, "data": {"members": members, "count": len(members)}}
+    finally:
+        uc_sess.close()
+
+
+# ── 绩效历史查询（供 /dashboard/performance-history 使用）──
+
+
+def performance_history_service(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    查询某用户全部季度的绩效记录，返回 PerformancePage 所需数据。
+    """
+    payload = payload or {}
+    target = str(payload.get("target", "")).strip()
+
+    uc_sess = SessionLocal()
+    try:
+        # 解析 target：可能是 user_id 或 name
+        user_row = uc_sess.query(UserCharacter).filter(
+            (UserCharacter.user_id == target) | (UserCharacter.name == target)
+        ).first()
+
+        if not user_row:
+            return {"success": False, "error": "user not found", "data": {}}
+
+        user_id = str(user_row.user_id)
+        user_name = str(user_row.name or user_id)
+        team_id_raw = str(getattr(user_row, "team_id", "") or "").strip()
+
+        # 确定绩效表
+        if team_id_raw in {"0", "nav", "navigation"}:
+            Model = NavPerfQuarterResult
+        elif team_id_raw in {"1", "servo", "service", "对接", "servo_team"}:
+            Model = ServoPerfQuarterResult
+        else:
+            return {"success": False, "error": f"unknown team: {team_id_raw}", "data": {}}
+
+    finally:
+        uc_sess.close()
+
+    perf_sess = PerfSessionLocal()
+    try:
+        rows = (
+            perf_sess.query(Model)
+            .filter(Model.user_id == user_id)
+            .filter(Model.calc_status.in_(["calculated", "archived"]))
+            .order_by(Model.year.asc(), Model.quarter.asc())
+            .all()
+        )
+
+        history = []
+        for row in rows:
+            overall = float(_round3(row.overall_score or 0))
+            final = float(_round3(row.final_score or 0))
+            carry = float(_round3(row.new_carry_balance or 0))
+            overflow = float(_round3(row.overflow_value or 0))
+            decay = float(_round3(row.carry_decay_value or 0))
+            balance = float(_round3(overall + float(_round3(row.prev_carry_balance or 0))))
+
+            history.append({
+                "quarter": f"{row.year} Q{row.quarter}",
+                "hourScore": float(_round3(row.work_hour_score or 0)),
+                "managerScore": float(_round3(row.supervisor_score or 0)),
+                "overallScore": overall,
+                "balanceScore": balance,
+                "overflowScore": overflow,
+                "decayScore": decay,
+                "carryScore": carry,
+                "finalScore": final,
+            })
+
+        return {
+            "success": True,
+            "data": {
+                "targetLabel": user_name,
+                "selectedTarget": user_id,
+                "desc": f"{user_name} · 季度绩效归档视图 · 最终绩效决定正式档位",
+                "history": history,
+            },
+        }
+    finally:
+        perf_sess.close()

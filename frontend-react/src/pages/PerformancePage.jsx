@@ -1,12 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { fetchPerformanceHistory } from '../api/dashboard';
+import { fetchPerformanceHistory, fetchMembers, fetchTeams } from '../api/dashboard';
 import Card from '../components/Card';
+import PerfImportModal from '../components/PerfImportModal';
 import SectionTitle from '../components/SectionTitle';
 import { ROLES } from '../constants/roles';
 import EmployeeLayout from '../layouts/EmployeeLayout';
 import { performanceArchives as fallbackArchives } from '../mock/platformData';
 import { useAuthStore } from '../store/authStore';
+import { shouldHideMemberInSelector } from '../utils/memberVisibility';
 
 const PERFORMANCE_THRESHOLD = 1.0;
 const BAND_GUIDES = [
@@ -111,17 +113,59 @@ export default function PerformancePage() {
   const [archive, setArchive] = useState(fallbackArchives[user?.name] ?? fallbackArchives.李四);
   const [memberOptions, setMemberOptions] = useState([]);
   const [selectedTarget, setSelectedTarget] = useState(defaultTarget);
+  const [selectedTeam, setSelectedTeam] = useState('');
+  const [teams, setTeams] = useState([]);
   const [isQuerying, setIsQuerying] = useState(false);
   const [showMoreColumns, setShowMoreColumns] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const initialLoadDone = useRef(false);
+
+  // 加载小组列表
+  useEffect(() => {
+    if (!canViewAllPeople) return;
+    fetchTeams().then((res) => {
+      const list = res?.data?.teams || [];
+      setTeams(list);
+      if (list.length && !selectedTeam) {
+        setSelectedTeam(list[0].key);
+      }
+    }).catch(() => {});
+  }, [canViewAllPeople]);
+
+  // 加载成员列表（按选中小组过滤）
+  useEffect(() => {
+    if (!canViewAllPeople || !selectedTeam) return;
+    fetchMembers(selectedTeam).then((res) => {
+      const mapped = (res?.data?.members || [])
+        .filter((m) => !shouldHideMemberInSelector(m))
+        .map((m) => ({
+          id: m.userName,
+          name: m.userName,
+          team: m.teamLabel || '',
+          userId: m.userId,
+        }));
+      setMemberOptions(mapped);
+      if (mapped.length && !mapped.find((m) => m.id === selectedTarget)) {
+        setSelectedTarget(mapped[0].id);
+      }
+    }).catch(() => {});
+  }, [canViewAllPeople, selectedTeam]);
 
   useEffect(() => {
+    if (initialLoadDone.current) return;
     let active = true;
 
     fetchPerformanceHistory(user, { target: defaultTarget }).then((response) => {
-      if (active) {
+      if (active && !initialLoadDone.current) {
         setArchive(response.data);
-        setMemberOptions(response.data.memberOptions ?? []);
-        setSelectedTarget(response.data.selectedTarget ?? defaultTarget);
+        // 仅在用户尚未手动选人时自动同步下拉框
+        setSelectedTarget((prev) => {
+          if (prev === defaultTarget || prev === '') {
+            return response.data.targetLabel ?? defaultTarget;
+          }
+          return prev;
+        });
+        initialLoadDone.current = true;
       }
     });
 
@@ -178,12 +222,9 @@ export default function PerformancePage() {
         target: selectedTarget,
       });
       setArchive(response.data);
-      setMemberOptions(response.data.memberOptions ?? memberOptions);
-      const nextTarget = response.data.selectedTarget ?? selectedTarget;
+      // 仅更新选中状态，不触发 URL 变动（避免重复请求）
+      const nextTarget = response.data.targetLabel ?? selectedTarget;
       setSelectedTarget(nextTarget);
-      if (canViewAllPeople && nextTarget) {
-        setSearchParams({ target: nextTarget });
-      }
     } finally {
       setIsQuerying(false);
     }
@@ -193,47 +234,33 @@ export default function PerformancePage() {
     <EmployeeLayout>
       <SectionTitle
         title="绩效管理"
-        desc="员工端按 3.1.2 评分标准将最终绩效映射到杰出、优秀、超出期望等正式档位，并展示结余绩效。"
-        right={(
-          <div className="flex gap-3">
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm">季度归档视图</div>
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm">{archive.targetLabel ?? selectedTarget}</div>
-          </div>
-        )}
       />
 
       <Card className="p-6">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          <div>
-            <div className="text-lg font-semibold">绩效规则提示</div>
-            <div className="mt-2 flex flex-wrap gap-2 text-sm">
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700">最终绩效决定档位</span>
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700">本季度结余用于预估下季度</span>
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-slate-700">结余先使用，再按季度衰减 25%</span>
-            </div>
-            <div className="mt-3 text-sm text-slate-500">
-              {archive.desc}
-            </div>
-          </div>
-          <div className="rounded-3xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm text-slate-500">
-            单季度达标线：
-            {' '}
-            <span className="font-semibold text-slate-900">{PERFORMANCE_THRESHOLD.toFixed(1)}</span>
-            {' '}
-            分及以上为符合预期
-          </div>
-        </div>
+            <div className="text-lg font-semibold">绩效查询</div>
         {canViewAllPeople ? (
-          <div className="mt-5 flex flex-wrap items-end gap-3 border-t border-slate-200 pt-5">
-            <label className="min-w-[240px]">
-              <div className="text-sm font-medium text-slate-700">查询对象</div>
+          <div className="mt-5 flex flex-wrap items-end gap-3">
+            <label className="min-w-[140px]">
+              <div className="text-sm font-medium text-slate-700">小组</div>
+              <select
+                className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-slate-300"
+                value={selectedTeam}
+                onChange={(e) => setSelectedTeam(e.target.value)}
+              >
+                {teams.map((t) => (
+                  <option key={t.key} value={t.key}>{t.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="min-w-[200px]">
+              <div className="text-sm font-medium text-slate-700">人员</div>
               <select
                 className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-slate-300"
                 value={selectedTarget}
                 onChange={(event) => setSelectedTarget(event.target.value)}
               >
                 {memberOptions.map((item) => (
-                  <option key={item.id} value={item.id}>{item.name}{item.team ? ` · ${item.team}` : ''}</option>
+                  <option key={item.id} value={item.id}>{item.name}</option>
                 ))}
               </select>
             </label>
@@ -244,6 +271,13 @@ export default function PerformancePage() {
               disabled={isQuerying}
             >
               {isQuerying ? '查询中...' : '查询绩效'}
+            </button>
+            <button
+              type="button"
+              className="rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
+              onClick={() => setImportOpen(true)}
+            >
+              导入/编辑绩效
             </button>
           </div>
         ) : null}
@@ -265,9 +299,6 @@ export default function PerformancePage() {
               </span>
             ) : null}
           </div>
-          <div className="mt-4 text-sm">
-            最终绩效决定本季度档位，是本页最核心的绩效结果。
-          </div>
         </Card>
 
         <Card className="p-6">
@@ -275,9 +306,6 @@ export default function PerformancePage() {
           <div className="mt-3 text-4xl font-semibold text-slate-900">{currentQuarter ? (currentQuarter.carryScore ?? 0).toFixed(3) : '-'}</div>
           <div className="mt-3 text-sm">
             {currentQuarter ? `${currentQuarter.quarter} 本季度结余` : '暂无归档'}
-          </div>
-          <div className="mt-4 text-sm">
-            该值由当前区间溢出值扣除衰减分数后得到，可用于预估下个季度是否更容易跨过更高档位门槛。
           </div>
         </Card>
 
@@ -379,10 +407,10 @@ export default function PerformancePage() {
                   <HelpLabel label="档位" tip="根据最终绩效映射得到的正式绩效档位，如杰出、优秀、超出期望等。" />
                 </th>
                 <th className="px-5 py-4 text-left">
-                  <HelpLabel label="本季度结余" tip="本季度可带入下季度的剩余绩效，用于辅助预估下季度是否更容易跨档。" highlighted />
+                  <HelpLabel label="本季度结余" tip="升档：上季度结余+补偿值-上季度衰减；不升档：上季度结余×0.75+本季度溢出值" highlighted />
                 </th>
                 <th className="px-5 py-4 text-left">
-                  <HelpLabel label="结余绩效" tip="叠加结余影响后的绩效值，用于计算最终绩效。" />
+                  <HelpLabel label="结余绩效" tip="结余绩效=本季度绩效+上季度结余" />
                 </th>
                 {showMoreColumns ? (
                   <>
@@ -474,6 +502,8 @@ export default function PerformancePage() {
           </div>
         </div>
       </Card>
+
+      <PerfImportModal open={importOpen} onClose={() => setImportOpen(false)} />
 
     </EmployeeLayout>
   );

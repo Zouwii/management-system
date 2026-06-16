@@ -89,6 +89,7 @@ def _query_workday_costhour_base(
             session.query(
                 ProjectTaskDetail.query_user_id,
                 ProjectTaskDetail.workday_costhour,
+                ProjectTaskDetail.need_statistic,
                 ProjectTaskDetail.project_category_1,
                 ProjectTaskDetail.task_id,
                 ProjectTaskDetail.content,
@@ -113,6 +114,7 @@ def _query_workday_costhour_base(
             session.query(
                 ProjectTaskOverdueDetail.query_user_id,
                 ProjectTaskOverdueDetail.workday_costhour,
+                ProjectTaskOverdueDetail.need_statistic,
                 ProjectTaskOverdueDetail.project_category_1,
                 ProjectTaskOverdueDetail.task_id,
                 ProjectTaskOverdueDetail.content,
@@ -137,8 +139,11 @@ def _query_workday_costhour_base(
             session.query(
                 ProgramIssueDetail.query_user_id,
                 ProgramIssueDetail.workday_costhour,
+                ProgramIssueDetail.need_statistic,
                 ProgramIssueDetail.project_category_1,
                 ProgramIssueDetail.vehicle_type_2,
+                ProgramIssue.task_id,
+                ProgramIssue.content,
             )
             .join(
                 ProgramIssue,
@@ -197,9 +202,16 @@ def _query_workday_costhour_base(
             return "其他"
 
         # B 表 → 软件开发
-        for uid, wdc, pc1, tid, content, _scenario, vt in b_rows:
+        for uid, wdc, need_stat, pc1, tid, content, _scenario, vt in b_rows:
             uid = str(uid or "").strip()
             if not uid:
+                continue
+            # 仅统计 need_statistic = "是" 的条目
+            ns = str(need_stat or "").strip()
+            if ns != "是":
+                continue
+            # 排除工作日耗时为 0 或无数据的条目
+            if wdc is None or not (wdc == wdc and float(wdc) > 0):
                 continue
             team_id, team_name, user_name = _resolve_team(uid)
             results.append({
@@ -221,9 +233,16 @@ def _query_workday_costhour_base(
             for r in results
             if r.get("taskId")
         }
-        for uid, wdc, pc1, tid, content, _scenario, vt in c_rows:
+        for uid, wdc, need_stat, pc1, tid, content, _scenario, vt in c_rows:
             uid = str(uid or "").strip()
             if not uid:
+                continue
+            # 仅统计 need_statistic = "是" 的条目
+            ns = str(need_stat or "").strip()
+            if ns != "是":
+                continue
+            # 排除工作日耗时为 0 或无数据的条目
+            if wdc is None or not (wdc == wdc and float(wdc) > 0):
                 continue
             task_id_str = str(tid or "")
             if task_id_str in b_task_ids:
@@ -243,9 +262,16 @@ def _query_workday_costhour_base(
             })
 
         # 问题处理
-        for uid, wdc, pc1, vt in issue_rows:
+        for uid, wdc, need_stat, pc1, vt, tid, content in issue_rows:
             uid = str(uid or "").strip()
             if not uid:
+                continue
+            # 仅统计 need_statistic = "是" 的条目
+            ns = str(need_stat or "").strip()
+            if ns != "是":
+                continue
+            # 排除工作日耗时为 0 或无数据的条目
+            if wdc is None or not (wdc == wdc and float(wdc) > 0):
                 continue
             team_id, team_name, user_name = _resolve_team(uid)
             results.append({
@@ -255,8 +281,8 @@ def _query_workday_costhour_base(
                 "teamName": team_name,
                 "taskType": "问题处理",
                 "projectType": _project_type_label(pc1),
-                "taskId": "",
-                "content": "",
+                "taskId": str(tid or ""),
+                "content": str(content or ""),
                 "workdayCosthour": float(wdc) if wdc is not None and wdc == wdc else 0.0,
                 "vehicleType2": str(vt or "").strip() if vt else "",
             })
@@ -471,5 +497,69 @@ def workday_costhour_task_status_detail_service(payload: Dict[str, Any]) -> Dict
                 "totalHours": all_total["hours"],
                 "totalCount": all_total["taskCount"],
             },
+        },
+    }
+
+
+# ── 接口 4：指定小组 + 项目类型的明细列表 ──
+
+def workday_costhour_team_project_detail_service(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    按 teamId + projectType 过滤，返回每条任务的明细列表。
+
+    参数:
+      - start_time / end_time (必填)
+      - team_id (必填): "0"=导航组, "1"=对接组
+      - project_type (必填): 如 "产品项目"、"研发项目"、"订单项目"
+    """
+    start_dt, end_dt, err = _resolve_time_range(payload)
+    if err:
+        return {"success": False, "error": err, "data": {}}
+
+    team_id = str(payload.get("team_id", "")).strip()
+    project_type = str(payload.get("project_type", "")).strip()
+
+    if not team_id:
+        return {"success": False, "error": "team_id is required", "data": {}}
+    if not project_type:
+        return {"success": False, "error": "project_type is required", "data": {}}
+
+    rows = _query_workday_costhour_base(start_dt, end_dt)
+
+    # 按 teamId + projectType 过滤
+    filtered = [
+        r for r in rows
+        if r.get("teamId") == team_id and r.get("projectType") == project_type
+    ]
+
+    # 组装明细列表
+    items = []
+    for r in filtered:
+        items.append({
+            "taskId": r.get("taskId", ""),
+            "content": r.get("content", ""),
+            "userName": r.get("userName", ""),
+            "taskType": r.get("taskType", ""),
+            "vehicleType": r.get("vehicleType2", ""),
+            "workdayCosthour": r.get("workdayCosthour", 0.0),
+        })
+
+    # 按工时降序排列
+    items.sort(key=lambda x: x["workdayCosthour"], reverse=True)
+
+    total = _total_hours_and_count(filtered)
+
+    return {
+        "success": True,
+        "data": {
+            "timeRange": {
+                "start_time": start_dt.isoformat(),
+                "end_time": end_dt.isoformat(),
+            },
+            "teamId": team_id,
+            "teamName": _team_name_static(team_id),
+            "projectType": project_type,
+            "total": total,
+            "items": items,
         },
     }

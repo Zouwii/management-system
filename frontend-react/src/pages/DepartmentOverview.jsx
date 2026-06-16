@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { fetchDepartmentOverview } from '../api/dashboard';
+import { fetchDepartmentOverview, fetchMembers } from '../api/dashboard';
 import Card from '../components/Card';
 import SectionTitle from '../components/SectionTitle';
 import StatCard from '../components/StatCard';
@@ -8,7 +8,7 @@ import { ROUTE_PATHS } from '../constants/routes';
 import ManagerLayout from '../layouts/ManagerLayout';
 import { departmentStats as fallbackStats, performanceArchives, personalHoursDashboard } from '../mock/platformData';
 import { useAuthStore } from '../store/authStore';
-import { buildTeamSummary, getCurrentLocalDateTime } from '../utils/managerDashboard';
+import { buildTeamSummary } from '../utils/managerDashboard';
 import { calculateExpectedEffectiveDays, formatDateTime, formatDays } from '../utils/workHours';
 
 const BASE_REFERENCE_HOURS = 156;
@@ -91,11 +91,20 @@ export default function DepartmentOverview() {
   const user = useAuthStore((state) => state.user);
   const [stats, setStats] = useState(fallbackStats);
   const [rows, setRows] = useState([]);
-  const [lastUpdatedAt, setLastUpdatedAt] = useState(getCurrentLocalDateTime());
+  const [lastUpdatedAt, setLastUpdatedAt] = useState('');
   const [expectedView, setExpectedView] = useState('quarter');
   const performanceQuarters = useMemo(() => {
-    const template = Object.values(performanceArchives)[0];
-    return template?.history?.map((item) => item.quarter) ?? [];
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentQuarter = Math.floor(now.getMonth() / 3) + 1;
+    const quarters = [];
+    for (let y = 2024; y <= currentYear; y++) {
+      const maxQ = y === currentYear ? currentQuarter : 4;
+      for (let q = 1; q <= maxQ; q++) {
+        quarters.push(`${y} Q${q}`);
+      }
+    }
+    return quarters;
   }, []);
   const latestQuarter = performanceQuarters[performanceQuarters.length - 1] ?? getQuarterLabel();
   const [selectedQuarter, setSelectedQuarter] = useState(latestQuarter);
@@ -104,18 +113,28 @@ export default function DepartmentOverview() {
     let active = true;
 
     fetchDepartmentOverview(user).then((response) => {
-      if (!active) {
-        return;
-      }
-
+      if (!active) return;
       setStats((prev) => ({ ...prev, ...response.data.stats }));
       setRows(response.data.rows ?? []);
-      setLastUpdatedAt(getCurrentLocalDateTime());
+      setLastUpdatedAt(response.data?.lastUpdatedAt || new Date().toISOString());
     });
 
-    return () => {
-      active = false;
-    };
+    // 真实成员统计：从统一接口获取，失败时用 department-overview 自带数据
+    fetchMembers().then((res) => {
+      if (!active) return;
+      const members = res?.data?.members;
+      if (!members || !members.length) return;
+      const navCount = members.filter((m) => m.teamKey === 'nav').length;
+      const servoCount = members.filter((m) => m.teamKey === 'servo').length;
+      setStats((prev) => ({
+        ...prev,
+        totalMembers: members.length,
+        navMembers: navCount,
+        integrationMembers: servoCount,
+      }));
+    }).catch(() => {});
+
+    return () => { active = false; };
   }, [user]);
 
   useEffect(() => {
@@ -244,7 +263,6 @@ export default function DepartmentOverview() {
     <ManagerLayout>
       <SectionTitle
         title="部门总览"
-        desc="按部门口径聚合导航组和对接组的工时与绩效数据，用于快速监控异常并一键下钻。"
         right={(
           <div className="flex flex-wrap justify-end gap-3">
             <select
@@ -265,7 +283,7 @@ export default function DepartmentOverview() {
               ))}
             </select>
             <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm">部门：本体开发部</div>
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm">最后同步：{formatDateTime(lastUpdatedAt)}</div>
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm">最后同步：{lastUpdatedAt ? formatDateTime(lastUpdatedAt) : '暂无'}</div>
           </div>
         )}
       />
@@ -274,7 +292,6 @@ export default function DepartmentOverview() {
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <div className="text-lg font-semibold">聚合视图</div>
-            <div className="mt-1 text-sm text-slate-500">部门页只做监控和下钻，不再展开个人明细。</div>
           </div>
           <div className="flex flex-wrap justify-end gap-2">
             <Link to={ROUTE_PATHS.DEPARTMENT_OVERVIEW} className="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white">部门总览</Link>

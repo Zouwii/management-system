@@ -76,7 +76,7 @@ def _group_detail_rows(team_id_value: str, expected_mode: str = "quarter"):
                 getattr(m, "is_servo_lead", False),
             )
             member_character = _to_character(getattr(m, "character", None), default=0)
-            if member_character == 0:
+            if member_character in (0, 9):
                 continue
             coefficient = float(coeff_map.get(str(member_character), 1.0) or 1.0)
             expected_effective_hours = quarter_expected_days * coefficient

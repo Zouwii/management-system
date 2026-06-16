@@ -17,6 +17,12 @@ cleanup() {
 }
 trap cleanup SIGINT SIGTERM
 
+# 先释放已被占用的端口
+echo "[dev] checking ports..."
+fuser -k 5001/tcp 2>/dev/null || true
+fuser -k 5200/tcp 2>/dev/null || true
+sleep 1
+
 # 后端
 cd "${BACKEND_DIR}"
 echo "[dev] backend starting..."
