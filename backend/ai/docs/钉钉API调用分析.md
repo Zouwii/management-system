@@ -1,8 +1,7 @@
-# 钉钉 API 调用分析（第二版）
+# 钉钉 API 调用分析
 
-> 分析日期: 2026-06-09
-> 数据来源: `/home/zhr/tb_tool_bt_daemon.log` (2026-06-05 ~ 2026-06-09)
-> 代码版本: 已实现 category 优化后的版本
+> 分析日期: 2026-06-24
+> 代码版本: 两层限额 + 三态 sync 开关 + 北京时间统一
 
 ---
 
@@ -210,7 +209,7 @@ daemon 日志中的 `sync_failures` 记录：
 
 | 消耗等级 | 业务场景 | 单次钉钉调用量 | 发生频率 |
 |---------|---------|--------------|---------|
-| 🟡 中 | 全量/小同步 | **~6,100 次** | daemon 每周 2 次 + 手动 |
+| 🟡 中 | 全量/小同步 | **~6,100 次** | daemon 每周 1 次 + 手动 |
 | 🟢 低 | 创建 TB 任务 | **1 次** | 按需使用 |
 | 🟢 零 | 任务分析 / AI 聊天 / MCP 工具 | **0 次** | 日常高频 |
 
@@ -218,15 +217,15 @@ daemon 日志中的 `sync_failures` 记录：
 
 ## 八、当前存在的问题
 
-### 🔴 问题 1：daemon 同步重复启动
+### ✅ 问题 1：daemon 同步重复启动（已修复 — 2026-06-23）
 
 **现象：** 6/6 凌晨 04:00:19 和 04:00:20 同时启动了两个同步任务。
 
-**原因推测：** Flask debug 模式的 reloader 创建了两个应用进程，各自的 daemon 线程独立运行。`last_trigger_date` 是进程级变量，跨进程不共享。
+**原因：** Flask debug 模式的 Werkzeug reloader 创建了两个应用进程，各自的 daemon 线程独立运行。`last_trigger_date` 是进程级变量，跨进程不共享。
 
-**影响：** 每次定时同步消耗双倍 API 配额（~12,200 次而非 ~6,100 次）。
+**修复：** `app.py` 中 `app.run()` 硬编码 `debug=False`，移除 `FLASK_DEBUG` 环境变量依赖。同时从 `run_on_pc_daemon.sh` 和 `.env` 中清除相关调试配置。
 
-**代码位置：** `backend/base/app.py:220-276`，使用 `globals()` + `threading.Thread` 方式防止重复，但在多进程场景下失效。
+**验证：** 不再出现双进程并发同步。
 
 ### 🟡 问题 2：failed 数始终在 ~908
 
@@ -239,15 +238,11 @@ daemon 日志中的 `sync_failures` 记录：
 
 **建议：** 记录并缓存失败节点 ID，后续同步跳过这些节点，避免重复消耗 API 配额。
 
-### 🟡 问题 3：没有逐条 API 调用日志
+### ✅ 问题 3：没有逐条 API 调用日志（已解决 — 2026-06-10）
 
 **现象：** 当前日志只有 `[sync-embed]` 级别的汇总，无法统计各端点的状态码、延迟分布。
 
-**对比：** 第一版有 `{"phase":"kb_api_get","endpoint":"...","status":200,"latency_ms":384}` 格式的逐条记录。
-
-**影响：** 排障困难 — 908 次 failed 无法区分是哪个端点失败、什么状态码、是否限流。
-
-**建议：** 在 `DingTalkKnowledgeClient` 的请求方法中恢复或添加结构化日志。
+**解决方案：** 新增 `api_call_logs` 数据库表 + `ApiCallMonitor` 内存缓存，统一记录所有钉钉 API 调用。详见下方「八.2 API 调用监控系统」。
 
 ### 🟡 问题 4：Teambition 创建连续 400 重试
 
@@ -323,22 +318,55 @@ record_api_call(endpoint, status, latency, source)
 
 ---
 
+## 八.3、同步开关管控迁移（2026-06-24）
+
+### 背景
+
+此前使用 `runtime/sync_disabled` 标记文件控制全局同步开关，文件系统操作有损可靠性。
+
+### 迁移方案
+
+改为 `config` 表 `knowledge_sync_enabled` 配置项：
+
+```sql
+-- 关闭同步
+INSERT INTO config (type_, value, brief) VALUES ('knowledge_sync_enabled', 'false', '全局同步开关');
+-- 恢复同步
+UPDATE config SET value = 'true' WHERE type_ = 'knowledge_sync_enabled';
+```
+
+**受影响代码（7 处）**：`app.py`（daemon）、`auto_sync.py`、`sync/routes.py`、`projects/routes.py`、`task_sync.py`（全量更新）、`personal/routes.py`、`api_monitor.py`。
+
+**统一入口**：`base/config/service.py :: is_sync_enabled()`，读取 config 表，默认开启。
+
+### 八.4、小同步调度频率调整（2026-06-24）
+
+小同步从"每周一 + 每周四"改为"每周一"，与大同步错开执行（大同步每月1号）。
+
+| | 旧 | 新 |
+|---|---|---|
+| 大同步 | 每月1号 04:00 | 不变 |
+| 小同步 | 周一/周四 04:00 | **仅周一 04:00** |
+| 月 list_nodes | ~20,000 次 | **~10,000 次** |
+
+---
+
 ## 九、进一步优化建议
 
 ### 优先级 1（高收益 / 低风险）
 
 | # | 优化项 | 预期收益 | 说明 |
 |---|--------|---------|------|
-| 1 | **修复 daemon 重复启动** | 节省 50% 定时同步配额 | 使用文件锁或数据库锁替代进程级变量 |
+| 1 | **修复 daemon 重复启动** ✅ | 节省 50% 定时同步配额 | 已修复：`app.run(debug=False)` 硬编码，消除 Werkzeug reloader |
 | 2 | **缓存失败节点黑名单** | 节省 ~908 次/同步 的浪费 | 失败的 folder 不应在下次同步时再次尝试遍历 |
-| 3 | **恢复逐条 API 调用日志** | 提升可观测性 | 确认 908 次 failed 的端点/状态码分布 |
+| 3 | **逐条 API 调用日志** ✅ | 提升可观测性 | 已实施：`api_call_logs` 表 + `ApiCallMonitor` 监控系统 |
 
 ### 优先级 2（中收益 / 需验证）
 
 | # | 优化项 | 预期收益 | 说明 |
 |---|--------|---------|------|
-| 4 | **降低 daemon 同步频率** | 按比例减少 | 当前每周 2 次，可减为每周 1 次或增量对比 |
-| 5 | **list_nodes 加本地缓存** | 减少 ~5,000 次/同步 | 对不变更的目录树缓存子节点列表 |
+| 4 | **降低 daemon 同步频率** ✅ | 按比例减少 | 已实施：小同步从每周 2 次减为每周 1 次（周一） |
+| 5 | ~~list_nodes 加本地缓存~~ | — | 讨论后放弃：不调 list_nodes 无法感知变更，缓存无意义 |
 | 6 | **WORKBOOK 类型支持** | 扩大知识覆盖面 | 当前直接跳过 WORKBOOK，可能遗漏表格类知识 |
 
 ### 优先级 3（长期改进）
@@ -371,5 +399,87 @@ record_api_call(endpoint, status, latency, source)
 3. **前端交互完全不走钉钉 API** — 知识库聊天、任务分析、MCP、工时查询等所有日常功能都是 0 次钉钉调用。
 
 4. **可观测性下降** — 建议恢复逐条 API 日志，便于监控和排障。
+
+---
+
+## 八.5、两层 API 限额自动管控（2026-06-24）
+
+### 背景
+
+此前仅有一种全-or-nothing 的同步开关（`knowledge_sync_enabled = true/false`），无法区分轻重操作。
+
+### 方案
+
+复用同一 config 行，值扩展为三态：`"true"` / `"partial"` / `"false"`。
+
+| config 值 | 触发条件 | 含义 |
+|-----------|---------|------|
+| `"true"` | 当日 API 调用 < 80% 限额 | 完全开放 |
+| `"partial"` | 80% ≤ 调用 < 100% 限额 | 阻止重量级同步，轻量操作仍可用 |
+| `"false"` | 调用 ≥ 100% 限额 | 阻止一切钉钉 API 调用 |
+
+**限额值**（`api_monitor.py`）：
+
+| | 日常 | 每月 1 号 |
+|---|------|----------|
+| 硬限 (100%) | 5,000 | 15,000 |
+| 软限 (80%) | 4,000 | 12,000 |
+
+### 分层门禁
+
+新增两个查询函数（`config/service.py`）：
+
+```python
+is_sync_enabled()        # "true"/"partial" → True  │ "false" → False
+is_full_sync_enabled()   # "true" → True             │ 其他 → False
+```
+
+| 门禁 | 被挡住的入口（12 处） |
+|------|---------------------|
+| `is_full_sync_enabled()` | daemon(04:00)、full_update、time_range_update、normal_incremental_update、personal-hours/update、sync_all_and_embed、ai_knowledge_sync、ai_knowledge_sync-all |
+| `is_sync_enabled()` | 以上全部 + query_project_tasks、query_task_details、create_teambition、db/sync/*、知识库浏览、知识库搜索、A 表自动写入 |
+
+### 自动恢复
+
+- **降级**：每次 `_flush_batch()`（50 条或 60 秒）后调用 `_ensure_state()`，单向 true→partial→false
+- **恢复**：前端每 15 秒轮询 `snapshot()` → `_ensure_state()`，可双向恢复
+
+### 改动文件
+
+`api_monitor.py`（核心：`_ensure_state`/`_soft_limit`）、`config/service.py`（`is_full_sync_enabled`）、`app.py`、`auto_sync.py`、`projects/routes.py`、`sync/routes.py`、`task_sync.py`、`personal/routes.py`、`teambition/routes.py`、`knowledge/routes.py`
+
+---
+
+## 八.6、北京时间统一 & 死代码清理（2026-06-24）
+
+### 北京时间统一
+
+此前多处各自定义 `timezone(timedelta(hours=8))`，`api_monitor` 内部混用 `utcnow()` 和 `DATE('now')`，存在时区不一致风险。
+
+**修正**：
+
+- `api_monitor.py` 定义唯一 `BJ_TZ` 常量 + `_bj_now()` 工具函数
+- `app.py`、`task_sync.py` 改为 `from base.api_monitor import BJ_TZ`
+- `_flush_batch` 存 `created_at` 改用北京时间
+- `_daily_limit` 月 1 号判断改用北京时间
+- `_today_count` SQL 从 `DATE('now')` 改为参数化 `:today`（北京日期串）
+- `snapshot` 默认日期改用北京时间
+
+### 死代码清理
+
+| 代码 | 位置 | 原因 |
+|------|------|------|
+| `_recent` ring buffer（200 条） | `api_monitor.py` | 从未被读取，纯占内存 |
+| `_today_key()` 静态方法 | `api_monitor.py` | 已内联到 `_bj_now()` |
+| 重复 `self._lock` | `api_monitor.__init__` | 类级 `_lock` 和实例级重复 |
+| `_is_sync_disabled()` + `runtime/sync_disabled` | `auto_sync.py`、`projects/routes.py`、`sync/routes.py`、`task_sync.py`、`personal/routes.py` | 文件系统标记 → config 表 |
+
+### 其他优化
+
+- `_auto_calc_loop`：从 30 秒轮询改为计算 sleep 到位（每天醒来 1 次 vs 2,880 次）
+- `_auto_full_update_loop` 删除：TB 全量合并到 `_auto_knowledge_sync_loop`（daemon 从 3 条减为 2 条）
+- `record()` 新增 60 秒定时 flush：避免低流量时 batch 长期滞留内存
+- 钉钉 API 记录统一：`_monitor_api` → `_record`，4 个 token 接口补 latency 测量
+- Bugfix：`get_dingtalk_user_info` 重复 `data = resp.json()`（line 179-180）
 
 5. **下一步优化重点**：修复 daemon 重复 → 失败节点黑名单 → 恢复 API 日志 → 增量同步。

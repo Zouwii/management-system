@@ -25,6 +25,8 @@ import {
   mockFetchWorkdayCosthourTeamSummary,
   mockFetchWorkdayCosthourDeptAggregate,
   mockFetchWorkdayCosthourTaskDetail,
+  mockFetchWorkdayCosthourMemberSummary,
+  mockFetchWorkdayCosthourProjectNameDetail,
   mockFetchWorkdays,
   mockFetchTeamImportUsers,
   mockBatchImportScores,
@@ -59,6 +61,8 @@ import {
   realFetchWorkdayCosthourTeamSummary,
   realFetchWorkdayCosthourDeptAggregate,
   realFetchWorkdayCosthourTaskDetail,
+  realFetchWorkdayCosthourMemberSummary,
+  realFetchWorkdayCosthourProjectNameDetail,
   realFetchWorkdays,
   realFetchTeamImportUsers,
   realBatchImportScores,
@@ -105,6 +109,8 @@ export const applySuggestion = createApiSwitch(mockApplySuggestion, realApplySug
 export const fetchWorkdayCosthourTeamSummary = createApiSwitch(mockFetchWorkdayCosthourTeamSummary, realFetchWorkdayCosthourTeamSummary);
 export const fetchWorkdayCosthourDeptAggregate = createApiSwitch(mockFetchWorkdayCosthourDeptAggregate, realFetchWorkdayCosthourDeptAggregate);
 export const fetchWorkdayCosthourTaskDetail = createApiSwitch(mockFetchWorkdayCosthourTaskDetail, realFetchWorkdayCosthourTaskDetail);
+export const fetchWorkdayCosthourMemberSummary = createApiSwitch(mockFetchWorkdayCosthourMemberSummary, realFetchWorkdayCosthourMemberSummary);
+export const fetchWorkdayCosthourProjectNameDetail = createApiSwitch(mockFetchWorkdayCosthourProjectNameDetail, realFetchWorkdayCosthourProjectNameDetail);
 export const fetchWorkdays = createApiSwitch(mockFetchWorkdays, realFetchWorkdays);
 
 export const fetchTeamImportUsers = createApiSwitch(mockFetchTeamImportUsers, realFetchTeamImportUsers);

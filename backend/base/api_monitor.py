@@ -1,28 +1,36 @@
-"""DingTalk API call monitor — SQL-backed with in-memory cache.
+"""DingTalk API call monitor — SQL-backed.
 
 - Every API call is persisted to api_call_logs table.
-- Memory cache keeps recent 200 calls for instant response.
+- Batch flush: accumulates 50 entries before writing to DB.
 - Aggregated stats queried from DB (today).
+- 所有日期判断使用北京时间 (UTC+8)。
 """
 
 import datetime as dt
 import threading
 import time
-from typing import List, Optional
+from datetime import timedelta, timezone
+from typing import Optional
+
+BJ_TZ = timezone(timedelta(hours=8))
+
+
+def _bj_now() -> dt.datetime:
+    """返回北京时间 now"""
+    return dt.datetime.now(BJ_TZ)
 
 
 class ApiCallMonitor:
-    """Singleton monitor. DB-persisted + in-memory recent buffer."""
+    """Singleton monitor. DB-persisted with batch flush."""
 
     _instance: Optional["ApiCallMonitor"] = None
     _lock = threading.Lock()
 
     def __init__(self):
-        self._lock = threading.Lock()
         self._started_at = time.time()
-        self._recent: List[dict] = []  # ring buffer, max 200
-        self._batch: List[dict] = []   # pending batch for DB insert
+        self._batch: list = []   # pending batch for DB insert
         self._batch_lock = threading.Lock()
+        self._last_record_at: float = time.time()
 
     @classmethod
     def get(cls) -> "ApiCallMonitor":
@@ -32,37 +40,27 @@ class ApiCallMonitor:
                     cls._instance = cls()
         return cls._instance
 
-    @staticmethod
-    def _today_key() -> str:
-        return dt.datetime.utcnow().strftime("%Y-%m-%d")
-
     def record(self, endpoint: str, status: int, latency_ms: int, error: str = "",
                source: str = ""):
-        """Record a single API call — memory buffer + DB persist."""
-        now = time.time()
-        entry = {
-            "ts": now,
-            "endpoint": endpoint,
-            "source": source,
-            "status": status,
-            "latency_ms": latency_ms,
-            "error": error,
-        }
-
-        # Memory ring buffer
-        with self._lock:
-            self._recent.append(entry)
-            if len(self._recent) > 200:
-                self._recent = self._recent[-200:]
-
-        # DB batch (non-blocking, flushed on snapshot or at threshold)
+        """Record a single API call — accumulate for batch flush (50条或60秒)."""
         with self._batch_lock:
-            self._batch.append(entry)
+            now = time.time()
+            # 超过 60 秒无新记录 → 先 flush 旧 batch，避免长期滞留内存
+            if self._batch and now - self._last_record_at > 60:
+                self._flush_batch()
+            self._last_record_at = now
+            self._batch.append({
+                "endpoint": endpoint,
+                "source": source,
+                "status": status,
+                "latency_ms": latency_ms,
+                "error": error,
+            })
             if len(self._batch) >= 50:
                 self._flush_batch()
 
     def _flush_batch(self):
-        """Write pending entries to DB."""
+        """Write pending entries to DB, then check/enforce daily API limit."""
         if not self._batch:
             return
         to_write = list(self._batch)
@@ -72,7 +70,7 @@ class ApiCallMonitor:
             from base.db.orm import ApiCallLog
             session = SessionLocal()
             try:
-                now = dt.datetime.utcnow()
+                now = _bj_now()
                 for e in to_write:
                     session.add(ApiCallLog(
                         endpoint=e["endpoint"],
@@ -88,14 +86,88 @@ class ApiCallMonitor:
         except Exception:
             pass
 
+        # 写入后检查用量，超限自动降级同步
+        self._ensure_state()
+
+    def _daily_limit(self) -> int:
+        """当日硬限额（100%）：每月1号 15000，其他 5000"""
+        return 15000 if _bj_now().day == 1 else 5000
+
+    def _soft_limit(self) -> int:
+        """当日软限额（80%）：硬限额 × 0.8"""
+        return int(self._daily_limit() * 0.8)
+
+    def _today_count(self) -> int:
+        """查询当天 api_call_logs 记录数"""
+        try:
+            from base.db.engine import SessionLocal
+            from sqlalchemy import text
+            session = SessionLocal()
+            try:
+                today_str = _bj_now().strftime("%Y-%m-%d")
+                row = session.execute(text(
+                    "SELECT COUNT(*) FROM api_call_logs WHERE DATE(created_at) = :today"
+                ), {"today": today_str}).fetchone()
+                return int(row[0]) if row else 0
+            finally:
+                session.close()
+        except Exception:
+            return 0
+
+    def _ensure_state(self) -> str:
+        """根据当前用量调整 knowledge_sync_enabled 状态（三态：true/partial/false）。
+        仅写入数据库；不记录 API 调用本身。"""
+        cnt = self._today_count()
+        soft = self._soft_limit()
+        hard = self._daily_limit()
+
+        if cnt >= hard:
+            desired = "false"
+        elif cnt >= soft:
+            desired = "partial"
+        else:
+            desired = "true"
+
+        try:
+            from base.db.engine import SessionLocal
+            from base.db.orm import Config
+            session = SessionLocal()
+            try:
+                row = session.query(Config).filter(Config.type_ == "knowledge_sync_enabled").first()
+                current = str(row.value).strip().lower() if row else "true"
+                if current == desired:
+                    return current
+
+                labels = {"true": "恢复全部同步", "partial": "阻止全量同步（软限）", "false": "禁用所有同步（硬限）"}
+                print(f"[api_monitor] 用量 {cnt}/{hard} (软限{soft}) → {labels.get(desired, desired)}")
+
+                if row:
+                    row.value = desired
+                else:
+                    session.add(Config(type_="knowledge_sync_enabled", value=desired,
+                                       brief="API限额自动管控"))
+                session.commit()
+                return desired
+            finally:
+                session.close()
+        except Exception:
+            return "true"
+
     def snapshot(self, day: str = "") -> dict:
-        """Return stats: DB aggregation for the given day (default today UTC).
-        Queries DB on every call."""
+        """Return stats + auto-re-enable sync if under daily limit."""
 
         # Flush pending batch first
         self._flush_batch()
 
-        today = day or self._today_key()
+        from base.config.service import is_sync_enabled, is_full_sync_enabled
+
+        today = day or _bj_now().strftime("%Y-%m-%d")
+
+        # 每次 snapshot 都检查并自动调整同步状态（恢复/降级）
+        try:
+            state = self._ensure_state()
+        except Exception:
+            state = "true"
 
         # Query DB for today's stats
         db_stats = self._query_stats_for_day(today)
@@ -122,12 +194,14 @@ class ApiCallMonitor:
             "top_endpoints": {path: endpoints[path] for path, _ in top},
             "all_endpoints": endpoints,
             "recent": recent,
-            "disabled": _is_sync_disabled(),
+            "disabled": not is_sync_enabled(),
+            "partial": is_sync_enabled() and not is_full_sync_enabled(),
+            "sync_state": state,
         }
 
     @staticmethod
     def _query_stats_for_day(day: str) -> dict:
-        """Query API call stats from MySQL for a specific day (YYYY-MM-DD, UTC)."""
+        """Query API call stats from MySQL for a specific day (YYYY-MM-DD, 北京时间)."""
         try:
             from base.db.engine import SessionLocal
             from sqlalchemy import text
@@ -194,12 +268,3 @@ def record_api_call(endpoint: str, status: int, latency_ms: int, error: str = ""
                     source: str = ""):
     """Convenience function to record an API call."""
     monitor.record(endpoint, status, latency_ms, error, source)
-
-
-def _is_sync_disabled() -> bool:
-    try:
-        from pathlib import Path
-        flag = Path(__file__).resolve().parent.parent / "runtime" / "sync_disabled"
-        return flag.exists()
-    except Exception:
-        return False

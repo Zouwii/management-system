@@ -962,11 +962,10 @@ def full_update_service(payload: Dict[str, Any]) -> Dict[str, Any]:
     3) 直接清空 B/C 表全部数据
     4) 按 [startDue, endDue] 同步 A，再回填 B/C
     """
-    # sync_disabled 检查：若存在禁用标记文件，拒绝执行全量同步
-    from pathlib import Path as _Path
-    _sync_disabled_flag = _Path(__file__).resolve().parent.parent.parent / "runtime" / "sync_disabled"
-    if _sync_disabled_flag.exists():
-        return {"success": False, "error": "sync is temporarily disabled (runtime/sync_disabled exists)", "data": {}}
+    # 同步开关检查：查询 config 表 knowledge_sync_enabled
+    from base.config.service import is_full_sync_enabled
+    if not is_full_sync_enabled():
+        return {"success": False, "error": "sync is disabled (config.knowledge_sync_enabled = partial or false)", "data": {}}
 
     payload = dict(payload or {})
     user_id = str(payload.get("userId") or payload.get("userid") or "").strip()
@@ -2246,8 +2245,8 @@ def normal_incremental_update_service(payload: Dict[str, Any]) -> Dict[str, Any]
         return {"success": False, "error": "missing userId or projectId", "data": {}}
 
     # 1) 读取 last_update_time + 季度末 end_time
-    bj_tz = timezone(timedelta(hours=8))
-    now_bj = datetime.now(bj_tz)
+    from base.api_monitor import BJ_TZ
+    now_bj = datetime.now(BJ_TZ)
     last_raw = _get_config_value("last_update_time")
     last_dt = _cmp_dt_utc(_parse_iso_dt(last_raw)) if last_raw else None
     end_cfg_raw = _get_config_value("end_time")

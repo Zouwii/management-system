@@ -21,6 +21,12 @@ def register(bp, ok, fail):
         After success, clears draft.json so the next conversation starts fresh.
         """
         body = request.get_json(silent=True) or {}
+
+        # 硬限检查：阻止所有钉钉 API 调用
+        from base.config.service import is_sync_enabled
+        if not is_sync_enabled():
+            return fail("all DingTalk API calls are temporarily blocked (hard limit)", code=503, data={})
+
         auth_user = session.get("auth_user") or {}
 
         if isinstance(auth_user, dict):

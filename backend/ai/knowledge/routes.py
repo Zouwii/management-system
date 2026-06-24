@@ -297,12 +297,23 @@ def _sync_workspace(client, workspace_id: str, root_id: str, limit: int = 0,
 
 def register(bp, ok, fail):
 
+    def _require_api_enabled():
+        """硬限检查：knowledge_sync_enabled='false' 时阻止所有钉钉 API 调用"""
+        from base.config.service import is_sync_enabled
+        if not is_sync_enabled():
+            return fail("all DingTalk API calls are temporarily blocked (hard limit)", code=503, data={})
+        return None
+
     @bp.route("/ai/knowledge/workspaces", methods=["GET"])
     def ai_knowledge_workspaces():
         """List knowledge bases accessible to the current user, sorted by priority."""
         union_id = _current_union_id()
         if not union_id:
             return fail("not logged in — unable to determine user identity", code=401)
+
+        blocked = _require_api_enabled()
+        if blocked:
+            return blocked
 
         client = DingTalkKnowledgeClient(union_id)
         try:
@@ -323,6 +334,10 @@ def register(bp, ok, fail):
         union_id = _current_union_id()
         if not union_id:
             return fail("not logged in", code=401)
+
+        blocked = _require_api_enabled()
+        if blocked:
+            return blocked
 
         parent_id = request.args.get("node_id", "").strip()
         client = DingTalkKnowledgeClient(union_id)
@@ -351,6 +366,10 @@ def register(bp, ok, fail):
         cached = _cached_document(node_id)
         if cached:
             return ok(cached)
+
+        blocked = _require_api_enabled()
+        if blocked:
+            return blocked
 
         client = DingTalkKnowledgeClient(union_id)
 
@@ -410,6 +429,10 @@ def register(bp, ok, fail):
         if not union_id:
             return fail("not logged in", code=401)
 
+        from base.config.service import is_full_sync_enabled
+        if not is_full_sync_enabled():
+            return fail("full sync is temporarily disabled", code=503, data={})
+
         body = request.get_json(silent=True) or {}
         workspace_id = str(body.get("workspace_id") or "").strip()
         if not workspace_id:
@@ -461,6 +484,10 @@ def register(bp, ok, fail):
         union_id = _current_union_id()
         if not union_id:
             return fail("not logged in", code=401)
+
+        from base.config.service import is_full_sync_enabled
+        if not is_full_sync_enabled():
+            return fail("full sync is temporarily disabled", code=503, data={})
 
         client = DingTalkKnowledgeClient(union_id)
 
@@ -563,6 +590,10 @@ def register(bp, ok, fail):
         union_id = _current_union_id()
         if not union_id:
             return fail("not logged in", code=401)
+
+        blocked = _require_api_enabled()
+        if blocked:
+            return blocked
 
         body = request.get_json(silent=True) or {}
         keyword = str(body.get("keyword") or body.get("q") or "").strip()

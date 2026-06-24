@@ -4,6 +4,8 @@ import {
   fetchWorkdayCosthourTeamSummary,
   fetchWorkdayCosthourDeptAggregate,
   fetchWorkdayCosthourTaskDetail,
+  fetchWorkdayCosthourMemberSummary,
+  fetchWorkdayCosthourProjectNameDetail,
   fetchWorkdays,
 } from '../api/dashboard';
 
@@ -279,11 +281,100 @@ function DualBarChart({ data = {}, title = '' }) {
           <span className="text-slate-500">占用工时（天）</span>
         </div>
         <div className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded-sm bg-emerald-500" />
+          <span className="w-3 h-3 rounded-sm bg-blue-400" />
           <span className="text-slate-500">处理事项</span>
         </div>
       </div>
     </div>
+  );
+}
+
+// ── 有效工时组别管理表 ──
+
+function EffectiveHourManageTable({ teams = [], selectedTeamId, onTeamChange, members = [], standardDays = 0, adjustments = {}, onAdjustmentChange }) {
+  const selectedMembers = members.filter((m) => !selectedTeamId || m.teamId === selectedTeamId);
+
+  return (
+    <section className="overflow-hidden rounded-lg border-t-4 border-blue-700 bg-white shadow-md">
+      <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-blue-700 p-4">
+        <div className="flex items-center gap-4">
+          <h2 className="text-xl font-bold text-white">有效工时组别管理</h2>
+          <span className="text-sm font-semibold text-blue-200 bg-blue-800 rounded px-3 py-1">
+            季度标准：{formatDays(standardDays)}天
+          </span>
+        </div>
+        <div className="flex items-center gap-3 rounded bg-blue-800 p-2 shadow-sm">
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-bold text-blue-100 whitespace-nowrap">组别:</label>
+            <select
+              value={selectedTeamId || ''}
+              onChange={(e) => onTeamChange(e.target.value)}
+              className="rounded border-none bg-white p-1 text-sm text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-300 cursor-pointer"
+            >
+              {teams.map((team) => (
+                <option key={team.teamId} value={team.teamId}>{team.teamName}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-6 overflow-x-auto">
+        <table className="min-w-full border-collapse border border-blue-200">
+          <thead>
+            <tr className="bg-blue-100 text-blue-800">
+              <th className="border border-blue-200 p-3">姓名</th>
+              <th className="border border-blue-200 p-3 bg-blue-50">预期天数</th>
+              <th className="border border-blue-200 p-3">实际天数</th>
+              <th className="border border-blue-200 p-3 bg-blue-200 text-center">加班 (天)</th>
+              <th className="border border-blue-200 p-3 bg-blue-200 text-center">请假 (天)</th>
+              <th className="border border-blue-200 p-3">差额 (天)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {selectedMembers.length === 0 ? (
+              <tr><td className="border border-blue-200 p-3 text-gray-400" colSpan={6}>暂无数据</td></tr>
+            ) : selectedMembers.map((member) => {
+              const workday = Number(member.workdayCosthour || 0);
+              const adjustment = adjustments[member.userId] || {};
+              const overtime = Number(adjustment.overtimeDays || 0);
+              const leave = Number(adjustment.leaveDays || 0);
+              const standard = Number(standardDays || 0);
+              const personalStandard = standard + overtime - leave;
+              const diff = workday - personalStandard;
+              return (
+                <tr key={member.userId} className="hover:bg-blue-50 transition-colors">
+                  <td className="border border-blue-200 p-3 font-bold text-gray-700">{member.userName}</td>
+                  <td className="border border-blue-200 p-3 text-gray-600 bg-blue-50">{formatDays(personalStandard)}</td>
+                  <td className="border border-blue-200 p-3 text-gray-600 bg-gray-50">{formatDays(workday)}</td>
+                  <td className="border border-blue-200 p-3 bg-blue-50 text-center">
+                    <input
+                      type="number"
+                      value={overtime}
+                      step="0.5"
+                      min="0"
+                      onChange={(e) => onAdjustmentChange(member.userId, 'overtimeDays', e.target.value)}
+                      className="w-24 rounded border border-gray-400 bg-white p-1.5 text-center font-semibold text-gray-800 shadow-inner focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </td>
+                  <td className="border border-blue-200 p-3 bg-blue-50 text-center">
+                    <input
+                      type="number"
+                      value={leave}
+                      step="0.5"
+                      min="0"
+                      onChange={(e) => onAdjustmentChange(member.userId, 'leaveDays', e.target.value)}
+                      className="w-24 rounded border border-gray-400 bg-white p-1.5 text-center font-semibold text-gray-800 shadow-inner focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </td>
+                  <td className={`border border-blue-200 p-3 text-lg font-bold ${diff < 0 ? 'text-red-600' : 'text-blue-700'}`}>{formatDays(diff)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </section>
   );
 }
 
@@ -299,7 +390,7 @@ function SmallTable({ title, data = {} }) {
       <div className="overflow-x-auto">
         <table className="min-w-full border-collapse border border-gray-300">
           <thead>
-            <tr className="bg-yellow-200">
+            <tr className="bg-blue-300">
               <th className="border border-gray-300 p-2">{title}</th>
               <th className="border border-gray-300 p-2">工时（人/天）</th>
             </tr>
@@ -316,7 +407,7 @@ function SmallTable({ title, data = {} }) {
     <div className="overflow-x-auto">
       <table className="min-w-full border-collapse border border-gray-300">
         <thead>
-          <tr className="bg-yellow-200">
+          <tr className="bg-blue-300">
             <th className="border border-gray-300 p-2">{title}</th>
             <th className="border border-gray-300 p-2">工时（人/天）</th>
           </tr>
@@ -330,7 +421,7 @@ function SmallTable({ title, data = {} }) {
           ))}
         </tbody>
         <tfoot>
-          <tr className="bg-green-100 font-bold">
+          <tr className="bg-blue-100 font-bold">
             <td className="border border-gray-300 p-2">总计</td>
             <td className="border border-gray-300 p-2">{formatDays(totalHours)}</td>
           </tr>
@@ -438,6 +529,83 @@ function TaskStatusTable({ details = [], summary = {} }) {
   );
 }
 
+// ── Section 4: 项目名称明细表（三个独立小表） ──
+
+function ProjectTypeSubTable({ projectType, totalHours, projectNames = [] }) {
+  // 过滤掉全0的
+  const items = projectNames.filter((pn) => pn.totalHours > 0).sort((a, b) => (b.totalHours || 0) - (a.totalHours || 0));
+
+  if (!items.length) {
+    return (
+      <div className="flex-1 min-w-[280px]">
+        <h3 className="text-base font-bold text-blue-700 mb-2">{projectType}</h3>
+        <p className="text-gray-400 text-sm">暂无数据</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 min-w-[280px]">
+      <h3 className="text-base font-bold text-blue-700 mb-2">{projectType}</h3>
+      <table className="w-full border-collapse border border-blue-200 text-sm">
+        <thead>
+          <tr className="bg-blue-300 text-blue-900">
+            <th className="p-1.5 border border-blue-200 text-left">项目名称</th>
+            <th className="p-1.5 border border-blue-200">工时(天)</th>
+            <th className="p-1.5 border border-blue-200">软件开发</th>
+            <th className="p-1.5 border border-blue-200">问题处理</th>
+          </tr>
+        </thead>
+        <tbody>
+          {items.map((pn) => {
+            const sw = pn.children.find((c) => c.taskType === '软件开发') || {};
+            const issue = pn.children.find((c) => c.taskType === '问题处理') || {};
+            return (
+              <tr key={pn.projectName} className="hover:bg-blue-50">
+                <td className="p-1.5 border border-blue-100 font-medium text-gray-700">{pn.projectName}</td>
+                <td className="p-1.5 border border-blue-100 font-semibold">{formatDays(pn.totalHours)}</td>
+                <td className="p-1.5 border border-blue-100">{formatDays(sw.hours || 0)}</td>
+                <td className="p-1.5 border border-blue-100">{formatDays(issue.hours || 0)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+        <tfoot>
+          <tr className="bg-blue-200 font-bold text-blue-900">
+            <td className="p-1.5 border border-blue-300">合计</td>
+            <td className="p-1.5 border border-blue-300">{formatDays(totalHours)}</td>
+            <td className="p-1.5 border border-blue-300">
+              {formatDays(items.reduce((s, pn) => s + (pn.children.find((c) => c.taskType === '软件开发')?.hours || 0), 0))}
+            </td>
+            <td className="p-1.5 border border-blue-300">
+              {formatDays(items.reduce((s, pn) => s + (pn.children.find((c) => c.taskType === '问题处理')?.hours || 0), 0))}
+            </td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
+}
+
+function ProjectNameDetailTable({ details = [] }) {
+  if (!details.length) {
+    return <div className="p-4 text-gray-400 text-center">暂无数据</div>;
+  }
+
+  return (
+    <div className="flex flex-col md:flex-row gap-6">
+      {details.map((pt) => (
+        <ProjectTypeSubTable
+          key={pt.projectType}
+          projectType={pt.projectType}
+          totalHours={pt.totalHours}
+          projectNames={pt.projectNames || []}
+        />
+      ))}
+    </div>
+  );
+}
+
 // ════════════════════════════════════════════════════════════════
 //  主页面组件
 // ════════════════════════════════════════════════════════════════
@@ -445,6 +613,7 @@ function TaskStatusTable({ details = [], summary = {} }) {
 export default function WorkdayCostHourStats() {
   const [quarter, setQuarter] = useState('q1');
   const [selectedTeamId, setSelectedTeamId] = useState(null);
+  const [manageTeamId, setManageTeamId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -454,8 +623,14 @@ export default function WorkdayCostHourStats() {
   const [deptData, setDeptData] = useState({ timeRange: {}, total: {}, byProjectType: {}, byVehicleType: {} });
   // 接口3：任务状态明细
   const [taskData, setTaskData] = useState({ timeRange: {}, total: {}, details: [], summary: {} });
+  // 个人维度统计
+  const [memberData, setMemberData] = useState({ timeRange: {}, total: {}, teams: [], members: [] });
+  // 页面临时录入：加班/请假，不持久化
+  const [memberAdjustments, setMemberAdjustments] = useState({});
   // 工作日数
   const [workdayCount, setWorkdayCount] = useState(null);
+  // 项目名称明细
+  const [projectNameData, setProjectNameData] = useState({ timeRange: {}, total: {}, details: [] });
 
   const quarterOption = useMemo(
     () => QUARTER_OPTIONS.find((q) => q.value === quarter) || QUARTER_OPTIONS[0],
@@ -468,10 +643,12 @@ export default function WorkdayCostHourStats() {
     const payload = { start_time: quarterOption.start, end_time: quarterOption.end };
 
     try {
-      const [tRes, dRes, sRes, wRes] = await Promise.all([
+      const [tRes, dRes, sRes, mRes, pnRes, wRes] = await Promise.all([
         fetchWorkdayCosthourTeamSummary(payload),
         fetchWorkdayCosthourDeptAggregate(payload),
         fetchWorkdayCosthourTaskDetail(payload),
+        fetchWorkdayCosthourMemberSummary(payload),
+        fetchWorkdayCosthourProjectNameDetail(payload),
         fetchWorkdays(payload),
       ]);
       const t = tRes?.data || {};
@@ -486,7 +663,17 @@ export default function WorkdayCostHourStats() {
       const s = sRes?.data || {};
       setTaskData({ timeRange: s.timeRange || {}, total: s.total || {}, details: s.details || [], summary: s.summary || {} });
 
-      const wd = wRes?.data?.workday_count ?? wRes?.data?.effective_workday_count ?? null;
+      const pn = pnRes?.data || {};
+      setProjectNameData({ timeRange: pn.timeRange || {}, total: pn.total || {}, details: pn.details || [] });
+
+      const m = mRes?.data || {};
+      const nextMemberData = { timeRange: m.timeRange || {}, total: m.total || {}, teams: m.teams || [], members: m.members || [] };
+      setMemberData(nextMemberData);
+      if (!manageTeamId && nextMemberData.teams?.length) {
+        setManageTeamId(nextMemberData.teams[0].teamId);
+      }
+
+      const wd = wRes?.data?.workday_count ?? wRes?.data?.effective_workday_count ?? wRes?.data?.workdays ?? null;
       setWorkdayCount(wd);
     } catch (err) {
       console.error('工作日耗时数据加载失败:', err);
@@ -494,7 +681,7 @@ export default function WorkdayCostHourStats() {
     } finally {
       setLoading(false);
     }
-  }, [quarterOption, selectedTeamId]);
+  }, [quarterOption, selectedTeamId, manageTeamId]);
 
   // 首次加载
   useEffect(() => {
@@ -505,6 +692,16 @@ export default function WorkdayCostHourStats() {
   const handleQuery = useCallback(() => {
     loadAll();
   }, [loadAll]);
+
+  const handleAdjustmentChange = useCallback((userId, field, value) => {
+    setMemberAdjustments((prev) => ({
+      ...prev,
+      [userId]: {
+        ...(prev[userId] || {}),
+        [field]: value,
+      },
+    }));
+  }, []);
 
   const currentTeam = useMemo(
     () => teamData.teams.find((t) => t.teamId === selectedTeamId) || teamData.teams[0] || {},
@@ -560,11 +757,22 @@ export default function WorkdayCostHourStats() {
           <div className="py-12 text-center text-gray-400">加载中...</div>
         ) : (
           <>
+            {/* ═══════ Effective Hour Management: 个人维度有效工时 ═══════ */}
+            <EffectiveHourManageTable
+              teams={memberData.teams.length ? memberData.teams : teamData.teams}
+              selectedTeamId={manageTeamId}
+              onTeamChange={setManageTeamId}
+              members={memberData.members}
+              standardDays={workdayCount || 0}
+              adjustments={memberAdjustments}
+              onAdjustmentChange={handleAdjustmentChange}
+            />
+
             {/* ═══════ Section 1: 小组明细 ═══════ */}
-            <section className="overflow-hidden rounded-lg border-t-4 border-yellow-400 bg-white shadow-md">
-              <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-yellow-400 p-4">
-                <h2 className="text-xl font-bold text-gray-800">各小组明细数据看板</h2>
-                <div className="flex items-center gap-2 rounded bg-yellow-300 p-2 shadow-sm">
+            <section className="overflow-hidden rounded-lg border-t-4 border-blue-500 bg-white shadow-md">
+              <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-blue-500 p-4">
+                <h2 className="text-xl font-bold text-white">各小组明细数据看板</h2>
+                <div className="flex items-center gap-2 rounded bg-blue-400 p-2 shadow-sm">
                   <TeamSelector
                     teams={teamData.teams}
                     selectedTeamId={selectedTeamId}
@@ -641,6 +849,16 @@ export default function WorkdayCostHourStats() {
                 </div>
               </section>
             </div>
+
+            {/* ═══════ Section 4: 项目名称明细 ─────── */}
+            <section className="overflow-hidden rounded-lg border-t-4 border-blue-400 bg-white shadow-md mt-6">
+              <div className="bg-blue-400 p-4">
+                <h2 className="text-center text-xl font-bold text-white">项目名称明细</h2>
+              </div>
+              <div className="p-6">
+                <ProjectNameDetailTable details={projectNameData.details} />
+              </div>
+            </section>
           </>
         )}
       </div>

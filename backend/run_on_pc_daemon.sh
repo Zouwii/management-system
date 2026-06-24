@@ -61,7 +61,6 @@ ensure_env_file() {
     cat > .env <<EOF
 DINGTALK_APPKEY=
 DINGTALK_APPSECRET=
-TB_TOOL_BT_DEBUG=false
 
 TB_TOOL_BT_USE_MYSQL=${USE_MYSQL}
 TB_TOOL_BT_DB_HOST=${DB_HOST}
@@ -170,12 +169,12 @@ start_daemon() {
   install_deps
   maybe_init_mysql
 
+  echo "[tb_tool_bt] Starting daemon on listen http://${APP_HOST}:${APP_PORT}"
   export FLASK_RUN_HOST="${APP_HOST}"
   export FLASK_RUN_PORT="${APP_PORT}"
   export AI_FLASK_BASE_URL="http://127.0.0.1:${APP_PORT}"
   export AI_TTYD_BASE_URL="http://${APP_PUBLIC_HOST}:{port}/"
 
-  echo "[tb_tool_bt] Starting daemon on listen http://${APP_HOST}:${APP_PORT}"
   echo "[tb_tool_bt] Access URL: http://${APP_PUBLIC_HOST}:${APP_PORT}"
   if [ "${USE_POETRY}" = "1" ]; then
     nohup poetry run python app.py >> "${LOG_FILE}" 2>&1 &

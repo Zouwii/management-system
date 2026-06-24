@@ -731,8 +731,118 @@ export function mockFetchWorkdayCosthourTaskDetail() {
   return delay({ code: 200, data: mockTaskDetailData });
 }
 
+const mockMemberSummaryData = {
+  timeRange: { start_time: '2026-01-01T00:00:00', end_time: '2026-03-31T23:59:59' },
+  total: { hours: 97, taskCount: 58 },
+  teams: [
+    { teamId: '0', teamName: '导航组' },
+    { teamId: '1', teamName: '对接组' },
+  ],
+  members: [
+    { userId: 'u1', userName: '张三', teamId: '0', teamName: '导航组', workdayCosthour: 55, taskCount: 20 },
+    { userId: 'u2', userName: '李四', teamId: '0', teamName: '导航组', workdayCosthour: 42, taskCount: 10 },
+    { userId: 'u3', userName: '王五', teamId: '1', teamName: '对接组', workdayCosthour: 45, taskCount: 28 },
+  ],
+};
+
+export function mockFetchWorkdayCosthourMemberSummary(payload = {}) {
+  const teamId = String(payload?.team_id || '');
+  const members = teamId
+    ? mockMemberSummaryData.members.filter((m) => m.teamId === teamId)
+    : mockMemberSummaryData.members;
+  return delay({ code: 200, data: { ...mockMemberSummaryData, teamId, members } });
+}
+
+const mockProjectNameDetailData = {
+  timeRange: { start_time: '2026-01-01T00:00:00', end_time: '2026-03-31T23:59:59' },
+  total: { hours: 97, taskCount: 58 },
+  details: [
+    {
+      projectType: '研发项目',
+      totalHours: 65,
+      totalCount: 40,
+      projectNames: [
+        {
+          projectName: '本地图调度',
+          totalHours: 25, totalCount: 15,
+          children: [
+            { taskType: '软件开发', hours: 15, count: 8 },
+            { taskType: '问题处理', hours: 10, count: 7 },
+          ],
+        },
+        {
+          projectName: '导航协作',
+          totalHours: 20, totalCount: 12,
+          children: [
+            { taskType: '软件开发', hours: 12, count: 6 },
+            { taskType: '问题处理', hours: 8, count: 6 },
+          ],
+        },
+        {
+          projectName: '其他研发',
+          totalHours: 20, totalCount: 13,
+          children: [
+            { taskType: '软件开发', hours: 10, count: 5 },
+            { taskType: '问题处理', hours: 10, count: 8 },
+          ],
+        },
+      ],
+    },
+    {
+      projectType: '产品项目',
+      totalHours: 20,
+      totalCount: 12,
+      projectNames: [
+        {
+          projectName: '智驾产品',
+          totalHours: 12, totalCount: 7,
+          children: [
+            { taskType: '软件开发', hours: 7, count: 4 },
+            { taskType: '问题处理', hours: 5, count: 3 },
+          ],
+        },
+        {
+          projectName: '座舱产品',
+          totalHours: 8, totalCount: 5,
+          children: [
+            { taskType: '软件开发', hours: 5, count: 3 },
+            { taskType: '问题处理', hours: 3, count: 2 },
+          ],
+        },
+      ],
+    },
+    {
+      projectType: '订单项目',
+      totalHours: 12,
+      totalCount: 6,
+      projectNames: [
+        {
+          projectName: '吉利项目',
+          totalHours: 7, totalCount: 3,
+          children: [
+            { taskType: '软件开发', hours: 4, count: 2 },
+            { taskType: '问题处理', hours: 3, count: 1 },
+          ],
+        },
+        {
+          projectName: '比亚迪项目',
+          totalHours: 5, totalCount: 3,
+          children: [
+            { taskType: '软件开发', hours: 3, count: 2 },
+            { taskType: '问题处理', hours: 2, count: 1 },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+export function mockFetchWorkdayCosthourProjectNameDetail() {
+  return delay({ code: 200, data: mockProjectNameDetailData });
+}
+
 export function mockFetchWorkdays() {
-  return delay({ code: 200, data: { workdays: 59 } });
+  return delay({ code: 200, data: { workday_count: 59, workdays: 59 } });
 }
 
 // ── 绩效导入 Mock ──

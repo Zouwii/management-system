@@ -95,6 +95,7 @@ def _query_workday_costhour_base(
                 ProjectTaskDetail.content,
                 ProjectTaskDetail.scenario_field_config_id,
                 ProjectTaskDetail.vehicle_type_2,
+                ProjectTaskDetail.project_name_3,
             )
             .join(
                 ProjectTask,
@@ -120,6 +121,7 @@ def _query_workday_costhour_base(
                 ProjectTaskOverdueDetail.content,
                 ProjectTaskOverdueDetail.scenario_field_config_id,
                 ProjectTaskOverdueDetail.vehicle_type_2,
+                ProjectTaskOverdueDetail.project_name_3,
             )
             .join(
                 ProjectTask,
@@ -142,6 +144,7 @@ def _query_workday_costhour_base(
                 ProgramIssueDetail.need_statistic,
                 ProgramIssueDetail.project_category_1,
                 ProgramIssueDetail.vehicle_type_2,
+                ProgramIssueDetail.project_name_3,
                 ProgramIssue.task_id,
                 ProgramIssue.content,
             )
@@ -202,7 +205,7 @@ def _query_workday_costhour_base(
             return "其他"
 
         # B 表 → 软件开发
-        for uid, wdc, need_stat, pc1, tid, content, _scenario, vt in b_rows:
+        for uid, wdc, need_stat, pc1, tid, content, _scenario, vt, pn3 in b_rows:
             uid = str(uid or "").strip()
             if not uid:
                 continue
@@ -225,6 +228,7 @@ def _query_workday_costhour_base(
                 "content": str(content or ""),
                 "workdayCosthour": float(wdc) if wdc is not None and wdc == wdc else 0.0,
                 "vehicleType2": str(vt or "").strip() if vt else "",
+                "projectName3": str(pn3 or "").strip() if pn3 else "",
             })
 
         # C 表 → 软件开发（B/C 去重：以 task_id 为 key，B 表优先）
@@ -233,7 +237,7 @@ def _query_workday_costhour_base(
             for r in results
             if r.get("taskId")
         }
-        for uid, wdc, need_stat, pc1, tid, content, _scenario, vt in c_rows:
+        for uid, wdc, need_stat, pc1, tid, content, _scenario, vt, pn3 in c_rows:
             uid = str(uid or "").strip()
             if not uid:
                 continue
@@ -259,10 +263,11 @@ def _query_workday_costhour_base(
                 "content": str(content or ""),
                 "workdayCosthour": float(wdc) if wdc is not None and wdc == wdc else 0.0,
                 "vehicleType2": str(vt or "").strip() if vt else "",
+                "projectName3": str(pn3 or "").strip() if pn3 else "",
             })
 
         # 问题处理
-        for uid, wdc, need_stat, pc1, vt, tid, content in issue_rows:
+        for uid, wdc, need_stat, pc1, vt, pn3, tid, content in issue_rows:
             uid = str(uid or "").strip()
             if not uid:
                 continue
@@ -285,6 +290,7 @@ def _query_workday_costhour_base(
                 "content": str(content or ""),
                 "workdayCosthour": float(wdc) if wdc is not None and wdc == wdc else 0.0,
                 "vehicleType2": str(vt or "").strip() if vt else "",
+                "projectName3": str(pn3 or "").strip() if pn3 else "",
             })
 
         # ── 白名单过滤：只保留指定参与人员 ──
@@ -501,6 +507,65 @@ def workday_costhour_task_status_detail_service(payload: Dict[str, Any]) -> Dict
     }
 
 
+def workday_costhour_member_summary_service(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """个人维度工作日耗时汇总：三张明细表统一查询后按 userId 聚合。"""
+    start_dt, end_dt, err = _resolve_time_range(payload)
+    if err:
+        return {"success": False, "error": err, "data": {}}
+
+    team_id_filter = str(payload.get("team_id", "") or "").strip()
+
+    rows = _query_workday_costhour_base(start_dt, end_dt)
+    if team_id_filter:
+        rows = [r for r in rows if str(r.get("teamId", "") or "").strip() == team_id_filter]
+
+    member_map: Dict[str, Dict[str, Any]] = {}
+    for r in rows:
+        uid = str(r.get("userId", "") or "").strip()
+        if not uid:
+            continue
+        bucket = member_map.setdefault(uid, {
+            "userId": uid,
+            "userName": r.get("userName", uid),
+            "teamId": str(r.get("teamId", "") or ""),
+            "teamName": r.get("teamName") or _team_name_static(r.get("teamId")),
+            "workdayCosthour": 0.0,
+            "taskCount": 0,
+        })
+        bucket["workdayCosthour"] += float(r.get("workdayCosthour") or 0.0)
+        bucket["taskCount"] += 1
+
+    members = []
+    for item in member_map.values():
+        item["workdayCosthour"] = round(float(item.get("workdayCosthour") or 0.0), 2)
+        members.append(item)
+    members.sort(key=lambda x: (str(x.get("teamId", "")), str(x.get("userName", ""))))
+
+    teams_seen: Dict[str, str] = {}
+    for m in members:
+        tid = str(m.get("teamId", "") or "")
+        teams_seen[tid] = m.get("teamName") or _team_name_static(tid)
+    teams = [
+        {"teamId": tid, "teamName": teams_seen[tid]}
+        for tid in sorted(teams_seen.keys())
+    ]
+
+    return {
+        "success": True,
+        "data": {
+            "timeRange": {
+                "start_time": start_dt.isoformat(),
+                "end_time": end_dt.isoformat(),
+            },
+            "teamId": team_id_filter,
+            "teamName": _team_name_static(team_id_filter) if team_id_filter else "全部",
+            "teams": teams,
+            "members": members,
+            "total": _total_hours_and_count(rows),
+        },
+    }
+
+
 # ── 接口 4：指定小组 + 项目类型的明细列表 ──
 
 def workday_costhour_team_project_detail_service(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -561,5 +626,75 @@ def workday_costhour_team_project_detail_service(payload: Dict[str, Any]) -> Dic
             "projectType": project_type,
             "total": total,
             "items": items,
+        },
+    }
+
+
+# ── 接口 5：项目名称明细（按 project_name_3 展开） ──
+
+def workday_costhour_project_name_detail_service(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """按项目类型 → project_name_3 → 软件开发/问题处理 的层级结构。"""
+    start_dt, end_dt, err = _resolve_time_range(payload)
+    if err:
+        return {"success": False, "error": err, "data": {}}
+
+    rows = _query_workday_costhour_base(start_dt, end_dt)
+    all_total = _total_hours_and_count(rows)
+
+    # 三层嵌套: projectType → projectName3 → taskType → {hours, count}
+    project_buckets: Dict[str, Dict[str, Dict[str, Dict[str, float]]]] = {}
+    for r in rows:
+        pt = r.get("projectType", "其他")
+        pn3 = r.get("projectName3") or "未分类"
+        tt = r.get("taskType", "未知")
+        bucket = (
+            project_buckets.setdefault(pt, {})
+            .setdefault(pn3, {})
+            .setdefault(tt, {"hours": 0.0, "count": 0})
+        )
+        bucket["hours"] += r.get("workdayCosthour", 0.0)
+        bucket["count"] += 1
+
+    project_type_order = ["研发项目", "产品项目", "订单项目"]
+    details = []
+    for pt in project_type_order:
+        pn3_map = project_buckets.get(pt, {})
+        pn3_items = []
+        for pn3 in sorted(pn3_map.keys()):
+            tt_map = pn3_map[pn3]
+            children = []
+            for tt in ["软件开发", "问题处理"]:
+                v = tt_map.get(tt, {"hours": 0.0, "count": 0})
+                children.append({
+                    "taskType": tt,
+                    "hours": round(v["hours"], 2),
+                    "count": int(v["count"]),
+                })
+            pn3_total_h = round(sum(c["hours"] for c in children), 2)
+            pn3_total_c = sum(c["count"] for c in children)
+            pn3_items.append({
+                "projectName": pn3,
+                "totalHours": pn3_total_h,
+                "totalCount": pn3_total_c,
+                "children": children,
+            })
+        pt_total_h = round(sum(item["totalHours"] for item in pn3_items), 2)
+        pt_total_c = sum(item["totalCount"] for item in pn3_items)
+        details.append({
+            "projectType": pt,
+            "totalHours": pt_total_h,
+            "totalCount": pt_total_c,
+            "projectNames": pn3_items,
+        })
+
+    return {
+        "success": True,
+        "data": {
+            "timeRange": {
+                "start_time": start_dt.isoformat(),
+                "end_time": end_dt.isoformat(),
+            },
+            "total": all_total,
+            "details": details,
         },
     }

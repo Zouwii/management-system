@@ -1,0 +1,13 @@
+{
+  "title": "Q2问题复盘与改进汇总",
+  "workType": "自主型",
+  "requirementDesc": "针对2026Q2已发生的工程/产品质量问题，梳理根因、改进措施并形成标准复盘模板，供后续复用。",
+  "outputs": [
+    "问题根因汇总及改进措施清单(1天)",
+    "复盘模板及撰写规范(0.5天)"
+  ],
+  "participationLevel": 1.5,
+  "dueDate": "2026-06-29",
+  "startDate": "2026-06-23",
+  "parentTaskId": ""
+}

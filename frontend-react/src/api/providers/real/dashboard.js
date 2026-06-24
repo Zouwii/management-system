@@ -773,6 +773,20 @@ export function realFetchWorkdayCosthourTaskDetail(payload = {}) {
   });
 }
 
+export function realFetchWorkdayCosthourMemberSummary(payload = {}) {
+  return httpRequest('/bt/stats/workday_costhour/member_summary', {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+  });
+}
+
+export function realFetchWorkdayCosthourProjectNameDetail(payload = {}) {
+  return httpRequest('/bt/stats/workday_costhour/project_name_detail', {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+  });
+}
+
 // ── 工作日数查询 ──
 
 export function realFetchWorkdays(payload = {}) {

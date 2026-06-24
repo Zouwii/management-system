@@ -288,6 +288,53 @@ def get_workhour_auto_calc_service() -> Dict[str, Any]:
         session.close()
 
 
+def is_sync_enabled() -> bool:
+    """
+    轻量级同步开关：knowledge_sync_enabled != 'false' 时返回 True。
+    三态值：
+      'true'    → True  (完全开放)
+      'partial' → True  (仅阻止重量级操作，轻量同步仍可用)
+      'false'   → False (阻止所有同步操作)
+    默认开启（表里没有记录或 value 非明确 false 时返回 True）。
+    关闭：INSERT INTO config (type, value, brief) VALUES ('knowledge_sync_enabled', 'false', '全局同步开关');
+    恢复：UPDATE config SET value = 'true' WHERE type = 'knowledge_sync_enabled';
+    """
+    from base.db.engine import SessionLocal
+    from base.db.orm import Config as DbConfig
+
+    session = SessionLocal()
+    try:
+        row = session.query(DbConfig).filter(DbConfig.type_ == "knowledge_sync_enabled").first()
+        if not row:
+            return True
+        return str(row.value).strip().lower() not in ("0", "false", "no", "off")
+    except Exception:
+        return True
+    finally:
+        session.close()
+
+
+def is_full_sync_enabled() -> bool:
+    """
+    重量级同步开关：仅 knowledge_sync_enabled == 'true' 时返回 True。
+    在 80% 软限时 config 值被设为 'partial'，此函数返回 False 阻止全量/大同步。
+    100% 硬限时设为 'false'，此函数也返回 False。
+    """
+    from base.db.engine import SessionLocal
+    from base.db.orm import Config as DbConfig
+
+    session = SessionLocal()
+    try:
+        row = session.query(DbConfig).filter(DbConfig.type_ == "knowledge_sync_enabled").first()
+        if not row:
+            return True  # 默认完全开放
+        return str(row.value).strip().lower() == "true"
+    except Exception:
+        return True
+    finally:
+        session.close()
+
+
 def update_workhour_auto_calc_service(
     enabled: Any,
     auto_time: str,

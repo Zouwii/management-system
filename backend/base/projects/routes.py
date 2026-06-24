@@ -1,7 +1,6 @@
 """项目任务：列表查询、用户任务明细"""
 
 import time
-from pathlib import Path
 
 from flask import request, session
 
@@ -20,11 +19,7 @@ from base.sync.task_sync import (
     sync_project_details_in_time_range_service,
     sync_project_tasks_to_db,
 )
-
-
-def _is_sync_disabled() -> bool:
-    flag_path = Path(__file__).resolve().parent.parent.parent / "runtime" / "sync_disabled"
-    return flag_path.exists()
+from base.config.service import is_sync_enabled, is_full_sync_enabled
 
 
 def register(bp, ok, fail):
@@ -41,7 +36,7 @@ def register(bp, ok, fail):
             if not (payload.get("projectId") or payload.get("projectid")):
                 return fail("missing projectId", code=400, data={})
             if str(payload.get("sync_ab_by_config_time_range") or "").strip().lower() in {"1", "true", "yes", "on"}:
-                if _is_sync_disabled():
+                if not is_full_sync_enabled():
                     return fail("sync is temporarily disabled (offline mode)", code=503, data={})
                 user_id = str(payload.get("userId") or payload.get("userid") or "").strip()
                 owner = "{}@{}".format(user_id or "unknown", int(time.time()))
@@ -56,17 +51,21 @@ def register(bp, ok, fail):
                 finally:
                     _release_update_lock(DEFAULT_UPDATE_LOCK_KEY, owner)
             if str(payload.get("sync_ab_by_time_range") or "").strip().lower() in {"1", "true", "yes", "on"}:
-                if _is_sync_disabled():
+                if not is_full_sync_enabled():
                     return fail("sync is temporarily disabled (offline mode)", code=503, data={})
                 out = sync_project_details_in_time_range_service(payload)
                 if out.get("success"):
                     return ok(out.get("data") or {})
                 return fail(out.get("error", "sync failed"), code=400, data=out.get("data") or {})
 
+            # 硬限检查：阻止所有钉钉 API 调用（包括查询）
+            if not is_sync_enabled():
+                return fail("all DingTalk API calls are temporarily blocked (hard limit)", code=503, data={})
+
             result = query_project_tasks_service(payload)
             if result.get("success"):
                 meta = dict(result.get("meta") or {})
-                if not _is_sync_disabled():
+                if is_sync_enabled():
                     sync_out = sync_project_tasks_to_db(payload, query_result=result)
                     if sync_out.get("success"):
                         meta["db_sync"] = sync_out.get("data")
@@ -89,6 +88,11 @@ def register(bp, ok, fail):
             payload = request.get_json(silent=True) or {}
             if not (payload.get("userId") or payload.get("userid")):
                 return fail("missing userId", code=400, data={})
+
+            # 硬限检查：阻止所有钉钉 API 调用（包括查询）
+            if not is_sync_enabled():
+                return fail("all DingTalk API calls are temporarily blocked (hard limit)", code=503, data={})
+
             result = query_user_tasks_service(payload)
             if result.get("success"):
                 return ok(result)

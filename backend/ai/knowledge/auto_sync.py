@@ -198,27 +198,16 @@ def _rechunk_documents(doc_ids: List[str]) -> dict:
         db.close()
 
 
-def _is_sync_disabled() -> bool:
-    """Check if sync operations are temporarily disabled via flag file.
-
-    To disable:  touch backend/runtime/sync_disabled
-    To re-enable: rm backend/runtime/sync_disabled
-    """
-    flag_file = (
-        Path(__file__).resolve().parent.parent.parent
-        / "runtime" / "sync_disabled"
-    )
-    return flag_file.exists()
-
-
 def sync_all_and_embed(union_id: str = "", full_sync: bool = False) -> dict:
     """Run the full pipeline: sync all KBs -> rechunk -> embed.
 
     full_sync=False (小同步): 增量拉取 + rechunk 变更 + embed 增量
     full_sync=True  (大同步): 对比修改时间重拉 + 全量 rechunk + embed
     """
-    if _is_sync_disabled():
-        msg = "sync is temporarily disabled (runtime/sync_disabled exists)"
+    from base.config.service import is_full_sync_enabled
+
+    if not is_full_sync_enabled():
+        msg = "sync is disabled (config.knowledge_sync_enabled = partial or false)"
         print(f"[auto_sync] ABORT: {msg}")
         _sync_log({
             "ts": int(time.time()), "phase": "pipeline", "event": "abort",

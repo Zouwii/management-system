@@ -9,8 +9,8 @@ import time
 from base.dingtalk_client import get_valid_access_token
 
 
-def _monitor_api(endpoint: str, status: int, latency_ms: int, error: str = "", source: str = ""):
-    """Feed API call data to the in-memory + DB monitor."""
+def _record(endpoint: str, status: int, latency_ms: int, error: str = "", source: str = ""):
+    """统一入口：记录钉钉 API 调用到 api_call_logs 表"""
     try:
         from base.api_monitor import record_api_call
         record_api_call(endpoint, status, latency_ms, error, source)
@@ -123,7 +123,7 @@ def query_project_tasks_service(payload: Dict[str, Any]) -> Dict[str, Any]:
             },
             timeout=30,
         )
-        _monitor_api(
+        _record(
             endpoint="/v1.0/project/users/{userId}/projectIds/{projectId}/tasks",
             status=resp.status_code,
             latency_ms=int((time.time() - _start) * 1000),
@@ -310,7 +310,7 @@ def query_user_tasks_service(payload: Dict[str, Any]) -> Dict[str, Any]:
             },
             timeout=30,
         )
-        _monitor_api(
+        _record(
             endpoint="/v1.0/project/users/{userId}/tasks",
             status=resp.status_code,
             latency_ms=int((time.time() - _start) * 1000),

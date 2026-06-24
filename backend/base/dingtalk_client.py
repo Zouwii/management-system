@@ -7,7 +7,8 @@ from typing import Dict, Any, Optional
 import requests
 
 
-def _monitor_api(endpoint: str, status: int, latency_ms: int, error: str = "", source: str = "auth"):
+def _record(endpoint: str, status: int, latency_ms: int, error: str = "", source: str = "auth"):
+    """统一入口：记录钉钉 API 调用到 api_call_logs 表"""
     try:
         from base.api_monitor import record_api_call
         record_api_call(endpoint, status, latency_ms, error, source)
@@ -139,6 +140,7 @@ def exchange_dingtalk_auth_code(auth_code: str, payload: Optional[Dict[str, Any]
         }
 
     try:
+        t0 = time.time()
         resp = requests.post(
             "https://api.dingtalk.com/v1.0/oauth2/userAccessToken",
             headers={"Content-Type": "application/json"},
@@ -150,7 +152,7 @@ def exchange_dingtalk_auth_code(auth_code: str, payload: Optional[Dict[str, Any]
             },
             timeout=30,
         )
-        _monitor_api("/v1.0/oauth2/userAccessToken", resp.status_code, 0)
+        _record("/v1.0/oauth2/userAccessToken", resp.status_code, int((time.time() - t0) * 1000))
         data = resp.json()
     except Exception as e:
         return {"ok": False, "error": str(e)}
@@ -168,13 +170,13 @@ def get_dingtalk_user_info(access_token: str) -> Dict[str, Any]:
         return {"ok": False, "error": "missing accessToken"}
 
     try:
+        t0 = time.time()
         resp = requests.get(
             "https://api.dingtalk.com/v1.0/contact/users/me",
             headers={"x-acs-dingtalk-access-token": token},
             timeout=30,
         )
-        _monitor_api("/v1.0/contact/users/me", resp.status_code, 0)
-        data = resp.json()
+        _record("/v1.0/contact/users/me", resp.status_code, int((time.time() - t0) * 1000))
         data = resp.json()
     except Exception as e:
         return {"ok": False, "error": str(e)}
@@ -200,12 +202,13 @@ def get_userid_by_unionid(unionid: str) -> Dict[str, Any]:
 
     access_token = token_out.get("access_token")
     try:
+        t0 = time.time()
         resp = requests.get(
             "https://oapi.dingtalk.com/user/getUseridByUnionid",
             params={"access_token": access_token, "unionid": uid},
             timeout=30,
         )
-        _monitor_api("/user/getUseridByUnionid", resp.status_code, 0)
+        _record("/user/getUseridByUnionid", resp.status_code, int((time.time() - t0) * 1000))
         data = resp.json()
     except Exception as e:
         return {"ok": False, "error": str(e)}
@@ -305,8 +308,9 @@ def fetch_dingtalk_json(payload: Dict) -> Dict:
     url = "https://oapi.dingtalk.com/gettoken"
     params = {"appkey": app_key, "appsecret": app_secret}
     try:
+        t0 = time.time()
         resp = requests.get(url, params=params, timeout=30)
-        _monitor_api("/gettoken", resp.status_code, 0)
+        _record("/gettoken", resp.status_code, int((time.time() - t0) * 1000))
         data = resp.json()
         ok = data.get("errcode", 0) == 0
         errcode = data.get("errcode")

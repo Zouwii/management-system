@@ -56,7 +56,7 @@ def create_app() -> Flask:
         except Exception:
             pass
 
-    # 后台：根据 config 表里的自动计算设置，到点触发“更新数据”
+    # 后台：根据 config 表里的自动计算设置，到点触发"更新数据"
     # 注意：用 daemon thread，且通过模块级标记避免重复启动。
     global _AUTO_CALC_THREAD_STARTED
     if not globals().get("_AUTO_CALC_THREAD_STARTED"):
@@ -69,59 +69,80 @@ def create_app() -> Flask:
                 get_last_update_time_service,
             )
 
+            from base.api_monitor import BJ_TZ
+
             while True:
                 try:
                     cfg = get_workhour_auto_calc_service() or {}
-                    if not cfg.get("auto_calc_enabled"):
-                        _time.sleep(30)
-                        continue
-
                     auto_time = str(cfg.get("auto_calc_time") or "").strip()
-                    parts = auto_time.split(":")
-                    if len(parts) != 2:
-                        _time.sleep(30)
+                    parts = auto_time.split(":") if auto_time else []
+                    enabled = bool(cfg.get("auto_calc_enabled"))
+                    hh, mm = (int(parts[0]), int(parts[1])) if len(parts) == 2 else (None, None)
+
+                    if not enabled or hh is None:
+                        _time.sleep(60)
                         continue
 
-                    hh = int(parts[0])
-                    mm = int(parts[1])
-                    now = datetime.now()
-                    if now.hour != hh or now.minute != mm:
-                        _time.sleep(30)
-                        continue
-
-                    # 用 last_update_time 的日期去重：确保同一天只触发一次
+                    now = datetime.now(BJ_TZ)
                     today = now.strftime("%Y-%m-%d")
+
+                    # 今天是否已触发
                     lu = get_last_update_time_service() or {}
                     last = lu.get("last_update_time") or ""
+                    done_today = False
                     if last:
                         try:
-                            last_dt = datetime.fromisoformat(last)
-                            last_local = last_dt.astimezone().strftime("%Y-%m-%d")
-                            if last_local == today:
-                                _time.sleep(30)
-                                continue
+                            if datetime.fromisoformat(last).astimezone().strftime("%Y-%m-%d") == today:
+                                done_today = True
                         except Exception:
-                            # 解析失败：直接放行触发（由 touch 接管 last_update_time）
                             pass
 
-                    # 触发一次“更新数据”（更新 last_update_time）
-                    touch_last_update_time_service()
+                    # 算下次触发时间（未触发→今天的目标时刻, 已触发→明天的）
+                    target = now.replace(hour=hh, minute=mm, second=0, microsecond=0)
+                    if target <= now:
+                        target += timedelta(days=1)
+
+                    # sleep 到触发时刻
+                    wait = (target - now).total_seconds()
+                    if wait > 0:
+                        _time.sleep(wait)
+
+                    # 再次读配置确认没变 + 防同天重复
+                    cfg2 = get_workhour_auto_calc_service() or {}
+                    lu2 = get_last_update_time_service() or {}
+                    last2 = lu2.get("last_update_time") or ""
+                    done2 = False
+                    if last2:
+                        try:
+                            if datetime.fromisoformat(last2).astimezone().strftime("%Y-%m-%d") == datetime.now(BJ_TZ).strftime("%Y-%m-%d"):
+                                done2 = True
+                        except Exception:
+                            pass
+
+                    if cfg2.get("auto_calc_enabled") and not done2:
+                        touch_last_update_time_service()
+
+                    _time.sleep(1)  # 避免同一秒重复触发
+
                 except Exception as e:
                     print("[auto_calc_loop] error:", repr(e))
-
-                # 稍等，避免同一分钟内多次触发
-                _time.sleep(30)
+                    _time.sleep(60)
 
         t = threading.Thread(target=_auto_calc_loop, daemon=True)
         t.start()
 
-    # 后台：北京时间每天 03:00 自动触发一次“全量更新”。
-    # 使用更新锁避免与手动更新并发冲突。
-    global _AUTO_FULL_UPDATE_THREAD_STARTED
-    if not globals().get("_AUTO_FULL_UPDATE_THREAD_STARTED"):
-        _AUTO_FULL_UPDATE_THREAD_STARTED = True
 
-        def _auto_full_update_loop():
+    # 后台：北京时间 04:00 自动触发知识库同步 & TB 全量更新。
+    # 每周一小同步（KB增量拉取），每月 1 号大同步（KB全量 + TB全量更新）。
+    # API 用量由 ApiCallMonitor 自动管控：
+    #   80% 软限 → knowledge_sync_enabled='partial' → is_full_sync_enabled() 为 false，阻止重量级同步
+    #   100% 硬限 → knowledge_sync_enabled='false' → is_sync_enabled() 为 false，阻止所有同步
+    global _AUTO_KNOWLEDGE_SYNC_THREAD_STARTED
+    if not globals().get("_AUTO_KNOWLEDGE_SYNC_THREAD_STARTED"):
+        _AUTO_KNOWLEDGE_SYNC_THREAD_STARTED = True
+
+        def _auto_knowledge_sync_loop():
+            from ai.knowledge.auto_sync import sync_all_and_embed
             from base.dingtalk_client import get_config_projectids, get_config_user_meta, get_config_userids
             from base.sync.task_sync import (
                 DEFAULT_UPDATE_LOCK_KEY,
@@ -130,159 +151,112 @@ def create_app() -> Flask:
                 full_update_service,
             )
 
-            bj_tz = timezone(timedelta(hours=8))
+            from base.api_monitor import BJ_TZ
             last_trigger_date = ""
-
-            def _resolve_operator_user_id() -> str:
-                meta = get_config_user_meta() or {}
-                if isinstance(meta, dict):
-                    for _name, one in meta.items():
-                        if not isinstance(one, dict):
-                            continue
-                        try:
-                            ch = int(one.get("character", 1))
-                        except Exception:
-                            ch = 1
-                        if ch == 0:
-                            uid = str(one.get("userId") or "").strip()
-                            if uid:
-                                return uid
-
-                userids = get_config_userids() or {}
-                if isinstance(userids, dict) and userids:
-                    return str(next(iter(userids.values())) or "").strip()
-                return ""
-
-            # sync_disabled：若标记文件存在，直接退出定时循环，不轮询
-            _flag_path = Path(__file__).resolve().parent.parent / "runtime" / "sync_disabled"
-            if _flag_path.exists():
-                print("[auto_full_update_loop] SKIP — sync is disabled (runtime/sync_disabled exists)")
-                return
 
             while True:
                 try:
-                    now_bj = datetime.now(bj_tz)
+                    now_bj = datetime.now(BJ_TZ)
                     today = now_bj.strftime("%Y-%m-%d")
 
-                    # 每天北京时间 03:00 触发一次。
-                    if now_bj.hour == 3 and now_bj.minute == 0 and last_trigger_date != today:
-                        user_id = _resolve_operator_user_id()
-                        projectids = get_config_projectids() or {}
-                        project_id = ""
-                        if isinstance(projectids, dict) and projectids:
-                            project_id = str(next(iter(projectids.values())) or "").strip()
+                    if now_bj.hour != 4 or now_bj.minute != 0 or last_trigger_date == today:
+                        _time.sleep(30)
+                        continue
 
-                        if not user_id or not project_id:
-                            print(
-                                "[auto_full_update_loop] skipped: missing userId/projectId in ids config",
-                                {"userId": user_id, "projectId": project_id},
-                            )
-                            last_trigger_date = today
-                            _time.sleep(30)
-                            continue
+                    # sync 开关（ApiCallMonitor 自动管控：true > partial > false）
+                    from base.config.service import is_full_sync_enabled
+                    if not is_full_sync_enabled():
+                        print("[auto_sync_loop] SKIP — full sync disabled (软限或硬限)")
+                        last_trigger_date = today
+                        _time.sleep(30)
+                        continue
 
-                        owner = "auto_full_update@{}".format(int(_time.time()))
-                        lock = _acquire_update_lock(DEFAULT_UPDATE_LOCK_KEY, owner)
-                        if not lock.get("ok"):
-                            print("[auto_full_update_loop] skipped: update lock occupied", lock.get("lock") or {})
-                            last_trigger_date = today
-                            _time.sleep(30)
-                            continue
+                    weekday = now_bj.weekday()  # 0=周一
+                    is_first_day = now_bj.day == 1
 
+                    # 每月 1 号：KB 大同步 + TB 全量更新
+                    if is_first_day:
+                        print("[auto_sync_loop] === 每月1号：KB大同步 + TB全量更新 ===")
+
+                        # 1) KB 大同步
+                        print("[auto_sync_loop] [1/2] KB大同步...")
+                        kb_result = sync_all_and_embed(full_sync=True)
+                        if kb_result.get("ok"):
+                            s = kb_result.get("sync", {})
+                            e = kb_result.get("embed", {})
+                            print(f"[auto_sync_loop] KB大同步 done  synced={s.get('totalSynced',0)}  failed={s.get('totalFailed',0)}  embed={e.get('embedded',0)}  elapsed={kb_result.get('durationSec',0):.1f}s")
+                        else:
+                            print("[auto_sync_loop] KB大同步 failed:", kb_result.get("error", "unknown"))
+
+                        # 2) TB 全量更新
+                        print("[auto_sync_loop] [2/2] TB全量更新...")
                         try:
-                            out = full_update_service(
-                                {
-                                    "userId": user_id,
-                                    "projectId": project_id,
-                                    "force_refresh": True,
-                                }
-                            )
-                            if out.get("success"):
-                                print(
-                                    "[auto_full_update_loop] success",
-                                    {
-                                        "date": today,
-                                        "projectId": project_id,
-                                        "userId": user_id,
-                                    },
-                                )
+                            user_id = ""
+                            meta = get_config_user_meta() or {}
+                            if isinstance(meta, dict):
+                                for _name, one in meta.items():
+                                    if not isinstance(one, dict):
+                                        continue
+                                    try:
+                                        ch = int(one.get("character", 1))
+                                    except Exception:
+                                        ch = 1
+                                    if ch == 0:
+                                        user_id = str(one.get("userId") or "").strip()
+                                        if user_id:
+                                            break
+                            if not user_id:
+                                userids = get_config_userids() or {}
+                                if isinstance(userids, dict) and userids:
+                                    user_id = str(next(iter(userids.values())) or "").strip()
+
+                            projectids = get_config_projectids() or {}
+                            project_id = ""
+                            if isinstance(projectids, dict) and projectids:
+                                project_id = str(next(iter(projectids.values())) or "").strip()
+
+                            if not user_id or not project_id:
+                                print("[auto_sync_loop] TB全量 skipped: missing userId/projectId")
                             else:
-                                print("[auto_full_update_loop] failed", out.get("error", "unknown error"))
-                        finally:
-                            _release_update_lock(DEFAULT_UPDATE_LOCK_KEY, owner)
+                                owner = "auto_full_update@{}".format(int(_time.time()))
+                                lock = _acquire_update_lock(DEFAULT_UPDATE_LOCK_KEY, owner)
+                                if not lock.get("ok"):
+                                    print("[auto_sync_loop] TB全量 skipped: lock occupied")
+                                else:
+                                    try:
+                                        out = full_update_service({
+                                            "userId": user_id,
+                                            "projectId": project_id,
+                                            "force_refresh": True,
+                                        })
+                                        if out.get("success"):
+                                            print(f"[auto_sync_loop] TB全量 success  projectId={project_id} userId={user_id}")
+                                        else:
+                                            print("[auto_sync_loop] TB全量 failed:", out.get("error", "unknown"))
+                                    finally:
+                                        _release_update_lock(DEFAULT_UPDATE_LOCK_KEY, owner)
+                        except Exception as e:
+                            print("[auto_sync_loop] TB全量 error:", repr(e))
 
-                        last_trigger_date = today
-                except Exception as e:
-                    print("[auto_full_update_loop] error:", repr(e))
-
-                _time.sleep(30)
-
-        t2 = threading.Thread(target=_auto_full_update_loop, daemon=True)
-        t2.start()
-
-    # 后台：北京时间每天 04:00 自动触发知识库同步。
-    # 每天小同步（增量拉新文档），每月 1 号大同步（全量对比更新）。
-    global _AUTO_KNOWLEDGE_SYNC_THREAD_STARTED
-    if not globals().get("_AUTO_KNOWLEDGE_SYNC_THREAD_STARTED"):
-        _AUTO_KNOWLEDGE_SYNC_THREAD_STARTED = True
-
-        def _auto_knowledge_sync_loop():
-            from ai.knowledge.auto_sync import sync_all_and_embed
-
-            bj_tz = timezone(timedelta(hours=8))
-            last_trigger_date = ""
-
-            while True:
-                try:
-                    now_bj = datetime.now(bj_tz)
-                    today = now_bj.strftime("%Y-%m-%d")
-
-                    # 小同步：每周一/周四 04:00；大同步：每月1号 04:00
-                    if now_bj.hour == 4 and now_bj.minute == 0 and last_trigger_date != today:
-                        weekday = now_bj.weekday()  # 0=周一, 3=周四
-                        # 每月 1 号做大同步，周一/周四做小同步
-                        if now_bj.day == 1:
-                            full_sync = True
-                            mode = "大同步(全量)"
-                        elif weekday in (0, 3):
-                            full_sync = False
-                            mode = "小同步(增量)"
-                        else:
-                            last_trigger_date = today
-                            _time.sleep(30)
-                            continue
-                        print(f"[auto_knowledge_sync_loop] starting {mode}")
-                        result = sync_all_and_embed(full_sync=full_sync)
+                    # 每周一：KB 小同步
+                    elif weekday == 0:
+                        print("[auto_sync_loop] === 周一：KB小同步 ===")
+                        result = sync_all_and_embed(full_sync=False)
                         if result.get("ok"):
-                            sync_info = result.get("sync", {})
-                            embed_info = result.get("embed", {})
-                            print(
-                                "[auto_knowledge_sync_loop] done"
-                                "  sync: {} synced, {} failed"
-                                "  skipped: {} wb, {} cached, {} unchanged"
-                                "  embed: {} embedded, {} skipped"
-                                "  elapsed: {:.1f}s".format(
-                                    sync_info.get("totalSynced", 0),
-                                    sync_info.get("totalFailed", 0),
-                                    sync_info.get("skippedWorkbooks", 0),
-                                    sync_info.get("skippedCached", 0),
-                                    sync_info.get("skippedUnchanged", 0),
-                                    embed_info.get("embedded", 0),
-                                    embed_info.get("skipped", 0),
-                                    result.get("durationSec", 0),
-                                )
-                            )
+                            s = result.get("sync", {})
+                            e = result.get("embed", {})
+                            print(f"[auto_sync_loop] KB小同步 done  synced={s.get('totalSynced',0)}  failed={s.get('totalFailed',0)}  embed={e.get('embedded',0)}  elapsed={result.get('durationSec',0):.1f}s")
                         else:
-                            print("[auto_knowledge_sync_loop] failed:", result.get("error", "unknown error"))
+                            print("[auto_sync_loop] KB小同步 failed:", result.get("error", "unknown"))
 
-                        last_trigger_date = today
+                    last_trigger_date = today
                 except Exception as e:
-                    print("[auto_knowledge_sync_loop] error:", repr(e))
+                    print("[auto_sync_loop] error:", repr(e))
 
                 _time.sleep(30)
 
-        t3 = threading.Thread(target=_auto_knowledge_sync_loop, daemon=True)
-        t3.start()
+        t2 = threading.Thread(target=_auto_knowledge_sync_loop, daemon=True)
+        t2.start()
 
     @app.teardown_appcontext
     def _remove_db_session(_exc):
