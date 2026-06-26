@@ -780,18 +780,18 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
                   <button
                     type="button"
                     onClick={handleUpdate}
-                    disabled={isUpdating || isFullUpdating}
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-60"
+                    disabled
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-400 disabled:opacity-60"
                   >
-                    {isUpdating ? '更新中...' : '更新'}
+                    更新
                   </button>
                   <button
                     type="button"
                     onClick={handleFullUpdate}
-                    disabled={isFullUpdating || isUpdating}
-                    className="whitespace-nowrap rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-60"
+                    disabled
+                    className="whitespace-nowrap rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-400 disabled:opacity-60"
                   >
-                    {isFullUpdating ? '全量更新中...' : '全量更新'}
+                    全量更新
                   </button>
                 </>
               ) : null}

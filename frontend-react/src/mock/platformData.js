@@ -2,7 +2,9 @@ export const departmentStats = {
   totalMembers: 9,
   navMembers: 4,
   integrationMembers: 5,
+  servoMembers: 5,
   totalHours: 1381,
+  quarter: '2026 Q2',
   avgPerformance: 'A-',
   riskCount: 3,
 };

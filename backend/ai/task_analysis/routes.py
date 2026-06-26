@@ -145,6 +145,57 @@ def register(bp, ok, fail):
             _log(f"step3 FAILED: {e}")
             return fail(str(e), code=500)
 
+    # ── 绩效达标分析 ──────────────────────────────────────────
+
+    @bp.route("/ai/task-analysis/performance-report", methods=["POST"])
+    def ai_task_analysis_performance_report():
+        body = request.get_json(silent=True) or {}
+        owner_key = str(body.get("owner_key") or "").strip() or None
+
+        if not owner_key:
+            auth_user = session.get("auth_user") or {}
+            owner_key = str(auth_user.get("user_id") or "").strip() or None
+
+        if not owner_key:
+            return fail("missing owner_key", code=400)
+
+        from performance.service import performance_history_service
+        from ai.task_analysis.data import fetch_tasks
+        from ai.task_analysis.performance_analysis import generate_performance_report
+
+        try:
+            t0 = time.time()
+
+            # 1. 拉取绩效历史，提取上季结余
+            perf_out = performance_history_service({"target": owner_key})
+            prev_carry = 0.0
+            if perf_out.get("success"):
+                history = (perf_out.get("data") or {}).get("history") or []
+                if history:
+                    prev_carry = float(history[-1].get("carryScore", 0) or 0)
+            _log(f"perf-report: prev_carry={prev_carry:.3f}")
+
+            # 2. 拉取当前季度排单
+            task_out = fetch_tasks(owner_key=owner_key)
+            tasks = task_out.get("tasks", [])
+            stats = task_out.get("stats", {})
+            _log(f"perf-report: {stats.get('total_tasks', 0)} tasks, {stats.get('quarter_work_hour', 0)}d planned")
+
+            # 3. LLM 分析
+            report = generate_performance_report(prev_carry, tasks, stats)
+            elapsed = round(time.time() - t0, 1)
+
+            if "error" in report:
+                _log(f"performance-report: FAILED {report['error'][:80]}, {elapsed}s")
+                return fail(report["error"], code=502, data=report)
+
+            ok_modules = [k for k, v in report.items() if isinstance(v, dict) and "error" not in v]
+            _log(f"performance-report: {len(ok_modules)}/2 modules OK, {elapsed}s")
+            return ok(report)
+        except Exception as e:
+            _log(f"performance-report FAILED: {e}")
+            return fail(str(e), code=500)
+
     # ── apply_suggestion: 应用分析建议，创建 TB 任务模板 ─────────
 
     @bp.route("/ai/task-analysis/apply-suggestion", methods=["POST"])
@@ -153,8 +204,8 @@ def register(bp, ok, fail):
         suggestion_type = str(body.get("suggestion_type") or "").strip()
         suggestion = body.get("suggestion") or {}
 
-        if suggestion_type not in ("autonomous", "capability"):
-            return fail("invalid suggestion_type, must be 'autonomous' or 'capability'", code=400)
+        if suggestion_type not in ("autonomous", "capability", "performance"):
+            return fail("invalid suggestion_type, must be 'autonomous', 'capability', or 'performance'", code=400)
 
         template = suggestion.get("task_template") or {}
         title = str(template.get("title") or "").strip()

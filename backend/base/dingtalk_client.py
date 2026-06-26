@@ -372,24 +372,63 @@ def get_valid_access_token(payload: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _is_user_entry(v: Any) -> bool:
+    """判断一个值是否为 user 条目（dict 且包含 userId 字段）。"""
+    return isinstance(v, dict) and any(k in v for k in ("userId", "user_id", "id"))
+
+
+def _flatten_userids(raw_userids: Any) -> Dict[str, Any]:
+    """
+    递归拉平 userids，兼容三种格式：
+
+    1) 旧扁平格式（按中文名索引）：
+       { "张三": "012345" }  或  { "张三": {"userId": "012345", ...} }
+
+    2) 新分组格式（按组别括号）：
+       { "导航组": { "张三": {"userId": "012345", ...}, ... },
+         "对接组": { "李四": {...}, ... } }
+
+    返回扁平化后的 { 中文名: value } 映射。
+    分组 key（如"导航组"）如果本身不是 user 条目则会被跳过。
+    """
+    out: Dict[str, Any] = {}
+    if not isinstance(raw_userids, dict):
+        return out
+    for key, v in raw_userids.items():
+        if _is_user_entry(v):
+            # 旧格式：value 直接就是 user 条目
+            out[str(key)] = v
+        elif isinstance(v, dict):
+            # 新格式：可能是分组，递归拉平
+            # 先判断是否为存量 user（兼容 key 取名恰好含 userId 的极端情况）
+            if not _is_user_entry(v):
+                out.update(_flatten_userids(v))
+            else:
+                out[str(key)] = v
+        else:
+            # 字符串 userId（旧格式）
+            out[str(key)] = v
+    return out
+
+
 def _normalize_userids(raw_userids: Any) -> Dict[str, str]:
     """
     兼容两种写法：
     1) "张三": "012345"
     2) "张三": {"userId": "012345", "character": 1}
+
+    也兼容分组格式（通过 _flatten_userids 递归拉平）。
     """
+    flat = _flatten_userids(raw_userids)
     out: Dict[str, str] = {}
-    if not isinstance(raw_userids, dict):
-        return out
-    for name, v in raw_userids.items():
-        nm = str(name)
+    for name, v in flat.items():
         if isinstance(v, dict):
             uid = v.get("userId", v.get("user_id", v.get("id", "")))
         else:
             uid = v
         uid_s = str(uid or "").strip()
         if uid_s:
-            out[nm] = uid_s
+            out[str(name)] = uid_s
     return out
 
 
@@ -397,6 +436,7 @@ def get_config_user_characters() -> Dict[str, int]:
     """
     从 ids.json/config.json 读取用户默认 character（按中文名索引）。
     仅在 value 为对象且包含 character 字段时返回。
+    兼容扁平格式和分组格式。
     """
     ids_path = Path(__file__).with_name("ids.json")
     try:
@@ -407,10 +447,9 @@ def get_config_user_characters() -> Dict[str, int]:
         cfg = _load_config_json()
         userids = cfg.get("userids")
 
+    flat = _flatten_userids(userids)
     out: Dict[str, int] = {}
-    if not isinstance(userids, dict):
-        return out
-    for name, v in userids.items():
+    for name, v in flat.items():
         if not isinstance(v, dict):
             continue
         ch = v.get("character")
@@ -439,12 +478,22 @@ def get_config_userids() -> Dict[str, str]:
 def get_config_user_meta() -> Dict[str, Dict[str, Any]]:
     """
     读取 ids.json 里的 userids 扩展信息（按中文名索引）。
+    兼容扁平格式和分组格式。
 
     期望格式（示例）：
+    新分组格式：
     {
       "userids": {
-        "张三": { "userId": "...", "character": 1, "team_id": 0, "is_nav_lead": false, "is_servo_lead": false },
-        "李四": "012345"  # 旧格式也兼容
+        "导航组": {
+          "张三": { "userId": "...", "character": 1, "team_id": 0, "is_nav_lead": false, "is_servo_lead": false }
+        }
+      }
+    }
+    旧扁平格式：
+    {
+      "userids": {
+        "张三": { "userId": "...", "character": 1 },
+        "李四": "012345"
       }
     }
 
@@ -461,11 +510,10 @@ def get_config_user_meta() -> Dict[str, Dict[str, Any]]:
         cfg = _load_config_json()
         userids = cfg.get("userids")
 
+    flat = _flatten_userids(userids)
     out: Dict[str, Dict[str, Any]] = {}
-    if not isinstance(userids, dict):
-        return out
 
-    for name, v in userids.items():
+    for name, v in flat.items():
         nm = str(name)
         if isinstance(v, dict):
             uid = v.get("userId", v.get("user_id", v.get("id", "")))

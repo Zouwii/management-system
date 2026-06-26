@@ -127,7 +127,7 @@ export default function LoginPage() {
                   <option value="">-- 请选择 --</option>
                   {localUsers.map((u) => (
                     <option key={u.user_id} value={u.user_id}>
-                      {u.name} ({u.user_id})
+                      {u.name}
                     </option>
                   ))}
                 </select>

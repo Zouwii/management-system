@@ -242,7 +242,7 @@ runtime/shared/.claude/skills/ ─► 改为 install_prompts.sh 从 ai/prompts/ 
 | requirementDesc | string | 是 | 支持 \n 换行 | 需求描述（背景+目标+范围） |
 | outputs | string[] | 是 | 每项格式"描述(N天)" | 任务产出清单 |
 | participationLevel | float | 是 | 固定档位 | 产出天数之和 |
-| dueDate | string | 是 | ISO 8601, 截止日 23:59:59 | 截止日期 |
+| dueDate | string | 是 | ISO 8601, 截止日 16:00:00 | 截止日期 |
 | startDate | string | 是 | ISO 8601, 开始日 00:00:00 | 开始日期 |
 | parentTaskId | string | 否 | taskId 或 "" | 父任务 ID |
 

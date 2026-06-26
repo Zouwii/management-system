@@ -9,7 +9,7 @@
 | requirementDesc | string | 是 | 支持 `\n` 换行 | 需求描述（背景 + 目标 + 工作范围） |
 | outputs | string[] | 是 | 每项格式 `描述(N天)` | 任务产出清单 |
 | participationLevel | float | 是 | 等于 outputs 天数之和，必须在固定档位中 | 参与度 |
-| dueDate | string | 是 | ISO 8601，截止日 23:59:59 | 截止日期 |
+| dueDate | string | 是 | ISO 8601，截止日 16:00:00 | 截止日期 |
 | startDate | string | 是 | ISO 8601，开始日 00:00:00 | 开始日期 |
 | parentTaskId | string | 否 | taskId 或 `""` | 父任务 ID |
 
@@ -26,7 +26,7 @@
     "A/B 测试与上线验证(0.5天)"
   ],
   "participationLevel": 2.0,
-  "dueDate": "2026-06-30T23:59:59+08:00",
+  "dueDate": "2026-06-30T16:00:00+08:00",
   "startDate": "2026-06-03T00:00:00+08:00",
   "parentTaskId": ""
 }

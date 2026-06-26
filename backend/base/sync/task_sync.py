@@ -1881,10 +1881,12 @@ def sync_task_details_batch_to_db(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 def sync_project_details_in_time_range_service(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
-    仅使用 payload.startDate/endDate 作为窗口（不再读取/回退 config）：
-    1) 先通过 query_project_tasks_service 拉列表（不落库）
-    2) 按 scenario=软件开发 过滤后 upsert 到 A 表
-    3) 仅同步窗口内任务的详情到 B 表（delete-reinsert）
+    增量更新：从 last_update_time 至今的变更。
+    1) 读取 config.last_update_time 作为窗口起点（如无记录则用今天-1天）
+    2) 调钉钉 API 拉 updated >= last_update_time 的任务列表
+    3) 按 scenario=软件开发 过滤后 upsert 到 A 表
+    4) 同步详情到 B 表
+    5) 完成后更新 last_update_time
 
     注意：该接口不负责更新 C 表（overdue），全量更新才会更新 C。
     """
@@ -1895,20 +1897,45 @@ def sync_project_details_in_time_range_service(payload: Dict[str, Any]) -> Dict[
     if not user_id or not project_id:
         return {"success": False, "error": "missing userId or projectId", "data": {}}
 
-    # 解析窗口：仅允许 payload
-    start_dt = _parse_iso_dt(payload.get("startDate") or payload.get("start_time") or payload.get("startTime"))
-    end_dt = _parse_iso_dt(payload.get("endDate") or payload.get("end_time") or payload.get("endTime"))
+    # 增量起点：读 config.last_update_time，无记录则退回到今天-1天
+    last_update_raw = _get_config_value("last_update_time")
+    last_update_dt = _parse_iso_dt(last_update_raw)
+    if not last_update_dt:
+        last_update_dt = datetime.now(timezone.utc) - timedelta(days=1)
+    last_update_dt = _cmp_dt_utc(last_update_dt)
 
-    if not start_dt or not end_dt:
-        return {"success": False, "error": "missing or invalid startDate/endDate", "data": {}}
+    # 窗口终点：用前端传的 endDate，或回退到今天
+    end_dt = _parse_iso_dt(payload.get("endDate") or payload.get("end_time") or payload.get("endTime"))
+    if not end_dt:
+        end_dt = datetime.now(timezone.utc)
+    end_dt = _cmp_dt_utc(end_dt)
+
+    # 也保留 due_date 窗口（用于 A 表过滤），用前端传的 startDate 或 last_update_time 前一年
+    start_dt = _parse_iso_dt(payload.get("startDate") or payload.get("start_time") or payload.get("startTime"))
+    if not start_dt:
+        start_dt = last_update_dt - timedelta(days=365)
+    start_dt = _cmp_dt_utc(start_dt)
 
     def _format_dt_for_tql(dt: datetime) -> str:
         d = dt.astimezone(timezone.utc).replace(microsecond=0)
         return d.strftime("%Y-%m-%dT%H:%M:%S") + ".000Z"
 
-    query = "(dueDate >= '{start}') AND (dueDate <= '{end}')".format(
+    # 增量查询：只拉 updated >= last_update_time 且有 due_date 窗口的
+    query = (
+        "(dueDate >= '{start}') AND (dueDate <= '{end}')"
+        " AND (updated >= '{updated_after}')"
+    ).format(
         start=_format_dt_for_tql(start_dt),
         end=_format_dt_for_tql(end_dt),
+        updated_after=_format_dt_for_tql(last_update_dt),
+    )
+
+    print(
+        "[time_range_update] incremental: updated_after={} start={} end={}".format(
+            _format_dt_for_tql(last_update_dt),
+            _format_dt_for_tql(start_dt),
+            _format_dt_for_tql(end_dt),
+        )
     )
 
     max_results = int(payload.get("maxResults", 500) or 500)
@@ -2208,6 +2235,10 @@ def sync_project_details_in_time_range_service(payload: Dict[str, Any]) -> Dict[
         failures=b_failures,
         retry_round=max_retry_rounds if b_failures else None,
     )
+
+    # 增量更新完成后刷新 last_update_time
+    from base.config.service import touch_last_update_time_service
+    touch_last_update_time_service()
 
     return {
         "success": True,

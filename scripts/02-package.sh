@@ -11,11 +11,7 @@ STAGE_DIR="${SCRIPT_DIR}/.package_stage/${PROJECT_NAME}"
 FRONTEND_API_MODE="${FRONTEND_API_MODE:-real}"
 echo "[${PROJECT_NAME}] building frontend (npm run build, VITE_API_MODE=${FRONTEND_API_MODE})..."
 pushd "${SCRIPT_DIR}/frontend-react" >/dev/null
-if [ -f "package-lock.json" ]; then
-  npm ci
-else
-  npm install
-fi
+npm install --prefer-offline
 VITE_API_MODE="${FRONTEND_API_MODE}" npm run build
 popd >/dev/null
 

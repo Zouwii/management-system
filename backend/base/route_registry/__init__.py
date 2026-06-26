@@ -23,6 +23,7 @@ from base.config.routes import register as register_config
 from performance.routes import register as register_perf
 from base.stats.routes import register as register_stats
 from workhour.costhour.routes import register as register_costhour
+from base.department.routes import register as register_department
 
 # AI routes now centralized in the ai/ package
 from ai import register_all_routes as register_ai_routes
@@ -38,3 +39,4 @@ def register_all_routes(bp, ok, fail):
     register_perf(bp, ok, fail)
     register_stats(bp, ok, fail)
     register_costhour(bp, ok, fail)
+    register_department(bp, ok, fail)

@@ -5,23 +5,654 @@
 - 这里只借鉴现有数据库中的文字描述和父子任务关系，不会修改任何任务单。
 
 ## 基本信息
-- 用户：anonymous
-- 用户 ID：unknown
-- 读取时间：2026-06-23T02:15:51+00:00
-- 摘要：暂未从数据库读取到该用户的任务记录。后续会先基于新任务描述生成草稿，不会修改已有任务单。
+- 用户：伍浩贤
+- 用户 ID：6515680920352168
+- 读取时间：2026-06-26T02:51:55+00:00
+- 摘要：已读取 60 条任务：未完成 31 个，已完成 29 个，逾期 0 个。常见任务性质：未标注 52 个、69d4d037c253ef42e9c31b39 8 个。
 
 ## 指标
-- taskCount: 0
-- completedTaskCount: 0
-- unfinishedTaskCount: 0
+- taskCount: 60
+- completedTaskCount: 29
+- unfinishedTaskCount: 31
 - overdueTaskCount: 0
-- scheduledHours: 0
+- scheduledHours: 0.0
 
 ## 最近任务
-- 无任务记录
+- [创建中] 宁波港机器狗项目
+  - taskId: 6a1011c98f68c09b45d87bba
+  - dueDate: 2026-05-29T10:00:00
+  - workHour: 0.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - content: 宁波港机器狗项目
+- [已完成] 一期
+  - taskId: 69e980f4448984fb4f73c6f0
+  - parent: 【产品专项】轮臂机器人专项
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 0.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - content: 一期
+- [未完成] 四期
+  - taskId: 69e985959de53b35ce1a8425
+  - parent: 【产品专项】高速小车
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 0
+  - content: 四期
+- [未完成] 【产品专项】轮臂机器人专项
+  - taskId: 69e98090f465c5a33527413a
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - content: 【产品专项】轮臂机器人专项
+- [未完成] 流程改进
+  - taskId: 69c9ec48d696a127ad56be72
+  - parent: 69c9e555d3c03da634a01db2
+  - dueDate: 2026-04-30T10:00:00
+  - workHour: 0.0
+  - content: 流程改进
+- [未完成] 调研方案
+  - taskId: 69ca0f5915199bda0be64a4d
+  - parent: 3. 使用AI对功能模块进行unit test
+  - dueDate: 2026-04-15T10:00:00
+  - workHour: 0.0
+  - content: 调研方案
+- [未完成] 2. 使用AI对功能模块进行code review
+  - taskId: 69c9e6055f76d6c66f99187b
+  - parent: 1. 代码开发AI赋能
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - content: 2. 使用AI对功能模块进行code review
+- [未完成] 平台数据接入AI
+  - taskId: 69ca77081c49ea8cadd7df81
+  - parent: 2. 部门数据管理平台化
+  - dueDate: 2026-05-31T10:00:00
+  - workHour: 0.0
+  - content: 平台数据接入AI
+- [未完成] 3. 使用AI对功能模块进行unit test
+  - taskId: 69ca0f183c0485b0e3fd82d0
+  - parent: 1. 代码开发AI赋能
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - content: 3. 使用AI对功能模块进行unit test
+- [未完成] 产品优化
+  - taskId: 69c9ec37c005883f0daf7336
+  - parent: 69c9e555d3c03da634a01db2
+  - dueDate: 2026-04-30T10:00:00
+  - workHour: 0.0
+  - content: 产品优化
+- [创建中] 新技术&重大项目Q1问题复盘
+  - taskId: 69c9ec1e1538aaca07538aec
+  - parent: 问题复盘
+  - dueDate: 2026-04-30T10:00:00
+  - workHour: 0.0
+  - content: 新技术&重大项目Q1问题复盘
+- [未完成] 使用AI的skills对代码进行code review标准化
+  - taskId: 69ca0e3c27eab03facd3dfdf
+  - parent: 2. 使用AI对功能模块进行code review
+  - dueDate: 2026-04-14T10:00:00
+  - workHour: 0.0
+  - content: 使用AI的skills对代码进行code review标准化
+  - requirementDesc: 目前可以使用AI对代码进行更高效的code review，计划在部门内引入一套流程规划，如果利用AI进行高效的code review
+  - taskOutputs: 输出流程规范总结实践效果
+- [未完成] 1. 代码开发AI赋能
+  - taskId: 69c9e5dbdd67840479992f07
+  - parent: 69c9e3ac6ba9c45307b8409c
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - content: 1. 代码开发AI赋能
+- [未完成] 问题复盘
+  - taskId: 69c9e6bc543b990cdf81df4c
+  - parent: 69c9e555d3c03da634a01db2
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - content: 问题复盘
+- [未完成] 2. 部门数据管理平台化
+  - taskId: 69c9e4b62d257d0af28399da
+  - parent: 69c9e3ac6ba9c45307b8409c
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - content: 2. 部门数据管理平台化
+  - requirementDesc: 针对目前本体开发部的一些数据，计划能够放到一个软件平台上进行管理
+- [未完成] 1. 使用AI对功能模块进行auto docs
+  - taskId: 69c9e3ee1e29bec4263e605b
+  - parent: 1. 代码开发AI赋能
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - content: 1. 使用AI对功能模块进行auto docs
+- [已完成] 模块重构
+  - taskId: 69c9e14ab2a822d5b6af0f6b
+  - parent: 3. 导航模块结构优化
+  - dueDate: 2026-03-30T10:00:00
+  - workHour: 0.0
+  - content: 模块重构
+  - requirementDesc: 记录模块重构的任务单
+- [未完成] 26年Q1季度季度考核表书写
+  - taskId: 69c63af52c53b32abea3524f
+  - parent: 69c63adeca895527699c0d31
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 0.0
+  - businessType: 1
+  - content: 26年Q1季度季度考核表书写
+- [已完成] 二维码导航优化
+  - taskId: 69c639decf505b70e0d0df2e
+  - parent: 【产品专项】二维码导航专项
+  - dueDate: 2026-03-27T10:00:00
+  - workHour: 0.0
+  - content: 二维码导航优化
+- [未完成] 机器狗接入迦智三期
+  - taskId: 69b8c0c24039169f885f2228
+  - parent: 【研发专项】机器狗接入迦智工具链
+  - dueDate: 2026-04-30T10:00:00
+  - workHour: 0.0
+  - content: 机器狗接入迦智三期
+- [未完成] 规控算法迭代【2026】
+  - taskId: 698d339e9270bf3d5f2b6f31
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - content: 规控算法迭代【2026】
+- [已完成] 2025年导航组年终述职
+  - taskId: 6969d7ca23f3f51138227a31
+  - parent: 677f302bc2a572dc466b4e6a
+  - dueDate: 2026-01-20T10:00:00
+  - workHour: 0.0
+  - content: 2025年导航组年终述职
+  - requirementDesc: 按照研发体系要求完成年终述职。
+  - taskOutputs: 输出年终述职文档参加年终述职报告
+- [已完成] 25年Q4季度季度考核表书写
+  - taskId: 694e713f91a3e532d86e6d2c
+  - parent: 2025年绩效考核总结
+  - dueDate: 2025-12-31T10:00:00
+  - workHour: 0.0
+  - businessType: 1
+  - content: 25年Q4季度季度考核表书写
+- [未完成] 【研发自驱】竞品性能对比
+  - taskId: 69254a465347265453246b69
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 0.0
+  - businessType: 1
+  - content: 【研发自驱】竞品性能对比
+- [未完成] 仿真平台搭建
+  - taskId: 692556bbecff47720a52b72e
+  - parent: 【研发自驱】导航模块自动化测试
+  - dueDate: 2025-12-31T10:00:00
+  - workHour: 0.0
+  - content: 仿真平台搭建
+- [已完成] 导航模块设计说明书
+  - taskId: 690d6526ce16a55b847ec1ba
+  - parent: 3. 导航模块结构优化
+  - dueDate: 2025-12-25T10:00:00
+  - workHour: 0.0
+  - content: 导航模块设计说明书
+- [已完成] 五期
+  - taskId: 690971c8bcbad56b1c3a83fb
+  - parent: 【研发专项】模块节点性能优化
+  - dueDate: 2025-11-30T10:00:00
+  - workHour: 0.0
+  - content: 五期
+- [已完成] 模块设计文档移植到代码仓库
+  - taskId: 690d655a16f6b91df1b9252c
+  - parent: 导航模块设计说明书
+  - dueDate: 2025-11-28T10:00:00
+  - workHour: 0.0
+  - content: 模块设计文档移植到代码仓库
+  - requirementDesc: 目前所有模块的文档都在钉钉文档中，不太方便每次版本更新的时候同步更新文档，所以需要将钉钉文档的说明书移到代码仓库中，以便后续发版时能够借助AI自动更新模块说明文档。需要将之前写的设计文档内容融合到新的代码仓库文档中统一格式规范方便后续持续维护
+  - taskOutputs: 所有模块将设计说明书移到代码仓库中。1、文档内容设计说明书模块概述功能列表系统架构流程图核心逻辑流程算法流程时序图接口说明类关系图2、文档规范模块说明书，接口说明和流程图使用.md格式 [图片] 类关系图使用.puml格式 [图片]...
+- [未完成] 【研发专项】机器狗接入迦智工具链
+  - taskId: 6909726f482487f2daccd6e8
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - businessType: 1
+  - content: 【研发专项】机器狗接入迦智工具链
+- [已完成] 机器狗接入迦智二期
+  - taskId: 690972ae1c8ca2ae4678167d
+  - parent: 【研发专项】机器狗接入迦智工具链
+  - dueDate: 2026-01-30T10:00:00
+  - workHour: 0.0
+  - content: 机器狗接入迦智二期
+- [已完成] 25年Q3季度季度考核表书写
+  - taskId: 68d931b056fbb0eeac458fad
+  - parent: 2025年绩效考核总结
+  - dueDate: 2025-09-30T10:00:00
+  - workHour: 0.0
+  - businessType: 1
+  - content: 25年Q3季度季度考核表书写
+- [已完成] 二维码导航七期
+  - taskId: 68a2e26c1b2775974a8e6fdd
+  - parent: 【产品专项】二维码导航专项
+  - dueDate: 2025-09-30T10:00:00
+  - workHour: 0.0
+  - content: 二维码导航七期
+- [已完成] 二期
+  - taskId: 68902959835d3061b66c303a
+  - parent: 【产品专项】高速小车
+  - dueDate: 2025-12-31T10:00:00
+  - workHour: 0.0
+  - content: 二期
+- [已完成] 电池状态驱动开发
+  - taskId: 6889801f55ecb854dee47e82
+  - parent: 6881a49b4ae6e1de25d0c0c2
+  - dueDate: 2025-08-06T10:00:00
+  - workHour: 0.0
+  - content: 电池状态驱动开发
+  - requirementDesc: 根据协议开发电池状态驱动为上层提供电池接口（rostopic）电池信息topic：/jzhw/battery充放电状态topic：/jzhw/pwr包含信息：电压、电流、容量、电量百分比、充放电状态等
+  - taskOutputs: 完成电池驱动开发和上报现场测试通过给出软件版本结论：现场已经可以正常获取电池电量了，软件版本：iosys 2.2412.37+pengxiang-v1+test10；CtrlBox-PC2CAN_1.26.09.bin
+- [已完成] 载具控制驱动开发
+  - taskId: 68897e35515e52c3fb6e52c2
+  - parent: 6881a49b4ae6e1de25d0c0c2
+  - dueDate: 2025-08-08T10:00:00
+  - workHour: 0.0
+  - content: 载具控制驱动开发
+  - requirementDesc: 根据协议开发载具控制驱动尾板：位置环、速度环控制卷帘门：开启关闭（上下限位）为上层提供ros接口载具控制：定义载具控制id，载具动作指令载具状态（进行中、完成、异常等）输出接口文档，参考驱动ROS接口
+  - taskOutputs: 完成载具控制开发和载具反馈上报现场测试通过给出软件版本结论：现场已经可以正常载具控制了，软件版本：iosys 2.2412.37+pengxiang-v1+test10；CtrlBox-PC2CAN_1.26.09.bin [图片]
+- [已完成] 灯光控制驱动开发
+  - taskId: 68897ab38bd454d5867222f8
+  - parent: 6881a49b4ae6e1de25d0c0c2
+  - dueDate: 2025-08-04T10:00:00
+  - workHour: 0.0
+  - content: 灯光控制驱动开发
+  - requirementDesc: 根据协议开发灯光控制驱动正常运行时，近光灯常亮报警时，灯光闪烁为上层提供ros接口开启/关闭 灯光闪烁输出接口协议文档，可参考当前驱动ROS接口
+  - taskOutputs: 完成灯光控制开发现场测试通过给出软件版本结论：现场已经可以正常控制灯光闪烁了，软件版本：iosys 2.2412.37+pengxiang-v1+test10；CtrlBox-PC2CAN_1.26.09.bin
+- [已完成] 运动控制驱动开发
+  - taskId: 68897ef7f4f2606381d53903
+  - parent: 6881a49b4ae6e1de25d0c0c2
+  - dueDate: 2025-08-04T10:00:00
+  - workHour: 0.0
+  - content: 运动控制驱动开发
+  - requirementDesc: 根据协议完成运动控制驱动开发包含速度下发、速度反馈等速度和转向刹车和驻车
+  - taskOutputs: 完成运动控制驱动开发和指令反馈上报现场测试通过给出软件版本结论：现场已经可以正常导航了，软件版本：iosys 2.2412.37+pengxiang-v1+test10；CtrlBox-PC2CAN_1.26.09.bin
+- [未完成] 【研发自驱】导航模块自动化测试
+  - taskId: 6878da6572dc136c15d56783
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - businessType: 1
+  - content: 【研发自驱】导航模块自动化测试
+- [已完成] 到点自学习五期
+  - taskId: 6874f1ceba3520a08df11067
+  - parent: 【产品专项】到点自学习专项
+  - dueDate: 2025-09-30T10:00:00
+  - workHour: 0.0
+  - content: 到点自学习五期
+- [未完成] 【产品专项】高速小车
+  - taskId: 6870746d0509e251d6169f02
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - businessType: 0
+  - content: 【产品专项】高速小车
+- [已完成] 一期
+  - taskId: 6870747a0509e251d616ad3a
+  - parent: 【产品专项】高速小车
+  - dueDate: 2025-07-31T10:00:00
+  - workHour: 0.0
+  - content: 一期
+- [未完成] 【研发专项】规控算法迭代专项
+  - taskId: 681dc5711af772b6e7497f5a
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - businessType: 1
+  - content: 【研发专项】规控算法迭代专项
+- [未完成] 【研发专项】本体&调度协作专项
+  - taskId: 681c4a4dd681a2b8717ac757
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - businessType: 1
+  - content: 【研发专项】本体&调度协作专项
+- [未完成] 【研发专项】模块节点性能优化
+  - taskId: 68391dd0d801cb0e9144ef03
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - businessType: 1
+  - content: 【研发专项】模块节点性能优化
+- [未完成] 【研发专项】故障诊断专项
+  - taskId: 67fe2014272195ab8b4c1a0b
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 0.0
+  - businessType: 1
+  - content: 【研发专项】故障诊断专项
+- [已完成] 四期
+  - taskId: 68391de706dbd02fcd3d13f5
+  - parent: 【研发专项】模块节点性能优化
+  - dueDate: 2025-07-31T10:00:00
+  - workHour: 0.0
+  - content: 四期
+- [搁置] 规控算法迭代二期（搁置）
+  - taskId: 6836902d49e2f7102f01981f
+  - parent: 【研发专项】规控算法迭代专项
+  - dueDate: 2025-07-31T10:00:00
+  - workHour: 0.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 0
+  - content: 规控算法迭代二期（搁置）
+- [未完成] 【产品专项】到点自学习专项
+  - taskId: 66c2c1dfe65b7336de712d7e
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - businessType: 0
+  - content: 【产品专项】到点自学习专项
+- [未完成] 季度绩效考核总结
+  - taskId: 677f2ca87c7200a7b1111a40
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 0.0
+  - businessType: 1
+  - content: 季度绩效考核总结
+- [已完成] 1. 提高代码质量
+  - taskId: 668799a533f7bb374067e426
+  - parent: 677f3ec63a56da5d953214b2
+  - dueDate: 2025-12-31T10:00:00
+  - workHour: 0.0
+  - businessType: 1
+  - content: 1. 提高代码质量
+- [已完成] 3. 导航模块结构优化
+  - taskId: 6728b6be833c65c8f09faacf
+  - parent: 677f3ec63a56da5d953214b2
+  - dueDate: 2025-12-31T10:00:00
+  - workHour: 0.0
+  - businessType: 1
+  - content: 3. 导航模块结构优化
+- [已完成] 2025年主干功能开发
+  - taskId: 677f4bc8fcff03e29681c511
+  - dueDate: 2025-12-31T10:00:00
+  - workHour: 0.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 1
+  - content: 2025年主干功能开发
+- [已完成] 2025年绩效考核总结
+  - taskId: 67b41dfde940bafa6a9f2ec3
+  - parent: 季度绩效考核总结
+  - dueDate: 2025-12-31T10:00:00
+  - workHour: 0.0
+  - businessType: 1
+  - content: 2025年绩效考核总结
+- [已完成] 【产品专项】二维码导航专项
+  - taskId: 677740f7f7f6a08aa40f38d7
+  - dueDate: 2025-12-31T10:00:00
+  - workHour: 0.0
+  - content: 【产品专项】二维码导航专项
+- [已完成] 2025年订单项目开发
+  - taskId: 677f4bd01eb5e811f19c76e2
+  - dueDate: 2025-12-31T10:00:00
+  - workHour: 0.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 2
+  - content: 2025年订单项目开发
+- [已完成] 导航组代码评审【2025年】
+  - taskId: 67b7df20718a5cd12fa25b2b
+  - parent: 66c2bb327331442259e93f55
+  - dueDate: 2025-12-31T10:00:00
+  - workHour: 0.0
+  - content: 导航组代码评审【2025年】
+- [已完成] 【产品专项】carly3落地与拓展
+  - taskId: 67d797a4f44b5bd586b391f8
+  - dueDate: 2025-09-30T10:00:00
+  - workHour: 0.0
+  - content: 【产品专项】carly3落地与拓展
+- [创建中] 差分车底盘起步姿态调整功能
+  - taskId: 66bf09562ffb25b438e6461d
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - content: 差分车底盘起步姿态调整功能
+- [已完成] 2. 降低现场问题
+  - taskId: 66c2c3f7b10ecd6d25a8aad7
+  - parent: 677f3ec63a56da5d953214b2
+  - dueDate: 2025-12-31T10:00:00
+  - workHour: 0.0
+  - businessType: 1
+  - content: 2. 降低现场问题
+- [已完成] 《代码整洁之道》分享会
+  - taskId: 66a7822d0b993b2a6a3fe77c
+  - parent: 66c2bb1101724b44192b234b
+  - dueDate: 2025-11-28T10:00:00
+  - workHour: 0.0
+  - businessType: 1
+  - content: 《代码整洁之道》分享会
 
 ## 父子任务关系
-- 未找到可作为根节点的任务
+- [已完成] 【产品专项】carly3落地与拓展
+  - taskId: 67d797a4f44b5bd586b391f8
+  - dueDate: 2025-09-30T10:00:00
+  - workHour: 0.0
+  - content: 【产品专项】carly3落地与拓展
+- [已完成] 【产品专项】二维码导航专项
+  - taskId: 677740f7f7f6a08aa40f38d7
+  - dueDate: 2025-12-31T10:00:00
+  - workHour: 0.0
+  - content: 【产品专项】二维码导航专项
+  - [已完成] 二维码导航七期
+    - taskId: 68a2e26c1b2775974a8e6fdd
+    - parent: 【产品专项】二维码导航专项
+    - dueDate: 2025-09-30T10:00:00
+    - workHour: 0.0
+    - content: 二维码导航七期
+  - [已完成] 二维码导航优化
+    - taskId: 69c639decf505b70e0d0df2e
+    - parent: 【产品专项】二维码导航专项
+    - dueDate: 2026-03-27T10:00:00
+    - workHour: 0.0
+    - content: 二维码导航优化
+- [已完成] 2025年主干功能开发
+  - taskId: 677f4bc8fcff03e29681c511
+  - dueDate: 2025-12-31T10:00:00
+  - workHour: 0.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 1
+  - content: 2025年主干功能开发
+- [已完成] 2025年订单项目开发
+  - taskId: 677f4bd01eb5e811f19c76e2
+  - dueDate: 2025-12-31T10:00:00
+  - workHour: 0.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - businessType: 2
+  - content: 2025年订单项目开发
+- [未完成] 季度绩效考核总结
+  - taskId: 677f2ca87c7200a7b1111a40
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 0.0
+  - businessType: 1
+  - content: 季度绩效考核总结
+  - [已完成] 2025年绩效考核总结
+    - taskId: 67b41dfde940bafa6a9f2ec3
+    - parent: 季度绩效考核总结
+    - dueDate: 2025-12-31T10:00:00
+    - workHour: 0.0
+    - businessType: 1
+    - content: 2025年绩效考核总结
+    - [已完成] 25年Q3季度季度考核表书写
+      - taskId: 68d931b056fbb0eeac458fad
+      - parent: 2025年绩效考核总结
+      - dueDate: 2025-09-30T10:00:00
+      - workHour: 0.0
+      - businessType: 1
+      - content: 25年Q3季度季度考核表书写
+    - [已完成] 25年Q4季度季度考核表书写
+      - taskId: 694e713f91a3e532d86e6d2c
+      - parent: 2025年绩效考核总结
+      - dueDate: 2025-12-31T10:00:00
+      - workHour: 0.0
+      - businessType: 1
+      - content: 25年Q4季度季度考核表书写
+- [未完成] 【研发专项】故障诊断专项
+  - taskId: 67fe2014272195ab8b4c1a0b
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 0.0
+  - businessType: 1
+  - content: 【研发专项】故障诊断专项
+- [未完成] 【研发自驱】竞品性能对比
+  - taskId: 69254a465347265453246b69
+  - dueDate: 2026-03-31T10:00:00
+  - workHour: 0.0
+  - businessType: 1
+  - content: 【研发自驱】竞品性能对比
+- [创建中] 宁波港机器狗项目
+  - taskId: 6a1011c98f68c09b45d87bba
+  - dueDate: 2026-05-29T10:00:00
+  - workHour: 0.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - content: 宁波港机器狗项目
+- [创建中] 差分车底盘起步姿态调整功能
+  - taskId: 66bf09562ffb25b438e6461d
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - content: 差分车底盘起步姿态调整功能
+- [未完成] 【产品专项】到点自学习专项
+  - taskId: 66c2c1dfe65b7336de712d7e
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - businessType: 0
+  - content: 【产品专项】到点自学习专项
+  - [已完成] 到点自学习五期
+    - taskId: 6874f1ceba3520a08df11067
+    - parent: 【产品专项】到点自学习专项
+    - dueDate: 2025-09-30T10:00:00
+    - workHour: 0.0
+    - content: 到点自学习五期
+- [未完成] 【研发专项】本体&调度协作专项
+  - taskId: 681c4a4dd681a2b8717ac757
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - businessType: 1
+  - content: 【研发专项】本体&调度协作专项
+- [未完成] 【研发专项】规控算法迭代专项
+  - taskId: 681dc5711af772b6e7497f5a
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - businessType: 1
+  - content: 【研发专项】规控算法迭代专项
+  - [搁置] 规控算法迭代二期（搁置）
+    - taskId: 6836902d49e2f7102f01981f
+    - parent: 【研发专项】规控算法迭代专项
+    - dueDate: 2025-07-31T10:00:00
+    - workHour: 0.0
+    - taskNature: 69d4d037c253ef42e9c31b39
+    - businessType: 0
+    - content: 规控算法迭代二期（搁置）
+- [未完成] 【研发专项】模块节点性能优化
+  - taskId: 68391dd0d801cb0e9144ef03
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - businessType: 1
+  - content: 【研发专项】模块节点性能优化
+  - [已完成] 四期
+    - taskId: 68391de706dbd02fcd3d13f5
+    - parent: 【研发专项】模块节点性能优化
+    - dueDate: 2025-07-31T10:00:00
+    - workHour: 0.0
+    - content: 四期
+  - [已完成] 五期
+    - taskId: 690971c8bcbad56b1c3a83fb
+    - parent: 【研发专项】模块节点性能优化
+    - dueDate: 2025-11-30T10:00:00
+    - workHour: 0.0
+    - content: 五期
+- [未完成] 【产品专项】高速小车
+  - taskId: 6870746d0509e251d6169f02
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - businessType: 0
+  - content: 【产品专项】高速小车
+  - [已完成] 一期
+    - taskId: 6870747a0509e251d616ad3a
+    - parent: 【产品专项】高速小车
+    - dueDate: 2025-07-31T10:00:00
+    - workHour: 0.0
+    - content: 一期
+  - [已完成] 二期
+    - taskId: 68902959835d3061b66c303a
+    - parent: 【产品专项】高速小车
+    - dueDate: 2025-12-31T10:00:00
+    - workHour: 0.0
+    - content: 二期
+  - [未完成] 四期
+    - taskId: 69e985959de53b35ce1a8425
+    - parent: 【产品专项】高速小车
+    - dueDate: 2026-06-30T10:00:00
+    - workHour: 0.0
+    - taskNature: 69d4d037c253ef42e9c31b39
+    - businessType: 0
+    - content: 四期
+- [未完成] 【研发自驱】导航模块自动化测试
+  - taskId: 6878da6572dc136c15d56783
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - businessType: 1
+  - content: 【研发自驱】导航模块自动化测试
+  - [未完成] 仿真平台搭建
+    - taskId: 692556bbecff47720a52b72e
+    - parent: 【研发自驱】导航模块自动化测试
+    - dueDate: 2025-12-31T10:00:00
+    - workHour: 0.0
+    - content: 仿真平台搭建
+- [未完成] 【研发专项】机器狗接入迦智工具链
+  - taskId: 6909726f482487f2daccd6e8
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - businessType: 1
+  - content: 【研发专项】机器狗接入迦智工具链
+  - [已完成] 机器狗接入迦智二期
+    - taskId: 690972ae1c8ca2ae4678167d
+    - parent: 【研发专项】机器狗接入迦智工具链
+    - dueDate: 2026-01-30T10:00:00
+    - workHour: 0.0
+    - content: 机器狗接入迦智二期
+  - [未完成] 机器狗接入迦智三期
+    - taskId: 69b8c0c24039169f885f2228
+    - parent: 【研发专项】机器狗接入迦智工具链
+    - dueDate: 2026-04-30T10:00:00
+    - workHour: 0.0
+    - content: 机器狗接入迦智三期
+- [未完成] 规控算法迭代【2026】
+  - taskId: 698d339e9270bf3d5f2b6f31
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - content: 规控算法迭代【2026】
+- [未完成] 【产品专项】轮臂机器人专项
+  - taskId: 69e98090f465c5a33527413a
+  - dueDate: 2026-06-30T10:00:00
+  - workHour: 0.0
+  - taskNature: 69d4d037c253ef42e9c31b39
+  - content: 【产品专项】轮臂机器人专项
+  - [已完成] 一期
+    - taskId: 69e980f4448984fb4f73c6f0
+    - parent: 【产品专项】轮臂机器人专项
+    - dueDate: 2026-03-31T10:00:00
+    - workHour: 0.0
+    - taskNature: 69d4d037c253ef42e9c31b39
+    - content: 一期
+
+## 孤立子任务
+- 流程改进
+  - parentTaskId: 69c9e555d3c03da634a01db2
+- 产品优化
+  - parentTaskId: 69c9e555d3c03da634a01db2
+- 1. 代码开发AI赋能
+  - parentTaskId: 69c9e3ac6ba9c45307b8409c
+- 问题复盘
+  - parentTaskId: 69c9e555d3c03da634a01db2
+- 2. 部门数据管理平台化
+  - parentTaskId: 69c9e3ac6ba9c45307b8409c
+- 26年Q1季度季度考核表书写
+  - parentTaskId: 69c63adeca895527699c0d31
+- 2025年导航组年终述职
+  - parentTaskId: 677f302bc2a572dc466b4e6a
+- 电池状态驱动开发
+  - parentTaskId: 6881a49b4ae6e1de25d0c0c2
+- 载具控制驱动开发
+  - parentTaskId: 6881a49b4ae6e1de25d0c0c2
+- 灯光控制驱动开发
+  - parentTaskId: 6881a49b4ae6e1de25d0c0c2
+- 运动控制驱动开发
+  - parentTaskId: 6881a49b4ae6e1de25d0c0c2
+- 1. 提高代码质量
+  - parentTaskId: 677f3ec63a56da5d953214b2
+- 3. 导航模块结构优化
+  - parentTaskId: 677f3ec63a56da5d953214b2
+- 导航组代码评审【2025年】
+  - parentTaskId: 66c2bb327331442259e93f55
+- 2. 降低现场问题
+  - parentTaskId: 677f3ec63a56da5d953214b2
+- 《代码整洁之道》分享会
+  - parentTaskId: 66c2bb1101724b44192b234b
 
 ## 给 AI 的使用规则
 - 优先参考任务标题、content、note 和父子任务结构。

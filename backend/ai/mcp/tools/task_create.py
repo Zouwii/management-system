@@ -43,7 +43,7 @@ def register_tool(mcp, resolve_user_fn):
             "requirementDesc": requirement_desc.strip(), "outputs": output_list,
             "participationLevel": total_days,
             "startDate": _norm(start_date, "00:00:00"),
-            "dueDate": _norm(due_date, "23:59:59"),
+            "dueDate": _norm(due_date, "16:00:00"),
             "parentTaskId": (parent_task_id or "").strip(), "executorId": uid,
         })
         if result.get("success"):

@@ -6,11 +6,9 @@ import {
   initTbcreateWorkspace,
   fetchAITtydSession,
   fetchAIModels,
-  fetchAIInsightList,
   fetchTbcreateTasks,
 } from '../api/dashboard';
 import EmployeeLayout from '../layouts/EmployeeLayout';
-import { aiInsightList as fallbackData } from '../mock/platformData';
 import { useAuthStore } from '../store/authStore';
 import AnalysisModules from './AnalysisModules';
 import TaskCreatePanel from './TaskCreatePanel';
@@ -54,7 +52,6 @@ function resolveOwnerKey(user) {
 export default function AIAnalysisPage() {
   const user = useAuthStore((state) => state.user);
   const ownerKey = resolveOwnerKey(user);
-  const [insights, setInsights] = useState(fallbackData);
   const [draft, setDraft] = useState({
     title: '',
     workType: WORK_TYPES[0],
@@ -93,6 +90,8 @@ export default function AIAnalysisPage() {
   const [applyingKeys, setApplyingKeys] = useState(new Set());
   const [taskCreateHighlight, setTaskCreateHighlight] = useState(false);
   const [performanceOpen, setPerformanceOpen] = useState(false);
+  const [performanceResult, setPerformanceResult] = useState(null);
+  const [performanceError, setPerformanceError] = useState('');
   const taskCreateRef = useRef(null);
 
   // ── 任务创建 ttyd 懒加载 ──
@@ -131,14 +130,6 @@ export default function AIAnalysisPage() {
     startTbTtyd();
   }, [startTbTtyd]);
 
-  // Load AI insights on mount
-  useEffect(() => {
-    let active = true;
-    fetchAIInsightList().then((response) => {
-      if (active) setInsights(response.data);
-    });
-    return () => { active = false; };
-  }, []);
 
   // Load available AI models
   useEffect(() => {
@@ -205,10 +196,6 @@ export default function AIAnalysisPage() {
     return () => window.clearTimeout(timer);
   }, [draft, ownerKey, user]);
 
-  const performanceInsights = useMemo(
-    () => insights.filter((item) => item.type === '绩效关联' || item.type === '能力发展'),
-    [insights],
-  );
 
   const handleCreateTicket = async () => {
     setCreating(true);
@@ -238,7 +225,10 @@ export default function AIAnalysisPage() {
     setAnalysisBusy(true);
     setDashboardResult(null);
     setDashboardError('');
+    setPerformanceResult(null);
+    setPerformanceError('');
     try {
+      // 步骤1: 拉取任务数据
       const t1 = await fetch('/api/bt/ai/task-analysis/fetch-tasks', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ owner_key: ownerKey }),
@@ -248,14 +238,31 @@ export default function AIAnalysisPage() {
       if (d1.code !== 200) throw new Error(d1.error || '步骤1失败');
       const { tasks, stats } = d1.data;
 
-      const t2 = await fetch('/api/bt/ai/task-analysis/search-kb', {
-        method: 'POST', headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ tasks, generate: true }),
-        credentials: 'include',
-      });
+      // 步骤2 + 绩效分析：并行
+      const [t2, tPerf] = await Promise.all([
+        fetch('/api/bt/ai/task-analysis/search-kb', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ tasks, generate: true }),
+          credentials: 'include',
+        }),
+        fetch('/api/bt/ai/task-analysis/performance-report', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({ owner_key: ownerKey }),
+          credentials: 'include',
+        }),
+      ]);
       const d2 = await t2.json();
+      const dPerf = await tPerf.json();
       if (d2.code !== 200) throw new Error(d2.error || '步骤2失败');
 
+      // 绩效结果
+      if (dPerf.code === 200) {
+        setPerformanceResult(dPerf.data);
+      } else {
+        setPerformanceError(dPerf.error || '绩效分析失败');
+      }
+
+      // 步骤3: 生成报告
       const t3 = await fetch('/api/bt/ai/task-analysis/generate-report', {
         method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({ tasks, stats, chunks: d2.data.chunks || [] }),
@@ -287,7 +294,7 @@ export default function AIAnalysisPage() {
     setApplyingKeys((prev) => new Set(prev).add(key));
     try {
       const template = suggestion?.task_template || {};
-      const workType = suggestionType === 'capability' ? '能力型' : '自主型';
+      const workType = suggestionType === 'capability' || suggestionType === 'performance' ? '能力型' : '自主型';
 
       // Parse outputs: 优先 outputs 数组，兜底 output 字符串
       const templateOutputs = Array.isArray(template.outputs) ? template.outputs : [];
@@ -452,16 +459,35 @@ export default function AIAnalysisPage() {
                     </svg>
                     <div className="text-[14px] font-semibold leading-5 text-slate-900">根据绩效进行分析</div>
                   </div>
-                  <span className="rounded border border-amber-100 bg-amber-50 px-2 py-0.5 text-[12px] font-semibold text-amber-700">绩效</span>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded border border-amber-100 bg-amber-50 px-2 py-0.5 text-[12px] font-semibold text-amber-700">绩效</span>
+                  </div>
                 </button>
                 {performanceOpen ? (
-                  <div className="space-y-2 border-t border-slate-100 p-3">
-                    {performanceInsights.map((item) => (
-                      <div key={item.title} className="rounded-md border border-slate-100 bg-slate-50 px-3 py-2">
-                        <div className="text-[13px] font-semibold leading-5 text-slate-800">{item.title}</div>
-                        <div className="mt-1 line-clamp-3 text-[12px] leading-5 text-slate-500">{item.content}</div>
+                  <div className="border-t border-slate-100 p-3">
+                    {analysisBusy && !performanceResult ? (
+                      <div className="flex items-center justify-center gap-3 py-8 text-[13px] text-slate-500">
+                        <svg className="h-4 w-4 animate-spin text-amber-500" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                        AI 正在分析绩效数据...
                       </div>
-                    ))}
+                    ) : null}
+                    {performanceError ? (
+                      <div className="rounded-md border border-red-100 bg-red-50 px-3 py-2 text-[13px] text-red-700">{performanceError}</div>
+                    ) : null}
+                    {!analysisBusy && !performanceResult && !performanceError ? (
+                      <div className="rounded-md border border-dashed border-slate-200 px-3 py-8 text-center text-[13px] text-slate-400">
+                        点击上方"开始分析"，将同时拉取工时和绩效数据进行分析
+                      </div>
+                    ) : null}
+                    {performanceResult ? (
+                      <div className="grid gap-3 xl:grid-cols-2">
+                        <StatusSummaryPanel data={performanceResult.status_summary} />
+                        <SchedulingAdvicePanel data={performanceResult.scheduling_advice} />
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
@@ -526,5 +552,73 @@ export default function AIAnalysisPage() {
         </div>
       </div>
     </EmployeeLayout>
+  );
+}
+
+// ── 绩效达标分析子组件 ────────────────────────────────────────
+
+function StatusSummaryPanel({ data }) {
+  const s = data || {};
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-3">
+      <h3 className="mb-2 flex items-center gap-2 text-[13px] font-semibold leading-5 text-slate-800">
+        <span className="h-2 w-2 rounded-full bg-amber-400" />
+        达标现状
+      </h3>
+      {s.status ? (
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            {s.current_score != null ? (
+              <span className="rounded bg-amber-50 px-2 py-1 text-[14px] font-bold text-amber-800">
+                得分 {typeof s.current_score === 'number' ? s.current_score.toFixed(2) : s.current_score}
+              </span>
+            ) : null}
+            {s.prev_carry != null && s.prev_carry > 0 ? (
+              <span className="rounded bg-purple-50 px-2 py-1 text-[13px] font-semibold text-purple-700">
+                上季结余 +{typeof s.prev_carry === 'number' ? s.prev_carry.toFixed(3) : s.prev_carry}
+              </span>
+            ) : null}
+          </div>
+          <p className="text-[13px] leading-5 text-slate-700">{(Array.isArray(s.status) ? s.status : [s.status]).map((line, i) => (
+  <p key={i} className={'text-[13px] leading-5 ' + (i === 0 ? 'font-semibold text-slate-800' : 'text-slate-600')}>{line}</p>
+))}</p>
+        </div>
+      ) : (
+        <div className="text-[12px] text-slate-400">暂无分析结果</div>
+      )}
+    </section>
+  );
+}
+
+function SchedulingAdvicePanel({ data }) {
+  const advice = data || {};
+  const suggestions = Array.isArray(advice.suggestions) ? advice.suggestions : [];
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-3">
+      <h3 className="mb-2 flex items-center gap-2 text-[13px] font-semibold leading-5 text-slate-800">
+        <span className="h-2 w-2 rounded-full bg-emerald-400" />
+        排单建议
+      </h3>
+      {suggestions.length > 0 ? (
+        <div className="divide-y divide-slate-100">
+          {suggestions.map((item, i) => (
+            <div key={i} className="py-2 first:pt-0 last:pb-0">
+              <div className="flex items-start gap-2">
+                <span className="shrink-0 mt-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-500">{item.priority || i + 1}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[12px] font-semibold leading-5 text-slate-800">{item.direction}</div>
+                  <div className="mt-0.5 text-[11px] leading-4 text-slate-500">{item.detail}</div>
+                </div>
+                {item.estimated_hours ? (
+                  <span className="shrink-0 rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700">+{item.estimated_hours}d</span>
+                ) : null}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-[12px] text-slate-400">暂无排单建议</div>
+      )}
+    </section>
   );
 }

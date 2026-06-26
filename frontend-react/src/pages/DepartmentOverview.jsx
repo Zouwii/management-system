@@ -1,65 +1,32 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { fetchDepartmentOverview, fetchMembers } from '../api/dashboard';
+import { fetchDepartmentOverview } from '../api/dashboard';
 import Card from '../components/Card';
 import SectionTitle from '../components/SectionTitle';
 import StatCard from '../components/StatCard';
 import { ROUTE_PATHS } from '../constants/routes';
 import ManagerLayout from '../layouts/ManagerLayout';
-import { departmentStats as fallbackStats, performanceArchives, personalHoursDashboard } from '../mock/platformData';
+import { departmentStats as fallbackStats } from '../mock/platformData';
 import { useAuthStore } from '../store/authStore';
-import { buildTeamSummary } from '../utils/managerDashboard';
-import { calculateExpectedEffectiveDays, formatDateTime, formatDays } from '../utils/workHours';
+import { formatDateTime } from '../utils/workHours';
 
-const BASE_REFERENCE_HOURS = 156;
-const CURRENT_PROGRESS_RATIO = 0.72;
-
-function getQuarterLabel() {
-  const now = new Date();
-  const quarter = Math.floor(now.getMonth() / 3) + 1;
-  return `${now.getFullYear()} Q${quarter}`;
+function getQuarterLabel(year, quarter) {
+  return `${year} Q${quarter}`;
 }
 
-function getArchiveByIndex(row, index) {
-  const templates = Object.values(performanceArchives);
-  return performanceArchives[row.name] ?? templates[index % templates.length];
-}
+// ── 基于真实 API 数据的计算函数 ──
 
-function buildPerformanceRows(rows, quarter) {
-  return rows.map((row, index) => {
-    const archive = getArchiveByIndex(row, index);
-    const record = archive.history.find((item) => item.quarter === quarter) ?? archive.history[archive.history.length - 1];
-
-    return {
-      name: row.name,
-      finalScore: record.finalScore,
-    };
-  });
-}
-
-function buildHoursRows(rows, expectedView) {
-  const baseQuarterExpectedHours = calculateExpectedEffectiveDays(
-    personalHoursDashboard.defaultRange.startDate,
-    personalHoursDashboard.defaultRange.endDate,
-    personalHoursDashboard.statutoryHolidays,
-    personalHoursDashboard.compensatoryDays,
-  ).hours;
-  const baseCurrentExpectedHours = baseQuarterExpectedHours * CURRENT_PROGRESS_RATIO;
-
+function buildMemberHoursRows(rows) {
   return rows.map((row) => {
-    const scale = Number(row.hours || 0) / BASE_REFERENCE_HOURS || 1;
-    const quarterExpectedHours = baseQuarterExpectedHours * scale;
-    const currentExpectedHours = baseCurrentExpectedHours * scale;
-    const selectedExpectedHours = expectedView === 'current' ? currentExpectedHours : quarterExpectedHours;
-    const scheduledHours = Number(personalHoursDashboard.scheduledEffectiveHours || 0) * scale;
-    const completedHours = Number(personalHoursDashboard.completedEffectiveHours || 0) * scale;
-    const overdueEffectiveHours = Number(personalHoursDashboard.quarterlyOverdueEffectiveHours || 0) * scale;
-    const overdueCompletedHours = Number(personalHoursDashboard.quarterlyOverdueCompletedHours || 0) * scale;
-    const allocationDelta = scheduledHours + overdueEffectiveHours - selectedExpectedHours;
-    const completionDelta = completedHours + overdueCompletedHours - selectedExpectedHours;
-
+    const expected = row.expectedEffectiveHours || 0;
+    const scheduled = row.scheduledHours || 0;
+    const completed = row.completedHours || 0;
+    const overdue = row.overdueHours || 0;
+    const overdueCompleted = row.overdueCompletedHours || 0;
+    const allocationDelta = scheduled + overdue - expected;
+    const completionDelta = completed + overdueCompleted - expected;
     return {
-      name: row.name,
+      name: row.userName,
       allocationDelta,
       completionDelta,
       highRisk: allocationDelta < 0 || completionDelta < 0,
@@ -67,23 +34,34 @@ function buildHoursRows(rows, expectedView) {
   });
 }
 
-function buildTeamMonitor(rows, quarter, expectedView) {
-  const summary = buildTeamSummary(rows);
-  const performanceRows = buildPerformanceRows(rows, quarter);
-  const hourRows = buildHoursRows(rows, expectedView);
+function buildMemberPerfRows(rows) {
+  return rows.map((row) => ({
+    name: row.userName,
+    finalScore: row.finalScore ?? 0,
+  }));
+}
 
+function buildTeamMonitor(rows) {
+  const totalMembers = rows.length;
+  const totalHours = rows.reduce((sum, r) => {
+    return sum + (r.scheduledHours || 0) + (r.overdueHours || 0) + (r.costHour || 0) + (r.issueCostHour || 0);
+  }, 0);
+  const perfRows = buildMemberPerfRows(rows);
+  const hourRows = buildMemberHoursRows(rows);
+  const validPerf = perfRows.filter((r) => r.finalScore > 0);
+  const avgFinalPerformance = validPerf.length
+    ? (validPerf.reduce((s, r) => s + r.finalScore, 0) / validPerf.length).toFixed(2)
+    : '0.00';
   return {
-    totalMembers: summary.totalMembers,
-    totalHours: summary.totalHours,
-    avgFinalPerformance: performanceRows.length
-      ? (performanceRows.reduce((sum, row) => sum + row.finalScore, 0) / performanceRows.length).toFixed(2)
-      : '0.00',
-    allocationRiskCount: hourRows.filter((row) => row.allocationDelta < 0).length,
-    completionRiskCount: hourRows.filter((row) => row.completionDelta < 0).length,
-    highRiskCount: hourRows.filter((row) => row.highRisk).length,
-    lowPerformanceCount: performanceRows.filter((row) => row.finalScore < 1.0).length,
-    allocationDelta: hourRows.reduce((sum, row) => sum + row.allocationDelta, 0),
-    completionDelta: hourRows.reduce((sum, row) => sum + row.completionDelta, 0),
+    totalMembers,
+    totalHours,
+    avgFinalPerformance,
+    allocationRiskCount: hourRows.filter((r) => r.allocationDelta < 0).length,
+    completionRiskCount: hourRows.filter((r) => r.completionDelta < 0).length,
+    highRiskCount: hourRows.filter((r) => r.highRisk).length,
+    lowPerformanceCount: perfRows.filter((r) => r.finalScore > 0 && r.finalScore < 1.0).length,
+    allocationDelta: hourRows.reduce((s, r) => s + r.allocationDelta, 0),
+    completionDelta: hourRows.reduce((s, r) => s + r.completionDelta, 0),
   };
 }
 
@@ -92,67 +70,57 @@ export default function DepartmentOverview() {
   const [stats, setStats] = useState(fallbackStats);
   const [rows, setRows] = useState([]);
   const [lastUpdatedAt, setLastUpdatedAt] = useState('');
-  const [expectedView, setExpectedView] = useState('quarter');
-  const performanceQuarters = useMemo(() => {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentQuarter = Math.floor(now.getMonth() / 3) + 1;
-    const quarters = [];
-    for (let y = 2024; y <= currentYear; y++) {
-      const maxQ = y === currentYear ? currentQuarter : 4;
-      for (let q = 1; q <= maxQ; q++) {
-        quarters.push(`${y} Q${q}`);
-      }
-    }
-    return quarters;
-  }, []);
-  const latestQuarter = performanceQuarters[performanceQuarters.length - 1] ?? getQuarterLabel();
-  const [selectedQuarter, setSelectedQuarter] = useState(latestQuarter);
+  const [apiQuarter, setApiQuarter] = useState(null);
+  const [apiPerfQuarter, setApiPerfQuarter] = useState(null);
 
   useEffect(() => {
     let active = true;
 
     fetchDepartmentOverview(user).then((response) => {
       if (!active) return;
-      setStats((prev) => ({ ...prev, ...response.data.stats }));
-      setRows(response.data.rows ?? []);
-      setLastUpdatedAt(response.data?.lastUpdatedAt || new Date().toISOString());
-    });
-
-    // 真实成员统计：从统一接口获取，失败时用 department-overview 自带数据
-    fetchMembers().then((res) => {
-      if (!active) return;
-      const members = res?.data?.members;
-      if (!members || !members.length) return;
-      const navCount = members.filter((m) => m.teamKey === 'nav').length;
-      const servoCount = members.filter((m) => m.teamKey === 'servo').length;
+      const data = response?.data ?? {};
+      const apiStats = data.stats ?? {};
       setStats((prev) => ({
         ...prev,
-        totalMembers: members.length,
-        navMembers: navCount,
-        integrationMembers: servoCount,
+        totalMembers: apiStats.totalMembers ?? prev.totalMembers,
+        navMembers: apiStats.navMembers ?? prev.navMembers,
+        integrationMembers: apiStats.servoMembers ?? prev.integrationMembers,
+        totalHours: apiStats.totalHours ?? prev.totalHours,
       }));
+      setRows(data.rows ?? []);
+      setLastUpdatedAt(data.lastUpdatedAt || new Date().toISOString());
+      setApiQuarter(data.quarter ?? null);
+      setApiPerfQuarter(data.perfQuarter ?? null);
     }).catch(() => {});
 
     return () => { active = false; };
   }, [user]);
 
-  useEffect(() => {
-    setSelectedQuarter(latestQuarter);
-  }, [latestQuarter]);
+  const quarterLabel = apiQuarter
+    ? getQuarterLabel(apiQuarter.year, apiQuarter.quarter)
+    : fallbackStats.quarter ?? '2026 Q2';
+  const perfQuarterLabel = apiPerfQuarter
+    ? getQuarterLabel(apiPerfQuarter.year, apiPerfQuarter.quarter)
+    : quarterLabel;
 
   const navRows = useMemo(() => rows.filter((row) => row.team === '导航组'), [rows]);
   const integrationRows = useMemo(() => rows.filter((row) => row.team === '对接组'), [rows]);
-  const summary = useMemo(() => buildTeamSummary(rows), [rows]);
-  const navMonitor = useMemo(() => buildTeamMonitor(navRows, selectedQuarter, expectedView), [expectedView, navRows, selectedQuarter]);
-  const integrationMonitor = useMemo(() => buildTeamMonitor(integrationRows, selectedQuarter, expectedView), [expectedView, integrationRows, selectedQuarter]);
-  const departmentPerformanceRows = useMemo(() => buildPerformanceRows(rows, selectedQuarter), [rows, selectedQuarter]);
-  const departmentHoursRows = useMemo(() => buildHoursRows(rows, expectedView), [expectedView, rows]);
+  const departmentSummary = useMemo(() => {
+    const totalHours = rows.reduce((sum, r) => {
+      return sum + (r.scheduledHours || 0) + (r.overdueHours || 0) + (r.costHour || 0) + (r.issueCostHour || 0);
+    }, 0);
+    return { totalHours, totalMembers: rows.length };
+  }, [rows]);
+  const navMonitor = useMemo(() => buildTeamMonitor(navRows), [navRows]);
+  const integrationMonitor = useMemo(() => buildTeamMonitor(integrationRows), [integrationRows]);
+
+  const departmentPerfRows = useMemo(() => buildMemberPerfRows(rows), [rows]);
+  const departmentHoursRows = useMemo(() => buildMemberHoursRows(rows), [rows]);
   const departmentAlerts = useMemo(() => ({
     allocationRiskCount: departmentHoursRows.filter((row) => row.allocationDelta < 0).length,
     completionRiskCount: departmentHoursRows.filter((row) => row.completionDelta < 0).length,
-    lowPerformanceCount: departmentPerformanceRows.filter((row) => row.finalScore < 1.0).length,
-  }), [departmentHoursRows, departmentPerformanceRows]);
+    lowPerformanceCount: departmentPerfRows.filter((row) => row.finalScore > 0 && row.finalScore < 1.0).length,
+  }), [departmentHoursRows, departmentPerfRows]);
   const rankingCards = useMemo(() => {
     const teamItems = [
       { label: '导航组', route: ROUTE_PATHS.NAV_TEAM_DETAIL, ...navMonitor },
@@ -166,7 +134,7 @@ export default function DepartmentOverview() {
     return [
       {
         title: '工时排名',
-        value: `${topHours?.label ?? '-'} · ${formatDays(topHours?.totalHours ?? 0)}天`,
+        value: `${topHours?.label ?? '-'} · ${(topHours?.totalHours ?? 0).toFixed(1)}`,
         to: topHours?.route ?? ROUTE_PATHS.DEPARTMENT_OVERVIEW,
       },
       {
@@ -177,10 +145,10 @@ export default function DepartmentOverview() {
       {
         title: '异常优先级',
         value: `${topRisk?.label ?? '-'} · ${(topRisk?.highRiskCount ?? 0) + (topRisk?.lowPerformanceCount ?? 0)}项`,
-        to: `${topRisk?.route ?? ROUTE_PATHS.DEPARTMENT_OVERVIEW}?hoursAbnormal=abnormal&performanceScore=below&expected=${expectedView}`,
+        to: `${topRisk?.route ?? ROUTE_PATHS.DEPARTMENT_OVERVIEW}?hoursAbnormal=abnormal&performanceScore=below`,
       },
     ];
-  }, [expectedView, integrationMonitor, navMonitor]);
+  }, [integrationMonitor, navMonitor]);
   const departmentInsights = useMemo(() => {
     const insights = [];
 
@@ -237,7 +205,7 @@ export default function DepartmentOverview() {
           </div>
           <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
             <div className="text-sm text-slate-500">总工时</div>
-            <div className="mt-2 text-2xl font-semibold text-slate-900">{formatDays(monitor.totalHours)}天</div>
+            <div className="mt-2 text-2xl font-semibold text-slate-900">{(monitor.totalHours ?? 0).toFixed(1)}</div>
           </div>
           <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
             <div className="text-sm text-slate-500">平均最终绩效</div>
@@ -245,10 +213,10 @@ export default function DepartmentOverview() {
           </div>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
-          <Link to={`${route}?hoursAbnormal=allocation&expected=${expectedView}`} className="rounded-full border border-rose-100 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700">
+          <Link to={`${route}?hoursAbnormal=allocation`} className="rounded-full border border-rose-100 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700">
             分配不足 {monitor.allocationRiskCount} 人
           </Link>
-          <Link to={`${route}?hoursAbnormal=completion&expected=${expectedView}`} className="rounded-full border border-amber-100 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700">
+          <Link to={`${route}?hoursAbnormal=completion`} className="rounded-full border border-amber-100 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700">
             完成不足 {monitor.completionRiskCount} 人
           </Link>
           <Link to={`${route}?performanceScore=below`} className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700">
@@ -265,23 +233,7 @@ export default function DepartmentOverview() {
         title="部门总览"
         right={(
           <div className="flex flex-wrap justify-end gap-3">
-            <select
-              value={expectedView}
-              onChange={(event) => setExpectedView(event.target.value)}
-              className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 outline-none"
-            >
-              <option value="quarter">本季度预期有效工时</option>
-              <option value="current">本季度至今天预期有效工时</option>
-            </select>
-            <select
-              value={selectedQuarter}
-              onChange={(event) => setSelectedQuarter(event.target.value)}
-              className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-700 outline-none"
-            >
-              {performanceQuarters.map((quarter) => (
-                <option key={quarter} value={quarter}>{quarter}</option>
-              ))}
-            </select>
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm">{quarterLabel}</div>
             <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm">部门：本体开发部</div>
             <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm">最后同步：{lastUpdatedAt ? formatDateTime(lastUpdatedAt) : '暂无'}</div>
           </div>
@@ -303,8 +255,8 @@ export default function DepartmentOverview() {
 
       <div className="grid gap-5 md:grid-cols-3">
         <StatCard title="部门总人数" value={rows.length || stats.totalMembers} sub={`导航组 ${stats.navMembers} 人，对接组 ${stats.integrationMembers} 人`} />
-        <StatCard title="部门总工时" value={`${formatDays(summary.totalHours || stats.totalHours)}天`} sub="聚合导航组和对接组全部成员工时" />
-        <StatCard title="平均最终绩效" value={departmentPerformanceRows.length ? (departmentPerformanceRows.reduce((sum, row) => sum + row.finalScore, 0) / departmentPerformanceRows.length).toFixed(2) : '0.00'} sub={`${selectedQuarter} 部门平均最终绩效`} />
+        <StatCard title="部门总工时" value={`${(departmentSummary.totalHours || stats.totalHours || 0).toFixed(1)}`} sub="聚合导航组和对接组全部成员工时" />
+        <StatCard title="平均最终绩效" value={departmentPerfRows.filter(r => r.finalScore > 0).length ? (departmentPerfRows.filter(r => r.finalScore > 0).reduce((s, r) => s + r.finalScore, 0) / departmentPerfRows.filter(r => r.finalScore > 0).length).toFixed(2) : '0.00'} sub={`${perfQuarterLabel} 部门平均最终绩效`} />
       </div>
 
       <div className="grid gap-5 md:grid-cols-3">
@@ -312,10 +264,10 @@ export default function DepartmentOverview() {
           <div className="text-sm">分配不足人数</div>
           <div className="mt-2 text-3xl font-semibold">{departmentAlerts.allocationRiskCount}</div>
           <div className="mt-3 flex flex-wrap gap-2 text-xs">
-            <Link to={`${ROUTE_PATHS.NAV_TEAM_DETAIL}?hoursAbnormal=allocation&expected=${expectedView}`} className="rounded-full border border-rose-200 bg-white px-3 py-1.5 font-medium text-rose-700">
+            <Link to={`${ROUTE_PATHS.NAV_TEAM_DETAIL}?hoursAbnormal=allocation`} className="rounded-full border border-rose-200 bg-white px-3 py-1.5 font-medium text-rose-700">
               导航组 {navMonitor.allocationRiskCount} 人
             </Link>
-            <Link to={`${ROUTE_PATHS.INTEGRATION_TEAM_DETAIL}?hoursAbnormal=allocation&expected=${expectedView}`} className="rounded-full border border-rose-200 bg-white px-3 py-1.5 font-medium text-rose-700">
+            <Link to={`${ROUTE_PATHS.INTEGRATION_TEAM_DETAIL}?hoursAbnormal=allocation`} className="rounded-full border border-rose-200 bg-white px-3 py-1.5 font-medium text-rose-700">
               对接组 {integrationMonitor.allocationRiskCount} 人
             </Link>
           </div>
@@ -324,10 +276,10 @@ export default function DepartmentOverview() {
           <div className="text-sm">完成不足人数</div>
           <div className="mt-2 text-3xl font-semibold">{departmentAlerts.completionRiskCount}</div>
           <div className="mt-3 flex flex-wrap gap-2 text-xs">
-            <Link to={`${ROUTE_PATHS.NAV_TEAM_DETAIL}?hoursAbnormal=completion&expected=${expectedView}`} className="rounded-full border border-amber-200 bg-white px-3 py-1.5 font-medium text-amber-700">
+            <Link to={`${ROUTE_PATHS.NAV_TEAM_DETAIL}?hoursAbnormal=completion`} className="rounded-full border border-amber-200 bg-white px-3 py-1.5 font-medium text-amber-700">
               导航组 {navMonitor.completionRiskCount} 人
             </Link>
-            <Link to={`${ROUTE_PATHS.INTEGRATION_TEAM_DETAIL}?hoursAbnormal=completion&expected=${expectedView}`} className="rounded-full border border-amber-200 bg-white px-3 py-1.5 font-medium text-amber-700">
+            <Link to={`${ROUTE_PATHS.INTEGRATION_TEAM_DETAIL}?hoursAbnormal=completion`} className="rounded-full border border-amber-200 bg-white px-3 py-1.5 font-medium text-amber-700">
               对接组 {integrationMonitor.completionRiskCount} 人
             </Link>
           </div>

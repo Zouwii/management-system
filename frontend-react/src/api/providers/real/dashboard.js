@@ -239,7 +239,7 @@ async function ensureNoGlobalUpdateLock() {
 }
 
 export function realFetchDepartmentOverview() {
-  return httpRequest('/dashboard/department-overview');
+  return httpRequest('/bt/dashboard/department-overview');
 }
 
 export function realFetchNavTeamDetail(_user, params = {}) {

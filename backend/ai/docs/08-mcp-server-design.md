@@ -408,7 +408,7 @@ def register_prompts(mcp):
     "边界 case 测试集构建(0.5天)"
   ],
   "startDate": "2026-06-03T00:00:00+08:00",
-  "dueDate": "2026-06-30T23:59:59+08:00",
+  "dueDate": "2026-06-30T16:00:00+08:00",
   "parentTaskId": ""
 }
 
@@ -453,7 +453,7 @@ def register_prompts(mcp):
   "outputs": [...],
   "participationLevel": 1.5,
   "startDate": "2026-06-03T00:00:00+08:00",
-  "dueDate": "2026-06-30T23:59:59+08:00",
+  "dueDate": "2026-06-30T16:00:00+08:00",
   "parentTaskId": ""
 }
 

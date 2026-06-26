@@ -1,8 +1,8 @@
 """标注助手：逐条显示当前基线检索（Group A）的候选chunk，交互式标记 relevant_chunk_ids。
 
 用法：
-  python -m ai.knowledge.benchmark.annotate     # 从头开始标注
-  python -m ai.knowledge.benchmark.annotate --resume  # 跳过已有标注的
+  python -m ai.knowledge.rag_improve.annotate     # 从头开始标注
+  python -m ai.knowledge.rag_improve.annotate --resume  # 跳过已有标注的
 """
 from __future__ import annotations
 import json
