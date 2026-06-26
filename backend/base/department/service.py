@@ -53,6 +53,39 @@ def _quarter_iso_range(year: int, quarter: int) -> Tuple[str, str]:
     return start.isoformat(), end.isoformat()
 
 
+def _parse_date_range(start_date: str | None, end_date: str | None, fallback: Tuple[str, str]) -> Tuple[str, str]:
+    """解析前端日期筛选，缺失或非法时回退当前季度范围。"""
+    if not start_date or not end_date:
+        return fallback
+
+    def _parse(value: str, is_end: bool) -> datetime:
+        text = str(value or "").strip()
+        if not text:
+            raise ValueError("empty date")
+        if len(text) == 10:
+            parsed = datetime.fromisoformat(text)
+            return parsed.replace(
+                hour=23 if is_end else 0,
+                minute=59 if is_end else 0,
+                second=59 if is_end else 0,
+                microsecond=0,
+                tzinfo=timezone.utc,
+            )
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+
+    try:
+        start = _parse(start_date, False)
+        end = _parse(end_date, True)
+        if end < start:
+            return fallback
+        return start.isoformat(), end.isoformat()
+    except Exception:
+        return fallback
+
+
 def _get_project_id() -> str:
     """从 ids.json 取第一个 project_id。"""
     pids = get_config_projectids()
@@ -269,10 +302,11 @@ def _assemble_response(
 #  主入口：按模块顺序调用，拼装后返回
 # ═══════════════════════════════════════════
 
-def department_overview_service() -> Dict[str, Any]:
+def department_overview_service(start_date: str | None = None, end_date: str | None = None) -> Dict[str, Any]:
     # 1. 基础数据
     year, quarter = _current_quarter()
-    quarter_start, quarter_end = _quarter_iso_range(year, quarter)
+    default_start, default_end = _quarter_iso_range(year, quarter)
+    quarter_start, quarter_end = _parse_date_range(start_date, end_date, (default_start, default_end))
     perf_year, perf_quarter = _prev_quarter(year, quarter)
     project_id = _get_project_id()
     tr = get_default_time_range_service() or {}

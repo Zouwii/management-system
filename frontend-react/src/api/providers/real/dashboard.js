@@ -238,8 +238,11 @@ async function ensureNoGlobalUpdateLock() {
   }
 }
 
-export function realFetchDepartmentOverview() {
-  return httpRequest('/bt/dashboard/department-overview');
+export function realFetchDepartmentOverview(_user, params = {}) {
+  return httpRequest(appendQuery('/bt/dashboard/department-overview', {
+    startDate: params.startDate,
+    endDate: params.endDate,
+  }));
 }
 
 export function realFetchNavTeamDetail(_user, params = {}) {
@@ -361,7 +364,6 @@ export function realQueryPersonalHours(_user, payload) {
   const startTime = toUtcISOString(startDate);
   const endTime = toUtcISOString(endDate);
   const target = payload?.target || user?.user_id || user?.name || 'ALL';
-  const targetLabel = target === 'ALL' ? '全部人员' : target;
 
   return Promise.resolve()
     .then(async () => {
@@ -619,8 +621,6 @@ export function realUpdatePersonalHours(_user, payload) {
 
 export function realFullUpdatePersonalHours(_user, payload) {
   const user = _user || {};
-  const startDate = payload?.startDate || '';
-  const endDate = payload?.endDate || '';
   const target = payload?.target || user?.user_id || user?.name || 'ALL';
   const targetLabel = target === 'ALL' ? '全部人员' : target;
 

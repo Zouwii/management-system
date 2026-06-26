@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { fetchDepartmentOverview } from '../api/dashboard';
 import Card from '../components/Card';
 import SectionTitle from '../components/SectionTitle';
-import StatCard from '../components/StatCard';
 import { ROUTE_PATHS } from '../constants/routes';
 import ManagerLayout from '../layouts/ManagerLayout';
 import { departmentStats as fallbackStats } from '../mock/platformData';
@@ -14,325 +13,451 @@ function getQuarterLabel(year, quarter) {
   return `${year} Q${quarter}`;
 }
 
-// ── 基于真实 API 数据的计算函数 ──
+function toNumber(value, fallback = 0) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
 
-function buildMemberHoursRows(rows) {
+function parsePercent(value, fallback = 100) {
+  if (typeof value === 'string') {
+    const number = Number(value.replace('%', ''));
+    return Number.isFinite(number) ? number : fallback;
+  }
+  return toNumber(value, fallback);
+}
+
+function getMemberName(row) {
+  return row.userName || row.name || row.memberName || '-';
+}
+
+function getTeamName(row) {
+  return row.team || row.teamName || row.teamLabel || '-';
+}
+
+function getExpectedHours(row) {
+  return toNumber(row.expectedEffectiveHours ?? row.quarterExpectedHours ?? row.expectedHours ?? row.hours, 0);
+}
+
+function getScheduledHours(row) {
+  return toNumber(row.scheduledHours ?? row.scheduledEffectiveHours ?? row.hours, 0)
+    + toNumber(row.overdueHours ?? row.quarterlyOverdueEffectiveHours, 0);
+}
+
+function getCompletedHours(row) {
+  const expectedHours = getExpectedHours(row);
+  const fromRate = row.effectiveRate !== undefined
+    ? expectedHours * parsePercent(row.effectiveRate, 100) / 100
+    : null;
+
+  return toNumber(row.completedHours ?? row.completedEffectiveHours ?? row.costHour ?? fromRate ?? row.hours, 0)
+    + toNumber(row.overdueCompletedHours ?? row.quarterlyOverdueCompletedHours, 0);
+}
+
+function getFinalScore(row) {
+  return toNumber(row.finalScore ?? row.finalPerformance, 0);
+}
+
+function formatHours(value) {
+  return toNumber(value).toFixed(1);
+}
+
+function formatScore(value) {
+  const score = toNumber(value);
+  return score > 0 ? score.toFixed(2) : '-';
+}
+
+function formatDateInput(date) {
+  const pad = (value) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function getCurrentQuarterRange() {
+  const now = new Date();
+  const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
+  return {
+    startDate: formatDateInput(new Date(now.getFullYear(), quarterStartMonth, 1)),
+    endDate: formatDateInput(now),
+  };
+}
+
+function getFullQuarterRange() {
+  const now = new Date();
+  const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
+  return {
+    startDate: formatDateInput(new Date(now.getFullYear(), quarterStartMonth, 1)),
+    endDate: formatDateInput(new Date(now.getFullYear(), quarterStartMonth + 3, 0)),
+  };
+}
+
+function buildMemberRows(rows) {
   return rows.map((row) => {
-    const expected = row.expectedEffectiveHours || 0;
-    const scheduled = row.scheduledHours || 0;
-    const completed = row.completedHours || 0;
-    const overdue = row.overdueHours || 0;
-    const overdueCompleted = row.overdueCompletedHours || 0;
-    const allocationDelta = scheduled + overdue - expected;
-    const completionDelta = completed + overdueCompleted - expected;
+    const expectedHours = getExpectedHours(row);
+    const scheduledHours = getScheduledHours(row);
+    const completedHours = getCompletedHours(row);
+    const finalScore = getFinalScore(row);
+    const allocationGap = scheduledHours - expectedHours;
+    const completionGap = completedHours - expectedHours;
+
     return {
-      name: row.userName,
-      allocationDelta,
-      completionDelta,
-      highRisk: allocationDelta < 0 || completionDelta < 0,
+      name: getMemberName(row),
+      team: getTeamName(row),
+      role: row.role || row.position || row.jobTitle || '-',
+      expectedHours,
+      scheduledHours,
+      completedHours,
+      finalScore,
+      allocationGap,
+      completionGap,
     };
   });
 }
 
-function buildMemberPerfRows(rows) {
-  return rows.map((row) => ({
-    name: row.userName,
-    finalScore: row.finalScore ?? 0,
-  }));
+function getGapClass(value) {
+  if (value < 0) return 'text-rose-700';
+  if (value > 0) return 'text-emerald-700';
+  return 'text-slate-700';
 }
 
-function buildTeamMonitor(rows) {
-  const totalMembers = rows.length;
-  const totalHours = rows.reduce((sum, r) => {
-    return sum + (r.scheduledHours || 0) + (r.overdueHours || 0) + (r.costHour || 0) + (r.issueCostHour || 0);
-  }, 0);
-  const perfRows = buildMemberPerfRows(rows);
-  const hourRows = buildMemberHoursRows(rows);
-  const validPerf = perfRows.filter((r) => r.finalScore > 0);
-  const avgFinalPerformance = validPerf.length
-    ? (validPerf.reduce((s, r) => s + r.finalScore, 0) / validPerf.length).toFixed(2)
-    : '0.00';
+function groupByTeam(memberRows) {
+  return memberRows.reduce((groups, row) => {
+    const key = row.team || '-';
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(row);
+    return groups;
+  }, {});
+}
+
+function buildTeamSummary(label, rows, route) {
+  const expectedHours = rows.reduce((sum, row) => sum + row.expectedHours, 0);
+  const scheduledHours = rows.reduce((sum, row) => sum + row.scheduledHours, 0);
+  const completedHours = rows.reduce((sum, row) => sum + row.completedHours, 0);
+  const allocationGap = scheduledHours - expectedHours;
+  const completionGap = completedHours - expectedHours;
+  const allocationRate = expectedHours > 0 ? Math.round((scheduledHours / expectedHours) * 100) : 0;
+  const completionRate = expectedHours > 0 ? Math.round((completedHours / expectedHours) * 100) : 0;
+
   return {
-    totalMembers,
-    totalHours,
-    avgFinalPerformance,
-    allocationRiskCount: hourRows.filter((r) => r.allocationDelta < 0).length,
-    completionRiskCount: hourRows.filter((r) => r.completionDelta < 0).length,
-    highRiskCount: hourRows.filter((r) => r.highRisk).length,
-    lowPerformanceCount: perfRows.filter((r) => r.finalScore > 0 && r.finalScore < 1.0).length,
-    allocationDelta: hourRows.reduce((s, r) => s + r.allocationDelta, 0),
-    completionDelta: hourRows.reduce((s, r) => s + r.completionDelta, 0),
+    label,
+    route,
+    expectedHours,
+    scheduledHours,
+    completedHours,
+    allocationGap,
+    completionGap,
+    allocationRate,
+    completionRate,
   };
 }
 
+function getProgressWidth(value) {
+  return `${Math.max(0, Math.min(value, 120))}%`;
+}
+
+function sortRows(rows, sortConfig) {
+  if (!sortConfig.key) return rows;
+  const direction = sortConfig.direction === 'asc' ? 1 : -1;
+  return [...rows].sort((left, right) => {
+    const leftValue = toNumber(left[sortConfig.key]);
+    const rightValue = toNumber(right[sortConfig.key]);
+    return (leftValue - rightValue) * direction;
+  });
+}
+
+const SORT_OPTIONS = [
+  { key: '', label: '默认' },
+  { key: 'allocationGap', label: '分配差额' },
+  { key: 'completionGap', label: '完成差额' },
+];
+
 export default function DepartmentOverview() {
   const user = useAuthStore((state) => state.user);
-  const [stats, setStats] = useState(fallbackStats);
   const [rows, setRows] = useState([]);
   const [lastUpdatedAt, setLastUpdatedAt] = useState('');
   const [apiQuarter, setApiQuarter] = useState(null);
-  const [apiPerfQuarter, setApiPerfQuarter] = useState(null);
+  const [dateRange, setDateRange] = useState(() => getCurrentQuarterRange());
+  const [showPerformance, setShowPerformance] = useState(false);
+  const [sortConfig, setSortConfig] = useState({ key: '', direction: 'asc' });
 
   useEffect(() => {
     let active = true;
 
-    fetchDepartmentOverview(user).then((response) => {
+    fetchDepartmentOverview(user, dateRange).then((response) => {
       if (!active) return;
       const data = response?.data ?? {};
-      const apiStats = data.stats ?? {};
-      setStats((prev) => ({
-        ...prev,
-        totalMembers: apiStats.totalMembers ?? prev.totalMembers,
-        navMembers: apiStats.navMembers ?? prev.navMembers,
-        integrationMembers: apiStats.servoMembers ?? prev.integrationMembers,
-        totalHours: apiStats.totalHours ?? prev.totalHours,
-      }));
       setRows(data.rows ?? []);
       setLastUpdatedAt(data.lastUpdatedAt || new Date().toISOString());
       setApiQuarter(data.quarter ?? null);
-      setApiPerfQuarter(data.perfQuarter ?? null);
     }).catch(() => {});
 
-    return () => { active = false; };
-  }, [user]);
+    return () => {
+      active = false;
+    };
+  }, [dateRange, user]);
 
   const quarterLabel = apiQuarter
     ? getQuarterLabel(apiQuarter.year, apiQuarter.quarter)
     : fallbackStats.quarter ?? '2026 Q2';
-  const perfQuarterLabel = apiPerfQuarter
-    ? getQuarterLabel(apiPerfQuarter.year, apiPerfQuarter.quarter)
-    : quarterLabel;
 
-  const navRows = useMemo(() => rows.filter((row) => row.team === '导航组'), [rows]);
-  const integrationRows = useMemo(() => rows.filter((row) => row.team === '对接组'), [rows]);
-  const departmentSummary = useMemo(() => {
-    const totalHours = rows.reduce((sum, r) => {
-      return sum + (r.scheduledHours || 0) + (r.overdueHours || 0) + (r.costHour || 0) + (r.issueCostHour || 0);
-    }, 0);
-    return { totalHours, totalMembers: rows.length };
-  }, [rows]);
-  const navMonitor = useMemo(() => buildTeamMonitor(navRows), [navRows]);
-  const integrationMonitor = useMemo(() => buildTeamMonitor(integrationRows), [integrationRows]);
-
-  const departmentPerfRows = useMemo(() => buildMemberPerfRows(rows), [rows]);
-  const departmentHoursRows = useMemo(() => buildMemberHoursRows(rows), [rows]);
-  const departmentAlerts = useMemo(() => ({
-    allocationRiskCount: departmentHoursRows.filter((row) => row.allocationDelta < 0).length,
-    completionRiskCount: departmentHoursRows.filter((row) => row.completionDelta < 0).length,
-    lowPerformanceCount: departmentPerfRows.filter((row) => row.finalScore > 0 && row.finalScore < 1.0).length,
-  }), [departmentHoursRows, departmentPerfRows]);
-  const rankingCards = useMemo(() => {
-    const teamItems = [
-      { label: '导航组', route: ROUTE_PATHS.NAV_TEAM_DETAIL, ...navMonitor },
-      { label: '对接组', route: ROUTE_PATHS.INTEGRATION_TEAM_DETAIL, ...integrationMonitor },
-    ];
-
-    const topHours = [...teamItems].sort((left, right) => right.totalHours - left.totalHours)[0];
-    const topPerformance = [...teamItems].sort((left, right) => Number(right.avgFinalPerformance) - Number(left.avgFinalPerformance))[0];
-    const topRisk = [...teamItems].sort((left, right) => (right.highRiskCount + right.lowPerformanceCount) - (left.highRiskCount + left.lowPerformanceCount))[0];
+  const memberRows = useMemo(() => buildMemberRows(rows), [rows]);
+  const teamGroups = useMemo(() => groupByTeam(memberRows), [memberRows]);
+  const teamSummaries = useMemo(() => {
+    const navRows = teamGroups['导航组'] ?? [];
+    const integrationRows = teamGroups['对接组'] ?? [];
 
     return [
-      {
-        title: '工时排名',
-        value: `${topHours?.label ?? '-'} · ${(topHours?.totalHours ?? 0).toFixed(1)}`,
-        to: topHours?.route ?? ROUTE_PATHS.DEPARTMENT_OVERVIEW,
-      },
-      {
-        title: '绩效排名',
-        value: `${topPerformance?.label ?? '-'} · ${topPerformance?.avgFinalPerformance ?? '0.00'}`,
-        to: topPerformance?.route ?? ROUTE_PATHS.DEPARTMENT_OVERVIEW,
-      },
-      {
-        title: '异常优先级',
-        value: `${topRisk?.label ?? '-'} · ${(topRisk?.highRiskCount ?? 0) + (topRisk?.lowPerformanceCount ?? 0)}项`,
-        to: `${topRisk?.route ?? ROUTE_PATHS.DEPARTMENT_OVERVIEW}?hoursAbnormal=abnormal&performanceScore=below`,
-      },
+      buildTeamSummary('对接组', integrationRows, ROUTE_PATHS.INTEGRATION_TEAM_DETAIL),
+      buildTeamSummary('导航组', navRows, ROUTE_PATHS.NAV_TEAM_DETAIL),
     ];
-  }, [integrationMonitor, navMonitor]);
-  const departmentInsights = useMemo(() => {
-    const insights = [];
+  }, [teamGroups]);
+  const summary = useMemo(() => {
+    const totalScheduledHours = memberRows.reduce((sum, row) => sum + row.scheduledHours, 0);
 
-    if (navMonitor.allocationDelta < integrationMonitor.allocationDelta) {
-      insights.push(`导航组的任务分配差值更低，当前更需要关注工时分配。`);
-    } else if (integrationMonitor.allocationDelta < navMonitor.allocationDelta) {
-      insights.push(`对接组的任务分配差值更低，当前更需要关注工时分配。`);
-    }
-
-    if (navMonitor.completionDelta < integrationMonitor.completionDelta) {
-      insights.push(`导航组的任务完成差值更低，当前更需要关注完成进度。`);
-    } else if (integrationMonitor.completionDelta < navMonitor.completionDelta) {
-      insights.push(`对接组的任务完成差值更低，当前更需要关注完成进度。`);
-    }
-
-    if (navMonitor.lowPerformanceCount > 0 && navMonitor.allocationRiskCount > 0) {
-      insights.push(`导航组存在工时不足且绩效低于 1.0 的成员，建议优先下钻查看。`);
-    }
-
-    if (integrationMonitor.lowPerformanceCount > 0 && integrationMonitor.allocationRiskCount > 0) {
-      insights.push(`对接组存在工时不足且绩效低于 1.0 的成员，建议优先下钻查看。`);
-    }
-
-    if (navMonitor.lowPerformanceCount > 0 && navMonitor.allocationRiskCount === 0) {
-      insights.push(`导航组工时分配基本充足，但仍有低绩效成员，建议复盘任务质量。`);
-    }
-
-    if (integrationMonitor.lowPerformanceCount > 0 && integrationMonitor.allocationRiskCount === 0) {
-      insights.push(`对接组工时分配基本充足，但仍有低绩效成员，建议复盘任务质量。`);
-    }
-
-    return insights.slice(0, 4);
-  }, [integrationMonitor, navMonitor]);
-
-  function renderTeamCard(title, monitor, route) {
-    return (
-      <Card className="p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="text-lg font-semibold">{title}</div>
-            <div className="mt-1 text-sm text-slate-500">聚合该团队成员的工时和绩效结果，可直接下钻查看异常。</div>
-          </div>
-          <Link
-            to={route}
-            className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            查看团队页
-          </Link>
-        </div>
-        <div className="mt-5 grid gap-4 md:grid-cols-3">
-          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-            <div className="text-sm text-slate-500">成员数</div>
-            <div className="mt-2 text-2xl font-semibold text-slate-900">{monitor.totalMembers}</div>
-          </div>
-          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-            <div className="text-sm text-slate-500">总工时</div>
-            <div className="mt-2 text-2xl font-semibold text-slate-900">{(monitor.totalHours ?? 0).toFixed(1)}</div>
-          </div>
-          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-            <div className="text-sm text-slate-500">平均最终绩效</div>
-            <div className="mt-2 text-2xl font-semibold text-slate-900">{monitor.avgFinalPerformance}</div>
-          </div>
-        </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Link to={`${route}?hoursAbnormal=allocation`} className="rounded-full border border-rose-100 bg-rose-50 px-3 py-1.5 text-xs font-medium text-rose-700">
-            分配不足 {monitor.allocationRiskCount} 人
-          </Link>
-          <Link to={`${route}?hoursAbnormal=completion`} className="rounded-full border border-amber-100 bg-amber-50 px-3 py-1.5 text-xs font-medium text-amber-700">
-            完成不足 {monitor.completionRiskCount} 人
-          </Link>
-          <Link to={`${route}?performanceScore=below`} className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700">
-            绩效低于 1.0 {monitor.lowPerformanceCount} 人
-          </Link>
-        </div>
-      </Card>
-    );
-  }
+    return {
+      totalScheduledHours,
+    };
+  }, [memberRows]);
+  const setSortKey = (key) => {
+    setSortConfig((prev) => ({
+      key,
+      direction: key ? prev.direction || 'asc' : 'asc',
+    }));
+  };
+  const toggleSortDirection = () => {
+    setSortConfig((prev) => ({
+      ...prev,
+      direction: prev.direction === 'asc' ? 'desc' : 'asc',
+    }));
+  };
 
   return (
     <ManagerLayout>
       <SectionTitle
         title="部门总览"
+        desc="先按时间查看对接组和导航组的工作分配、完成情况，再看成员明细。"
         right={(
-          <div className="flex flex-wrap justify-end gap-3">
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm">{quarterLabel}</div>
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm">部门：本体开发部</div>
-            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm">最后同步：{lastUpdatedAt ? formatDateTime(lastUpdatedAt) : '暂无'}</div>
+          <div className="flex flex-wrap justify-end gap-2 text-sm">
+            <div className="rounded-full border border-slate-200 bg-white px-3 py-1.5">{quarterLabel}</div>
+            <div className="rounded-full border border-slate-200 bg-white px-3 py-1.5">同步：{lastUpdatedAt ? formatDateTime(lastUpdatedAt) : '暂无'}</div>
           </div>
         )}
       />
 
-      <Card className="p-6">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+      <Card className="p-5">
+        <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <div className="text-lg font-semibold">聚合视图</div>
+            <div className="text-lg font-semibold text-slate-900">筛选时间</div>
+            <div className="mt-1 text-sm text-slate-500">按所选时间查看小组工作分配和完成情况。</div>
           </div>
-          <div className="flex flex-wrap justify-end gap-2">
-            <Link to={ROUTE_PATHS.DEPARTMENT_OVERVIEW} className="rounded-full bg-slate-900 px-4 py-2 text-sm font-medium text-white">部门总览</Link>
-            <Link to={ROUTE_PATHS.NAV_TEAM_DETAIL} className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">导航组</Link>
-            <Link to={ROUTE_PATHS.INTEGRATION_TEAM_DETAIL} className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">对接组</Link>
+          <div className="grid w-full gap-3 md:w-auto md:grid-cols-[180px_180px_auto_auto]">
+            <label className="text-sm text-slate-600">
+              <span className="mb-1 block">开始日期</span>
+              <input
+                type="date"
+                value={dateRange.startDate}
+                onChange={(event) => setDateRange((prev) => ({ ...prev, startDate: event.target.value }))}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-400"
+              />
+            </label>
+            <label className="text-sm text-slate-600">
+              <span className="mb-1 block">结束日期</span>
+              <input
+                type="date"
+                value={dateRange.endDate}
+                onChange={(event) => setDateRange((prev) => ({ ...prev, endDate: event.target.value }))}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-400"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => setDateRange(getCurrentQuarterRange())}
+              className="self-end rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              本季度至今
+            </button>
+            <button
+              type="button"
+              onClick={() => setDateRange(getFullQuarterRange())}
+              className="self-end rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-700"
+            >
+              本季度
+            </button>
           </div>
         </div>
       </Card>
 
-      <div className="grid gap-5 md:grid-cols-3">
-        <StatCard title="部门总人数" value={rows.length || stats.totalMembers} sub={`导航组 ${stats.navMembers} 人，对接组 ${stats.integrationMembers} 人`} />
-        <StatCard title="部门总工时" value={`${(departmentSummary.totalHours || stats.totalHours || 0).toFixed(1)}`} sub="聚合导航组和对接组全部成员工时" />
-        <StatCard title="平均最终绩效" value={departmentPerfRows.filter(r => r.finalScore > 0).length ? (departmentPerfRows.filter(r => r.finalScore > 0).reduce((s, r) => s + r.finalScore, 0) / departmentPerfRows.filter(r => r.finalScore > 0).length).toFixed(2) : '0.00'} sub={`${perfQuarterLabel} 部门平均最终绩效`} />
-      </div>
-
-      <div className="grid gap-5 md:grid-cols-3">
-        <Card className="border border-rose-100 bg-rose-50 p-5 text-rose-800">
-          <div className="text-sm">分配不足人数</div>
-          <div className="mt-2 text-3xl font-semibold">{departmentAlerts.allocationRiskCount}</div>
-          <div className="mt-3 flex flex-wrap gap-2 text-xs">
-            <Link to={`${ROUTE_PATHS.NAV_TEAM_DETAIL}?hoursAbnormal=allocation`} className="rounded-full border border-rose-200 bg-white px-3 py-1.5 font-medium text-rose-700">
-              导航组 {navMonitor.allocationRiskCount} 人
-            </Link>
-            <Link to={`${ROUTE_PATHS.INTEGRATION_TEAM_DETAIL}?hoursAbnormal=allocation`} className="rounded-full border border-rose-200 bg-white px-3 py-1.5 font-medium text-rose-700">
-              对接组 {integrationMonitor.allocationRiskCount} 人
-            </Link>
-          </div>
-        </Card>
-        <Card className="border border-amber-100 bg-amber-50 p-5 text-amber-800">
-          <div className="text-sm">完成不足人数</div>
-          <div className="mt-2 text-3xl font-semibold">{departmentAlerts.completionRiskCount}</div>
-          <div className="mt-3 flex flex-wrap gap-2 text-xs">
-            <Link to={`${ROUTE_PATHS.NAV_TEAM_DETAIL}?hoursAbnormal=completion`} className="rounded-full border border-amber-200 bg-white px-3 py-1.5 font-medium text-amber-700">
-              导航组 {navMonitor.completionRiskCount} 人
-            </Link>
-            <Link to={`${ROUTE_PATHS.INTEGRATION_TEAM_DETAIL}?hoursAbnormal=completion`} className="rounded-full border border-amber-200 bg-white px-3 py-1.5 font-medium text-amber-700">
-              对接组 {integrationMonitor.completionRiskCount} 人
-            </Link>
-          </div>
-        </Card>
-        <Card className="border border-slate-200 bg-slate-50 p-5 text-slate-800">
-          <div className="text-sm">绩效低于 1.0 人数</div>
-          <div className="mt-2 text-3xl font-semibold">{departmentAlerts.lowPerformanceCount}</div>
-          <div className="mt-3 flex flex-wrap gap-2 text-xs">
-            <Link to={`${ROUTE_PATHS.NAV_TEAM_DETAIL}?performanceScore=below`} className="rounded-full border border-slate-200 bg-white px-3 py-1.5 font-medium text-slate-700">
-              导航组 {navMonitor.lowPerformanceCount} 人
-            </Link>
-            <Link to={`${ROUTE_PATHS.INTEGRATION_TEAM_DETAIL}?performanceScore=below`} className="rounded-full border border-slate-200 bg-white px-3 py-1.5 font-medium text-slate-700">
-              对接组 {integrationMonitor.lowPerformanceCount} 人
-            </Link>
-          </div>
-        </Card>
-      </div>
-
-      <div className="grid gap-5 xl:grid-cols-2">
-        {renderTeamCard('导航组', navMonitor, ROUTE_PATHS.NAV_TEAM_DETAIL)}
-        {renderTeamCard('对接组', integrationMonitor, ROUTE_PATHS.INTEGRATION_TEAM_DETAIL)}
-      </div>
-
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <Card className="p-6">
-          <div className="text-lg font-semibold">团队排序</div>
-          <div className="mt-1 text-sm text-slate-500">按工时、绩效和异常优先级快速判断当前更需要下钻哪个团队。</div>
-          <div className="mt-5 space-y-3">
-            {rankingCards.map((item) => (
-              <Link key={item.title} to={item.to} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 hover:bg-slate-100">
-                <span className="font-medium text-slate-900">{item.title}</span>
-                <span>{item.value}</span>
+      <div className="grid gap-4 lg:grid-cols-2">
+        {teamSummaries.map((team) => (
+          <Card key={team.label} className="p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-xl font-semibold text-slate-900">{team.label}</div>
+              </div>
+              <Link to={team.route} className="rounded-full border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                明细
               </Link>
-            ))}
-          </div>
-        </Card>
+            </div>
 
-        <Card className="p-6">
-          <div className="text-lg font-semibold">部门提醒</div>
-          <div className="mt-1 text-sm text-slate-500">基于团队工时差值和季度绩效做轻量判断，帮助部门主管快速定位异常方向。</div>
-          <div className="mt-5 space-y-3">
-            {departmentInsights.length ? departmentInsights.map((item) => (
-              <div key={item} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                {item}
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-xl bg-slate-50 px-4 py-3">
+                <div className="text-xs text-slate-500">应分配</div>
+                <div className="mt-1 text-xl font-semibold text-slate-900">{formatHours(team.expectedHours)}h</div>
               </div>
-            )) : (
-              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-                当前部门口径下暂无需要额外提示的团队风险。
+              <div className="rounded-xl bg-slate-50 px-4 py-3">
+                <div className="text-xs text-slate-500">已分配</div>
+                <div className="mt-1 text-xl font-semibold text-slate-900">{formatHours(team.scheduledHours)}h</div>
               </div>
-            )}
-          </div>
-        </Card>
+              <div className="rounded-xl bg-slate-50 px-4 py-3">
+                <div className="text-xs text-slate-500">已完成</div>
+                <div className="mt-1 text-xl font-semibold text-slate-900">{formatHours(team.completedHours)}h</div>
+              </div>
+            </div>
+
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div className="rounded-xl border border-slate-200 px-4 py-3">
+                <div className="text-xs text-slate-500">任务分配差额</div>
+                <div className={`mt-1 text-xl font-semibold ${getGapClass(team.allocationGap)}`}>
+                  {team.allocationGap > 0 ? '+' : ''}{formatHours(team.allocationGap)}h
+                </div>
+              </div>
+              <div className="rounded-xl border border-slate-200 px-4 py-3">
+                <div className="text-xs text-slate-500">任务完成差额</div>
+                <div className={`mt-1 text-xl font-semibold ${getGapClass(team.completionGap)}`}>
+                  {team.completionGap > 0 ? '+' : ''}{formatHours(team.completionGap)}h
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              <div>
+                <div className="mb-2 flex justify-between text-sm">
+                  <span className="text-slate-600">分配进度</span>
+                  <span className="font-semibold text-slate-900">{team.allocationRate}%</span>
+                </div>
+                <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
+                  <div className="h-full rounded-full bg-sky-500" style={{ width: getProgressWidth(team.allocationRate) }} />
+                </div>
+              </div>
+              <div>
+                <div className="mb-2 flex justify-between text-sm">
+                  <span className="text-slate-600">完成进度</span>
+                  <span className="font-semibold text-slate-900">{team.completionRate}%</span>
+                </div>
+                <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
+                  <div className="h-full rounded-full bg-emerald-500" style={{ width: getProgressWidth(team.completionRate) }} />
+                </div>
+              </div>
+            </div>
+          </Card>
+        ))}
       </div>
+
+      <Card className="overflow-hidden p-0">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
+          <div>
+            <div className="text-lg font-semibold text-slate-900">部门成员</div>
+            <div className="mt-1 text-sm text-slate-500">按小组查看每个人的工时；展开后显示绩效。</div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="text-sm text-slate-500">
+              已排期 {formatHours(summary.totalScheduledHours)}h
+            </div>
+            <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 p-1">
+              {SORT_OPTIONS.map((option) => (
+                <button
+                  key={option.key || 'default'}
+                  type="button"
+                  onClick={() => setSortKey(option.key)}
+                  className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
+                    sortConfig.key === option.key
+                      ? 'bg-white text-slate-900 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={toggleSortDirection}
+              disabled={!sortConfig.key}
+              className={`rounded-xl border px-3 py-2 text-sm font-medium ${
+                sortConfig.key
+                  ? 'border-slate-200 text-slate-700 hover:bg-slate-50'
+                  : 'cursor-not-allowed border-slate-100 text-slate-300'
+              }`}
+            >
+              {sortConfig.direction === 'asc' ? '从低到高' : '从高到低'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowPerformance((prev) => !prev)}
+              className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              {showPerformance ? '收起绩效' : '展开绩效'}
+            </button>
+          </div>
+        </div>
+
+        {Object.entries(teamGroups).map(([team, teamRows]) => {
+          const sortedRows = sortRows(teamRows, sortConfig);
+          return (
+            <div key={team} className="border-b border-slate-100 last:border-b-0">
+              <div className="flex items-center justify-between bg-slate-50 px-5 py-3">
+                <div className="font-semibold text-slate-900">{team}</div>
+                <div className="text-sm text-slate-500">{teamRows.length} 人</div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className={`${showPerformance ? 'min-w-[900px] max-w-[1020px]' : 'min-w-[800px] max-w-[920px]'} table-fixed text-left text-sm`}>
+                  <colgroup>
+                    <col className="w-[16%]" />
+                    <col className="w-[20%]" />
+                    <col className="w-[14%]" />
+                    <col className="w-[14%]" />
+                    <col className="w-[16%]" />
+                    <col className="w-[16%]" />
+                    {showPerformance && <col className="w-[12%]" />}
+                  </colgroup>
+                  <thead className="text-xs font-semibold uppercase text-slate-500">
+                    <tr className="border-b border-slate-100">
+                      <th className="pl-6 pr-4 py-3">成员</th>
+                      <th className="px-4 py-3">岗位</th>
+                      <th className="px-4 py-3 text-right">已排期</th>
+                      <th className="px-4 py-3 text-right">已完成</th>
+                      <th className="px-4 py-3 text-right">
+                        分配差额{sortConfig.key === 'allocationGap' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                      </th>
+                      <th className={`${showPerformance ? 'px-4' : 'pl-4 pr-10'} py-3 text-right`}>
+                        完成差额{sortConfig.key === 'completionGap' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
+                      </th>
+                      {showPerformance && <th className="pl-4 pr-10 py-3 text-right">绩效</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedRows.map((row) => (
+                      <tr key={`${row.team}-${row.name}`} className="border-b border-slate-100 last:border-b-0">
+                        <td className="truncate pl-6 pr-4 py-3 font-semibold text-slate-900">{row.name}</td>
+                        <td className="truncate px-4 py-3 text-slate-600">{row.role}</td>
+                        <td className="px-4 py-3 text-right tabular-nums text-slate-700">{formatHours(row.scheduledHours)}h</td>
+                        <td className="px-4 py-3 text-right tabular-nums text-slate-700">{formatHours(row.completedHours)}h</td>
+                        <td className={`px-4 py-3 text-right font-semibold tabular-nums ${getGapClass(row.allocationGap)}`}>
+                          {row.allocationGap > 0 ? '+' : ''}{formatHours(row.allocationGap)}h
+                        </td>
+                        <td className={`${showPerformance ? 'px-4' : 'pl-4 pr-10'} py-3 text-right font-semibold tabular-nums ${getGapClass(row.completionGap)}`}>
+                          {row.completionGap > 0 ? '+' : ''}{formatHours(row.completionGap)}h
+                        </td>
+                        {showPerformance && (
+                          <td className="pl-4 pr-10 py-3 text-right font-semibold tabular-nums text-slate-900">{formatScore(row.finalScore)}</td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        })}
+      </Card>
     </ManagerLayout>
   );
 }
