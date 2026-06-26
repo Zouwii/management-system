@@ -15,7 +15,7 @@ import { ROLES } from '../constants/roles';
 export const appRouteConfig = [
   {
     path: ROUTE_PATHS.DEPARTMENT_OVERVIEW,
-    label: '有效工时总览',
+    label: '有效工时',
     menu: true,
     allowedRoles: [ROLES.MANAGER, ROLES.ADMIN],
     permissionCode: PAGE_PERMISSION_CODES.DEPARTMENT_OVERVIEW,
@@ -82,7 +82,7 @@ export const appRouteConfig = [
   },
   {
     path: ROUTE_PATHS.WORKDAY_COSTHOUR,
-    label: '工作日耗时总览',
+    label: '工作日耗时',
     menu: true,
     allowedRoles: [ROLES.MANAGER, ROLES.ADMIN],
     permissionCode: PAGE_PERMISSION_CODES.WORKDAY_COSTHOUR,

@@ -209,7 +209,7 @@ export default function TeamDetailDashboard({
     return () => {
       active = false;
     };
-  }, [expectedView, fallbackRows, fetcher, user]);
+  }, [expectedView, fallbackRows, fetcher, teamKey, user]);
 
   useEffect(() => {
     setSelectedQuarter(latestQuarter);
@@ -341,46 +341,6 @@ export default function TeamDetailDashboard({
   const avgFinalPerformance = visiblePerformanceRows.length
     ? (visiblePerformanceRows.reduce((sum, row) => sum + row.finalScore, 0) / visiblePerformanceRows.length).toFixed(2)
     : '0.00';
-  const combinedInsights = useMemo(() => visibleHourRows.reduce((accumulator, row) => {
-    const matchedPerformance = visiblePerformanceRows.find((item) => item.name === row.name);
-
-    if (!matchedPerformance) {
-      return accumulator;
-    }
-
-    if (row.allocationDelta < 0 && matchedPerformance.finalScore < 1.0) {
-      accumulator.push({
-        name: row.name,
-        message: `工时分配不足，且${appliedQuarter}最终绩效低于 1.0，需要优先关注。`,
-      });
-      return accumulator;
-    }
-
-    if (row.completionDelta < 0 && matchedPerformance.finalScore < 1.0) {
-      accumulator.push({
-        name: row.name,
-        message: `任务完成进度偏慢，且${appliedQuarter}最终绩效低于 1.0，建议跟进完成节奏。`,
-      });
-      return accumulator;
-    }
-
-    if (row.allocationDelta >= 0 && matchedPerformance.finalScore < 1.0) {
-      accumulator.push({
-        name: row.name,
-        message: `工时分配充足，但${appliedQuarter}最终绩效仍低于 1.0，建议复盘任务质量和产出。`,
-      });
-      return accumulator;
-    }
-
-    if (row.allocationDelta < 0 && matchedPerformance.finalScore >= 1.0) {
-      accumulator.push({
-        name: row.name,
-        message: '工时略紧但绩效仍达标，可关注后续负载是否持续偏高。',
-      });
-    }
-
-    return accumulator;
-  }, []).slice(0, 4), [appliedQuarter, visibleHourRows, visiblePerformanceRows]);
   const expectedConfig = expectedView === 'current'
     ? {
         label: '本季度至今天预期有效工时',
@@ -649,39 +609,6 @@ export default function TeamDetailDashboard({
         </div>
       </Card>
 
-      <Card className="p-6">
-        <div className="text-lg font-semibold">交叉判断</div>
-        <div className="mt-1 text-sm text-slate-500">把工时差值和当前季度绩效放到一起看，帮助主管快速定位优先关注对象。</div>
-        <div className="mt-4 space-y-3">
-          {combinedInsights.length ? combinedInsights.map((item) => (
-            <div key={`${item.name}-${item.message}`} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-              <div>
-                <span className="font-medium text-slate-900">{item.name}</span>
-                {'：'}
-                {item.message}
-              </div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <Link
-                  to={`${ROUTE_PATHS.PERSONAL_HOURS}?target=${encodeURIComponent(item.name)}`}
-                  className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
-                >
-                  查看工时管理
-                </Link>
-                <Link
-                  to={`${ROUTE_PATHS.PERFORMANCE}?target=${encodeURIComponent(item.name)}`}
-                  className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
-                >
-                  查看绩效管理
-                </Link>
-              </div>
-            </div>
-          )) : (
-            <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-              当前筛选口径下暂无需要额外提示的交叉风险。
-            </div>
-          )}
-        </div>
-      </Card>
     </ManagerLayout>
   );
 }
