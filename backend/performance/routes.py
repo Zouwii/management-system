@@ -44,6 +44,7 @@ def register(bp, ok, fail):
                 "year": request.args.get("year"),
                 "quarter": request.args.get("quarter"),
                 "user_id": request.args.get("userId", request.args.get("user_id", "")),
+                "team_key": request.args.get("teamKey", request.args.get("team_key", "")),
             }
             out = query_quarter_performance_service(payload)
             if out.get("success"):

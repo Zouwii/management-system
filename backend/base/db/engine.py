@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
@@ -481,10 +481,17 @@ def init_database() -> None:
         session = SessionLocal()
         try:
             # ===== seed: config 表默认值（type -> value）=====
-            start_dt = datetime(2026, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
-            end_dt = datetime(2026, 3, 31, 23, 59, 59, tzinfo=timezone.utc)
+            _now = datetime.now(timezone.utc)
+            _q_end_month = ((_now.month - 1) // 3 + 1) * 3
+            if _q_end_month == 12:
+                _next_q_first = datetime(_now.year + 1, 1, 1, tzinfo=timezone.utc)
+            else:
+                _next_q_first = datetime(_now.year, _q_end_month + 1, 1, tzinfo=timezone.utc)
+            _q_end_day = (_next_q_first - timedelta(days=1)).day
+            start_dt = datetime(_now.year, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
+            end_dt = datetime(_now.year, _q_end_month, _q_end_day, 23, 59, 59, tzinfo=timezone.utc)
             default_config_seed = {
-                # 时间范围（和前端默认保持一致）
+                # 时间范围（动态计算：年初 ~ 当前季度末）
                 "start_time": start_dt.isoformat(),
                 "end_time": end_dt.isoformat(),
                 # character -> coefficient（工时折算系数映射）

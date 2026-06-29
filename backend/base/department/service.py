@@ -25,6 +25,17 @@ from workhour.personal.aggregate import team_quarter_workhours_db_service, workd
 _TEAM_LABEL = {"0": "导航组", "1": "对接组"}
 _TEAM_KEY = {"0": "nav", "1": "servo"}
 
+_ROLE_MAP = {
+    0: "组长",
+    1: "软件开发工程师",
+    2: "软件应用工程师",
+    3: "应用工程师",
+    4: "算法工程师",
+}
+
+def _get_role(character: int) -> str:
+    return _ROLE_MAP.get(character, str(character))
+
 
 # ═══════════════════════════════════════════
 #  1. 基础数据：当前季度、项目 ID、最后同步时间
@@ -51,6 +62,39 @@ def _quarter_iso_range(year: int, quarter: int) -> Tuple[str, str]:
     start = datetime(year, start_month, 1, 0, 0, 0, tzinfo=timezone.utc)
     end = datetime(year, end_month, last_day, 23, 59, 59, tzinfo=timezone.utc)
     return start.isoformat(), end.isoformat()
+
+
+def _parse_date_range(start_date: str | None, end_date: str | None, fallback: Tuple[str, str]) -> Tuple[str, str]:
+    """解析前端日期筛选，缺失或非法时回退当前季度范围。"""
+    if not start_date or not end_date:
+        return fallback
+
+    def _parse(value: str, is_end: bool) -> datetime:
+        text = str(value or "").strip()
+        if not text:
+            raise ValueError("empty date")
+        if len(text) == 10:
+            parsed = datetime.fromisoformat(text)
+            return parsed.replace(
+                hour=23 if is_end else 0,
+                minute=59 if is_end else 0,
+                second=59 if is_end else 0,
+                microsecond=0,
+                # 不设 tzinfo，由 workdays_in_range_service 按 Asia/Shanghai 本地时间解释
+            )
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+
+    try:
+        start = _parse(start_date, False)
+        end = _parse(end_date, True)
+        if end < start:
+            return fallback
+        return start.isoformat(), end.isoformat()
+    except Exception:
+        return fallback
 
 
 def _get_project_id() -> str:
@@ -124,7 +168,7 @@ def _fetch_members() -> List[Dict[str, Any]]:
 # ═══════════════════════════════════════════
 
 def _fetch_work_hours_map(project_id: str, quarter_start: str, quarter_end: str) -> Dict[str, Dict[str, float]]:
-    """返回 {userId: {scheduledHours, completedHours, overdueHours, overdueCompletedHours, coefficient, expectedEffectiveHours}}。"""
+    """返回 {userId: {scheduledHours, completedHours, overdueHours, overdueCompletedHours, coefficient}}。"""
     hours_map: Dict[str, Dict[str, float]] = {}
 
     for team_id in ("0", "1"):
@@ -147,7 +191,6 @@ def _fetch_work_hours_map(project_id: str, quarter_start: str, quarter_end: str)
                 "overdueHours": float(row.get("overdueEffectiveHours", 0) or 0),
                 "overdueCompletedHours": float(row.get("overdueCompletedHours", 0) or 0),
                 "coefficient": float(row.get("coefficient", 1) or 1),
-                "expectedEffectiveHours": float(row.get("quarterExpectedHours", 0) or 0),
             }
 
     return hours_map
@@ -192,7 +235,8 @@ def _fetch_perf_map(year: int, quarter: int) -> Dict[str, Dict[str, Any]]:
 def _assemble_response(
     members: List[Dict[str, Any]],
     hours_map: Dict[str, Dict[str, float]],
-    perf_map: Dict[str, Dict[str, Any]],
+    prev_perf_map: Dict[str, Dict[str, Any]],
+    curr_perf_map: Dict[str, Dict[str, Any]],
     year: int, quarter: int,
     perf_year: int, perf_quarter: int,
     workday_count: float,
@@ -213,11 +257,16 @@ def _assemble_response(
             servo_count += 1
 
         wh = hours_map.get(uid, {})
-        pf = perf_map.get(uid, {})
+        prev_pf = prev_perf_map.get(uid, {})
+        curr_pf = curr_perf_map.get(uid, {})
 
         sched = wh.get("scheduledHours", 0.0)
         od = wh.get("overdueHours", 0.0)
+        coeff = wh.get("coefficient", 1.0)
         total_hours += sched + od
+
+        # 应分配 = 工作日天数 × 个人系数（动态跟随日期区间）
+        expected_effective = round(workday_count * coeff, 2)
 
         rows.append({
             "userId": uid,
@@ -225,25 +274,27 @@ def _assemble_response(
             "team": m["team"],
             "teamKey": tk,
             "character": m["character"],
+            "role": _get_role(m["character"]),
             "isTeamLead": m["isTeamLead"],
             # 工时
-            "coefficient": wh.get("coefficient", 1.0),
-            "expectedEffectiveHours": wh.get("expectedEffectiveHours", 0.0),
+            "coefficient": coeff,
+            "expectedEffectiveHours": expected_effective,
             "scheduledHours": sched,
             "completedHours": wh.get("completedHours", 0.0),
             "overdueHours": od,
             "overdueCompletedHours": wh.get("overdueCompletedHours", 0.0),
             # 绩效
-            "workHourScore": pf.get("workHourScore"),
-            "supervisorScore": pf.get("supervisorScore"),
-            "overallScore": pf.get("overallScore"),
-            "finalScore": pf.get("finalScore"),
-            "companyScore": pf.get("companyScore"),
-            "newCarryBalance": pf.get("newCarryBalance"),
-            "calcStatus": pf.get("calcStatus"),
+            "prevFinalScore": prev_pf.get("finalScore"),
+            "currentFinalScore": curr_pf.get("finalScore"),
+            "workHourScore": prev_pf.get("workHourScore"),
+            "supervisorScore": prev_pf.get("supervisorScore"),
+            "overallScore": prev_pf.get("overallScore"),
+            "companyScore": prev_pf.get("companyScore"),
+            "newCarryBalance": prev_pf.get("newCarryBalance"),
+            "calcStatus": prev_pf.get("calcStatus"),
         })
 
-    final_scores = [r["finalScore"] for r in rows if r["finalScore"] is not None]
+    final_scores = [r["prevFinalScore"] for r in rows if r["prevFinalScore"] is not None]
     avg_final = round(sum(final_scores) / len(final_scores), 2) if final_scores else 0.0
 
     return {
@@ -269,10 +320,11 @@ def _assemble_response(
 #  主入口：按模块顺序调用，拼装后返回
 # ═══════════════════════════════════════════
 
-def department_overview_service() -> Dict[str, Any]:
+def department_overview_service(start_date: str | None = None, end_date: str | None = None) -> Dict[str, Any]:
     # 1. 基础数据
     year, quarter = _current_quarter()
-    quarter_start, quarter_end = _quarter_iso_range(year, quarter)
+    default_start, default_end = _quarter_iso_range(year, quarter)
+    quarter_start, quarter_end = _parse_date_range(start_date, end_date, (default_start, default_end))
     perf_year, perf_quarter = _prev_quarter(year, quarter)
     project_id = _get_project_id()
     tr = get_default_time_range_service() or {}
@@ -287,11 +339,12 @@ def department_overview_service() -> Dict[str, Any]:
     # 4. 工时数据（当前季度）
     hours_map = _fetch_work_hours_map(project_id, quarter_start, quarter_end)
 
-    # 5. 绩效数据（上一季度）
-    perf_map = _fetch_perf_map(perf_year, perf_quarter)
+    # 5. 绩效数据（上一季度 + 本季度）
+    prev_perf_map = _fetch_perf_map(perf_year, perf_quarter)
+    curr_perf_map = _fetch_perf_map(year, quarter)
 
     # 6. 组装返回
     return _assemble_response(
-        members, hours_map, perf_map,
+        members, hours_map, prev_perf_map, curr_perf_map,
         year, quarter, perf_year, perf_quarter, workday_count, last_updated,
     )

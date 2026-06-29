@@ -1,5 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import ManagerLayout from '../layouts/ManagerLayout';
+import Card from '../components/Card';
+import SectionTitle from '../components/SectionTitle';
 import {
   fetchWorkdayCosthourTeamSummary,
   fetchWorkdayCosthourDeptAggregate,
@@ -52,11 +54,11 @@ function formatDays(hours) {
 function TeamSelector({ teams = [], selectedTeamId, onSelect }) {
   return (
     <div className="flex items-center gap-2">
-      <label className="text-sm font-bold text-gray-800 whitespace-nowrap">当前查看小组:</label>
+      <label className="whitespace-nowrap text-sm font-medium text-slate-600">当前小组</label>
       <select
         value={selectedTeamId ?? ''}
         onChange={(e) => onSelect(e.target.value)}
-        className="border-none rounded p-1.5 bg-white font-semibold shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-600 cursor-pointer"
+        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none focus:border-slate-400"
       >
         {teams.map((t) => (
           <option key={t.teamId} value={t.teamId}>{t.teamName}</option>
@@ -295,21 +297,21 @@ function EffectiveHourManageTable({ teams = [], selectedTeamId, onTeamChange, me
   const selectedMembers = members.filter((m) => !selectedTeamId || m.teamId === selectedTeamId);
 
   return (
-    <section className="overflow-hidden rounded-lg border-t-4 border-blue-700 bg-white shadow-md">
-      <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-blue-700 p-4">
+    <Card className="overflow-hidden p-0">
+      <div className="flex flex-col items-start justify-between gap-4 border-b border-slate-200 bg-slate-50 px-5 py-4 md:flex-row md:items-center">
         <div className="flex items-center gap-4">
-          <h2 className="text-xl font-bold text-white">有效工时组别管理</h2>
-          <span className="text-sm font-semibold text-blue-200 bg-blue-800 rounded px-3 py-1">
+          <h2 className="text-lg font-semibold text-slate-900">员工出勤表</h2>
+          <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600">
             季度标准：{formatDays(standardDays)}天
           </span>
         </div>
-        <div className="flex items-center gap-3 rounded bg-blue-800 p-2 shadow-sm">
+        <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
-            <label className="text-sm font-bold text-blue-100 whitespace-nowrap">组别:</label>
+            <label className="whitespace-nowrap text-sm font-medium text-slate-600">组别</label>
             <select
               value={selectedTeamId || ''}
               onChange={(e) => onTeamChange(e.target.value)}
-              className="rounded border-none bg-white p-1 text-sm text-gray-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-300 cursor-pointer"
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-slate-400"
             >
               {teams.map((team) => (
                 <option key={team.teamId} value={team.teamId}>{team.teamName}</option>
@@ -319,21 +321,21 @@ function EffectiveHourManageTable({ teams = [], selectedTeamId, onTeamChange, me
         </div>
       </div>
 
-      <div className="p-6 overflow-x-auto">
-        <table className="min-w-full border-collapse border border-blue-200">
-          <thead>
-            <tr className="bg-blue-100 text-blue-800">
-              <th className="border border-blue-200 p-3">姓名</th>
-              <th className="border border-blue-200 p-3 bg-blue-50">预期天数</th>
-              <th className="border border-blue-200 p-3">实际天数</th>
-              <th className="border border-blue-200 p-3 bg-blue-200 text-center">加班 (天)</th>
-              <th className="border border-blue-200 p-3 bg-blue-200 text-center">请假 (天)</th>
-              <th className="border border-blue-200 p-3">差额 (天)</th>
+      <div className="overflow-x-auto">
+        <table className="min-w-full text-sm">
+          <thead className="border-b border-slate-200 bg-white text-slate-500">
+            <tr>
+              <th className="px-5 py-3 text-left font-medium">姓名</th>
+              <th className="px-5 py-3 text-right font-medium">预期天数</th>
+              <th className="px-5 py-3 text-right font-medium">实际天数</th>
+              <th className="bg-sky-50 px-5 py-3 text-center font-medium text-sky-700">加班</th>
+              <th className="bg-sky-50 px-5 py-3 text-center font-medium text-sky-700">请假</th>
+              <th className="px-5 py-3 text-right font-medium">差额</th>
             </tr>
           </thead>
           <tbody>
             {selectedMembers.length === 0 ? (
-              <tr><td className="border border-blue-200 p-3 text-gray-400" colSpan={6}>暂无数据</td></tr>
+              <tr><td className="px-5 py-4 text-slate-400" colSpan={6}>暂无数据</td></tr>
             ) : selectedMembers.map((member) => {
               const workday = Number(member.workdayCosthour || 0);
               const adjustment = adjustments[member.userId] || {};
@@ -343,38 +345,38 @@ function EffectiveHourManageTable({ teams = [], selectedTeamId, onTeamChange, me
               const personalStandard = standard + overtime - leave;
               const diff = workday - personalStandard;
               return (
-                <tr key={member.userId} className="hover:bg-blue-50 transition-colors">
-                  <td className="border border-blue-200 p-3 font-bold text-gray-700">{member.userName}</td>
-                  <td className="border border-blue-200 p-3 text-gray-600 bg-blue-50">{formatDays(personalStandard)}</td>
-                  <td className="border border-blue-200 p-3 text-gray-600 bg-gray-50">{formatDays(workday)}</td>
-                  <td className="border border-blue-200 p-3 bg-blue-50 text-center">
+                <tr key={member.userId} className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50">
+                  <td className="px-5 py-3 font-semibold text-slate-900">{member.userName}</td>
+                  <td className="bg-slate-50/60 px-5 py-3 text-right tabular-nums text-slate-600">{formatDays(personalStandard)}</td>
+                  <td className="bg-slate-50/60 px-5 py-3 text-right tabular-nums text-slate-600">{formatDays(workday)}</td>
+                  <td className="bg-sky-50/60 px-5 py-3 text-center">
                     <input
                       type="number"
                       value={overtime}
                       step="0.5"
                       min="0"
                       onChange={(e) => onAdjustmentChange(member.userId, 'overtimeDays', e.target.value)}
-                      className="w-24 rounded border border-gray-400 bg-white p-1.5 text-center font-semibold text-gray-800 shadow-inner focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-24 rounded-xl border border-sky-200 bg-white px-3 py-2 text-center text-sm font-medium text-slate-800 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
                     />
                   </td>
-                  <td className="border border-blue-200 p-3 bg-blue-50 text-center">
+                  <td className="bg-sky-50/60 px-5 py-3 text-center">
                     <input
                       type="number"
                       value={leave}
                       step="0.5"
                       min="0"
                       onChange={(e) => onAdjustmentChange(member.userId, 'leaveDays', e.target.value)}
-                      className="w-24 rounded border border-gray-400 bg-white p-1.5 text-center font-semibold text-gray-800 shadow-inner focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-24 rounded-xl border border-sky-200 bg-white px-3 py-2 text-center text-sm font-medium text-slate-800 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
                     />
                   </td>
-                  <td className={`border border-blue-200 p-3 text-lg font-bold ${diff < 0 ? 'text-red-600' : 'text-blue-700'}`}>{formatDays(diff)}</td>
+                  <td className={`px-5 py-3 text-right font-semibold tabular-nums ${diff < 0 ? 'text-rose-700' : 'text-emerald-700'}`}>{formatDays(diff)}</td>
                 </tr>
               );
             })}
           </tbody>
         </table>
       </div>
-    </section>
+    </Card>
   );
 }
 
@@ -383,20 +385,19 @@ function EffectiveHourManageTable({ teams = [], selectedTeamId, onTeamChange, me
 function SmallTable({ title, data = {} }) {
   const entries = Object.entries(data).sort((a, b) => (b[1].hours || 0) - (a[1].hours || 0));
   const totalHours = entries.reduce((s, [, v]) => s + (v.hours || 0), 0);
-  const totalCount = entries.reduce((s, [, v]) => s + (v.count || 0), 0);
 
   if (entries.length === 0) {
     return (
       <div className="overflow-x-auto">
-        <table className="min-w-full border-collapse border border-gray-300">
-          <thead>
-            <tr className="bg-blue-300">
-              <th className="border border-gray-300 p-2">{title}</th>
-              <th className="border border-gray-300 p-2">工时（人/天）</th>
+        <table className="min-w-full text-sm">
+          <thead className="border-b border-slate-200 bg-slate-50 text-slate-500">
+            <tr>
+              <th className="px-4 py-3 text-left font-medium">{title}</th>
+              <th className="px-4 py-3 text-right font-medium">工时（人/天）</th>
             </tr>
           </thead>
           <tbody>
-            <tr><td className="border border-gray-300 p-2 text-gray-400" colSpan={2}>暂无数据</td></tr>
+            <tr><td className="px-4 py-3 text-slate-400" colSpan={2}>暂无数据</td></tr>
           </tbody>
         </table>
       </div>
@@ -405,25 +406,25 @@ function SmallTable({ title, data = {} }) {
 
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full border-collapse border border-gray-300">
-        <thead>
-          <tr className="bg-blue-300">
-            <th className="border border-gray-300 p-2">{title}</th>
-            <th className="border border-gray-300 p-2">工时（人/天）</th>
+      <table className="min-w-full text-sm">
+        <thead className="border-b border-slate-200 bg-slate-50 text-slate-500">
+          <tr>
+            <th className="px-4 py-3 text-left font-medium">{title}</th>
+            <th className="px-4 py-3 text-right font-medium">工时（人/天）</th>
           </tr>
         </thead>
         <tbody>
           {entries.map(([key, val]) => (
-            <tr key={key}>
-              <td className="border border-gray-300 p-2">{key}</td>
-              <td className="border border-gray-300 p-2">{formatDays(val.hours)}</td>
+            <tr key={key} className="border-b border-slate-100 last:border-b-0">
+              <td className="px-4 py-3 text-slate-700">{key}</td>
+              <td className="px-4 py-3 text-right tabular-nums text-slate-700">{formatDays(val.hours)}</td>
             </tr>
           ))}
         </tbody>
         <tfoot>
-          <tr className="bg-blue-100 font-bold">
-            <td className="border border-gray-300 p-2">总计</td>
-            <td className="border border-gray-300 p-2">{formatDays(totalHours)}</td>
+          <tr className="border-t border-slate-200 bg-slate-50 font-semibold text-slate-900">
+            <td className="px-4 py-3">总计</td>
+            <td className="px-4 py-3 text-right tabular-nums">{formatDays(totalHours)}</td>
           </tr>
         </tfoot>
       </table>
@@ -440,32 +441,32 @@ function AggregateTable({ title, data = {} }) {
 
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full border-collapse border border-blue-300">
-        <thead>
-          <tr className="bg-blue-500 text-white">
-            <th className="p-3 border border-blue-400">{title}</th>
-            <th className="p-3 border border-blue-400">占用工时（天）</th>
-            <th className="p-3 border border-blue-400">处理事项</th>
+      <table className="min-w-full text-sm">
+        <thead className="border-b border-slate-200 bg-slate-50 text-slate-500">
+          <tr>
+            <th className="px-4 py-3 text-left font-medium">{title}</th>
+            <th className="px-4 py-3 text-right font-medium">占用工时（天）</th>
+            <th className="px-4 py-3 text-right font-medium">处理事项</th>
           </tr>
         </thead>
-        <tbody className="bg-blue-50">
+        <tbody>
           {entries.length === 0 ? (
-            <tr><td className="p-2 border border-blue-200 text-gray-400" colSpan={3}>暂无数据</td></tr>
+            <tr><td className="px-4 py-3 text-slate-400" colSpan={3}>暂无数据</td></tr>
           ) : (
             entries.map(([key, val]) => (
-              <tr key={key}>
-                <td className="p-2 border border-blue-200">{key}</td>
-                <td className="p-2 border border-blue-200">{formatDays(val.hours)}</td>
-                <td className="p-2 border border-blue-200">{val.count}</td>
+              <tr key={key} className="border-b border-slate-100 last:border-b-0">
+                <td className="px-4 py-3 text-slate-700">{key}</td>
+                <td className="px-4 py-3 text-right tabular-nums text-slate-700">{formatDays(val.hours)}</td>
+                <td className="px-4 py-3 text-right tabular-nums text-slate-700">{val.count}</td>
               </tr>
             ))
           )}
         </tbody>
         <tfoot>
-          <tr className="bg-blue-600 text-white font-bold">
-            <td className="p-3 border border-blue-400">总计</td>
-            <td className="p-3 border border-blue-400">{formatDays(totalHours)}</td>
-            <td className="p-3 border border-blue-400">{totalCount}</td>
+          <tr className="border-t border-slate-200 bg-slate-50 font-semibold text-slate-900">
+            <td className="px-4 py-3">总计</td>
+            <td className="px-4 py-3 text-right tabular-nums">{formatDays(totalHours)}</td>
+            <td className="px-4 py-3 text-right tabular-nums">{totalCount}</td>
           </tr>
         </tfoot>
       </table>
@@ -477,51 +478,50 @@ function AggregateTable({ title, data = {} }) {
 
 function TaskStatusTable({ details = [], summary = {} }) {
   if (!details.length) {
-    return <div className="p-4 text-gray-400 text-center">暂无数据</div>;
+    return <div className="p-4 text-center text-slate-400">暂无数据</div>;
   }
 
   return (
     <div className="overflow-x-auto text-xs">
-      <table className="min-w-full border-collapse border border-blue-200">
-        <thead>
-          <tr className="bg-blue-400 text-white">
-            <th className="p-1.5 border border-blue-300 text-left">任务状态</th>
-            <th className="p-1.5 border border-blue-300">占用工时（天）</th>
-            <th className="p-1.5 border border-blue-300">处理事项</th>
+      <table className="min-w-full text-sm">
+        <thead className="border-b border-slate-200 bg-slate-50 text-slate-500">
+          <tr>
+            <th className="px-3 py-2 text-left font-medium">任务状态</th>
+            <th className="px-3 py-2 text-right font-medium">占用工时（天）</th>
+            <th className="px-3 py-2 text-right font-medium">处理事项</th>
           </tr>
         </thead>
-        <tbody className="bg-white">
+        <tbody>
           {details.map((group) => (
             <>
-              <tr key={group.projectType} className="bg-blue-50 font-bold">
-                <td className="p-1 border border-blue-100">{group.projectType}</td>
-                <td className="p-1 border border-blue-100">{formatDays(group.totalHours)}</td>
-                <td className="p-1 border border-blue-100">{group.totalCount}</td>
+              <tr key={group.projectType} className="border-b border-slate-100 bg-slate-50 font-semibold text-slate-900">
+                <td className="px-3 py-2">{group.projectType}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{formatDays(group.totalHours)}</td>
+                <td className="px-3 py-2 text-right tabular-nums">{group.totalCount}</td>
               </tr>
               {(group.children || []).map((child) => (
-                <tr key={`${group.projectType}-${child.taskType}`}>
-                  <td className="p-1 border border-blue-100 pl-6 text-gray-600">{child.taskType}</td>
-                  <td className="p-1 border border-blue-100">{formatDays(child.hours)}</td>
-                  <td className="p-1 border border-blue-100">{child.count}</td>
+                <tr key={`${group.projectType}-${child.taskType}`} className="border-b border-slate-100">
+                  <td className="px-3 py-2 pl-7 text-slate-600">{child.taskType}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-slate-600">{formatDays(child.hours)}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-slate-600">{child.count}</td>
                 </tr>
               ))}
             </>
           ))}
-          {/* 总结行 */}
-          <tr className="bg-blue-200 font-bold text-blue-900">
-            <td className="p-1.5 border border-blue-300">总计</td>
-            <td className="p-1.5 border border-blue-300">{formatDays(summary.totalHours)}</td>
-            <td className="p-1.5 border border-blue-300">{summary.totalCount}</td>
+          <tr className="border-t border-slate-200 bg-slate-50 font-semibold text-slate-900">
+            <td className="px-3 py-2">总计</td>
+            <td className="px-3 py-2 text-right tabular-nums">{formatDays(summary.totalHours)}</td>
+            <td className="px-3 py-2 text-right tabular-nums">{summary.totalCount}</td>
           </tr>
-          <tr className="bg-blue-50">
-            <td className="p-1 border border-blue-100 pl-6">软件开发</td>
-            <td className="p-1 border border-blue-100">{formatDays(summary['软件开发']?.hours)}</td>
-            <td className="p-1 border border-blue-100">{summary['软件开发']?.count}</td>
+          <tr className="border-b border-slate-100">
+            <td className="px-3 py-2 pl-7 text-slate-600">软件开发</td>
+            <td className="px-3 py-2 text-right tabular-nums text-slate-600">{formatDays(summary['软件开发']?.hours)}</td>
+            <td className="px-3 py-2 text-right tabular-nums text-slate-600">{summary['软件开发']?.count}</td>
           </tr>
-          <tr className="bg-blue-50">
-            <td className="p-1 border border-blue-100 pl-6">问题处理</td>
-            <td className="p-1 border border-blue-100">{formatDays(summary['问题处理']?.hours)}</td>
-            <td className="p-1 border border-blue-100">{summary['问题处理']?.count}</td>
+          <tr>
+            <td className="px-3 py-2 pl-7 text-slate-600">问题处理</td>
+            <td className="px-3 py-2 text-right tabular-nums text-slate-600">{formatDays(summary['问题处理']?.hours)}</td>
+            <td className="px-3 py-2 text-right tabular-nums text-slate-600">{summary['问题处理']?.count}</td>
           </tr>
         </tbody>
       </table>
@@ -538,22 +538,22 @@ function ProjectTypeSubTable({ projectType, totalHours, projectNames = [] }) {
   if (!items.length) {
     return (
       <div className="flex-1 min-w-[280px]">
-        <h3 className="text-base font-bold text-blue-700 mb-2">{projectType}</h3>
-        <p className="text-gray-400 text-sm">暂无数据</p>
+        <h3 className="mb-2 text-base font-semibold text-slate-900">{projectType}</h3>
+        <p className="text-sm text-slate-400">暂无数据</p>
       </div>
     );
   }
 
   return (
     <div className="flex-1 min-w-[280px]">
-      <h3 className="text-base font-bold text-blue-700 mb-2">{projectType}</h3>
-      <table className="w-full border-collapse border border-blue-200 text-sm">
-        <thead>
-          <tr className="bg-blue-300 text-blue-900">
-            <th className="p-1.5 border border-blue-200 text-left">项目名称</th>
-            <th className="p-1.5 border border-blue-200">工时(天)</th>
-            <th className="p-1.5 border border-blue-200">软件开发</th>
-            <th className="p-1.5 border border-blue-200">问题处理</th>
+      <h3 className="mb-2 text-base font-semibold text-slate-900">{projectType}</h3>
+      <table className="w-full text-sm">
+        <thead className="border-b border-slate-200 bg-slate-50 text-slate-500">
+          <tr>
+            <th className="px-3 py-2 text-left font-medium">项目名称</th>
+            <th className="px-3 py-2 text-right font-medium">工时</th>
+            <th className="px-3 py-2 text-right font-medium">软件开发</th>
+            <th className="px-3 py-2 text-right font-medium">问题处理</th>
           </tr>
         </thead>
         <tbody>
@@ -561,23 +561,23 @@ function ProjectTypeSubTable({ projectType, totalHours, projectNames = [] }) {
             const sw = pn.children.find((c) => c.taskType === '软件开发') || {};
             const issue = pn.children.find((c) => c.taskType === '问题处理') || {};
             return (
-              <tr key={pn.projectName} className="hover:bg-blue-50">
-                <td className="p-1.5 border border-blue-100 font-medium text-gray-700">{pn.projectName}</td>
-                <td className="p-1.5 border border-blue-100 font-semibold">{formatDays(pn.totalHours)}</td>
-                <td className="p-1.5 border border-blue-100">{formatDays(sw.hours || 0)}</td>
-                <td className="p-1.5 border border-blue-100">{formatDays(issue.hours || 0)}</td>
+              <tr key={pn.projectName} className="border-b border-slate-100 hover:bg-slate-50">
+                <td className="px-3 py-2 font-medium text-slate-700">{pn.projectName}</td>
+                <td className="px-3 py-2 text-right font-semibold tabular-nums text-slate-900">{formatDays(pn.totalHours)}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-slate-600">{formatDays(sw.hours || 0)}</td>
+                <td className="px-3 py-2 text-right tabular-nums text-slate-600">{formatDays(issue.hours || 0)}</td>
               </tr>
             );
           })}
         </tbody>
         <tfoot>
-          <tr className="bg-blue-200 font-bold text-blue-900">
-            <td className="p-1.5 border border-blue-300">合计</td>
-            <td className="p-1.5 border border-blue-300">{formatDays(totalHours)}</td>
-            <td className="p-1.5 border border-blue-300">
+          <tr className="border-t border-slate-200 bg-slate-50 font-semibold text-slate-900">
+            <td className="px-3 py-2">合计</td>
+            <td className="px-3 py-2 text-right tabular-nums">{formatDays(totalHours)}</td>
+            <td className="px-3 py-2 text-right tabular-nums">
               {formatDays(items.reduce((s, pn) => s + (pn.children.find((c) => c.taskType === '软件开发')?.hours || 0), 0))}
             </td>
-            <td className="p-1.5 border border-blue-300">
+            <td className="px-3 py-2 text-right tabular-nums">
               {formatDays(items.reduce((s, pn) => s + (pn.children.find((c) => c.taskType === '问题处理')?.hours || 0), 0))}
             </td>
           </tr>
@@ -589,7 +589,7 @@ function ProjectTypeSubTable({ projectType, totalHours, projectNames = [] }) {
 
 function ProjectNameDetailTable({ details = [] }) {
   if (!details.length) {
-    return <div className="p-4 text-gray-400 text-center">暂无数据</div>;
+    return <div className="p-4 text-center text-slate-400">暂无数据</div>;
   }
 
   return (
@@ -708,33 +708,34 @@ export default function WorkdayCostHourStats() {
     [teamData.teams, selectedTeamId],
   );
 
-  const totalHours = deptData.total?.hours ?? teamData.total?.hours ?? 0;
-  const totalCount = deptData.total?.taskCount ?? teamData.total?.taskCount ?? 0;
-
   return (
     <ManagerLayout>
+      <SectionTitle
+        title="工作日耗时"
+        desc="按季度查看部门、小组、项目和成员维度的工作日耗时数据。"
+      />
+
       {error ? (
-        <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-red-700">
-          ⚠️ {error}
+        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-700">
+          {error}
           <button
             type="button"
             onClick={loadAll}
-            className="ml-4 underline hover:text-red-900"
+            className="ml-4 underline hover:text-rose-900"
           >
             重试
           </button>
         </div>
       ) : null}
 
-      {/* ═══════ 全局时间选择器 ═══════ */}
-      <div className="z-10 rounded-lg border-l-4 border-indigo-500 bg-white shadow-md">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4 p-4">
-        <div className="flex items-center gap-4 w-full md:w-auto">
-          <label className="text-base font-bold text-gray-700 whitespace-nowrap">全局时间 (季度) :</label>
+      <Card className="p-5">
+        <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
+        <div className="w-full md:w-auto">
+          <label className="mb-1 block text-sm font-medium text-slate-600">统计时间</label>
           <select
             value={quarter}
             onChange={(e) => setQuarter(e.target.value)}
-            className="w-full md:w-64 rounded border border-gray-300 bg-gray-50 p-2 text-base text-gray-700 hover:bg-white focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer transition-colors"
+            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-400 md:w-72"
           >
             {QUARTER_OPTIONS.map((q) => (
               <option key={q.value} value={q.value}>{q.label}</option>
@@ -745,16 +746,16 @@ export default function WorkdayCostHourStats() {
           type="button"
           onClick={handleQuery}
           disabled={loading}
-          className="rounded bg-indigo-600 px-6 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+          className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
         >
           {loading ? '查询中...' : '查询'}
         </button>
         </div>
-      </div>
+      </Card>
 
-      <div className="space-y-8">
+      <div className="space-y-6">
         {loading ? (
-          <div className="py-12 text-center text-gray-400">加载中...</div>
+          <div className="py-12 text-center text-slate-400">加载中...</div>
         ) : (
           <>
             {/* ═══════ Effective Hour Management: 个人维度有效工时 ═══════ */}
@@ -768,11 +769,10 @@ export default function WorkdayCostHourStats() {
               onAdjustmentChange={handleAdjustmentChange}
             />
 
-            {/* ═══════ Section 1: 小组明细 ═══════ */}
-            <section className="overflow-hidden rounded-lg border-t-4 border-blue-500 bg-white shadow-md">
-              <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-blue-500 p-4">
-                <h2 className="text-xl font-bold text-white">各小组明细数据看板</h2>
-                <div className="flex items-center gap-2 rounded bg-blue-400 p-2 shadow-sm">
+            <Card className="overflow-hidden p-0">
+              <div className="flex flex-col items-start justify-between gap-4 border-b border-slate-200 bg-slate-50 px-5 py-4 md:flex-row md:items-center">
+                <h2 className="text-lg font-semibold text-slate-900">小组数据看板</h2>
+                <div className="flex items-center gap-2">
                   <TeamSelector
                     teams={teamData.teams}
                     selectedTeamId={selectedTeamId}
@@ -800,44 +800,36 @@ export default function WorkdayCostHourStats() {
                   </div>
                 </div>
               </div>
-            </section>
+            </Card>
 
-            {/* ═══════ Section 2+3: 数据总表 + 任务状态明细 左右布局 ═══════ */}
-            <div className="flex flex-col lg:flex-row gap-6 items-stretch">
-              {/* Section 2: 数据总表 (2/3) */}
-              <section className="flex flex-col overflow-hidden rounded-lg border-t-4 border-blue-600 bg-white shadow-md lg:w-2/3">
-                <div className="bg-blue-600 p-4">
-                  <h2 className="text-center text-xl font-bold text-white">
-                    数据来源《研发人力数据化管理总表》全员{quarterOption.label.split('(')[0].trim()}数据
-                    {workdayCount != null ? ` (共计${workdayCount}天)` : ''}
-                  </h2>
-                </div>
-                <div className="flex flex-1 flex-col lg:flex-row gap-8 p-6">
-                  <div className="flex flex-1 flex-col">
-                    <AggregateTable title="项目类型" data={deptData.byProjectType} />
-                    <div className="mt-auto pt-6">
-                      <DualBarChart data={deptData.byProjectType} title="项目类型 - 工时与事项数" />
-                    </div>
-                  </div>
-                  <div className="flex flex-1 flex-col">
-                    <AggregateTable title="车型" data={deptData.byVehicleType} />
-                    <div className="mt-auto pt-6">
-                      <DualBarChart data={deptData.byVehicleType} title="车型 - 工时与事项数" />
-                    </div>
+            <Card className="overflow-hidden p-0">
+              <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
+                <h2 className="text-lg font-semibold text-slate-900">
+                  部门汇总数据（导航组 + 对接组）· {quarterOption.label.split('(')[0].trim()}
+                  {workdayCount != null ? ` (共计${workdayCount}天)` : ''}
+                </h2>
+              </div>
+              <div className="grid gap-8 p-6 lg:grid-cols-2">
+                <div className="flex flex-col">
+                  <AggregateTable title="项目类型" data={deptData.byProjectType} />
+                  <div className="mt-auto pt-6">
+                    <DualBarChart data={deptData.byProjectType} title="项目类型 - 工时与事项数" />
                   </div>
                 </div>
-              </section>
-
-              {/* Section 3: 任务状态明细 (1/3) */}
-              <section className="flex flex-col overflow-hidden rounded-lg border-t-4 border-blue-500 bg-white shadow-md lg:w-1/3">
-                <div className="bg-blue-500 p-4">
-                  <h2 className="text-center text-xl font-bold text-white">
-                    任务状态明细项
-                  </h2>
+                <div className="flex flex-col">
+                  <AggregateTable title="车型" data={deptData.byVehicleType} />
+                  <div className="mt-auto pt-6">
+                    <DualBarChart data={deptData.byVehicleType} title="车型 - 工时与事项数" />
+                  </div>
                 </div>
-                <div className="flex flex-col flex-1 p-6">
+              </div>
+              <div className="border-t border-slate-200">
+                <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
+                  <h3 className="text-base font-semibold text-slate-900">任务状态统计</h3>
+                </div>
+                <div className="grid gap-6 p-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(260px,0.6fr)]">
                   <TaskStatusTable details={taskData.details} summary={taskData.summary} />
-                  <div className="mt-auto flex justify-center pt-6">
+                  <div className="flex items-center justify-center">
                     <ProjectTypePieChart
                       data={{
                         '软件开发': taskData.summary['软件开发'] || { hours: 0, count: 0 },
@@ -847,18 +839,16 @@ export default function WorkdayCostHourStats() {
                     />
                   </div>
                 </div>
-              </section>
-            </div>
-
-            {/* ═══════ Section 4: 项目名称明细 ─────── */}
-            <section className="overflow-hidden rounded-lg border-t-4 border-blue-400 bg-white shadow-md mt-6">
-              <div className="bg-blue-400 p-4">
-                <h2 className="text-center text-xl font-bold text-white">项目名称明细</h2>
               </div>
-              <div className="p-6">
-                <ProjectNameDetailTable details={projectNameData.details} />
+              <div>
+                <div className="bg-slate-50 px-5 py-4">
+                  <h3 className="text-base font-semibold text-slate-900">项目类型统计</h3>
+                </div>
+                <div className="p-6 pt-4">
+                  <ProjectNameDetailTable details={projectNameData.details} />
+                </div>
               </div>
-            </section>
+            </Card>
           </>
         )}
       </div>

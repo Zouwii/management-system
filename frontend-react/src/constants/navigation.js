@@ -5,16 +5,16 @@ import { ROLES } from './roles';
 export const sideMenuConfig = [
   {
     path: ROUTE_PATHS.DEPARTMENT_OVERVIEW,
-    label: '部门总览',
-    employeeLabel: '部门总览',
+    label: '有效工时',
+    employeeLabel: '有效工时',
     section: '部门',
     allowedRoles: [ROLES.MANAGER, ROLES.ADMIN],
     permissionCode: PAGE_PERMISSION_CODES.DEPARTMENT_OVERVIEW,
   },
   {
     path: ROUTE_PATHS.WORKDAY_COSTHOUR,
-    label: '工作日耗时统计',
-    employeeLabel: '工作日耗时统计',
+    label: '工作日耗时',
+    employeeLabel: '工作日耗时',
     section: '部门',
     allowedRoles: [ROLES.MANAGER, ROLES.ADMIN],
     permissionCode: PAGE_PERMISSION_CODES.WORKDAY_COSTHOUR,

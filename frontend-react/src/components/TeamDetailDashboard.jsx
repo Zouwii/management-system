@@ -6,7 +6,7 @@ import ManagerLayout from '../layouts/ManagerLayout';
 import { ROUTE_PATHS } from '../constants/routes';
 import { useAuthStore } from '../store/authStore';
 import { formatDateTime } from '../utils/workHours';
-import { fetchMembers } from '../api/dashboard';
+import { fetchMembers, fetchTeamPerformance } from '../api/dashboard';
 import { shouldHideMemberInSelector } from '../utils/memberVisibility';
 
 function formatRawDays(value) {
@@ -140,6 +140,36 @@ function getCurrentQuarterLabel() {
   return `${now.getFullYear()}Q${q}`;
 }
 
+function generateQuarterOptions() {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentQuarter = Math.floor(now.getMonth() / 3) + 1;
+  const quarters = [];
+  // 从 2025Q1 生成到当前季度
+  for (let y = 2025; y <= currentYear; y++) {
+    const endQ = y === currentYear ? currentQuarter : 4;
+    for (let q = 1; q <= endQ; q++) {
+      quarters.push(`${y}Q${q}`);
+    }
+  }
+  // 最新季度排前面
+  return quarters.reverse();
+}
+
+function getDefaultQuarter() {
+  const now = new Date();
+  const q = Math.floor(now.getMonth() / 3) + 1;
+  const defaultQ = q === 1 ? 4 : q - 1;
+  const defaultY = q === 1 ? now.getFullYear() - 1 : now.getFullYear();
+  return `${defaultY}Q${defaultQ}`;
+}
+
+function parseQuarterLabel(label) {
+  const match = String(label || '').match(/^(\d{4})Q([1-4])$/);
+  if (!match) return null;
+  return { year: Number(match[1]), quarter: Number(match[2]) };
+}
+
 export default function TeamDetailDashboard({
   title,
   desc,
@@ -173,14 +203,38 @@ export default function TeamDetailDashboard({
   const [expectedView, setExpectedView] = useState(initialExpectedView);
   const [performanceMemberFilter, setPerformanceMemberFilter] = useState('全部');
   const [performanceScoreFilter, setPerformanceScoreFilter] = useState(initialPerformanceScore);
-  const performanceQuarters = useMemo(() => {
-    const fromRows = Array.from(new Set(rows.map((row) => String(row.quarter || '').trim()).filter(Boolean)));
-    return fromRows.length ? fromRows : [getCurrentQuarterLabel()];
-  }, [rows]);
-  const latestQuarter = performanceQuarters[performanceQuarters.length - 1] ?? '';
-  const [selectedQuarter, setSelectedQuarter] = useState(latestQuarter);
-  const [appliedQuarter, setAppliedQuarter] = useState(latestQuarter);
+  const performanceQuarters = useMemo(() => generateQuarterOptions(), []);
+  const defaultQuarter = useMemo(() => getDefaultQuarter(), []);
+  const [selectedQuarter, setSelectedQuarter] = useState(defaultQuarter);
+  const [appliedQuarter, setAppliedQuarter] = useState(defaultQuarter);
+  const [performanceData, setPerformanceData] = useState([]);
+  const [perfLoading, setPerfLoading] = useState(false);
 
+  // 切换季度时拉取绩效数据
+  useEffect(() => {
+    let active = true;
+    const parsed = parseQuarterLabel(appliedQuarter);
+    if (!parsed || !teamKey) return;
+
+    setPerfLoading(true);
+    fetchTeamPerformance(user, {
+      year: parsed.year,
+      quarter: parsed.quarter,
+      teamKey,
+    }).then((res) => {
+      if (!active) return;
+      setPerformanceData(res?.data?.results ?? []);
+      setPerfLoading(false);
+    }).catch(() => {
+      if (!active) return;
+      setPerformanceData([]);
+      setPerfLoading(false);
+    });
+
+    return () => { active = false; };
+  }, [appliedQuarter, teamKey, user]);
+
+  // 工时数据加载
   useEffect(() => {
     let active = true;
 
@@ -209,12 +263,7 @@ export default function TeamDetailDashboard({
     return () => {
       active = false;
     };
-  }, [expectedView, fallbackRows, fetcher, user]);
-
-  useEffect(() => {
-    setSelectedQuarter(latestQuarter);
-    setAppliedQuarter(latestQuarter);
-  }, [latestQuarter]);
+  }, [expectedView, fallbackRows, fetcher, teamKey, user]);
 
   useEffect(() => {
     const nextExpectedView = searchParams.get('expected') === 'current' ? 'current' : 'quarter';
@@ -296,26 +345,44 @@ export default function TeamDetailDashboard({
   }, [allHourRows, allocationSort, completionSort, hoursAbnormalFilter, hoursMemberFilter]);
 
   const visiblePerformanceRows = useMemo(() => {
-    return buildPerformanceRows(rows, appliedQuarter).filter((row) => {
+    // 将 API 返回的绩效数据与 rows 做 join（rows 有 userName / role）
+    const rowMap = {};
+    rows.forEach((r) => {
+      rowMap[String(r.userId || '')] = r;
+    });
+
+    let perfRows = performanceData.map((p) => {
+      const info = rowMap[String(p.userId || '')] || {};
+      const score = Number(p.finalScore);
+      return {
+        userId: p.userId,
+        name: info.name || info.userName || p.userId,
+        role: info.role || '-',
+        quarter: `${p.year}Q${p.quarter}`,
+        finalScore: Number.isFinite(score) ? score : 0,
+        band: Number.isFinite(score) ? getPerformanceBand(score) : '-',
+        carryScore: Number(p.newCarryBalance || 0),
+        performanceRisk: Number.isFinite(score) ? score < 1.0 : false,
+      };
+    });
+
+    // 过滤
+    return perfRows.filter((row) => {
       if (performanceMemberFilter !== '全部' && row.name !== performanceMemberFilter) {
         return false;
       }
-
       if (performanceScoreFilter === '低于1.0') {
         return row.finalScore < 1.0;
       }
-
       if (performanceScoreFilter === '1.0-1.2') {
         return row.finalScore >= 1.0 && row.finalScore < 1.2;
       }
-
       if (performanceScoreFilter === '1.2及以上') {
         return row.finalScore >= 1.2;
       }
-
       return true;
     });
-  }, [appliedQuarter, performanceMemberFilter, performanceScoreFilter, rows]);
+  }, [performanceData, rows, performanceMemberFilter, performanceScoreFilter]);
 
   const teamHoursSummary = useMemo(() => ({
     quarterExpectedHours: visibleHourRows.reduce((sum, row) => sum + row.quarterExpectedHours, 0),
@@ -341,46 +408,6 @@ export default function TeamDetailDashboard({
   const avgFinalPerformance = visiblePerformanceRows.length
     ? (visiblePerformanceRows.reduce((sum, row) => sum + row.finalScore, 0) / visiblePerformanceRows.length).toFixed(2)
     : '0.00';
-  const combinedInsights = useMemo(() => visibleHourRows.reduce((accumulator, row) => {
-    const matchedPerformance = visiblePerformanceRows.find((item) => item.name === row.name);
-
-    if (!matchedPerformance) {
-      return accumulator;
-    }
-
-    if (row.allocationDelta < 0 && matchedPerformance.finalScore < 1.0) {
-      accumulator.push({
-        name: row.name,
-        message: `工时分配不足，且${appliedQuarter}最终绩效低于 1.0，需要优先关注。`,
-      });
-      return accumulator;
-    }
-
-    if (row.completionDelta < 0 && matchedPerformance.finalScore < 1.0) {
-      accumulator.push({
-        name: row.name,
-        message: `任务完成进度偏慢，且${appliedQuarter}最终绩效低于 1.0，建议跟进完成节奏。`,
-      });
-      return accumulator;
-    }
-
-    if (row.allocationDelta >= 0 && matchedPerformance.finalScore < 1.0) {
-      accumulator.push({
-        name: row.name,
-        message: `工时分配充足，但${appliedQuarter}最终绩效仍低于 1.0，建议复盘任务质量和产出。`,
-      });
-      return accumulator;
-    }
-
-    if (row.allocationDelta < 0 && matchedPerformance.finalScore >= 1.0) {
-      accumulator.push({
-        name: row.name,
-        message: '工时略紧但绩效仍达标，可关注后续负载是否持续偏高。',
-      });
-    }
-
-    return accumulator;
-  }, []).slice(0, 4), [appliedQuarter, visibleHourRows, visiblePerformanceRows]);
   const expectedConfig = expectedView === 'current'
     ? {
         label: '本季度至今天预期有效工时',
@@ -610,9 +637,10 @@ export default function TeamDetailDashboard({
             <button
               type="button"
               onClick={() => setAppliedQuarter(selectedQuarter)}
-              className="rounded-full bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
+              disabled={perfLoading}
+              className="rounded-full bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
             >
-              查询季度
+              {perfLoading ? '查询中...' : '查询季度'}
             </button>
             <div className="flex items-center justify-end text-sm text-slate-500">
               平均最终绩效
@@ -649,39 +677,6 @@ export default function TeamDetailDashboard({
         </div>
       </Card>
 
-      <Card className="p-6">
-        <div className="text-lg font-semibold">交叉判断</div>
-        <div className="mt-1 text-sm text-slate-500">把工时差值和当前季度绩效放到一起看，帮助主管快速定位优先关注对象。</div>
-        <div className="mt-4 space-y-3">
-          {combinedInsights.length ? combinedInsights.map((item) => (
-            <div key={`${item.name}-${item.message}`} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-              <div>
-                <span className="font-medium text-slate-900">{item.name}</span>
-                {'：'}
-                {item.message}
-              </div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <Link
-                  to={`${ROUTE_PATHS.PERSONAL_HOURS}?target=${encodeURIComponent(item.name)}`}
-                  className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
-                >
-                  查看工时管理
-                </Link>
-                <Link
-                  to={`${ROUTE_PATHS.PERFORMANCE}?target=${encodeURIComponent(item.name)}`}
-                  className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100"
-                >
-                  查看绩效管理
-                </Link>
-              </div>
-            </div>
-          )) : (
-            <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-              当前筛选口径下暂无需要额外提示的交叉风险。
-            </div>
-          )}
-        </div>
-      </Card>
     </ManagerLayout>
   );
 }
