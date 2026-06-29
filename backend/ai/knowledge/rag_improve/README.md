@@ -6,17 +6,19 @@
 
 ## 工作清单
 
-### [ ] 1. 标注测试集 ← 当前待做
+### [x] 1. 标注测试集 ✅ 完成
 
-**文件**: `test_queries.json`（25 条查询，`relevant_chunk_ids` 为空待填）
+**方法**: TREC Pooling（三路检索合并）+ LLM relevance judgment + 人工复核
 
-**操作**:
+**文件**: `test_queries.json`（26 条查询，`relevant_chunk_ids` 已标注）
+
+**脚本**: `llm_label.py` — 执行标注
 ```bash
-python -m ai.knowledge.rag_improve.annotate            # 从头标注
-python -m ai.knowledge.rag_improve.annotate --resume   # 续标
+python -m ai.knowledge.rag_improve.llm_label
 ```
 
-**产出**: 所有 25 条的 `relevant_chunk_ids` 填写完毕
+**文档**: `docs/step1-annotation.md` — 完整方法说明
+**参考**: `docs/how-to-build-testset.md` — 业界标准做法对比
 
 ---
 

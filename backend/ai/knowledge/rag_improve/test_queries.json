@@ -1,177 +1,417 @@
 [
   {
-    "id": 1, "type": "技术文档", "difficulty": "easy",
+    "id": 1,
+    "type": "技术文档",
+    "difficulty": "easy",
     "query": "导航控制器的参数有哪些如何梳理",
-    "relevant_chunk_ids": [],
-    "source_docs": ["控制器参数梳理.adoc"],
+    "relevant_chunk_ids": [
+      401,
+      4134,
+      4135
+    ],
+    "source_docs": [
+      "控制器参数梳理.adoc"
+    ],
     "note": "直接查控制器参数梳理.adoc，chunk里包含了具体的参数名"
   },
   {
-    "id": 2, "type": "技术文档", "difficulty": "medium",
+    "id": 2,
+    "type": "技术文档",
+    "difficulty": "medium",
     "query": "机器人原地旋转的精度指标是多少",
     "relevant_chunk_ids": [],
-    "source_docs": ["盲走精度测试.adoc"],
+    "source_docs": [
+      "盲走精度测试.adoc"
+    ],
     "note": "盲走精度测试.adoc 中有原地旋转绝对精度1%的指标"
   },
   {
-    "id": 3, "type": "技术文档", "difficulty": "hard",
+    "id": 3,
+    "type": "技术文档",
+    "difficulty": "hard",
     "query": "nav-manager的设计思路和整体架构是怎样的",
-    "relevant_chunk_ids": [],
-    "source_docs": ["nav-manager设计文档.adoc"],
+    "relevant_chunk_ids": [
+      2999,
+      3000,
+      3007,
+      3008,
+      3023
+    ],
+    "source_docs": [
+      "nav-manager设计文档.adoc"
+    ],
     "note": "需要检索 nav-manager设计文档 中的设计思路+架构部分"
   },
   {
-    "id": 4, "type": "技术文档", "difficulty": "easy",
+    "id": 4,
+    "type": "技术文档",
+    "difficulty": "easy",
     "query": "本体和调度之间的接口协议是什么",
-    "relevant_chunk_ids": [],
-    "source_docs": ["【高速小车】本体&调度协议设计（基于VDA5050).adoc", "STU 本体-调度 接口协议.adoc"],
+    "relevant_chunk_ids": [
+      163,
+      2055,
+      2070,
+      3204,
+      3205,
+      3208,
+      3209,
+      3215,
+      3217,
+      3221,
+      3229,
+      3235,
+      3239,
+      3241
+    ],
+    "source_docs": [
+      "【高速小车】本体&调度协议设计（基于VDA5050).adoc",
+      "STU 本体-调度 接口协议.adoc"
+    ],
     "note": "多个文档都有相关内容，可能有多个正确答案"
   },
   {
-    "id": 5, "type": "技术文档", "difficulty": "medium",
+    "id": 5,
+    "type": "技术文档",
+    "difficulty": "medium",
     "query": "伺服驱动器测试工具的功能设计有哪些",
     "relevant_chunk_ids": [],
-    "source_docs": ["驱动器测试工具功能设计说明书.adoc"],
+    "source_docs": [
+      "驱动器测试工具功能设计说明书.adoc"
+    ],
     "note": "驱动器测试工具功能设计说明书.adoc"
   },
   {
-    "id": 6, "type": "技术文档", "difficulty": "medium",
+    "id": 6,
+    "type": "技术文档",
+    "difficulty": "medium",
     "query": "机器人运动控制中车辆状态的x y yaw kappa分别代表什么",
     "relevant_chunk_ids": [],
-    "source_docs": ["线路轨迹数据结构接口文档.adoc"],
+    "source_docs": [
+      "线路轨迹数据结构接口文档.adoc"
+    ],
     "note": "线路轨迹数据结构接口文档.adoc 中有精确定义"
   },
   {
-    "id": 7, "type": "技术文档", "difficulty": "hard",
+    "id": 7,
+    "type": "技术文档",
+    "difficulty": "hard",
     "query": "转盘功能详细设计包含哪些模块和接口",
     "relevant_chunk_ids": [],
-    "source_docs": ["转盘功能详细设计.adoc", "1.转盘功能设计说明书.adoc"],
+    "source_docs": [
+      "转盘功能详细设计.adoc",
+      "1.转盘功能设计说明书.adoc"
+    ],
     "note": "转盘相关的两个设计文档"
   },
   {
-    "id": 8, "type": "技术文档", "difficulty": "medium",
+    "id": 8,
+    "type": "技术文档",
+    "difficulty": "medium",
     "query": "嵌入式驱动器的性能指标设计有哪些",
-    "relevant_chunk_ids": [],
-    "source_docs": ["嵌入式驱动器性能指标设计.adoc"],
+    "relevant_chunk_ids": [
+      293,
+      294,
+      299,
+      570,
+      576,
+      3078,
+      8962,
+      8963,
+      8964
+    ],
+    "source_docs": [
+      "嵌入式驱动器性能指标设计.adoc"
+    ],
     "note": "嵌入式驱动器性能指标设计.adoc"
   },
   {
-    "id": 9, "type": "会议纪要", "difficulty": "easy",
+    "id": 9,
+    "type": "会议纪要",
+    "difficulty": "easy",
     "query": "本体开发部的有效工时是怎么定义的",
-    "relevant_chunk_ids": [],
-    "source_docs": ["0. 本体开发部制度规范.adoc"],
+    "relevant_chunk_ids": [
+      72,
+      76,
+      77
+    ],
+    "source_docs": [
+      "0. 本体开发部制度规范.adoc"
+    ],
     "note": "制度规范文档中有有效工时的完整定义"
   },
   {
-    "id": 10, "type": "会议纪要", "difficulty": "medium",
+    "id": 10,
+    "type": "会议纪要",
+    "difficulty": "medium",
     "query": "Q1导航组复盘了哪些主要问题",
-    "relevant_chunk_ids": [],
-    "source_docs": ["2026年Q1导航组问题复盘.adoc", "2025年Q1导航组问题复盘.adoc"],
+    "relevant_chunk_ids": [
+      2891,
+      2896
+    ],
+    "source_docs": [
+      "2026年Q1导航组问题复盘.adoc",
+      "2025年Q1导航组问题复盘.adoc"
+    ],
     "note": "复盘文档中分条目列出了问题"
   },
   {
-    "id": 11, "type": "会议纪要", "difficulty": "medium",
+    "id": 11,
+    "type": "会议纪要",
+    "difficulty": "medium",
     "query": "OKR复盘会议上导航组和对接组分别讨论了什么",
-    "relevant_chunk_ids": [],
-    "source_docs": ["OKR阶段性复盘会议记录【2023.09.22】.adoc"],
+    "relevant_chunk_ids": [
+      112
+    ],
+    "source_docs": [
+      "OKR阶段性复盘会议记录【2023.09.22】.adoc"
+    ],
     "note": "OKR复盘会议记录文档"
   },
   {
-    "id": 12, "type": "会议纪要", "difficulty": "hard",
+    "id": 12,
+    "type": "会议纪要",
+    "difficulty": "hard",
     "query": "Roadmap总结会上到点自学习和Carly3的进展状态是什么",
-    "relevant_chunk_ids": [],
-    "source_docs": ["导航组Roadmap总结会【2025.4.10】.adoc"],
+    "relevant_chunk_ids": [
+      82
+    ],
+    "source_docs": [
+      "导航组Roadmap总结会【2025.4.10】.adoc"
+    ],
     "note": "总结会文档中有各项的当前进展和状态"
   },
   {
-    "id": 13, "type": "会议纪要", "difficulty": "easy",
+    "id": 13,
+    "type": "会议纪要",
+    "difficulty": "easy",
     "query": "主管评分的参考标准是什么",
     "relevant_chunk_ids": [],
-    "source_docs": ["0. 本体开发部制度规范.adoc"],
+    "source_docs": [
+      "0. 本体开发部制度规范.adoc"
+    ],
     "note": "制度规范中的主管评分标准表格"
   },
   {
-    "id": 14, "type": "会议纪要", "difficulty": "medium",
+    "id": 14,
+    "type": "会议纪要",
+    "difficulty": "medium",
     "query": "对接组Q4复盘了哪些问题",
-    "relevant_chunk_ids": [],
-    "source_docs": ["2025年Q4对接组问题复盘.adoc"],
+    "relevant_chunk_ids": [
+      2833,
+      2835,
+      2903
+    ],
+    "source_docs": [
+      "2025年Q4对接组问题复盘.adoc"
+    ],
     "note": "Q4对接组复盘文档"
   },
   {
-    "id": 15, "type": "表格", "difficulty": "easy",
+    "id": 15,
+    "type": "表格",
+    "difficulty": "easy",
     "query": "导航组2026年Roadmap中Q1有哪些P0优先级的专项",
-    "relevant_chunk_ids": [],
-    "source_docs": ["导航组2026年Roadmap.axls"],
+    "relevant_chunk_ids": [
+      79
+    ],
+    "source_docs": [
+      "导航组2026年Roadmap.axls"
+    ],
     "note": "Roadmap表格中列出了各季度的P0/P1/P2专项"
   },
   {
-    "id": 16, "type": "表格", "difficulty": "medium",
+    "id": 16,
+    "type": "表格",
+    "difficulty": "medium",
     "query": "导航组的版本更新日志中有哪些改动记录",
-    "relevant_chunk_ids": [],
-    "source_docs": ["导航版本更新日志.axls"],
+    "relevant_chunk_ids": [
+      3684,
+      3685,
+      3686,
+      3687,
+      3688,
+      3689,
+      3690,
+      3691,
+      3692
+    ],
+    "source_docs": [
+      "导航版本更新日志.axls"
+    ],
     "note": "版本更新日志表格"
   },
   {
-    "id": 17, "type": "表格", "difficulty": "hard",
+    "id": 17,
+    "type": "表格",
+    "difficulty": "hard",
     "query": "伺服报错有哪些类型和对应的处理方式",
-    "relevant_chunk_ids": [],
-    "source_docs": ["伺服报错汇总.axls"],
+    "relevant_chunk_ids": [
+      1644,
+      1645,
+      2489,
+      4735,
+      4833,
+      5673,
+      5674
+    ],
+    "source_docs": [
+      "伺服报错汇总.axls"
+    ],
     "note": "伺服报错汇总表格信息密度高"
   },
   {
-    "id": 18, "type": "表格", "difficulty": "easy",
+    "id": 18,
+    "type": "表格",
+    "difficulty": "easy",
     "query": "导航组2025年的Roadmap包含哪些目标",
-    "relevant_chunk_ids": [],
-    "source_docs": ["2025年导航组Roadmap.adoc", "导航组2025年Roadmap.axls"],
+    "relevant_chunk_ids": [
+      88,
+      95,
+      98,
+      103,
+      113,
+      116,
+      308
+    ],
+    "source_docs": [
+      "2025年导航组Roadmap.adoc",
+      "导航组2025年Roadmap.axls"
+    ],
     "note": "2025年Roadmap可能有adoc和axls两种格式"
   },
   {
-    "id": 19, "type": "跨文档", "difficulty": "medium",
+    "id": 19,
+    "type": "跨文档",
+    "difficulty": "medium",
     "query": "小车性能测试的方法和指标有哪些",
-    "relevant_chunk_ids": [],
-    "source_docs": ["小车性能测试方法.adoc", "盲走精度测试.adoc", "新伺服测试报告.adoc"],
+    "relevant_chunk_ids": [
+      374,
+      377,
+      741,
+      864,
+      865,
+      875,
+      876,
+      2294,
+      3078,
+      4140,
+      6115,
+      6163,
+      6186,
+      7686,
+      11441
+    ],
+    "source_docs": [
+      "小车性能测试方法.adoc",
+      "盲走精度测试.adoc",
+      "新伺服测试报告.adoc"
+    ],
     "note": "需要跨多文档综合：测试方法文档+精度测试+伺服测试报告"
   },
   {
-    "id": 20, "type": "跨文档", "difficulty": "hard",
+    "id": 20,
+    "type": "跨文档",
+    "difficulty": "hard",
     "query": "AGV的导航精度和到点自学习有什么关系如何优化",
     "relevant_chunk_ids": [],
-    "source_docs": ["盲走精度测试.adoc", "到点自学习实施效率优化.adoc", "2026年Q1导航组问题复盘.adoc"],
+    "source_docs": [
+      "盲走精度测试.adoc",
+      "到点自学习实施效率优化.adoc",
+      "2026年Q1导航组问题复盘.adoc"
+    ],
     "note": "跨文档：精度测试 + 到点自学习 + 复盘中的经验"
   },
   {
-    "id": 21, "type": "跨文档", "difficulty": "medium",
+    "id": 21,
+    "type": "跨文档",
+    "difficulty": "medium",
     "query": "二维码导航的功能包括哪些有什么版本迭代",
-    "relevant_chunk_ids": [],
-    "source_docs": ["功能设计 | 二维码子图检码扩展（子图列表 + 秒回聚合）.adoc", "低代码算子字典.adoc"],
+    "relevant_chunk_ids": [
+      87,
+      91,
+      5026,
+      6877,
+      6892,
+      6957
+    ],
+    "source_docs": [
+      "功能设计 | 二维码子图检码扩展（子图列表 + 秒回聚合）.adoc",
+      "低代码算子字典.adoc"
+    ],
     "note": "二维码导航功能涉及多文档"
   },
   {
-    "id": 22, "type": "跨文档", "difficulty": "hard",
+    "id": 22,
+    "type": "跨文档",
+    "difficulty": "hard",
     "query": "导航模块的CPU占用情况如何有哪些优化措施",
     "relevant_chunk_ids": [],
-    "source_docs": ["nav-net CPU占用分析.adoc", "nav-base空闲状态cpu占用分析.adoc", "2025年Q2导航组问题复盘.adoc"],
+    "source_docs": [
+      "nav-net CPU占用分析.adoc",
+      "nav-base空闲状态cpu占用分析.adoc",
+      "2025年Q2导航组问题复盘.adoc"
+    ],
     "note": "跨文档：CPU分析文档+复盘中的优化措施"
   },
   {
-    "id": 23, "type": "跨文档", "difficulty": "medium",
+    "id": 23,
+    "type": "跨文档",
+    "difficulty": "medium",
     "query": "行为树在移动机器人中有哪些应用实例",
-    "relevant_chunk_ids": [],
-    "source_docs": ["行为树基础概念及其在移动机器人中的应用实例.adoc", "行为树节点示教参数传递.adoc"],
+    "relevant_chunk_ids": [
+      2205,
+      2208,
+      3631,
+      4961,
+      5147,
+      6393,
+      6417
+    ],
+    "source_docs": [
+      "行为树基础概念及其在移动机器人中的应用实例.adoc",
+      "行为树节点示教参数传递.adoc"
+    ],
     "note": "行为树相关两篇文档"
   },
   {
-    "id": 24, "type": "技术文档", "difficulty": "hard",
+    "id": 24,
+    "type": "技术文档",
+    "difficulty": "hard",
     "query": "servo-net的设计架构和对外接口协议是什么",
     "relevant_chunk_ids": [],
-    "source_docs": ["servo-net设计文档.adoc", "servo-net对外接口协议.adoc"],
+    "source_docs": [
+      "servo-net设计文档.adoc",
+      "servo-net对外接口协议.adoc"
+    ],
     "note": "servo-net的设计+接口两部分"
   },
   {
-    "id": 25, "type": "会议纪要", "difficulty": "hard",
+    "id": 25,
+    "type": "会议纪要",
+    "difficulty": "hard",
     "query": "2025年CodeReview总结中有哪些改进措施",
-    "relevant_chunk_ids": [],
-    "source_docs": ["2025Q1CodeReview总结.adoc"],
+    "relevant_chunk_ids": [
+      2979,
+      2985
+    ],
+    "source_docs": [
+      "2025Q1CodeReview总结.adoc"
+    ],
     "note": "CodeReview总结文档"
+  },
+  {
+    "id": 26,
+    "type": "技术文档",
+    "difficulty": "medium",
+    "query": "自学习的精度优化方法有哪些实施步骤",
+    "relevant_chunk_ids": [
+      6087,
+      6088
+    ],
+    "source_docs": [
+      "到点自学习实施效率优化.adoc",
+      "【5】自学习计算方法替换实验.adoc"
+    ],
+    "note": "自学习精度优化涉及实施效率优化和计算方法替换两方面"
   }
 ]
