@@ -897,3 +897,11 @@ export function mockRecalcMemberPerformance(_payload = {}) {
     data: { success: true },
   });
 }
+
+export function mockFetchTeamPerformance(_user, _params = {}) {
+  return Promise.resolve({
+    code: 200,
+    error: '',
+    data: { results: [], count: 0 },
+  });
+}

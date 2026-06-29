@@ -204,23 +204,36 @@ def fill_member_input_service(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 def query_quarter_performance_service(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
-    查询绩效结果：year + quarter 必填，user_id 可选。
+    查询绩效结果：year + quarter 必填，user_id / team_key 可选。
+    team_key: nav → 只查导航组, servo → 只查对接组, 空 → 查两个组。
     """
     payload = payload or {}
     year = int(payload.get("year"))
     quarter = int(payload.get("quarter"))
     user_id = str(payload.get("user_id") or payload.get("userId") or payload.get("userid") or "").strip()
+    team_key = str(payload.get("team_key") or payload.get("teamKey") or "").strip().lower()
+
+    TEAM_MODEL_MAP = {
+        "nav": (NavPerfQuarterResult, "导航组"),
+        "servo": (ServoPerfQuarterResult, "对接组"),
+    }
+    models = [TEAM_MODEL_MAP[team_key]] if team_key in TEAM_MODEL_MAP else [
+        (NavPerfQuarterResult, "导航组"),
+        (ServoPerfQuarterResult, "对接组"),
+    ]
 
     session = PerfSessionLocal()
     try:
         results = []
-        for Model in (NavPerfQuarterResult, ServoPerfQuarterResult):
+        for Model, team_label in models:
             stmt = select(Model).where(Model.year == year, Model.quarter == quarter)
             if user_id:
                 stmt = stmt.where(Model.user_id == user_id)
             rows = session.scalars(stmt).all()
             for row in rows:
-                results.append(_row_to_dict(row))
+                d = _row_to_dict(row)
+                d["team"] = team_label
+                results.append(d)
         return {"success": True, "data": {"results": results, "count": len(results)}}
     except Exception as e:
         return {"success": False, "error": str(e), "data": {}}

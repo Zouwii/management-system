@@ -450,69 +450,79 @@ def _sync_one_detail_to_b_and_c(
     cascading = _extract_cascading_project_fields(item)
 
     if write_b:
-        stmt = select(ProjectTaskDetail).where(
-            ProjectTaskDetail.task_id == task_id,
-            ProjectTaskDetail.query_user_id == executor_id,
-        )
-        row = one_session.scalars(stmt).first()
-        if row:
-            row.project_id = project_id
-            row.scenario_field_config_id = scenario_id or DEFAULT_SCENARIO_FIELD_CONFIG_ID
-            row.content = content
-            row.due_date = due_date
-            row.work_hour_field_id = field_id
-            row.work_hour = wh
-            row.custom_fields_json = cfs if cfs is not None else None
-            row.raw_json = raw_blob
-            row.parent_task_id = parent_id
-            row.parent_id = parent_id
-            row.task_list_id = str(item.get("taskListId") or "") or None
-            row.task_stage_id = str(item.get("taskStageId") or item.get("stageId") or "") or None
-            row.unique_id = unique_id
-            row.task_nature = task_nature
-            row.need_statistic = cascading["need_statistic"]
-            row.workday_costhour = workday_costhour
-            row.requirement_desc = _extract_requirement_desc(item)
-            row.task_outputs = _serialize_outputs(_extract_task_outputs(item))
-            row.is_overdue = is_overdue
-            row.business_type = business_type
-            row.task_flow_status_id = task_flow_status_id
-            row.project_category_1 = cascading["project_category_1"]
-            row.vehicle_type_2 = cascading["vehicle_type_2"]
-            row.project_name_3 = cascading["project_name_3"]
-            row.fetched_at = now
-        else:
-            one_session.add(
-                ProjectTaskDetail(
-                    project_id=project_id,
-                    task_id=task_id,
-                    query_user_id=executor_id,
-                    scenario_field_config_id=scenario_id or DEFAULT_SCENARIO_FIELD_CONFIG_ID,
-                    content=content,
-                    due_date=due_date,
-                    work_hour_field_id=field_id,
-                    work_hour=wh,
-                    custom_fields_json=cfs if cfs is not None else None,
-                    raw_json=raw_blob,
-                    parent_task_id=parent_id,
-                    parent_id=parent_id,
-                    task_list_id=str(item.get("taskListId") or "") or None,
-                    task_stage_id=str(item.get("taskStageId") or item.get("stageId") or "") or None,
-                    unique_id=unique_id,
-                    task_nature=task_nature,
-                    need_statistic=cascading["need_statistic"],
-                    workday_costhour=workday_costhour,
-                    requirement_desc=_extract_requirement_desc(item),
-                    task_outputs=_serialize_outputs(_extract_task_outputs(item)),
-                    is_overdue=is_overdue,
-                    business_type=business_type,
-                    task_flow_status_id=task_flow_status_id,
-                    project_category_1=cascading["project_category_1"],
-                    vehicle_type_2=cascading["vehicle_type_2"],
-                    project_name_3=cascading["project_name_3"],
-                    fetched_at=now,
-                )
+        if is_overdue:
+            # 逾期任务不应留在 B 表，删掉
+            stmt_del = select(ProjectTaskDetail).where(
+                ProjectTaskDetail.task_id == task_id,
+                ProjectTaskDetail.query_user_id == executor_id,
             )
+            row_del = one_session.scalars(stmt_del).first()
+            if row_del:
+                one_session.delete(row_del)
+        else:
+            stmt = select(ProjectTaskDetail).where(
+                ProjectTaskDetail.task_id == task_id,
+                ProjectTaskDetail.query_user_id == executor_id,
+            )
+            row = one_session.scalars(stmt).first()
+            if row:
+                row.project_id = project_id
+                row.scenario_field_config_id = scenario_id or DEFAULT_SCENARIO_FIELD_CONFIG_ID
+                row.content = content
+                row.due_date = due_date
+                row.work_hour_field_id = field_id
+                row.work_hour = wh
+                row.custom_fields_json = cfs if cfs is not None else None
+                row.raw_json = raw_blob
+                row.parent_task_id = parent_id
+                row.parent_id = parent_id
+                row.task_list_id = str(item.get("taskListId") or "") or None
+                row.task_stage_id = str(item.get("taskStageId") or item.get("stageId") or "") or None
+                row.unique_id = unique_id
+                row.task_nature = task_nature
+                row.need_statistic = cascading["need_statistic"]
+                row.workday_costhour = workday_costhour
+                row.requirement_desc = _extract_requirement_desc(item)
+                row.task_outputs = _serialize_outputs(_extract_task_outputs(item))
+                row.is_overdue = is_overdue
+                row.business_type = business_type
+                row.task_flow_status_id = task_flow_status_id
+                row.project_category_1 = cascading["project_category_1"]
+                row.vehicle_type_2 = cascading["vehicle_type_2"]
+                row.project_name_3 = cascading["project_name_3"]
+                row.fetched_at = now
+            else:
+                one_session.add(
+                    ProjectTaskDetail(
+                        project_id=project_id,
+                        task_id=task_id,
+                        query_user_id=executor_id,
+                        scenario_field_config_id=scenario_id or DEFAULT_SCENARIO_FIELD_CONFIG_ID,
+                        content=content,
+                        due_date=due_date,
+                        work_hour_field_id=field_id,
+                        work_hour=wh,
+                        custom_fields_json=cfs if cfs is not None else None,
+                        raw_json=raw_blob,
+                        parent_task_id=parent_id,
+                        parent_id=parent_id,
+                        task_list_id=str(item.get("taskListId") or "") or None,
+                        task_stage_id=str(item.get("taskStageId") or item.get("stageId") or "") or None,
+                        unique_id=unique_id,
+                        task_nature=task_nature,
+                        need_statistic=cascading["need_statistic"],
+                        workday_costhour=workday_costhour,
+                        requirement_desc=_extract_requirement_desc(item),
+                        task_outputs=_serialize_outputs(_extract_task_outputs(item)),
+                        is_overdue=is_overdue,
+                        business_type=business_type,
+                        task_flow_status_id=task_flow_status_id,
+                        project_category_1=cascading["project_category_1"],
+                        vehicle_type_2=cascading["vehicle_type_2"],
+                        project_name_3=cascading["project_name_3"],
+                        fetched_at=now,
+                    )
+                )
 
     if write_c:
         stmt2 = select(ProjectTaskOverdueDetail).where(
@@ -1337,147 +1347,6 @@ def _all_time_download_impl(payload: Dict[str, Any]) -> Dict[str, Any]:
             return raw_result
         return None
 
-    def _upsert_detail_one(
-        one_session,
-        *,
-        user_id: str,
-        task_id: str,
-        project_id_val: str,
-        item: Dict[str, Any],
-        wh: Optional[float],
-        is_overdue: bool,
-        business_type: Optional[int],
-        task_flow_status_id: Optional[int],
-    ) -> None:
-        cfs = item.get("customFields") or item.get("customfields")
-        try:
-            raw_blob = json.dumps(item, ensure_ascii=False)
-        except Exception:
-            raw_blob = None
-
-        uid_val = item.get("uniqueId")
-        unique_id: Optional[int]
-        try:
-            unique_id = int(uid_val) if uid_val is not None and str(uid_val) != "" else None
-        except (TypeError, ValueError):
-            unique_id = None
-
-        now = datetime.now(timezone.utc)
-        casc = _extract_cascading_project_fields(item)
-        stmt = select(ProjectTaskDetail).where(
-            ProjectTaskDetail.task_id == task_id,
-            ProjectTaskDetail.query_user_id == user_id,
-        )
-        row = one_session.scalars(stmt).first()
-        if row:
-            row.project_id = project_id_val
-            row.work_hour_field_id = field_id
-            row.work_hour = wh
-            row.custom_fields_json = cfs if cfs is not None else None
-            row.raw_json = raw_blob
-            parent_id = str(item.get("parentTaskId") or item.get("parent_id") or "") or None
-            row.parent_task_id = parent_id
-            row.parent_id = parent_id
-            row.task_list_id = str(item.get("taskListId") or "") or None
-            row.task_stage_id = str(item.get("taskStageId") or item.get("stageId") or "") or None
-            row.unique_id = unique_id
-            row.task_nature = _extract_task_nature(item)
-            row.need_statistic = casc["need_statistic"]
-            row.workday_costhour = _extract_workday_costhour(item)
-            row.is_overdue = is_overdue
-            row.business_type = business_type
-            row.task_flow_status_id = task_flow_status_id
-            row.project_category_1 = casc["project_category_1"]
-            row.vehicle_type_2 = casc["vehicle_type_2"]
-            row.project_name_3 = casc["project_name_3"]
-            row.fetched_at = now
-        else:
-            one_session.add(
-                ProjectTaskDetail(
-                    project_id=project_id_val,
-                    task_id=task_id,
-                    query_user_id=user_id,
-                    work_hour_field_id=field_id,
-                    work_hour=wh,
-                    custom_fields_json=cfs if cfs is not None else None,
-                    raw_json=raw_blob,
-                    parent_task_id=str(item.get("parentTaskId") or item.get("parent_id") or "") or None,
-                    parent_id=str(item.get("parentTaskId") or item.get("parent_id") or "") or None,
-                    task_list_id=str(item.get("taskListId") or "") or None,
-                    task_stage_id=str(item.get("taskStageId") or item.get("stageId") or "") or None,
-                    unique_id=unique_id,
-                    task_nature=_extract_task_nature(item),
-                    need_statistic=casc["need_statistic"],
-                    workday_costhour=_extract_workday_costhour(item),
-                    requirement_desc=_extract_requirement_desc(item),
-                    task_outputs=_serialize_outputs(_extract_task_outputs(item)),
-                    is_overdue=is_overdue,
-                    business_type=business_type,
-                    task_flow_status_id=task_flow_status_id,
-                    project_category_1=casc["project_category_1"],
-                    vehicle_type_2=casc["vehicle_type_2"],
-                    project_name_3=casc["project_name_3"],
-                    fetched_at=now,
-                )
-            )
-
-    def _upsert_overdue_one(
-        one_session,
-        *,
-        user_id: str,
-        task_id: str,
-        project_id_val: str,
-        item: Dict[str, Any],
-        wh: Optional[float],
-        business_type: Optional[int],
-        task_flow_status_id: Optional[int],
-    ) -> None:
-        """把逾期明细单独落到 overdue 表。"""
-
-        cfs = item.get("customFields") or item.get("customfields")
-        try:
-            raw_blob = json.dumps(item, ensure_ascii=False)
-        except Exception:
-            raw_blob = None
-
-        now = datetime.now(timezone.utc)
-        casc = _extract_cascading_project_fields(item)
-        stmt = select(ProjectTaskOverdueDetail).where(
-            ProjectTaskOverdueDetail.task_id == task_id,
-            ProjectTaskOverdueDetail.query_user_id == user_id,
-            ProjectTaskOverdueDetail.project_id == project_id_val,
-        )
-        row = one_session.scalars(stmt).first()
-        if row:
-            row.work_hour = wh
-            row.business_type = business_type
-            row.task_flow_status_id = task_flow_status_id
-            row.custom_fields_json = cfs if cfs is not None else None
-            row.raw_json = raw_blob
-            row.need_statistic = casc["need_statistic"]
-            row.project_category_1 = casc["project_category_1"]
-            row.vehicle_type_2 = casc["vehicle_type_2"]
-            row.project_name_3 = casc["project_name_3"]
-            row.fetched_at = now
-        else:
-            one_session.add(
-                ProjectTaskOverdueDetail(
-                    project_id=project_id_val,
-                    task_id=task_id,
-                    query_user_id=user_id,
-                    work_hour=wh,
-                    business_type=business_type,
-                    task_flow_status_id=task_flow_status_id,
-                    custom_fields_json=cfs if cfs is not None else None,
-                    raw_json=raw_blob,
-                    need_statistic=casc["need_statistic"],
-                    project_category_1=casc["project_category_1"],
-                    vehicle_type_2=casc["vehicle_type_2"],
-                    project_name_3=casc["project_name_3"],
-                    fetched_at=now,
-                )
-            )
-
     def _worker(task_specs_slice: List[Dict[str, Any]]) -> Dict[str, Any]:
         ok_upserts = 0
         skipped = 0
@@ -2264,10 +2133,8 @@ def normal_incremental_update_service(payload: Dict[str, Any]) -> Dict[str, Any]
     """
     普通更新（按钮专用）：
     1) 增量窗口：last_update_time -> config.end_time（季度末）
-    2) 对增量结果写入 A，并对新增/变更任务写入 B/C
-    3) 存量窗口：config.start_time -> config.end_time
-       对该窗口内 A 的任务全量回填 B（存量刷新）
-    4) 单独对 C 表（当前逾期快照）做状态刷新（根据逾期变化自动增删）
+    2) 对增量结果写入 A，并对变更任务写入 B/C
+       （_sync_one_detail_to_b_and_c 已覆盖：新增/内容变更→B，逾期状态变更→C增删）
     """
     payload = dict(payload or {})
     user_id = str(payload.get("userId") or payload.get("userid") or "").strip()
@@ -2286,7 +2153,7 @@ def normal_incremental_update_service(payload: Dict[str, Any]) -> Dict[str, Any]
         return {"success": False, "error": "missing or invalid config.end_time", "data": {}}
     end_cfg_dt = _normalize_day_end_utc(end_cfg_dt)
 
-    # 2) 存量窗口：config.start_time -> config.end_time
+    # 2) 读取 config.start_time（仅用于 last_update_time 缺省时的兜底）
     start_cfg_raw = _get_config_value("start_time")
     selected_start_dt = _cmp_dt_utc(_parse_iso_dt(str(start_cfg_raw or "")))
     if not selected_start_dt:
@@ -2301,20 +2168,20 @@ def normal_incremental_update_service(payload: Dict[str, Any]) -> Dict[str, Any]
     if last_dt > end_cfg_dt:
         last_dt = end_cfg_dt
 
-    created_threshold = _format_dt_for_tql_utc(last_dt)
-    created_upper = _format_dt_for_tql_utc(end_cfg_dt)
+    updated_threshold = _format_dt_for_tql_utc(last_dt)
+    updated_upper = _format_dt_for_tql_utc(end_cfg_dt)
 
     max_results = int(payload.get("maxResults", 500) or 500)
     max_pages = int(payload.get("maxPages", 200) or 200)
 
-    # 3) 钉钉增量拉列表：created >= last_update_time AND created <= 当前时刻
+    # 3) 钉钉增量拉列表：updated >= last_update_time AND updated <= 当前时刻
     inc_payload = dict(payload)
     inc_payload.update(
         {
             "userId": user_id,
             "projectId": project_id,
-            "query": "(created >= '{t0}') AND (created <= '{t1}')".format(
-                t0=created_threshold, t1=created_upper
+            "query": "(updated >= '{t0}') AND (updated <= '{t1}')".format(
+                t0=updated_threshold, t1=updated_upper
             ),
             "maxResults": max_results,
             "maxPages": max_pages,
@@ -2422,320 +2289,13 @@ def normal_incremental_update_service(payload: Dict[str, Any]) -> Dict[str, Any]
         retry_round=None,
     )
 
-    # 5) 存量刷新：用 payload.start_time -> config.end_time 从 A 表筛选范围任务，3 线程更新 B
-    start_iso = _format_dt_for_tql_utc(selected_start_dt)
-    end_iso = _format_dt_for_tql_utc(end_cfg_dt)
-
-    session = SessionLocal()
-    task_specs: List[Dict[str, Any]] = []
-    b_skipped_by_character = 0
-    try:
-        rows: List[ProjectTask] = (
-            session.query(ProjectTask)
-            .filter(ProjectTask.project_id == project_id)
-            .filter(ProjectTask.scenario_field_config_id == DEFAULT_SCENARIO_FIELD_CONFIG_ID)
-            .order_by(ProjectTask.task_id)
-            .all()
-        )
-        for r in rows:
-            ex = str(r.executor_id or "").strip()
-            tid = str(r.task_id or "").strip()
-            if not ex or not tid:
-                continue
-            if allowed_executor_ids and ex not in allowed_executor_ids:
-                b_skipped_by_character += 1
-                continue
-            due_dt = _cmp_dt_utc(r.due_date)
-            in_range = bool(due_dt and selected_start_dt <= due_dt <= end_cfg_dt)
-            if not in_range:
-                continue
-            task_specs.append({"task_id": tid, "executor_id": ex, "project_id": project_id})
-    finally:
-        session.close()
-
-    thread_count = 3
-    specs_by_worker: List[List[Dict[str, str]]] = [[] for _ in range(thread_count)]
-    for idx, spec in enumerate(task_specs):
-        specs_by_worker[idx % thread_count].append(spec)
-
-    def _b_worker(slice_specs: List[Dict[str, str]]) -> Dict[str, Any]:
-        ok_upserts = 0
-        fail_count = 0
-        failures: List[Dict[str, Any]] = []
-        pending_commit = 0
-        one_session = SessionLocal()
-        try:
-            for spec in slice_specs:
-                q_payload = {
-                    "userId": spec["executor_id"],
-                    "taskId": spec["task_id"],
-                    "projectId": spec["project_id"],
-                    "force_refresh": True,
-                    "access_token": access_token,
-                    "workHourFieldId": field_id,
-                }
-                dres = query_user_tasks_service(q_payload)
-                if not dres.get("success"):
-                    fail_count += 1
-                    failures.append({"taskId": spec["task_id"], "executorId": spec["executor_id"], "error": dres.get("error")})
-                    continue
-                item = _extract_detail_item(dres)
-                if not item:
-                    fail_count += 1
-                    failures.append({"taskId": spec["task_id"], "executorId": spec["executor_id"], "error": "empty detail"})
-                    continue
-                now = datetime.now(timezone.utc)
-                _sync_one_detail_to_b_and_c(
-                    one_session,
-                    executor_id=spec["executor_id"],
-                    task_id=spec["task_id"],
-                    project_id=spec["project_id"],
-                    item=item,
-                    field_id=field_id,
-                    now=now,
-                    business_type_mapping=business_type_mapping,
-                    task_flow_status_mapping=task_flow_status_mapping,
-                    write_b=True,
-                    write_c=False,
-                )
-                pending_commit += 1
-                if pending_commit >= DEFAULT_DB_COMMIT_BATCH_SIZE:
-                    one_session.commit()
-                    pending_commit = 0
-                ok_upserts += 1
-            if pending_commit > 0:
-                one_session.commit()
-        finally:
-            one_session.close()
-        return {"ok_upserts": ok_upserts, "fail_count": fail_count, "failures": failures}
-
-    b_upserts = 0
-    b_fail = 0
-    b_failures: List[Dict[str, Any]] = []
-    with ThreadPoolExecutor(max_workers=thread_count) as pool:
-        futures = [pool.submit(_b_worker, ss) for ss in specs_by_worker if ss]
-        for fut in futures:
-            r = fut.result()
-            b_upserts += int(r.get("ok_upserts", 0) or 0)
-            b_fail += int(r.get("fail_count", 0) or 0)
-            b_failures.extend(r.get("failures") or [])
-    b_fail_initial = b_fail
-    b_retry_attempted = 0
-    b_retry_recovered = 0
-    max_retry_rounds = 5
-    if b_failures:
-        spec_by_key_b: Dict[tuple, Dict[str, str]] = {
-            (str(s.get("task_id") or ""), str(s.get("executor_id") or "")): s for s in task_specs
-        }
-        retry_round_b = 0
-        while b_failures and retry_round_b < max_retry_rounds:
-            retry_round_b += 1
-            retry_specs_b: List[Dict[str, str]] = []
-            seen_retry_b = set()
-            for f in b_failures:
-                key = (str(f.get("taskId") or ""), str(f.get("executorId") or ""))
-                if key in seen_retry_b:
-                    continue
-                seen_retry_b.add(key)
-                sp = spec_by_key_b.get(key)
-                if sp:
-                    retry_specs_b.append(sp)
-            if not retry_specs_b:
-                break
-            b_retry_attempted += len(retry_specs_b)
-            print(
-                "[normal_update][b_retry] round={}/{} attempt={} remain_before={}".format(
-                    retry_round_b,
-                    max_retry_rounds,
-                    len(retry_specs_b),
-                    len(b_failures),
-                )
-            )
-            retry_slices_b: List[List[Dict[str, str]]] = [[] for _ in range(thread_count)]
-            for idx, spec in enumerate(retry_specs_b):
-                retry_slices_b[idx % thread_count].append(spec)
-            retry_failures_b: List[Dict[str, Any]] = []
-            with ThreadPoolExecutor(max_workers=thread_count) as retry_pool:
-                retry_futures = [retry_pool.submit(_b_worker, ss) for ss in retry_slices_b if ss]
-                for fut in retry_futures:
-                    rr = fut.result()
-                    b_upserts += int(rr.get("ok_upserts", 0) or 0)
-                    retry_failures_b.extend(rr.get("failures") or [])
-            b_failures = retry_failures_b
-            print(
-                "[normal_update][b_retry] round={}/{} remain_after={}".format(
-                    retry_round_b,
-                    max_retry_rounds,
-                    len(b_failures),
-                )
-            )
-        b_fail = len(b_failures)
-        b_retry_recovered = max(b_fail_initial - b_fail, 0)
-    _record_sync_failures(
-        sync_type="normal_update",
-        project_id=project_id,
-        phase="b_refresh",
-        failures=b_failures,
-        retry_round=max_retry_rounds if b_failures else None,
-    )
-
-    # 6) 存量 C 复查：从 C 表现有记录出发逐条查询
-    #    - 若已非逾期：写回 B，并从 C 删除
-    #    - 若仍逾期但内容/状态变动：更新 C
-    c_specs: List[Dict[str, str]] = []
-    c_skipped_by_character = 0
-    cscan_sess = SessionLocal()
-    try:
-        c_rows = (
-            cscan_sess.query(ProjectTaskOverdueDetail)
-            .filter(ProjectTaskOverdueDetail.project_id == project_id)
-            .all()
-        )
-        for r in c_rows:
-            task_id = str(getattr(r, "task_id", "") or "").strip()
-            ex_id = str(getattr(r, "query_user_id", "") or "").strip()
-            if task_id and ex_id:
-                if allowed_executor_ids and ex_id not in allowed_executor_ids:
-                    c_skipped_by_character += 1
-                    continue
-                c_specs.append({"task_id": task_id, "executor_id": ex_id, "project_id": project_id})
-    finally:
-        cscan_sess.close()
-
-    def _c_worker(slice_specs: List[Dict[str, str]]) -> Dict[str, Any]:
-        ok_count = 0
-        fail_count = 0
-        failures: List[Dict[str, Any]] = []
-        pending_commit = 0
-        one_session = SessionLocal()
-        try:
-            for spec in slice_specs:
-                q_payload = {
-                    "userId": spec["executor_id"],
-                    "taskId": spec["task_id"],
-                    "projectId": spec["project_id"],
-                    "force_refresh": True,
-                    "access_token": access_token,
-                    "workHourFieldId": field_id,
-                }
-                dres = query_user_tasks_service(q_payload)
-                if not dres.get("success"):
-                    fail_count += 1
-                    failures.append({"taskId": spec["task_id"], "executorId": spec["executor_id"], "error": dres.get("error")})
-                    continue
-                item = _extract_detail_item(dres)
-                if not item:
-                    fail_count += 1
-                    failures.append({"taskId": spec["task_id"], "executorId": spec["executor_id"], "error": "empty detail"})
-                    continue
-                now = datetime.now(timezone.utc)
-                _sync_one_detail_to_b_and_c(
-                    one_session,
-                    executor_id=spec["executor_id"],
-                    task_id=spec["task_id"],
-                    project_id=spec["project_id"],
-                    item=item,
-                    field_id=field_id,
-                    now=now,
-                    business_type_mapping=business_type_mapping,
-                    task_flow_status_mapping=task_flow_status_mapping,
-                    write_b=True,
-                    write_c=True,
-                )
-                pending_commit += 1
-                if pending_commit >= DEFAULT_DB_COMMIT_BATCH_SIZE:
-                    one_session.commit()
-                    pending_commit = 0
-                ok_count += 1
-            if pending_commit > 0:
-                one_session.commit()
-        finally:
-            one_session.close()
-        return {"ok_count": ok_count, "fail_count": fail_count, "failures": failures}
-
-    c_ok = 0
-    c_fail = 0
-    c_failures: List[Dict[str, Any]] = []
-    if c_specs:
-        specs_by_worker_c: List[List[Dict[str, str]]] = [[] for _ in range(thread_count)]
-        for idx, spec in enumerate(c_specs):
-            specs_by_worker_c[idx % thread_count].append(spec)
-        with ThreadPoolExecutor(max_workers=thread_count) as pool:
-            futures = [pool.submit(_c_worker, ss) for ss in specs_by_worker_c if ss]
-            for fut in futures:
-                r = fut.result()
-                c_ok += int(r.get("ok_count", 0) or 0)
-                c_fail += int(r.get("fail_count", 0) or 0)
-                c_failures.extend(r.get("failures") or [])
-    c_fail_initial = c_fail
-    c_retry_attempted = 0
-    c_retry_recovered = 0
-    max_retry_rounds = 5
-    if c_failures:
-        spec_by_key_c: Dict[tuple, Dict[str, str]] = {
-            (str(s.get("task_id") or ""), str(s.get("executor_id") or "")): s for s in c_specs
-        }
-        retry_round_c = 0
-        while c_failures and retry_round_c < max_retry_rounds:
-            retry_round_c += 1
-            retry_specs_c: List[Dict[str, str]] = []
-            seen_retry_c = set()
-            for f in c_failures:
-                key = (str(f.get("taskId") or ""), str(f.get("executorId") or ""))
-                if key in seen_retry_c:
-                    continue
-                seen_retry_c.add(key)
-                sp = spec_by_key_c.get(key)
-                if sp:
-                    retry_specs_c.append(sp)
-            if not retry_specs_c:
-                break
-            c_retry_attempted += len(retry_specs_c)
-            print(
-                "[normal_update][c_retry] round={}/{} attempt={} remain_before={}".format(
-                    retry_round_c,
-                    max_retry_rounds,
-                    len(retry_specs_c),
-                    len(c_failures),
-                )
-            )
-            retry_slices_c: List[List[Dict[str, str]]] = [[] for _ in range(thread_count)]
-            for idx, spec in enumerate(retry_specs_c):
-                retry_slices_c[idx % thread_count].append(spec)
-            retry_failures_c: List[Dict[str, Any]] = []
-            with ThreadPoolExecutor(max_workers=thread_count) as retry_pool:
-                retry_futures = [retry_pool.submit(_c_worker, ss) for ss in retry_slices_c if ss]
-                for fut in retry_futures:
-                    rr = fut.result()
-                    c_ok += int(rr.get("ok_count", 0) or 0)
-                    retry_failures_c.extend(rr.get("failures") or [])
-            c_failures = retry_failures_c
-            print(
-                "[normal_update][c_retry] round={}/{} remain_after={}".format(
-                    retry_round_c,
-                    max_retry_rounds,
-                    len(c_failures),
-                )
-            )
-        c_fail = len(c_failures)
-        c_retry_recovered = max(c_fail_initial - c_fail, 0)
-    _record_sync_failures(
-        sync_type="normal_update",
-        project_id=project_id,
-        phase="c_refresh",
-        failures=c_failures,
-        retry_round=max_retry_rounds if c_failures else None,
-    )
-
-    # 更新 last_update_time 为“北京时间 now”
+    # 更新 last_update_time 为"北京时间 now"
     _upsert_config_value("last_update_time", now_bj.isoformat())
     print(
-        "[normal_update] success projectId={} userId={} inc_count={} b_upserts={} c_checked={}".format(
+        "[normal_update] success projectId={} userId={} inc_count={}".format(
             project_id,
             user_id,
             len(inc_specs),
-            b_upserts,
-            len(c_specs),
         )
     )
 
@@ -2745,41 +2305,16 @@ def normal_incremental_update_service(payload: Dict[str, Any]) -> Dict[str, Any]
             "beijing_now": now_bj.isoformat(),
             "last_update_time_before": str(last_raw or ""),
             "incremental_query": {
-                "created_gte": created_threshold,
-                "created_lte": created_upper,
+                "updated_gte": updated_threshold,
+                "updated_lte": updated_upper,
                 "quarter_end_time": end_cfg_dt.isoformat(),
                 "maxResults": max_results,
                 "maxPages": max_pages,
             },
             "a_sync": a_out.get("data") or {},
             "incremental_bc": {"count": len(inc_specs), "ok": inc_ok, "fail": inc_fail, "failures": inc_failures[:20]},
-            "b_refresh": {
-                "window": {"start": start_iso, "end": end_iso},
-                "task_count_in_a_window": len(task_specs),
-                "skipped_by_character": b_skipped_by_character,
-                "b_upserts": b_upserts,
-                "b_fail": b_fail,
-                "b_fail_initial": b_fail_initial,
-                "b_retry_attempted": b_retry_attempted,
-                "b_retry_recovered": b_retry_recovered,
-                "failures": b_failures[:20],
-                "thread_count": thread_count,
-                "mode": "window-upsert-only",
-            },
-            "c_refresh": {
-                "checked_from_c": len(c_specs),
-                "skipped_by_character": c_skipped_by_character,
-                "ok": c_ok,
-                "fail": c_fail,
-                "fail_initial": c_fail_initial,
-                "retry_attempted": c_retry_attempted,
-                "retry_recovered": c_retry_recovered,
-                "failures": c_failures[:20],
-            },
             "character_filter": {
                 "incremental_skipped_by_character": inc_skipped_by_character,
-                "b_window_skipped_by_character": b_skipped_by_character,
-                "c_refresh_skipped_by_character": c_skipped_by_character,
             },
         },
     }

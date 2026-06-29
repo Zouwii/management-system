@@ -51,6 +51,9 @@ sshpass -p "${REMOTE_PASS}" ssh -o StrictHostKeyChecking=no "${REMOTE_USER}@${RE
   if [ -f tb_tool_bt/backend/.env ]; then
     mv tb_tool_bt/backend/.env .tb_tool_bt_preserve/.env
   fi
+  if [ -d tb_tool_bt/backend/data ]; then
+    mv tb_tool_bt/backend/data .tb_tool_bt_preserve/data
+  fi
   rm -rf tb_tool_bt
 "
 
@@ -62,6 +65,6 @@ rm -f "${LATEST_PACKAGE}"
 
 echo "[deploy] extract and start daemon..."
 sshpass -p "${REMOTE_PASS}" ssh -o StrictHostKeyChecking=no "${REMOTE_USER}@${REMOTE_HOST}" \
-  "bash -lc 'set -e; export PATH=\"\$HOME/.local/bin:\$PATH\"; cd \"${REMOTE_BASE_DIR}\"; tar -vzxf \"${PACKAGE_NAME}\"; rm -f \"${PACKAGE_NAME}\"; if [ -d .tb_tool_bt_preserve/.venv ]; then mv .tb_tool_bt_preserve/.venv \"${REMOTE_PROJECT_DIR}/backend/.venv\"; fi; if [ -f .tb_tool_bt_preserve/.env ]; then mv .tb_tool_bt_preserve/.env \"${REMOTE_PROJECT_DIR}/backend/.env\"; fi; rm -rf .tb_tool_bt_preserve; cd \"${REMOTE_PROJECT_DIR}/backend\"; mkdir -p runtime; echo \"[deploy] remote PATH: \$PATH\"; if [[ -x \"./run_on_pc_daemon\" ]]; then ./run_on_pc_daemon start; elif [[ -x \"./run_on_pc_daemon.sh\" ]]; then bash ./run_on_pc_daemon.sh start; else echo \"run_on_pc_daemon(.sh) 不存在或不可执行\"; exit 1; fi'"
+  "bash -lc 'set -e; export PATH=\"\$HOME/.local/bin:\$PATH\"; cd \"${REMOTE_BASE_DIR}\"; tar -vzxf \"${PACKAGE_NAME}\"; rm -f \"${PACKAGE_NAME}\"; if [ -d .tb_tool_bt_preserve/.venv ]; then mv .tb_tool_bt_preserve/.venv \"${REMOTE_PROJECT_DIR}/backend/.venv\"; fi; if [ -f .tb_tool_bt_preserve/.env ]; then mv .tb_tool_bt_preserve/.env \"${REMOTE_PROJECT_DIR}/backend/.env\"; fi; if [ -d .tb_tool_bt_preserve/data ]; then rm -rf \"${REMOTE_PROJECT_DIR}/backend/data\"; mv .tb_tool_bt_preserve/data \"${REMOTE_PROJECT_DIR}/backend/data\"; fi; rm -rf .tb_tool_bt_preserve; cd \"${REMOTE_PROJECT_DIR}/backend\"; mkdir -p runtime; echo \"[deploy] remote PATH: \$PATH\"; if [[ -x \"./run_on_pc_daemon\" ]]; then ./run_on_pc_daemon start; elif [[ -x \"./run_on_pc_daemon.sh\" ]]; then bash ./run_on_pc_daemon.sh start; else echo \"run_on_pc_daemon(.sh) 不存在或不可执行\"; exit 1; fi'"
 
 echo "[deploy] done."

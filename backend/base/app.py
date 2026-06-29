@@ -174,12 +174,24 @@ def create_app() -> Flask:
                     weekday = now_bj.weekday()  # 0=周一
                     is_first_day = now_bj.day == 1
 
-                    # 每月 1 号：KB 大同步 + TB 全量更新
+                    # 每月 1 号：刷新季度末 + KB 大同步 + TB 全量更新
                     if is_first_day:
-                        print("[auto_sync_loop] === 每月1号：KB大同步 + TB全量更新 ===")
+                        print("[auto_sync_loop] === 每月1号：刷新季度末 + KB大同步 + TB全量更新 ===")
 
-                        # 1) KB 大同步
-                        print("[auto_sync_loop] [1/2] KB大同步...")
+                        # 1) 刷新 end_time 到当前季度末
+                        print("[auto_sync_loop] [1/3] 刷新季度末...")
+                        try:
+                            from base.config.service import update_endtime_service
+                            end_result = update_endtime_service()
+                            if end_result.get("success"):
+                                print(f"[auto_sync_loop] end_time 已更新: {end_result.get('end_time', '?')}")
+                            else:
+                                print("[auto_sync_loop] end_time 更新失败:", end_result.get("error", "unknown"))
+                        except Exception as e:
+                            print("[auto_sync_loop] end_time 更新异常:", repr(e))
+
+                        # 2) KB 大同步
+                        print("[auto_sync_loop] [2/3] KB大同步...")
                         kb_result = sync_all_and_embed(full_sync=True)
                         if kb_result.get("ok"):
                             s = kb_result.get("sync", {})
@@ -188,8 +200,8 @@ def create_app() -> Flask:
                         else:
                             print("[auto_sync_loop] KB大同步 failed:", kb_result.get("error", "unknown"))
 
-                        # 2) TB 全量更新
-                        print("[auto_sync_loop] [2/2] TB全量更新...")
+                        # 3) TB 全量更新
+                        print("[auto_sync_loop] [3/3] TB全量更新...")
                         try:
                             user_id = ""
                             meta = get_config_user_meta() or {}

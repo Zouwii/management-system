@@ -672,6 +672,14 @@ export function realFetchPerformanceHistory(_user, params = {}) {
   }));
 }
 
+export function realFetchTeamPerformance(_user, params = {}) {
+  return httpRequest(appendQuery('/bt/perf/query', {
+    year: params.year,
+    quarter: params.quarter,
+    teamKey: params.teamKey,
+  }));
+}
+
 export function realFetchAIInsightList() {
   return httpRequest('/dashboard/ai-insights');
 }

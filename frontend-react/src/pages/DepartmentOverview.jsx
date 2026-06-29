@@ -57,6 +57,14 @@ function getFinalScore(row) {
   return toNumber(row.finalScore ?? row.finalPerformance, 0);
 }
 
+function getPrevFinalScore(row) {
+  return toNumber(row.prevFinalScore ?? row.finalScore ?? row.finalPerformance, 0);
+}
+
+function getCurrentFinalScore(row) {
+  return toNumber(row.currentFinalScore ?? 0);
+}
+
 function formatHours(value) {
   return toNumber(value).toFixed(1);
 }
@@ -94,7 +102,8 @@ function buildMemberRows(rows) {
     const expectedHours = getExpectedHours(row);
     const scheduledHours = getScheduledHours(row);
     const completedHours = getCompletedHours(row);
-    const finalScore = getFinalScore(row);
+    const prevFinalScore = getPrevFinalScore(row);
+    const currentFinalScore = getCurrentFinalScore(row);
     const allocationGap = scheduledHours - expectedHours;
     const completionGap = completedHours - expectedHours;
 
@@ -105,7 +114,8 @@ function buildMemberRows(rows) {
       expectedHours,
       scheduledHours,
       completedHours,
-      finalScore,
+      prevFinalScore,
+      currentFinalScore,
       allocationGap,
       completionGap,
     };
@@ -232,7 +242,7 @@ export default function DepartmentOverview() {
   return (
     <ManagerLayout>
       <SectionTitle
-        title="部门总览"
+        title="部门有效工时"
         desc="先按时间查看对接组和导航组的工作分配、完成情况，再看成员明细。"
         right={(
           <div className="flex flex-wrap justify-end gap-2 text-sm">
@@ -300,15 +310,15 @@ export default function DepartmentOverview() {
             <div className="mt-5 grid gap-3 sm:grid-cols-3">
               <div className="rounded-xl bg-slate-50 px-4 py-3">
                 <div className="text-xs text-slate-500">应分配</div>
-                <div className="mt-1 text-xl font-semibold text-slate-900">{formatHours(team.expectedHours)}h</div>
+                <div className="mt-1 text-xl font-semibold text-slate-900">{formatHours(team.expectedHours)}</div>
               </div>
               <div className="rounded-xl bg-slate-50 px-4 py-3">
                 <div className="text-xs text-slate-500">已分配</div>
-                <div className="mt-1 text-xl font-semibold text-slate-900">{formatHours(team.scheduledHours)}h</div>
+                <div className="mt-1 text-xl font-semibold text-slate-900">{formatHours(team.scheduledHours)}</div>
               </div>
               <div className="rounded-xl bg-slate-50 px-4 py-3">
                 <div className="text-xs text-slate-500">已完成</div>
-                <div className="mt-1 text-xl font-semibold text-slate-900">{formatHours(team.completedHours)}h</div>
+                <div className="mt-1 text-xl font-semibold text-slate-900">{formatHours(team.completedHours)}</div>
               </div>
             </div>
 
@@ -316,13 +326,13 @@ export default function DepartmentOverview() {
               <div className="rounded-xl border border-slate-200 px-4 py-3">
                 <div className="text-xs text-slate-500">任务分配差额</div>
                 <div className={`mt-1 text-xl font-semibold ${getGapClass(team.allocationGap)}`}>
-                  {team.allocationGap > 0 ? '+' : ''}{formatHours(team.allocationGap)}h
+                  {team.allocationGap > 0 ? '+' : ''}{formatHours(team.allocationGap)}
                 </div>
               </div>
               <div className="rounded-xl border border-slate-200 px-4 py-3">
                 <div className="text-xs text-slate-500">任务完成差额</div>
                 <div className={`mt-1 text-xl font-semibold ${getGapClass(team.completionGap)}`}>
-                  {team.completionGap > 0 ? '+' : ''}{formatHours(team.completionGap)}h
+                  {team.completionGap > 0 ? '+' : ''}{formatHours(team.completionGap)}
                 </div>
               </div>
             </div>
@@ -359,7 +369,7 @@ export default function DepartmentOverview() {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <div className="text-sm text-slate-500">
-              已排期 {formatHours(summary.totalScheduledHours)}h
+              已排期 {formatHours(summary.totalScheduledHours)}
             </div>
             <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 p-1">
               {SORT_OPTIONS.map((option) => (
@@ -408,15 +418,16 @@ export default function DepartmentOverview() {
                 <div className="text-sm text-slate-500">{teamRows.length} 人</div>
               </div>
               <div className="overflow-x-auto">
-                <table className={`${showPerformance ? 'min-w-[900px] max-w-[1020px]' : 'min-w-[800px] max-w-[920px]'} table-fixed text-left text-sm`}>
+                <table className={`${showPerformance ? 'min-w-[1050px] max-w-[1200px]' : 'min-w-[800px] max-w-[920px]'} table-fixed text-left text-sm`}>
                   <colgroup>
-                    <col className="w-[16%]" />
-                    <col className="w-[20%]" />
-                    <col className="w-[14%]" />
                     <col className="w-[14%]" />
                     <col className="w-[16%]" />
-                    <col className="w-[16%]" />
-                    {showPerformance && <col className="w-[12%]" />}
+                    <col className="w-[12%]" />
+                    <col className="w-[12%]" />
+                    <col className="w-[14%]" />
+                    <col className="w-[14%]" />
+                    {showPerformance && <col className="w-[9%]" />}
+                    {showPerformance && <col className="w-[9%]" />}
                   </colgroup>
                   <thead className="text-xs font-semibold uppercase text-slate-500">
                     <tr className="border-b border-slate-100">
@@ -430,7 +441,8 @@ export default function DepartmentOverview() {
                       <th className={`${showPerformance ? 'px-4' : 'pl-4 pr-10'} py-3 text-right`}>
                         完成差额{sortConfig.key === 'completionGap' ? (sortConfig.direction === 'asc' ? ' ↑' : ' ↓') : ''}
                       </th>
-                      {showPerformance && <th className="pl-4 pr-10 py-3 text-right">绩效</th>}
+                      {showPerformance && <th className="px-3 py-3 text-right">上季绩效</th>}
+                      {showPerformance && <th className="pl-3 pr-10 py-3 text-right">本季绩效</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -438,16 +450,19 @@ export default function DepartmentOverview() {
                       <tr key={`${row.team}-${row.name}`} className="border-b border-slate-100 last:border-b-0">
                         <td className="truncate pl-6 pr-4 py-3 font-semibold text-slate-900">{row.name}</td>
                         <td className="truncate px-4 py-3 text-slate-600">{row.role}</td>
-                        <td className="px-4 py-3 text-right tabular-nums text-slate-700">{formatHours(row.scheduledHours)}h</td>
-                        <td className="px-4 py-3 text-right tabular-nums text-slate-700">{formatHours(row.completedHours)}h</td>
+                        <td className="px-4 py-3 text-right tabular-nums text-slate-700">{formatHours(row.scheduledHours)}</td>
+                        <td className="px-4 py-3 text-right tabular-nums text-slate-700">{formatHours(row.completedHours)}</td>
                         <td className={`px-4 py-3 text-right font-semibold tabular-nums ${getGapClass(row.allocationGap)}`}>
-                          {row.allocationGap > 0 ? '+' : ''}{formatHours(row.allocationGap)}h
+                          {row.allocationGap > 0 ? '+' : ''}{formatHours(row.allocationGap)}
                         </td>
                         <td className={`${showPerformance ? 'px-4' : 'pl-4 pr-10'} py-3 text-right font-semibold tabular-nums ${getGapClass(row.completionGap)}`}>
-                          {row.completionGap > 0 ? '+' : ''}{formatHours(row.completionGap)}h
+                          {row.completionGap > 0 ? '+' : ''}{formatHours(row.completionGap)}
                         </td>
                         {showPerformance && (
-                          <td className="pl-4 pr-10 py-3 text-right font-semibold tabular-nums text-slate-900">{formatScore(row.finalScore)}</td>
+                          <>
+                            <td className="px-3 py-3 text-right font-semibold tabular-nums text-slate-700">{formatScore(row.prevFinalScore)}</td>
+                            <td className="pl-3 pr-10 py-3 text-right font-semibold tabular-nums text-slate-900">{formatScore(row.currentFinalScore)}</td>
+                          </>
                         )}
                       </tr>
                     ))}
