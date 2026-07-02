@@ -1,0 +1,37 @@
+{
+  "experiment_date": "2026-06-29",
+  "test_queries": 26,
+  "K": 5,
+  "overall": {
+    "A": {"recall": 0.341, "mrr": 0.559, "ndcg": 0.3847},
+    "B": {"recall": 0.633, "mrr": 0.7641, "ndcg": 0.698}
+  },
+  "per_query": [
+    {"id": 1,  "query": "导航控制器的参数有哪些如何梳理", "type": "技术文档", "difficulty": "easy", "A_recall": 0.00, "B_recall": 0.67, "delta": "▲"},
+    {"id": 2,  "query": "机器人原地旋转的精度指标是多少", "type": "技术文档", "difficulty": "medium", "A_recall": 1.00, "B_recall": 1.00, "delta": "—"},
+    {"id": 3,  "query": "nav-manager的设计思路和整体架构是怎样的", "type": "技术文档", "difficulty": "hard", "A_recall": 0.40, "B_recall": 1.00, "delta": "▲"},
+    {"id": 4,  "query": "本体和调度之间的接口协议是什么", "type": "技术文档", "difficulty": "easy", "A_recall": 0.07, "B_recall": 0.21, "delta": "▲"},
+    {"id": 5,  "query": "伺服驱动器测试工具的功能设计有哪些", "type": "技术文档", "difficulty": "medium", "A_recall": 0.40, "B_recall": 0.60, "delta": "▲"},
+    {"id": 6,  "query": "盲走精度测试包含哪些测试项，验收标准是什么", "type": "技术文档", "difficulty": "medium", "A_recall": 0.00, "B_recall": 1.00, "delta": "▲"},
+    {"id": 7,  "query": "转盘功能详细设计包含哪些模块和接口", "type": "技术文档", "difficulty": "hard", "A_recall": 0.19, "B_recall": 0.31, "delta": "▲"},
+    {"id": 8,  "query": "嵌入式驱动器的性能指标设计有哪些", "type": "技术文档", "difficulty": "medium", "A_recall": 0.22, "B_recall": 0.33, "delta": "▲"},
+    {"id": 9,  "query": "本体开发部的有效工时是怎么定义的", "type": "会议纪要", "difficulty": "easy", "A_recall": 0.33, "B_recall": 1.00, "delta": "▲"},
+    {"id": 10, "query": "Q1导航组复盘了哪些主要问题", "type": "会议纪要", "difficulty": "medium", "A_recall": 0.50, "B_recall": 1.00, "delta": "▲"},
+    {"id": 11, "query": "OKR复盘会议上导航组和对接组分别讨论了什么", "type": "会议纪要", "difficulty": "medium", "A_recall": 1.00, "B_recall": 1.00, "delta": "—"},
+    {"id": 12, "query": "Roadmap总结会上到点自学习和Carly3的进展状态是什么", "type": "会议纪要", "difficulty": "hard", "A_recall": 0.00, "B_recall": 1.00, "delta": "▲"},
+    {"id": 13, "query": "主管评分的参考标准是什么", "type": "会议纪要", "difficulty": "easy", "A_recall": 1.00, "B_recall": 1.00, "delta": "—"},
+    {"id": 14, "query": "对接组Q4复盘了哪些问题", "type": "会议纪要", "difficulty": "medium", "A_recall": 0.33, "B_recall": 1.00, "delta": "▲"},
+    {"id": 15, "query": "导航组2026年Roadmap中Q1有哪些P0优先级的专项", "type": "表格", "difficulty": "easy", "A_recall": 1.00, "B_recall": 1.00, "delta": "—"},
+    {"id": 16, "query": "导航组的版本更新日志中有哪些改动记录", "type": "表格", "difficulty": "medium", "A_recall": 0.56, "B_recall": 0.56, "delta": "—"},
+    {"id": 17, "query": "伺服报错有哪些类型和对应的处理方式", "type": "表格", "difficulty": "hard", "A_recall": 0.14, "B_recall": 0.43, "delta": "▲"},
+    {"id": 18, "query": "导航组2025年的Roadmap包含哪些目标", "type": "表格", "difficulty": "easy", "A_recall": 0.14, "B_recall": 0.57, "delta": "▲"},
+    {"id": 19, "query": "小车性能测试的方法和指标有哪些", "type": "跨文档", "difficulty": "medium", "A_recall": 0.13, "B_recall": 0.33, "delta": "▲"},
+    {"id": 20, "query": "移动机器人导航栈的性能瓶颈在哪里，如何系统性地分析和优化", "type": "跨文档", "difficulty": "hard", "A_recall": 0.33, "B_recall": 0.17, "delta": "▼"},
+    {"id": 21, "query": "二维码导航的功能包括哪些有什么版本迭代", "type": "跨文档", "difficulty": "medium", "A_recall": 0.00, "B_recall": 0.50, "delta": "▲"},
+    {"id": 22, "query": "导航模块的CPU占用情况如何有哪些优化措施", "type": "跨文档", "difficulty": "hard", "A_recall": 0.33, "B_recall": 0.50, "delta": "▲"},
+    {"id": 23, "query": "行为树在移动机器人中有哪些应用实例", "type": "跨文档", "difficulty": "medium", "A_recall": 0.29, "B_recall": 0.29, "delta": "—"},
+    {"id": 24, "query": "自学习计算方法替换实验中对比了哪些方案，实验结果如何", "type": "技术文档", "difficulty": "hard", "A_recall": 0.00, "B_recall": 0.00, "delta": "—"},
+    {"id": 25, "query": "2025年CodeReview总结中有哪些改进措施", "type": "会议纪要", "difficulty": "hard", "A_recall": 0.50, "B_recall": 1.00, "delta": "▲"},
+    {"id": 26, "query": "自学习的精度优化方法有哪些实施步骤", "type": "技术文档", "difficulty": "medium", "A_recall": 0.00, "B_recall": 0.00, "delta": "—"}
+  ]
+}

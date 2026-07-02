@@ -3,7 +3,7 @@
 Endpoints:
   GET  /update_lock_status          - Check if an update lock is held
   POST /time_range_update           - Sync A+B tables for a time range
-  POST /full_update                 - Full update: A + threaded B/C
+  POST /incremental_update          - TB小更新：DEV增量
   POST /db/sync/project-tasks       - Sync A table (project task list)
   POST /db/sync/task-detail         - Sync a single B table record
   POST /db/sync/task-details-batch  - Batch sync B table records
@@ -20,11 +20,11 @@ from base.sync.lock import (
     DEFAULT_UPDATE_LOCK_KEY,
 )
 from base.sync.task_sync import (
-    full_update_service,
     sync_project_details_in_time_range_service,
     sync_project_tasks_to_db,
     sync_task_detail_to_db,
     sync_task_details_batch_to_db,
+    tb_incremental_update_service,
 )
 from base.config.service import is_sync_enabled, is_full_sync_enabled
 
@@ -62,28 +62,20 @@ def register(bp, ok, fail):
         except Exception as e:
             return fail(str(e), code=500, data={})
 
-    @bp.route("/full_update", methods=["POST"])
-    def full_update():
-        """Full update: update_endtime → compute range (last year) → sync A → threaded B/C.
+    @bp.route("/incremental_update", methods=["POST"])
+    def incremental_update():
+        """TB小更新：DEV增量（基于 last_update_time 拉变更任务）。
 
-        Request body: userId, projectId. Optional: maxResults, maxPages, workHourFieldId, force_refresh.
+        Request body: userId, projectId.
         """
         if not is_full_sync_enabled():
             return fail("sync is temporarily disabled (offline mode)", code=503, data={})
         try:
             payload = request.get_json(silent=True) or {}
-            user_id = str(payload.get("userId") or payload.get("userid") or "").strip()
-            owner = "{}@{}".format(user_id or "unknown", int(time.time()))
-            lock = _acquire_update_lock(DEFAULT_UPDATE_LOCK_KEY, owner)
-            if not lock.get("ok"):
-                return fail(lock.get("error", "update is in progress"), code=409, data=lock.get("lock") or {})
-            try:
-                out = full_update_service(payload)
-                if out.get("success"):
-                    return ok(out.get("data") or {})
-                return fail(out.get("error", "full_update failed"), code=400, data=out.get("data") or {})
-            finally:
-                _release_update_lock(DEFAULT_UPDATE_LOCK_KEY, owner)
+            out = tb_incremental_update_service(payload)
+            if out.get("success"):
+                return ok(out.get("data") or {})
+            return fail(out.get("error", "incremental_update failed"), code=400, data=out.get("data") or {})
         except Exception as e:
             return fail(str(e), code=500, data={})
 

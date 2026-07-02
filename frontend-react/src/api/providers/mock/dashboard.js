@@ -438,7 +438,6 @@ export function mockUpdatePersonalHours(user, payload) {
   const endDate = payload?.endDate || '';
   const target = payload?.target || user?.name || ALL_TARGET;
   const targetLabel = target === ALL_TARGET ? '全部人员' : target;
-  const isFullSync = Boolean(payload?.fullSync);
 
   return Promise.resolve()
     .then(async () => {
@@ -452,31 +451,12 @@ export function mockUpdatePersonalHours(user, payload) {
         });
       }
 
-      if (isFullSync) {
-        const projectId = await fetchProjectId();
-        const userids = await fetchUserids();
-        const executorIds = resolveExecutorIdsByTarget(user, target, userids);
-
-        for (const executorId of executorIds) {
-          await httpRequest('/bt/query_project_tasks', {
-            method: 'POST',
-            body: JSON.stringify({
-              userId: executorId,
-              projectId,
-              sync_ab_by_config_time_range: true,
-              start_time: toUtcISOString(startDate),
-              end_time: toUtcISOString(endDate),
-            }),
-          });
-        }
-      }
-
       await httpRequest('/bt/config/touch_last_update_time', { method: 'POST' });
       const tr = await fetchTimeRange();
       return {
         success: true,
         selectedTarget: target,
-        message: isFullSync ? `已触发${targetLabel}的全量更新。` : `已触发${targetLabel}的工时更新。`,
+        message: `已触发${targetLabel}的工时更新。`,
         lastUpdatedAt: tr.lastUpdateTime || '',
       };
     })

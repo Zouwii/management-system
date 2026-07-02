@@ -189,32 +189,69 @@ Response 200:
 }
 ```
 
-### 4.4 手动同步
+### 4.4 同步系统
+
+#### 4.4.1 四个主体函数
+
+| 函数 | 文件 | 行为 |
+|------|------|------|
+| `kb_incremental_sync()` | `auto_sync.py` | KB小更新：仅拉取未缓存的新文档 |
+| `kb_full_sync()` | `auto_sync.py` | KB大更新：对比 `modified_at`，重拉新文档 + 已变更文档 |
+| `tb_incremental_update_service(payload)` | `task_sync.py` | TB小更新：DEV增量（`updated >= last_update_time`） |
+| `tb_full_update_service(payload)` | `task_sync.py` | TB大更新：DEV增量 + Issue增量，统一管理 `last_update_time` |
+
+#### 4.4.2 KB 同步流程（`sync_all_and_embed`）
+
+无论是 `kb_incremental_sync` 还是 `kb_full_sync`，底层都走 `sync_all_and_embed`，差异仅在于 `check_modified` 参数：
 
 ```
-POST /api/bt/ai/knowledge/sync
-Body: { "workspace_id": "xxx", "full_sync": true }
+Phase 1: sync → 从钉钉知识库拉取文档（check_modified=False 跳过已缓存，=True 对比 modified_at）
+Phase 2: rechunk → 对变更文档重新切片
+Phase 3: embed → 对未 embedding 的切片做向量化
+```
 
-流程:
-  1. 遍历知识库节点树（广度优先）
-  2. 对每个 document 类型节点，下载正文 → 解析 → 写入 DB
-  3. folder 类型节点继续递归
-  4. 记录同步日志
+#### 4.4.3 TB 增量写入逻辑（`_sync_one_detail_to_b_and_c`）
 
-Response 200:
-{
-  "code": 200, "error": "",
-  "data": {
-    "workspaceId": "xxx",
-    "syncedCount": 35,
-    "failedCount": 2,
-    "errors": [
-      { "nodeId": "aaa", "title": "旧版文档", "error": "API 返回 404" }
-    ],
-    "startedAt": "...",
-    "finishedAt": "..."
-  }
-}
+对每个变更任务，5 种 case：
+
+```
+纯新增        → INSERT B 表
+B 表内容更新   → UPDATE B 表
+逾期被移除     → DELETE C + UPSERT B
+新增逾期       → INSERT C（不写 B）
+非逾期→逾期    → DELETE B + INSERT C
+```
+
+#### 4.4.4 定时调度（APScheduler）
+
+| 触发时间 | Job | 执行内容 |
+|----------|-----|---------|
+| 每周一 04:00 | `weekly_sync` | TB小更新（DEV增量）+ KB小更新（新文档）<br>如当天是 1 号则跳过，由月度负责 |
+| 每月 1 号 04:00 | `monthly_sync` | 1) 刷新季度末 `end_time`<br>2) KB大更新（变更文档）<br>3) TB大更新（DEV + Issue 增量） |
+
+#### 4.4.5 API 用量管控（`ApiCallMonitor`）
+
+| 阈值 | `knowledge_sync_enabled` | 效果 |
+|------|--------------------------|------|
+| 超过硬限（1号 15000，其他 5000） | `'false'` | `is_sync_enabled() = False`，全部同步停 |
+| 超过软限（硬限 × 0.8） | `'partial'` | `is_full_sync_enabled() = False`，定时任务停，手动查询正常 |
+
+定时任务执行前会调用 `_ensure_state()` 刷新当日实际用量，防止跨天 stale state 导致误判。
+
+#### 4.4.6 HTTP 端点
+
+```
+POST /api/bt/ai/knowledge/sync-and-embedding
+  Body: { "check_modified": true }  → KB大更新
+  Body: { "check_modified": false } → KB小更新
+
+POST /api/bt/incremental_update
+  Body: { "userId": "...", "projectId": "..." }
+  → TB小更新（DEV增量，带分布式锁）
+
+POST /api/bt/query_project_tasks
+  Body: { ..., "sync_ab_by_config_time_range": true }
+  → 前端"同步"按钮触发 TB小更新
 ```
 
 ---
@@ -440,4 +477,5 @@ class DingTalkKnowledgeClient:
 - [ ] `GET /ai/knowledge/workspaces/<id>/nodes` 返回文档目录树
 - [ ] `GET /ai/knowledge/documents/<node_id>` 返回 Markdown 正文
 - [ ] 检查 `backend/data/tb_tool_bt.db` 中 `kb_documents` 表有数据
-- [ ] `POST /ai/knowledge/sync` 手动触发同步，返回同步统计
+- [ ] `POST /ai/knowledge/sync-and-embedding` 手动触发 KB 同步（`check_modified: true` 大更新，`false` 小更新）
+- [ ] `POST /bt/incremental_update` 手动触发 TB 增量同步（DEV 小更新）

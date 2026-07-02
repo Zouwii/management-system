@@ -19,7 +19,9 @@
     "type": "技术文档",
     "difficulty": "medium",
     "query": "机器人原地旋转的精度指标是多少",
-    "relevant_chunk_ids": [],
+    "relevant_chunk_ids": [
+      218
+    ],
     "source_docs": [
       "盲走精度测试.adoc"
     ],
@@ -74,7 +76,13 @@
     "type": "技术文档",
     "difficulty": "medium",
     "query": "伺服驱动器测试工具的功能设计有哪些",
-    "relevant_chunk_ids": [],
+    "relevant_chunk_ids": [
+      678,
+      688,
+      740,
+      741,
+      1470
+    ],
     "source_docs": [
       "驱动器测试工具功能设计说明书.adoc"
     ],
@@ -84,19 +92,39 @@
     "id": 6,
     "type": "技术文档",
     "difficulty": "medium",
-    "query": "机器人运动控制中车辆状态的x y yaw kappa分别代表什么",
-    "relevant_chunk_ids": [],
-    "source_docs": [
-      "线路轨迹数据结构接口文档.adoc"
+    "query": "盲走精度测试包含哪些测试项，验收标准是什么",
+    "relevant_chunk_ids": [
+      218,
+      7926
     ],
-    "note": "线路轨迹数据结构接口文档.adoc 中有精确定义"
+    "source_docs": [
+      "盲走精度测试.adoc"
+    ],
+    "note": "盲走精度测试.adoc 中有测试项和验收标准的完整说明"
   },
   {
     "id": 7,
     "type": "技术文档",
     "difficulty": "hard",
     "query": "转盘功能详细设计包含哪些模块和接口",
-    "relevant_chunk_ids": [],
+    "relevant_chunk_ids": [
+      999,
+      1000,
+      1001,
+      1002,
+      1004,
+      1005,
+      1008,
+      1009,
+      1033,
+      1034,
+      1035,
+      1038,
+      1039,
+      1042,
+      1043,
+      1047
+    ],
     "source_docs": [
       "转盘功能详细设计.adoc",
       "1.转盘功能设计说明书.adoc"
@@ -185,7 +213,9 @@
     "type": "会议纪要",
     "difficulty": "easy",
     "query": "主管评分的参考标准是什么",
-    "relevant_chunk_ids": [],
+    "relevant_chunk_ids": [
+      75
+    ],
     "source_docs": [
       "0. 本体开发部制度规范.adoc"
     ],
@@ -312,14 +342,21 @@
     "id": 20,
     "type": "跨文档",
     "difficulty": "hard",
-    "query": "AGV的导航精度和到点自学习有什么关系如何优化",
-    "relevant_chunk_ids": [],
+    "query": "移动机器人导航栈的性能瓶颈在哪里，如何系统性地分析和优化",
+    "relevant_chunk_ids": [
+      262,
+      266,
+      350,
+      745,
+      2823,
+      3024
+    ],
     "source_docs": [
-      "盲走精度测试.adoc",
-      "到点自学习实施效率优化.adoc",
+      "nav-net CPU占用分析.adoc",
+      "nav-base空闲状态cpu占用分析.adoc",
       "2026年Q1导航组问题复盘.adoc"
     ],
-    "note": "跨文档：精度测试 + 到点自学习 + 复盘中的经验"
+    "note": "跨文档：nav-net + nav-base CPU分析 + Q1复盘中的优化经验"
   },
   {
     "id": 21,
@@ -345,7 +382,14 @@
     "type": "跨文档",
     "difficulty": "hard",
     "query": "导航模块的CPU占用情况如何有哪些优化措施",
-    "relevant_chunk_ids": [],
+    "relevant_chunk_ids": [
+      899,
+      905,
+      2100,
+      2101,
+      2657,
+      2661
+    ],
     "source_docs": [
       "nav-net CPU占用分析.adoc",
       "nav-base空闲状态cpu占用分析.adoc",
@@ -377,13 +421,14 @@
     "id": 24,
     "type": "技术文档",
     "difficulty": "hard",
-    "query": "servo-net的设计架构和对外接口协议是什么",
-    "relevant_chunk_ids": [],
-    "source_docs": [
-      "servo-net设计文档.adoc",
-      "servo-net对外接口协议.adoc"
+    "query": "自学习计算方法替换实验中对比了哪些方案，实验结果如何",
+    "relevant_chunk_ids": [
+      1224
     ],
-    "note": "servo-net的设计+接口两部分"
+    "source_docs": [
+      "【5】自学习计算方法替换实验.adoc"
+    ],
+    "note": "自学习计算方法替换实验的对比方案和实验结论"
   },
   {
     "id": 25,

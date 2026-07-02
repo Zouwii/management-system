@@ -60,7 +60,7 @@ def _resolve_union_id() -> str:
 
 
 def _sync_all_workspaces(client: DingTalkKnowledgeClient,
-                        full_sync: bool = False) -> dict:
+                        check_modified: bool = False) -> dict:
     """Sync all known workspaces. Returns aggregated results with changedIds."""
     known = get_known_workspaces()
 
@@ -97,7 +97,7 @@ def _sync_all_workspaces(client: DingTalkKnowledgeClient,
             continue
 
         ws_started = time.time()
-        r = _sync_workspace(client, ws_id, root_id, full_sync=full_sync)
+        r = _sync_workspace(client, ws_id, root_id, check_modified=check_modified)
         ws_elapsed = round(time.time() - ws_started, 1)
         ws_changed = r.get("syncedIds", [])
         all_changed_ids.extend(ws_changed)
@@ -198,11 +198,11 @@ def _rechunk_documents(doc_ids: List[str]) -> dict:
         db.close()
 
 
-def sync_all_and_embed(union_id: str = "", full_sync: bool = False) -> dict:
+def sync_all_and_embed(union_id: str = "", check_modified: bool = False) -> dict:
     """Run the full pipeline: sync all KBs -> rechunk -> embed.
 
-    full_sync=False (小同步): 增量拉取 + rechunk 变更 + embed 增量
-    full_sync=True  (大同步): 对比修改时间重拉 + 全量 rechunk + embed
+    check_modified=False: KB增量（仅拉取未缓存的新文档）
+    check_modified=True:  KB变更（对比 modified_at，重拉已变更文档）
     """
     from base.config.service import is_full_sync_enabled
 
@@ -247,7 +247,7 @@ def sync_all_and_embed(union_id: str = "", full_sync: bool = False) -> dict:
     })
     client = DingTalkKnowledgeClient(union_id)
     phase1_start = time.time()
-    sync_result = _sync_all_workspaces(client, full_sync=full_sync)
+    sync_result = _sync_all_workspaces(client, check_modified=check_modified)
     overall["sync"] = sync_result
     phase1_elapsed = round(time.time() - phase1_start, 1)
     if not sync_result.get("ok"):
@@ -346,3 +346,19 @@ def sync_all_and_embed(union_id: str = "", full_sync: bool = False) -> dict:
     })
 
     return overall
+
+
+# ---------------------------------------------------------------------------
+# 便捷入口：四个主体函数
+#   kb_incremental_sync  — KB小更新：仅拉取新文档
+#   kb_full_sync         — KB大更新：对比 modified_at，重拉已变更文档
+# ---------------------------------------------------------------------------
+
+def kb_incremental_sync() -> dict:
+    """KB小更新：仅拉取未缓存的新文档（check_modified=False）。"""
+    return sync_all_and_embed(check_modified=False)
+
+
+def kb_full_sync() -> dict:
+    """KB大更新：对比 modified_at，重拉新文档及已变更文档（check_modified=True）。"""
+    return sync_all_and_embed(check_modified=True)

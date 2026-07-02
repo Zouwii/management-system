@@ -33,13 +33,14 @@
 | chunk 截断长度 | 800 字符 |
 | LLM 模型 | deepseek-v4-pro (via one-api) |
 | temperature | 0.0 |
-| 测试题数量 | 26 条 |
-| 测试题类型 | 技术文档 (9)、会议纪要 (6)、表格 (4)、跨文档 (6)、新增自学习 (1) |
+| 测试题数量 | 26 条（135 个标注 chunk，0 空题） |
+| 测试题类型 | 技术文档(10) / 会议纪要(7) / 表格(4) / 跨文档(5) |
+| 难度分布 | easy(6) / medium(12) / hard(8) |
 
 ### 脚本
 
-- `llm_label.py` — 执行标注，每次写入不丢数据
-- 运行：`python -m ai.knowledge.rag_improve.llm_label`
+- `step01_build_testset.py` — 执行标注
+- 运行：`python -m ai.knowledge.rag_improve.step01_build_testset`
 
 ### 人工复核
 

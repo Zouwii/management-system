@@ -132,143 +132,160 @@ def create_app() -> Flask:
         t.start()
 
 
-    # 后台：北京时间 04:00 自动触发知识库同步 & TB 全量更新。
-    # 每周一小同步（KB增量拉取），每月 1 号大同步（KB全量 + TB全量更新）。
-    # API 用量由 ApiCallMonitor 自动管控：
-    #   80% 软限 → knowledge_sync_enabled='partial' → is_full_sync_enabled() 为 false，阻止重量级同步
-    #   100% 硬限 → knowledge_sync_enabled='false' → is_sync_enabled() 为 false，阻止所有同步
-    global _AUTO_KNOWLEDGE_SYNC_THREAD_STARTED
-    if not globals().get("_AUTO_KNOWLEDGE_SYNC_THREAD_STARTED"):
-        _AUTO_KNOWLEDGE_SYNC_THREAD_STARTED = True
+    # 后台：APScheduler 定时触发同步任务。
+    #   每周一 04:00 → TB小更新 + KB小更新
+    #   每月 1 号 04:00 → 刷新季度末 + KB大更新 + TB大更新
+    #   API 用量由 ApiCallMonitor 自动管控：
+    #     80% 软限 → knowledge_sync_enabled='partial' → is_full_sync_enabled() 为 false
+    #     100% 硬限 → knowledge_sync_enabled='false' → is_sync_enabled() 为 false
+    from zoneinfo import ZoneInfo
+    from apscheduler.schedulers.background import BackgroundScheduler
 
-        def _auto_knowledge_sync_loop():
-            from ai.knowledge.auto_sync import sync_all_and_embed
-            from base.dingtalk_client import get_config_projectids, get_config_user_meta, get_config_userids
-            from base.sync.task_sync import (
-                DEFAULT_UPDATE_LOCK_KEY,
-                _acquire_update_lock,
-                _release_update_lock,
-                full_update_service,
-            )
+    _sync_scheduler = BackgroundScheduler(timezone=ZoneInfo("Asia/Shanghai"))
 
-            from base.api_monitor import BJ_TZ
-            last_trigger_date = ""
+    def _resolve_sync_user_project() -> tuple:
+        """从 config 表解析 userId 和 projectId，供定时同步使用。"""
+        from base.dingtalk_client import get_config_projectids, get_config_user_meta, get_config_userids
 
-            while True:
+        user_id = ""
+        meta = get_config_user_meta() or {}
+        if isinstance(meta, dict):
+            for _name, one in meta.items():
+                if not isinstance(one, dict):
+                    continue
                 try:
-                    now_bj = datetime.now(BJ_TZ)
-                    today = now_bj.strftime("%Y-%m-%d")
+                    ch = int(one.get("character", 1))
+                except Exception:
+                    ch = 1
+                if ch == 0:
+                    user_id = str(one.get("userId") or "").strip()
+                    if user_id:
+                        break
+        if not user_id:
+            userids = get_config_userids() or {}
+            if isinstance(userids, dict) and userids:
+                user_id = str(next(iter(userids.values())) or "").strip()
 
-                    if now_bj.hour != 4 or now_bj.minute != 0 or last_trigger_date == today:
-                        _time.sleep(30)
-                        continue
+        projectids = get_config_projectids() or {}
+        project_id = ""
+        if isinstance(projectids, dict) and projectids:
+            project_id = str(next(iter(projectids.values())) or "").strip()
 
-                    # sync 开关（ApiCallMonitor 自动管控：true > partial > false）
-                    from base.config.service import is_full_sync_enabled
-                    if not is_full_sync_enabled():
-                        print("[auto_sync_loop] SKIP — full sync disabled (软限或硬限)")
-                        last_trigger_date = today
-                        _time.sleep(30)
-                        continue
+        return user_id, project_id
 
-                    weekday = now_bj.weekday()  # 0=周一
-                    is_first_day = now_bj.day == 1
+    def _do_monthly_sync():
+        """每月 1 号 04:00：刷新季度末 + KB大更新 + TB大更新。"""
+        print("[auto_sync] === 每月1号：刷新季度末 + KB大更新 + TB大更新 ===")
 
-                    # 每月 1 号：刷新季度末 + KB 大同步 + TB 全量更新
-                    if is_first_day:
-                        print("[auto_sync_loop] === 每月1号：刷新季度末 + KB大同步 + TB全量更新 ===")
+        from base.api_monitor import monitor as _api_monitor
+        _api_monitor._ensure_state()
+        from base.config.service import is_full_sync_enabled
+        if not is_full_sync_enabled():
+            print("[auto_sync] SKIP — full sync disabled (软限或硬限)")
+            return
 
-                        # 1) 刷新 end_time 到当前季度末
-                        print("[auto_sync_loop] [1/3] 刷新季度末...")
-                        try:
-                            from base.config.service import update_endtime_service
-                            end_result = update_endtime_service()
-                            if end_result.get("success"):
-                                print(f"[auto_sync_loop] end_time 已更新: {end_result.get('end_time', '?')}")
-                            else:
-                                print("[auto_sync_loop] end_time 更新失败:", end_result.get("error", "unknown"))
-                        except Exception as e:
-                            print("[auto_sync_loop] end_time 更新异常:", repr(e))
+        # 1) 刷新季度末
+        print("[auto_sync] [1/3] 刷新季度末...")
+        try:
+            from base.config.service import update_endtime_service
+            end_result = update_endtime_service()
+            if end_result.get("success"):
+                print(f"[auto_sync] end_time 已更新: {end_result.get('end_time', '?')}")
+            else:
+                print("[auto_sync] end_time 更新失败:", end_result.get("error", "unknown"))
+        except Exception as e:
+            print("[auto_sync] end_time 更新异常:", repr(e))
 
-                        # 2) KB 大同步
-                        print("[auto_sync_loop] [2/3] KB大同步...")
-                        kb_result = sync_all_and_embed(full_sync=True)
-                        if kb_result.get("ok"):
-                            s = kb_result.get("sync", {})
-                            e = kb_result.get("embed", {})
-                            print(f"[auto_sync_loop] KB大同步 done  synced={s.get('totalSynced',0)}  failed={s.get('totalFailed',0)}  embed={e.get('embedded',0)}  elapsed={kb_result.get('durationSec',0):.1f}s")
-                        else:
-                            print("[auto_sync_loop] KB大同步 failed:", kb_result.get("error", "unknown"))
+        # 2) KB大更新
+        print("[auto_sync] [2/3] KB大更新...")
+        try:
+            from ai.knowledge.auto_sync import kb_full_sync
+            kb_result = kb_full_sync()
+            if kb_result.get("ok"):
+                s = kb_result.get("sync", {})
+                e = kb_result.get("embed", {})
+                print(f"[auto_sync] KB大更新 done  synced={s.get('totalSynced',0)}  failed={s.get('totalFailed',0)}  embed={e.get('embedded',0)}  elapsed={kb_result.get('durationSec',0):.1f}s")
+            else:
+                print("[auto_sync] KB大更新 failed:", kb_result.get("error", "unknown"))
+        except Exception as e:
+            print("[auto_sync] KB大更新 error:", repr(e))
 
-                        # 3) TB 全量更新
-                        print("[auto_sync_loop] [3/3] TB全量更新...")
-                        try:
-                            user_id = ""
-                            meta = get_config_user_meta() or {}
-                            if isinstance(meta, dict):
-                                for _name, one in meta.items():
-                                    if not isinstance(one, dict):
-                                        continue
-                                    try:
-                                        ch = int(one.get("character", 1))
-                                    except Exception:
-                                        ch = 1
-                                    if ch == 0:
-                                        user_id = str(one.get("userId") or "").strip()
-                                        if user_id:
-                                            break
-                            if not user_id:
-                                userids = get_config_userids() or {}
-                                if isinstance(userids, dict) and userids:
-                                    user_id = str(next(iter(userids.values())) or "").strip()
+        # 3) TB大更新（DEV增量 + Issue增量）
+        print("[auto_sync] [3/3] TB大更新...")
+        try:
+            from base.sync.task_sync import tb_full_update_service
+            user_id, project_id = _resolve_sync_user_project()
+            if not user_id or not project_id:
+                print("[auto_sync] TB大更新 skipped: missing userId/projectId")
+            else:
+                result = tb_full_update_service({"userId": user_id, "projectId": project_id})
+                if result.get("success"):
+                    dev_data = result.get("data", {}).get("dev", {})
+                    issue_data = result.get("data", {}).get("issue", {})
+                    dev_bc = dev_data.get("incremental_bc", {})
+                    issue_detail = issue_data.get("issue_incremental_detail", {})
+                    print(f"[auto_sync] TB大更新 done  DEV: inc={dev_bc.get('count',0)} ok={dev_bc.get('ok',0)} fail={dev_bc.get('fail',0)}  Issue: inc={issue_detail.get('count',0)} ok={issue_detail.get('ok',0)} fail={issue_detail.get('fail',0)}")
+                else:
+                    print("[auto_sync] TB大更新 failed:", result.get("error", "unknown"))
+        except Exception as e:
+            print("[auto_sync] TB大更新 error:", repr(e))
 
-                            projectids = get_config_projectids() or {}
-                            project_id = ""
-                            if isinstance(projectids, dict) and projectids:
-                                project_id = str(next(iter(projectids.values())) or "").strip()
+    def _do_weekly_sync():
+        """每周一 04:00：TB小更新 + KB小更新。"""
+        if datetime.now(ZoneInfo("Asia/Shanghai")).day == 1:
+            print("[auto_sync] 周一但为1号，由月度大同步负责，跳过周同步")
+            return
 
-                            if not user_id or not project_id:
-                                print("[auto_sync_loop] TB全量 skipped: missing userId/projectId")
-                            else:
-                                owner = "auto_full_update@{}".format(int(_time.time()))
-                                lock = _acquire_update_lock(DEFAULT_UPDATE_LOCK_KEY, owner)
-                                if not lock.get("ok"):
-                                    print("[auto_sync_loop] TB全量 skipped: lock occupied")
-                                else:
-                                    try:
-                                        out = full_update_service({
-                                            "userId": user_id,
-                                            "projectId": project_id,
-                                            "force_refresh": True,
-                                        })
-                                        if out.get("success"):
-                                            print(f"[auto_sync_loop] TB全量 success  projectId={project_id} userId={user_id}")
-                                        else:
-                                            print("[auto_sync_loop] TB全量 failed:", out.get("error", "unknown"))
-                                    finally:
-                                        _release_update_lock(DEFAULT_UPDATE_LOCK_KEY, owner)
-                        except Exception as e:
-                            print("[auto_sync_loop] TB全量 error:", repr(e))
+        print("[auto_sync] === 周一：TB小更新 + KB小更新 ===")
 
-                    # 每周一：KB 小同步
-                    elif weekday == 0:
-                        print("[auto_sync_loop] === 周一：KB小同步 ===")
-                        result = sync_all_and_embed(full_sync=False)
-                        if result.get("ok"):
-                            s = result.get("sync", {})
-                            e = result.get("embed", {})
-                            print(f"[auto_sync_loop] KB小同步 done  synced={s.get('totalSynced',0)}  failed={s.get('totalFailed',0)}  embed={e.get('embedded',0)}  elapsed={result.get('durationSec',0):.1f}s")
-                        else:
-                            print("[auto_sync_loop] KB小同步 failed:", result.get("error", "unknown"))
+        from base.api_monitor import monitor as _api_monitor
+        _api_monitor._ensure_state()
+        from base.config.service import is_full_sync_enabled
+        if not is_full_sync_enabled():
+            print("[auto_sync] SKIP — full sync disabled (软限或硬限)")
+            return
 
-                    last_trigger_date = today
-                except Exception as e:
-                    print("[auto_sync_loop] error:", repr(e))
+        # 1) TB小更新（DEV增量）
+        print("[auto_sync] [1/2] TB小更新...")
+        try:
+            from base.sync.task_sync import tb_incremental_update_service
+            user_id, project_id = _resolve_sync_user_project()
+            if not user_id or not project_id:
+                print("[auto_sync] TB小更新 skipped: missing userId/projectId")
+            else:
+                result = tb_incremental_update_service({"userId": user_id, "projectId": project_id})
+                if result.get("success"):
+                    dev_data = result.get("data", {}).get("dev", {})
+                    dev_bc = dev_data.get("incremental_bc", {})
+                    print(f"[auto_sync] TB小更新 done  DEV: inc={dev_bc.get('count',0)} ok={dev_bc.get('ok',0)} fail={dev_bc.get('fail',0)}")
+                else:
+                    print("[auto_sync] TB小更新 failed:", result.get("error", "unknown"))
+        except Exception as e:
+            print("[auto_sync] TB小更新 error:", repr(e))
 
-                _time.sleep(30)
+        # 2) KB小更新
+        print("[auto_sync] [2/2] KB小更新...")
+        try:
+            from ai.knowledge.auto_sync import kb_incremental_sync
+            result = kb_incremental_sync()
+            if result.get("ok"):
+                s = result.get("sync", {})
+                e = result.get("embed", {})
+                print(f"[auto_sync] KB小更新 done  synced={s.get('totalSynced',0)}  failed={s.get('totalFailed',0)}  embed={e.get('embedded',0)}  elapsed={result.get('durationSec',0):.1f}s")
+            else:
+                print("[auto_sync] KB小更新 failed:", result.get("error", "unknown"))
+        except Exception as e:
+            print("[auto_sync] KB小更新 error:", repr(e))
 
-        t2 = threading.Thread(target=_auto_knowledge_sync_loop, daemon=True)
-        t2.start()
+    _sync_scheduler.add_job(
+        _do_monthly_sync, 'cron', day=1, hour=4, minute=0,
+        id='monthly_sync', misfire_grace_time=3600,
+    )
+    _sync_scheduler.add_job(
+        _do_weekly_sync, 'cron', day_of_week='mon', hour=4, minute=0,
+        id='weekly_sync', misfire_grace_time=3600,
+    )
+    _sync_scheduler.start()
 
     @app.teardown_appcontext
     def _remove_db_session(_exc):

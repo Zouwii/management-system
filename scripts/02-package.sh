@@ -29,6 +29,7 @@ tar \
   --exclude="backend/.ruff_cache" \
   --exclude="backend/data" \
   --exclude="backend/runtime" \
+  --exclude="backend/local_models" \
   --exclude="backend/**/__pycache__" \
   --exclude="backend/**/*.pyc" \
   -C "${SCRIPT_DIR}" -cf - backend | tar -C "${STAGE_DIR}" -xf -

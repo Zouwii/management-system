@@ -164,11 +164,11 @@ def _cached_document(node_id: str) -> dict | None:
 # ── workspace sync (module-level, shared with auto_sync) ────────
 
 def _sync_workspace(client, workspace_id: str, root_id: str, limit: int = 0,
-                    full_sync: bool = False) -> dict:
+                    check_modified: bool = False) -> dict:
     """Walk a workspace tree, cache documents.
 
-    full_sync=False (小同步/日常):   仅拉取未缓存过的新 ALIDOC 文档。
-    full_sync=True  (大同步/月度):   对比 remote_modified_at，重新拉取已变更的文档。
+    check_modified=False: 仅拉取未缓存过的新 ALIDOC 文档。
+    check_modified=True:  对比 remote_modified_at，重新拉取已变更的文档。
 
     Returns {syncedCount, syncedIds, failedCount, errors, skippedWorkbooks,
              skippedCached, skippedUnchanged}.
@@ -236,14 +236,14 @@ def _sync_workspace(client, workspace_id: str, root_id: str, limit: int = 0,
 
                 cached = cache.get(nid)
 
-                # 2. 小同步：已缓存 → 跳过
-                if not full_sync:
+                # 2. check_modified=False：已缓存 → 跳过
+                if not check_modified:
                     if cached and cached["content"]:
                         skipped_cached += 1
                         continue
 
-                # 3. 大同步：对比修改时间，未变 → 跳过
-                if full_sync and cached and cached["content"]:
+                # 3. check_modified=True：对比修改时间，未变 → 跳过
+                if check_modified and cached and cached["content"]:
                     last_rmt = cached["remote_modified_at"]
                     cur_rmt = _parse_modified_time(remote_mod)
                     if last_rmt and cur_rmt and cur_rmt <= last_rmt:
@@ -421,9 +421,9 @@ def register(bp, ok, fail):
     def ai_knowledge_sync():
         """Walk a workspace tree and cache all documents.
 
-        Body: { "workspace_id": "...", "full_sync": false }
-        full_sync=false (小同步): 仅拉取新文档
-        full_sync=true  (大同步): 对比 remote_modified_at 重拉变更文档
+        Body: { "workspace_id": "...", "check_modified": false }
+        check_modified=false: 仅拉取新文档
+        check_modified=true:  对比 remote_modified_at 重拉变更文档
         """
         union_id = _current_union_id()
         if not union_id:
@@ -439,7 +439,7 @@ def register(bp, ok, fail):
             return fail("missing workspace_id", code=400)
 
         limit = max(0, int(body.get("limit") or 0))  # 0 = no limit
-        full_sync = str(body.get("full_sync") or "").lower() in ("1", "true", "yes")
+        check_modified = str(body.get("check_modified") or "").lower() in ("1", "true", "yes")
 
         client = DingTalkKnowledgeClient(union_id)
 
@@ -458,7 +458,7 @@ def register(bp, ok, fail):
 
         started = time.time()
         result = _sync_workspace(client, workspace_id, root_id, limit=limit,
-                                 full_sync=full_sync)
+                                 check_modified=check_modified)
         finished = time.time()
 
         return ok({
@@ -477,9 +477,9 @@ def register(bp, ok, fail):
     def ai_knowledge_sync_all():
         """Sync all known knowledge bases.
 
-        Body: { "limit"?: N, "ws_limit"?: N, "full_sync"?: true/false }
-        full_sync=false (小同步): 仅拉取新文档
-        full_sync=true  (大同步): 对比修改时间重拉变更文档
+        Body: { "limit"?: N, "ws_limit"?: N, "check_modified"?: true/false }
+        check_modified=false: 仅拉取新文档
+        check_modified=true:  对比修改时间重拉变更文档
         """
         union_id = _current_union_id()
         if not union_id:
@@ -499,7 +499,7 @@ def register(bp, ok, fail):
         body = request.get_json(silent=True) or {}
         limit = max(0, int(body.get("limit") or 0))
         ws_limit = max(0, int(body.get("ws_limit") or 0))
-        full_sync = str(body.get("full_sync") or "").lower() in ("1", "true", "yes")
+        check_modified = str(body.get("check_modified") or "").lower() in ("1", "true", "yes")
 
         from ai.knowledge.service import get_known_workspaces
         known = get_known_workspaces()
@@ -523,7 +523,7 @@ def register(bp, ok, fail):
         for ws_id, root_id, ws_name in workspaces_to_sync:
             ws_started = time.time()
             r = _sync_workspace(client, ws_id, root_id, limit=limit,
-                                full_sync=full_sync)
+                                check_modified=check_modified)
             ws_elapsed = round(time.time() - ws_started, 1)
             results.append({
                 "workspaceId": ws_id,
@@ -559,9 +559,9 @@ def register(bp, ok, fail):
     def ai_knowledge_sync_and_embedding():
         """Full pipeline: sync all KBs -> rechunk -> embed.
 
-        Body: { "full_sync"?: true/false }
-        full_sync=false (小同步): 增量拉取 + rechunk 变更 + embed 增量
-        full_sync=true  (大同步): 对比修改时间重拉 + 全量 rechunk + embed
+        Body: { "check_modified"?: true/false }
+        check_modified=false: KB增量（仅拉取新文档）
+        check_modified=true:  KB变更（对比 modified_at 重拉变更文档）
         """
         union_id = _current_union_id()
         if not union_id:
@@ -570,10 +570,10 @@ def register(bp, ok, fail):
         from ai.knowledge.auto_sync import sync_all_and_embed
 
         body = request.get_json(silent=True) or {}
-        full_sync = str(body.get("full_sync") or "").lower() in ("1", "true", "yes")
+        check_modified = str(body.get("check_modified") or "").lower() in ("1", "true", "yes")
 
         try:
-            result = sync_all_and_embed(union_id=union_id, full_sync=full_sync)
+            result = sync_all_and_embed(union_id=union_id, check_modified=check_modified)
             if result.get("ok"):
                 return ok(result)
             else:

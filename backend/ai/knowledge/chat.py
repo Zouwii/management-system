@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Dict, Generator, List
 
@@ -62,10 +63,14 @@ def _build_context(query: str, workspace_id: str | None = None) -> tuple[str, li
     """Retrieve relevant chunks and format them into a prompt context string.
     Returns (context_text, citations).
     """
-    from ai.knowledge.retriever import search_hybrid
+    from ai.knowledge.retriever import search_hybrid, search_with_rerank
 
     try:
-        results = search_hybrid(query, top_k=_RETRIEVAL_TOP_K, workspace_id=workspace_id)
+        # 通过环境变量 RERANK_ENABLED=true 启用重排
+        if os.environ.get("RERANK_ENABLED", "").lower() in ("1", "true", "yes"):
+            results = search_with_rerank(query, top_k=_RETRIEVAL_TOP_K, workspace_id=workspace_id)
+        else:
+            results = search_hybrid(query, top_k=_RETRIEVAL_TOP_K, workspace_id=workspace_id)
     except Exception:
         logger.exception("retrieval failed")
         results = []

@@ -35,6 +35,10 @@ __pycache__/
 backend/.env
 backend/.env.*
 
+# Large model files (managed separately via modelscope / scp)
+backend/local_models/
+backend/.venv/
+
 tar/
 .package_stage/
 

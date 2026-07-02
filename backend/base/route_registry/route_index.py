@@ -98,10 +98,10 @@ API_BT_ROUTE_INDEX: List[Dict[str, str]] = [
     {
         "module": "updates",
         "method": "POST",
-        "path": "/api/bt/full_update",
-        "desc": "全量更新：update_endtime + 最近一年窗口 + 同步 A + 3 线程同步 B/C",
-        "handler": "route_registry.updates.full_update",
-        "service": "base.sync.task_sync.full_update_service",
+        "path": "/api/bt/incremental_update",
+        "desc": "TB小更新：DEV增量（基于 last_update_time）",
+        "handler": "route_registry.updates.incremental_update",
+        "service": "base.sync.task_sync.tb_incremental_update_service",
     },
     {
         "module": "projects",

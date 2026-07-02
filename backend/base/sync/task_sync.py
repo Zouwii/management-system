@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import select, text
+from sqlalchemy import select
 
 from base.db.engine import SessionLocal
 from base.db.orm import Config as DbConfig
@@ -22,7 +22,6 @@ from base.db.orm import (
     ProjectTaskDetail,
     ProjectTaskOverdueDetail,
     SyncFailure,
-    UpdateLock,
     UserCharacter as DbUserCharacter,
 )
 from base.projects.task_service import query_project_tasks_service, query_user_tasks_service
@@ -964,570 +963,6 @@ def sync_project_tasks_to_db(
     return _upsert_filtered_project_tasks(payload, query_result)
 
 
-def full_update_service(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    全量更新封装（按钮专用）：
-    1) 读取 config.end_time 作为季度末（endDue）
-    2) startDue 固定为 endDue 往前一年
-    3) 直接清空 B/C 表全部数据
-    4) 按 [startDue, endDue] 同步 A，再回填 B/C
-    """
-    # 同步开关检查：查询 config 表 knowledge_sync_enabled
-    from base.config.service import is_full_sync_enabled
-    if not is_full_sync_enabled():
-        return {"success": False, "error": "sync is disabled (config.knowledge_sync_enabled = partial or false)", "data": {}}
-
-    payload = dict(payload or {})
-    user_id = str(payload.get("userId") or payload.get("userid") or "").strip()
-    project_id = str(payload.get("projectId") or payload.get("projectid") or "").strip()
-    if not user_id or not project_id:
-        return {"success": False, "error": "missing userId or projectId", "data": {}}
-
-    # 1) 读取 config.end_time（季度末）
-    from base.db.engine import SessionLocal
-    from base.db.orm import Config as DbConfig
-
-    sess = SessionLocal()
-    try:
-        end_row = sess.query(DbConfig).filter(DbConfig.type_ == "end_time").first()
-        end_raw = str(getattr(end_row, "value", "") or "").strip() if end_row else ""
-    finally:
-        sess.close()
-    if not end_raw:
-        return {"success": False, "error": "missing config end_time", "data": {}}
-
-    end_dt = _parse_iso_dt(end_raw)
-    if not end_dt:
-        return {"success": False, "error": "invalid config end_time", "data": {}}
-
-    # end_time 由 config 给出（季度末）
-    if end_dt.tzinfo is None:
-        end_dt = end_dt.replace(tzinfo=timezone.utc)
-    else:
-        end_dt = end_dt.astimezone(timezone.utc)
-    end_dt = _normalize_day_end_utc(end_dt)
-
-    def _format_dt_for_tql_local(dt: datetime) -> str:
-        d = dt.astimezone(timezone.utc).replace(microsecond=0)
-        return d.strftime("%Y-%m-%dT%H:%M:%S") + ".000Z"
-
-    def _subtract_one_year_local(dt: datetime) -> datetime:
-        try:
-            return dt.replace(year=dt.year - 1)
-        except ValueError:
-            # 处理闰年 2/29
-            day = min(dt.day, 28)
-            return dt.replace(year=dt.year - 1, day=day)
-
-    start_dt = _subtract_one_year_local(end_dt)
-
-    start_due = _format_dt_for_tql_local(start_dt)
-    end_due = _format_dt_for_tql_local(end_dt)
-
-    # 2) 直接清空 B/C 全表
-    wipe_sess = SessionLocal()
-    try:
-        wiped_b = wipe_sess.query(ProjectTaskDetail).delete(synchronize_session=False)
-        wiped_b2 = wipe_sess.query(ProgramIssueDetail).delete(synchronize_session=False)
-        wiped_c = wipe_sess.query(ProjectTaskOverdueDetail).delete(synchronize_session=False)
-        wiped_fail = wipe_sess.query(SyncFailure).delete(synchronize_session=False)
-        # 删除后重置自增序列，保证新写入从 1 开始（不同数据库方言分别处理）。
-        dialect = str(getattr(getattr(wipe_sess, "bind", None), "dialect", None).name or "")
-        if dialect == "sqlite":
-            wipe_sess.execute(
-                text(
-                    "DELETE FROM sqlite_sequence "
-                    "WHERE name IN ('project_task_details', 'program_issue_detail', 'project_task_overdue_details', 'sync_failures')"
-                )
-            )
-        elif dialect in {"mysql", "mariadb"}:
-            wipe_sess.execute(text("ALTER TABLE project_task_details AUTO_INCREMENT = 1"))
-            wipe_sess.execute(text("ALTER TABLE program_issue_detail AUTO_INCREMENT = 1"))
-            wipe_sess.execute(text("ALTER TABLE project_task_overdue_details AUTO_INCREMENT = 1"))
-            wipe_sess.execute(text("ALTER TABLE sync_failures AUTO_INCREMENT = 1"))
-        elif dialect == "postgresql":
-            wipe_sess.execute(
-                text(
-                    "TRUNCATE TABLE project_task_details, program_issue_detail, "
-                    "project_task_overdue_details, sync_failures RESTART IDENTITY"
-                )
-            )
-        wipe_sess.commit()
-    except Exception as e:
-        wipe_sess.rollback()
-        return {"success": False, "error": "wipe B/C failed: {}".format(str(e)), "data": {}}
-    finally:
-        wipe_sess.close()
-
-    # 3) A 表：按 startDue/endDue 同步（软件开发场景过滤由 sync_project_tasks_to_db 完成）
-    max_results = int(payload.get("maxResults", 500) or 500)
-    max_pages = int(payload.get("maxPages", 200) or 200)
-    a_payload = dict(payload)
-    a_payload.update(
-        {
-            "userId": user_id,
-            "projectId": project_id,
-            "scenarioFieldConfigIds": [
-                DEFAULT_SCENARIO_FIELD_CONFIG_ID,
-                ISSUE_SCENARIO_FIELD_CONFIG_ID,
-            ],
-            "query": "(dueDate >= '{start}') AND (dueDate <= '{end}')".format(start=start_due, end=end_due),
-            "maxResults": max_results,
-            "maxPages": max_pages,
-            "force_refresh": True,
-        }
-    )
-    a_out = sync_project_tasks_to_db(a_payload)
-    if not a_out.get("success"):
-        return {"success": False, "error": a_out.get("error", "sync A failed"), "data": a_out.get("data") or {}}
-
-    # 4) B/C：固定线程轮循（复用 all_time_download 的实现）
-    bc_payload = dict(payload)
-    bc_payload.update(
-        {
-            "userId": user_id,
-            "projectId": project_id,
-            # B 表过滤窗口：全量更新按最近一年口径
-            "startDate": start_due,
-            "endDate": end_due,
-            # A 表窗口：同样使用 endDate 推导（实现里会再 subtract one year）
-            "endDate": end_due,
-        }
-    )
-    bc_out = _all_time_download_impl(bc_payload)
-    if not bc_out.get("success"):
-        return {"success": False, "error": bc_out.get("error", "sync B/C failed"), "data": bc_out.get("data") or {}}
-
-    # 全量更新成功后统一刷新 last_update_time，
-    # 让页面右上角“最后同步”能感知到自动/手动全量更新。
-    from base.config.service import touch_last_update_time_service
-
-    touched = touch_last_update_time_service() or {}
-    last_update_time = ""
-    if touched.get("success"):
-        last_update_time = str(touched.get("last_update_time") or "")
-
-    print(
-        "[full_update] success projectId={} userId={} wiped_b={} wiped_b2={} wiped_c={} wiped_fail={}".format(
-            project_id,
-            user_id,
-            int(wiped_b or 0),
-            int(wiped_b2 or 0),
-            int(wiped_c or 0),
-            int(wiped_fail or 0),
-        )
-    )
-
-    return {
-        "success": True,
-        "data": {
-            "updated_end_time": end_dt.isoformat(),
-            "startDue": start_due,
-            "endDue": end_due,
-            "last_update_time": last_update_time,
-            "wiped": {
-                "b_deleted": int(wiped_b or 0),
-                "b2_deleted": int(wiped_b2 or 0),
-                "c_deleted": int(wiped_c or 0),
-                "fail_deleted": int(wiped_fail or 0),
-            },
-            "syncA": a_out.get("data") or {},
-            "syncBC": bc_out.get("data") or {},
-        },
-    }
-
-
-def _all_time_download_impl(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    B/C 同步实现（仅基于现有 A 表）：
-    - 读取 endDate（缺省回退 config.end_time）计算最近一年窗口，用于从 A 表筛任务
-    - 严格使用 payload.startDate/endDate 作为“写入 B 表的阈值窗口”
-    - 固定 3 线程轮循拉详情并 upsert B/C
-    """
-
-    payload = dict(payload or {})
-    user_id = str(payload.get("userId") or payload.get("userid") or "").strip()
-    project_id = str(payload.get("projectId") or payload.get("projectid") or "").strip()
-    if not user_id or not project_id:
-        return {"success": False, "error": "missing userId or projectId", "data": {}}
-
-    max_results = int(payload.get("maxResults", 500) or 500)
-    max_pages = int(payload.get("maxPages", 200) or 200)
-    if max_results < 1:
-        max_results = 1
-    if max_pages < 1:
-        max_pages = 1
-    if max_pages > 2000:
-        max_pages = 2000
-
-    def _cmp_dt(dt: Optional[datetime]) -> Optional[datetime]:
-        if dt is None:
-            return None
-        if dt.tzinfo is None:
-            return dt.replace(tzinfo=timezone.utc)
-        return dt.astimezone(timezone.utc)
-
-    def _subtract_one_year(dt: datetime) -> datetime:
-        # 处理 2/29：若替换失败，则落到 2/28
-        try:
-            return dt.replace(year=dt.year - 1)
-        except ValueError:
-            day = min(dt.day, 28)
-            return dt.replace(year=dt.year - 1, day=day)
-
-    def _format_dt_for_tql(dt: datetime) -> str:
-        d = dt.astimezone(timezone.utc).replace(microsecond=0)
-        # 参考前端/旧实现：固定 ".000Z"
-        return d.strftime("%Y-%m-%dT%H:%M:%S") + ".000Z"
-
-    # 1) 读取结束时间（优先前端传入 endDate，其次 config.end_time），算最近一年窗口并写入 A 表
-    from base.db.orm import Config as DbConfig
-
-    session = SessionLocal()
-    try:
-        end_row = session.query(DbConfig).filter(DbConfig.type_ == "end_time").first()
-    finally:
-        session.close()
-
-    end_raw = payload.get("endDate") or payload.get("end_time")
-    if not end_raw and end_row:
-        end_raw = end_row.value
-    if not end_raw:
-        return {"success": False, "error": "missing endDate and config end_time", "data": {}}
-
-    end_dt = _cmp_dt(_parse_iso_dt(end_raw))
-    if not end_dt:
-        return {"success": False, "error": "invalid endDate/config end_time", "data": {}}
-
-    start_dt = _subtract_one_year(end_dt)
-    start_iso = _format_dt_for_tql(start_dt)
-    end_iso = _format_dt_for_tql(end_dt)
-
-    query = "(dueDate >= '{start}') AND (dueDate <= '{end}')".format(start=start_iso, end=end_iso)
-
-    dl_payload = dict(payload)
-    dl_payload["userId"] = user_id
-    dl_payload["projectId"] = project_id
-    dl_payload["query"] = query
-    dl_payload["maxResults"] = max_results
-    dl_payload["maxPages"] = max_pages
-    dl_payload["force_refresh"] = True
-
-    # 2) 从 A/A2 表取出要轮循拉详情的 task 列表（软件开发+问题处理，最近一年窗口）
-    # 同时：B 表写入阈值窗口严格使用 payload.startDate/endDate
-    cfg_start_raw = payload.get("startDate") or payload.get("start_time")
-    cfg_end_raw = payload.get("endDate") or payload.get("end_time")
-    cfg_start_dt = _cmp_dt(_parse_iso_dt(cfg_start_raw))
-    cfg_end_dt = _cmp_dt(_parse_iso_dt(cfg_end_raw))
-    if not cfg_start_dt or not cfg_end_dt:
-        return {"success": False, "error": "missing or invalid startDate/endDate", "data": {}}
-
-    allowed_executor_ids = _load_allowed_executor_ids()
-    session = SessionLocal()
-    tasks: List[Dict[str, Any]] = []
-    task_specs: List[Dict[str, Any]] = []  # {task_id, executor_id, project_id, scenario_id, in_cfg_range}
-    skipped_by_character = 0
-    try:
-        dev_rows: List[ProjectTask] = (
-            session.query(ProjectTask)
-            .filter(
-                ProjectTask.project_id == project_id,
-                ProjectTask.scenario_field_config_id == DEFAULT_SCENARIO_FIELD_CONFIG_ID,
-            )
-            .order_by(ProjectTask.task_id)
-            .all()
-        )
-        issue_rows: List[ProgramIssue] = (
-            session.query(ProgramIssue)
-            .filter(
-                ProgramIssue.project_id == project_id,
-                ProgramIssue.scenario_field_config_id == ISSUE_SCENARIO_FIELD_CONFIG_ID,
-            )
-            .order_by(ProgramIssue.task_id)
-            .all()
-        )
-        for r in list(dev_rows) + list(issue_rows):
-            executor_id = str(r.executor_id or "").strip()
-            task_id = str(r.task_id or "").strip()
-            if not executor_id or not task_id:
-                continue
-            if allowed_executor_ids and executor_id not in allowed_executor_ids:
-                skipped_by_character += 1
-                continue
-
-            due_dt_a = _cmp_dt(r.due_date)
-            in_range_a = bool(due_dt_a and start_dt <= due_dt_a <= end_dt)
-
-            # A 表已经是最近一年落库；但仍做一次兜底过滤，保证窗口一致
-            if not in_range_a:
-                continue
-
-            tasks.append({"id": r.task_id, "name": r.content, "executorId": r.executor_id})
-            in_cfg_range = bool(due_dt_a and cfg_start_dt <= due_dt_a <= cfg_end_dt)
-            task_specs.append(
-                {
-                    "task_id": task_id,
-                    "executor_id": executor_id,
-                    "project_id": str(r.project_id or project_id),
-                    "scenario_id": str(r.scenario_field_config_id or ""),
-                    "in_cfg_range": in_cfg_range,
-                }
-            )
-    finally:
-        session.close()
-    if skipped_by_character > 0:
-        print(
-            "[all_time_download] skipped_by_character={} (executor not in user_character)".format(
-                skipped_by_character
-            )
-        )
-
-    # 3) B/C：不做 project 全量删写；只清理“本次窗口未包含”的 task 行
-    #    这样 stats（不按时间窗过滤）仍然能保持 B/C 是“当前窗口快照”，同时避免整项目擦除。
-    eligible_by_executor: Dict[str, set] = {}
-    for spec in task_specs:
-        ex_id = str(spec.get("executor_id") or "").strip()
-        t_id = str(spec.get("task_id") or "").strip()
-        if not ex_id or not t_id:
-            continue
-        eligible_by_executor.setdefault(ex_id, set()).add(t_id)
-
-    if eligible_by_executor:
-        del_sess = SessionLocal()
-        try:
-            for ex_id, tids in eligible_by_executor.items():
-                tids_list = list(tids)
-                if tids_list:
-                    del_sess.query(ProjectTaskDetail).filter(
-                        ProjectTaskDetail.project_id == project_id,
-                        ProjectTaskDetail.query_user_id == ex_id,
-                        ProjectTaskDetail.task_id.notin_(tids_list),
-                    ).delete(synchronize_session=False)
-                    del_sess.query(ProgramIssueDetail).filter(
-                        ProgramIssueDetail.project_id == project_id,
-                        ProgramIssueDetail.query_user_id == ex_id,
-                        ProgramIssueDetail.task_id.notin_(tids_list),
-                    ).delete(synchronize_session=False)
-                    del_sess.query(ProjectTaskOverdueDetail).filter(
-                        ProjectTaskOverdueDetail.project_id == project_id,
-                        ProjectTaskOverdueDetail.query_user_id == ex_id,
-                        ProjectTaskOverdueDetail.task_id.notin_(tids_list),
-                    ).delete(synchronize_session=False)
-            del_sess.commit()
-        finally:
-            del_sess.close()
-
-    # 4) 3 线程并发轮循拉详情 + eligible 判断 + upsert B
-    field_id = str(
-        payload.get("workHourFieldId")
-        or os.getenv("TB_TOOL_BT_WORKHOUR_FIELD_ID")
-        or os.getenv("TB_TOOL_B1_WORKHOUR_FIELD_ID")
-        or DEFAULT_WORKHOUR_FIELD_ID
-    )
-    business_type_mapping = _get_business_type_tag_mapping()
-    task_flow_status_mapping = _get_task_flow_status_mapping()
-
-    token_result = get_valid_access_token(payload or {})
-    if not token_result.get("ok"):
-        return {"success": False, "error": token_result.get("error", "failed to fetch dingtalk token"), "data": {}}
-    access_token = token_result.get("access_token")
-
-    # 固定并发线程数
-    thread_count = 3
-    business_type_mapping = _get_business_type_tag_mapping()
-    task_flow_status_mapping = _get_task_flow_status_mapping()
-
-    def _extract_item(result: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        ding = ((result.get("data") or {}).get("dingtalk")) or {}
-        raw_result = ding.get("result")
-        if isinstance(raw_result, list) and raw_result:
-            first = raw_result[0]
-            return first if isinstance(first, dict) else None
-        if isinstance(raw_result, dict):
-            return raw_result
-        return None
-
-    def _worker(task_specs_slice: List[Dict[str, Any]]) -> Dict[str, Any]:
-        ok_upserts = 0
-        skipped = 0
-        fail_count = 0
-        failures: List[Dict[str, Any]] = []
-        pending_commit = 0
-
-        # 每个 worker 线程单独 session，避免并发共享
-        one_session = SessionLocal()
-        try:
-            for spec in task_specs_slice:
-                q_payload: Dict[str, Any] = {
-                    "userId": spec["executor_id"],
-                    "taskId": spec["task_id"],
-                    "projectId": spec["project_id"],
-                    "force_refresh": True,
-                    "access_token": access_token,
-                    "workHourFieldId": field_id,
-                }
-                dres = query_user_tasks_service(q_payload)
-                if not dres.get("success"):
-                    fail_count += 1
-                    failures.append(
-                        {"taskId": spec["task_id"], "executorId": spec["executor_id"], "error": dres.get("error")}
-                    )
-                    continue
-
-                item = _extract_item(dres)
-                if not item:
-                    fail_count += 1
-                    failures.append(
-                        {"taskId": spec["task_id"], "executorId": spec["executor_id"], "error": "empty dingtalk detail"}
-                    )
-                    continue
-
-                scenario_id = str(spec.get("scenario_id") or "")
-                now = datetime.now(timezone.utc)
-                if bool(spec.get("in_cfg_range")):
-                    if scenario_id == ISSUE_SCENARIO_FIELD_CONFIG_ID:
-                        _sync_one_issue_detail(
-                            one_session,
-                            executor_id=spec["executor_id"],
-                            task_id=spec["task_id"],
-                            project_id=spec["project_id"],
-                            item=item,
-                            field_id=field_id,
-                            now=now,
-                            business_type_mapping=business_type_mapping,
-                        )
-                    else:
-                        _sync_one_detail_to_b_and_c(
-                            one_session,
-                            executor_id=spec["executor_id"],
-                            task_id=spec["task_id"],
-                            project_id=spec["project_id"],
-                            item=item,
-                            field_id=field_id,
-                            now=now,
-                            business_type_mapping=business_type_mapping,
-                            task_flow_status_mapping=task_flow_status_mapping,
-                            write_b=True,
-                            write_c=True,
-                        )
-                else:
-                    skipped += 1
-                pending_commit += 1
-                if pending_commit >= DEFAULT_DB_COMMIT_BATCH_SIZE:
-                    one_session.commit()
-                    pending_commit = 0
-                ok_upserts += 1
-            if pending_commit > 0:
-                one_session.commit()
-        finally:
-            one_session.close()
-
-        return {
-            "ok_upserts": ok_upserts,
-            "skipped": skipped,
-            "fail_count": fail_count,
-            "failures": failures,
-        }
-
-    specs_by_worker: List[List[Dict[str, str]]] = [[] for _ in range(thread_count)]
-    for idx, spec in enumerate(task_specs):
-        specs_by_worker[idx % thread_count].append(spec)
-
-    b_upserts = 0
-    b_skipped = 0
-    b_fail = 0
-    b_failures: List[Dict[str, Any]] = []
-    with ThreadPoolExecutor(max_workers=thread_count) as pool:
-        futures = [pool.submit(_worker, slice_specs) for slice_specs in specs_by_worker if slice_specs]
-        for fut in futures:
-            r = fut.result()
-            b_upserts += int(r.get("ok_upserts", 0) or 0)
-            b_skipped += int(r.get("skipped", 0) or 0)
-            b_fail += int(r.get("fail_count", 0) or 0)
-            b_failures.extend(r.get("failures") or [])
-    b_fail_initial = b_fail
-    b_retry_attempted = 0
-    b_retry_recovered = 0
-    max_retry_rounds = 5
-    if b_failures:
-        spec_by_key: Dict[tuple, Dict[str, Any]] = {
-            (str(s.get("task_id") or ""), str(s.get("executor_id") or "")): s for s in task_specs
-        }
-        retry_round = 0
-        while b_failures and retry_round < max_retry_rounds:
-            retry_round += 1
-            retry_specs: List[Dict[str, Any]] = []
-            seen_retry = set()
-            for f in b_failures:
-                key = (str(f.get("taskId") or ""), str(f.get("executorId") or ""))
-                if key in seen_retry:
-                    continue
-                seen_retry.add(key)
-                sp = spec_by_key.get(key)
-                if sp:
-                    retry_specs.append(sp)
-            if not retry_specs:
-                break
-            b_retry_attempted += len(retry_specs)
-            print(
-                "[all_time_download][b_retry] round={}/{} attempt={} remain_before={}".format(
-                    retry_round,
-                    max_retry_rounds,
-                    len(retry_specs),
-                    len(b_failures),
-                )
-            )
-            retry_slices: List[List[Dict[str, Any]]] = [[] for _ in range(thread_count)]
-            for idx, spec in enumerate(retry_specs):
-                retry_slices[idx % thread_count].append(spec)
-            retry_failures: List[Dict[str, Any]] = []
-            with ThreadPoolExecutor(max_workers=thread_count) as retry_pool:
-                retry_futures = [retry_pool.submit(_worker, ss) for ss in retry_slices if ss]
-                for fut in retry_futures:
-                    rr = fut.result()
-                    b_upserts += int(rr.get("ok_upserts", 0) or 0)
-                    b_skipped += int(rr.get("skipped", 0) or 0)
-                    retry_failures.extend(rr.get("failures") or [])
-            b_failures = retry_failures
-            print(
-                "[all_time_download][b_retry] round={}/{} remain_after={}".format(
-                    retry_round,
-                    max_retry_rounds,
-                    len(b_failures),
-                )
-            )
-        b_fail = len(b_failures)
-        b_retry_recovered = max(b_fail_initial - b_fail, 0)
-    _record_sync_failures(
-        sync_type="full_update",
-        project_id=project_id,
-        phase="b_sync",
-        failures=b_failures,
-        retry_round=max_retry_rounds if b_failures else None,
-    )
-
-    return {
-        "success": True,
-        "data": {
-            "sync": {},
-            "tasks": tasks,
-            "b_sync": {
-                "window": {"start": start_iso, "end": end_iso},
-                "task_count_in_a": len(task_specs),
-                "skipped_by_character": skipped_by_character,
-                "b_upserts": b_upserts,
-                "b_skipped": b_skipped,
-                "b_fail": b_fail,
-                "b_fail_initial": b_fail_initial,
-                "b_retry_attempted": b_retry_attempted,
-                "b_retry_recovered": b_retry_recovered,
-                "failures": b_failures[:20],
-                "mode": "upsert-cleanup",
-            },
-        },
-    }
-
-
 def sync_task_detail_to_db(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
     拉单任务详情并 upsert B 表（模式 1）。
@@ -2129,7 +1564,7 @@ def sync_project_details_in_time_range_service(payload: Dict[str, Any]) -> Dict[
     }
 
 
-def normal_incremental_update_service(payload: Dict[str, Any]) -> Dict[str, Any]:
+def normal_incremental_update_service(payload: Dict[str, Any], skip_update_time: bool = False) -> Dict[str, Any]:
     """
     普通更新（按钮专用）：
     1) 增量窗口：last_update_time -> config.end_time（季度末）
@@ -2290,7 +1725,8 @@ def normal_incremental_update_service(payload: Dict[str, Any]) -> Dict[str, Any]
     )
 
     # 更新 last_update_time 为"北京时间 now"
-    _upsert_config_value("last_update_time", now_bj.isoformat())
+    if not skip_update_time:
+        _upsert_config_value("last_update_time", now_bj.isoformat())
     print(
         "[normal_update] success projectId={} userId={} inc_count={}".format(
             project_id,
@@ -2318,3 +1754,292 @@ def normal_incremental_update_service(payload: Dict[str, Any]) -> Dict[str, Any]
             },
         },
     }
+
+
+def normal_issue_incremental_update_service(payload: Dict[str, Any], skip_update_time: bool = False) -> Dict[str, Any]:
+    """
+    Program Issue 增量更新：
+    1) 增量窗口：last_update_time -> config.end_time（季度末）
+    2) 对增量结果写入 ProgramIssue A 表，并对变更任务写入 ProgramIssueDetail
+    """
+    payload = dict(payload or {})
+    user_id = str(payload.get("userId") or payload.get("userid") or "").strip()
+    project_id = str(payload.get("projectId") or payload.get("projectid") or "").strip()
+    if not user_id or not project_id:
+        return {"success": False, "error": "missing userId or projectId", "data": {}}
+
+    from base.api_monitor import BJ_TZ
+    now_bj = datetime.now(BJ_TZ)
+    last_raw = _get_config_value("last_update_time")
+    last_dt = _cmp_dt_utc(_parse_iso_dt(last_raw)) if last_raw else None
+    end_cfg_raw = _get_config_value("end_time")
+    end_cfg_dt = _cmp_dt_utc(_parse_iso_dt(end_cfg_raw)) if end_cfg_raw else None
+    if not end_cfg_dt:
+        return {"success": False, "error": "missing or invalid config.end_time", "data": {}}
+    end_cfg_dt = _normalize_day_end_utc(end_cfg_dt)
+
+    start_cfg_raw = _get_config_value("start_time")
+    selected_start_dt = _cmp_dt_utc(_parse_iso_dt(str(start_cfg_raw or "")))
+    if not selected_start_dt:
+        return {"success": False, "error": "missing or invalid config.start_time", "data": {}}
+    if selected_start_dt > end_cfg_dt:
+        return {"success": False, "error": "config.start_time must be <= config.end_time", "data": {}}
+
+    if not last_dt:
+        last_dt = selected_start_dt
+        last_raw = _format_dt_for_tql_utc(last_dt)
+    if last_dt > end_cfg_dt:
+        last_dt = end_cfg_dt
+
+    updated_threshold = _format_dt_for_tql_utc(last_dt)
+    updated_upper = _format_dt_for_tql_utc(end_cfg_dt)
+
+    max_results = int(payload.get("maxResults", 500) or 500)
+    max_pages = int(payload.get("maxPages", 200) or 200)
+
+    # 增量拉列表：updated >= last_update_time，仅 Issues
+    inc_payload = dict(payload)
+    inc_payload.update(
+        {
+            "userId": user_id,
+            "projectId": project_id,
+            "scenarioFieldConfigIds": [ISSUE_SCENARIO_FIELD_CONFIG_ID],
+            "query": "(updated >= '{t0}') AND (updated <= '{t1}')".format(
+                t0=updated_threshold, t1=updated_upper
+            ),
+            "maxResults": max_results,
+            "maxPages": max_pages,
+            "force_refresh": True,
+        }
+    )
+    inc_res = query_project_tasks_service(inc_payload)
+    if not inc_res.get("success"):
+        return {"success": False, "error": inc_res.get("error", "issue incremental query failed"), "data": inc_res}
+
+    # 写 ProgramIssue A 表
+    a_out = sync_project_tasks_to_db(inc_payload, query_result=inc_res)
+    if not a_out.get("success"):
+        return {"success": False, "error": a_out.get("error", "sync issue A failed"), "data": a_out.get("data") or {}}
+
+    token_result = get_valid_access_token(payload or {})
+    if not token_result.get("ok"):
+        return {"success": False, "error": token_result.get("error", "failed to fetch dingtalk token"), "data": {}}
+    access_token = token_result.get("access_token")
+
+    field_id = str(
+        payload.get("workHourFieldId")
+        or os.getenv("TB_TOOL_BT_WORKHOUR_FIELD_ID")
+        or os.getenv("TB_TOOL_B1_WORKHOUR_FIELD_ID")
+        or DEFAULT_WORKHOUR_FIELD_ID
+    )
+    business_type_mapping = _get_business_type_tag_mapping()
+
+    ding = (inc_res.get("data") or {}).get("dingtalk") or {}
+    all_rows = ding.get("result") if isinstance(ding.get("result"), list) else []
+    inc_specs: List[Dict[str, str]] = []
+    for r in all_rows:
+        if not isinstance(r, dict):
+            continue
+        tid = str(r.get("taskId") or "").strip()
+        ex = str(r.get("executorId") or "").strip()
+        if not tid or not ex:
+            continue
+        inc_specs.append({"task_id": tid, "executor_id": ex, "project_id": project_id})
+
+    inc_ok = 0
+    inc_fail = 0
+    inc_failures: List[Dict[str, Any]] = []
+    if inc_specs:
+        sess = SessionLocal()
+        pending_commit = 0
+        try:
+            for spec in inc_specs:
+                q_payload: Dict[str, Any] = {
+                    "userId": spec["executor_id"],
+                    "taskId": spec["task_id"],
+                    "projectId": spec["project_id"],
+                    "force_refresh": True,
+                    "access_token": access_token,
+                    "workHourFieldId": field_id,
+                }
+                dres = query_user_tasks_service(q_payload)
+                if not dres.get("success"):
+                    inc_fail += 1
+                    inc_failures.append({"taskId": spec["task_id"], "executorId": spec["executor_id"], "error": dres.get("error")})
+                    continue
+                item = _extract_detail_item(dres)
+                if not item:
+                    inc_fail += 1
+                    inc_failures.append({"taskId": spec["task_id"], "executorId": spec["executor_id"], "error": "empty detail"})
+                    continue
+                now = datetime.now(timezone.utc)
+                _sync_one_issue_detail(
+                    sess,
+                    executor_id=spec["executor_id"],
+                    task_id=spec["task_id"],
+                    project_id=spec["project_id"],
+                    item=item,
+                    field_id=field_id,
+                    now=now,
+                    business_type_mapping=business_type_mapping,
+                )
+                pending_commit += 1
+                if pending_commit >= DEFAULT_DB_COMMIT_BATCH_SIZE:
+                    sess.commit()
+                    pending_commit = 0
+                inc_ok += 1
+            if pending_commit > 0:
+                sess.commit()
+        finally:
+            sess.close()
+    _record_sync_failures(
+        sync_type="normal_issue_update",
+        project_id=project_id,
+        phase="issue_incremental_bc",
+        failures=inc_failures,
+        retry_round=None,
+    )
+
+    if not skip_update_time:
+        _upsert_config_value("last_update_time", now_bj.isoformat())
+    print(
+        "[normal_issue_update] success projectId={} userId={} inc_count={}".format(
+            project_id,
+            user_id,
+            len(inc_specs),
+        )
+    )
+
+    return {
+        "success": True,
+        "data": {
+            "beijing_now": now_bj.isoformat(),
+            "last_update_time_before": str(last_raw or ""),
+            "incremental_query": {
+                "updated_gte": updated_threshold,
+                "updated_lte": updated_upper,
+                "quarter_end_time": end_cfg_dt.isoformat(),
+                "maxResults": max_results,
+                "maxPages": max_pages,
+            },
+            "a_sync": a_out.get("data") or {},
+            "issue_incremental_detail": {"count": len(inc_specs), "ok": inc_ok, "fail": inc_fail, "failures": inc_failures[:20]},
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
+# 便捷入口：四个主体函数
+#   tb_incremental_update_service — TB小更新：DEV增量 only
+#   tb_full_update_service        — TB大更新：DEV增量 + Issue增量
+# ---------------------------------------------------------------------------
+
+def tb_incremental_update_service(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """TB小更新：仅 DEV增量，不处理 Issue。
+
+    封装 normal_incremental_update_service + 分布式锁。
+    last_update_time 由 normal_incremental_update_service 自行管理（skip_update_time=False）。
+    """
+    payload = dict(payload or {})
+    user_id = str(payload.get("userId") or payload.get("userid") or "").strip()
+    project_id = str(payload.get("projectId") or payload.get("projectid") or "").strip()
+    if not user_id or not project_id:
+        return {"success": False, "error": "missing userId or projectId", "data": {}}
+
+    from base.config.service import is_full_sync_enabled
+    if not is_full_sync_enabled():
+        return {"success": False, "error": "sync is disabled (partial or false)", "data": {}}
+
+    owner = "tb_incremental@{}".format(int(time.time()))
+    lock = _acquire_update_lock(DEFAULT_UPDATE_LOCK_KEY, owner)
+    if not lock.get("ok"):
+        return {"success": False, "error": lock.get("error", "update is in progress"), "data": lock.get("lock") or {}}
+
+    try:
+        dev_out = normal_incremental_update_service(
+            {"userId": user_id, "projectId": project_id},
+            skip_update_time=False,
+        )
+        if dev_out.get("success"):
+            d = dev_out.get("data", {})
+            bc = d.get("incremental_bc", {})
+            print(f"[tb_incremental] DEV done  inc={bc.get('count',0)}  ok={bc.get('ok',0)}  fail={bc.get('fail',0)}")
+        else:
+            print("[tb_incremental] DEV failed:", dev_out.get("error", "unknown"))
+        return {"success": dev_out.get("success", False), "data": {"dev": dev_out.get("data") or {}}}
+    finally:
+        _release_update_lock(DEFAULT_UPDATE_LOCK_KEY, owner)
+
+
+def tb_full_update_service(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """TB大更新：DEV增量 + Issue增量，统一管理锁和 last_update_time。
+
+    封装了 normal_incremental_update_service + normal_issue_incremental_update_service，
+    DEV/Issue 共用 skip_update_time=True，最后统一写入 last_update_time。
+
+    注意：刷新季度末（update_endtime_service）由调用方（每月1号定时任务）独立执行。
+    """
+    payload = dict(payload or {})
+    user_id = str(payload.get("userId") or payload.get("userid") or "").strip()
+    project_id = str(payload.get("projectId") or payload.get("projectid") or "").strip()
+    if not user_id or not project_id:
+        return {"success": False, "error": "missing userId or projectId", "data": {}}
+
+    from base.config.service import is_full_sync_enabled
+    if not is_full_sync_enabled():
+        return {"success": False, "error": "sync is disabled (partial or false)", "data": {}}
+
+    owner = "tb_full@{}".format(int(time.time()))
+    lock = _acquire_update_lock(DEFAULT_UPDATE_LOCK_KEY, owner)
+    if not lock.get("ok"):
+        return {"success": False, "error": lock.get("error", "update is in progress"), "data": lock.get("lock") or {}}
+
+    dev_out: Dict[str, Any] = {}
+    issue_out: Dict[str, Any] = {}
+    try:
+        shared = {"userId": user_id, "projectId": project_id}
+
+        # 2) DEV增量
+        print("[tb_full] DEV增量...")
+        dev_out = normal_incremental_update_service(shared, skip_update_time=True)
+        if dev_out.get("success"):
+            d = dev_out.get("data", {})
+            bc = d.get("incremental_bc", {})
+            print(f"[tb_full] DEV done  inc={bc.get('count',0)}  ok={bc.get('ok',0)}  fail={bc.get('fail',0)}")
+        else:
+            print("[tb_full] DEV failed:", dev_out.get("error", "unknown"))
+
+        # 3) Issue增量
+        print("[tb_full] Issue增量...")
+        issue_out = normal_issue_incremental_update_service(shared, skip_update_time=True)
+        if issue_out.get("success"):
+            d = issue_out.get("data", {})
+            detail = d.get("issue_incremental_detail", {})
+            print(f"[tb_full] Issue done  inc={detail.get('count',0)}  ok={detail.get('ok',0)}  fail={detail.get('fail',0)}")
+        else:
+            print("[tb_full] Issue failed:", issue_out.get("error", "unknown"))
+
+        # 统一更新 last_update_time
+        if dev_out.get("success") or issue_out.get("success"):
+            from base.api_monitor import BJ_TZ
+            now_bj = datetime.now(BJ_TZ).isoformat()
+            sess = SessionLocal()
+            try:
+                _upsert_config_value("last_update_time", now_bj)
+                sess.commit()
+                print(f"[tb_full] last_update_time → {now_bj}")
+            except Exception as e:
+                sess.rollback()
+                print("[tb_full] last_update_time 更新失败:", repr(e))
+            finally:
+                sess.close()
+
+        return {
+            "success": True,
+            "data": {
+                "dev": dev_out.get("data") or {},
+                "issue": issue_out.get("data") or {},
+            },
+        }
+    finally:
+        _release_update_lock(DEFAULT_UPDATE_LOCK_KEY, owner)

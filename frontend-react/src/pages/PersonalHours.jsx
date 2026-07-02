@@ -4,7 +4,6 @@ import {
   fetchPersonalHoursMembers,
   queryPersonalHours,
   updatePersonalHours,
-  fullUpdatePersonalHours,
 } from '../api/dashboard';
 import Card from '../components/Card';
 import SectionTitle from '../components/SectionTitle';
@@ -50,9 +49,7 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
   const [taskSort, setTaskSort] = useState('desc');
   const [isQuerying, setIsQuerying] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [isFullUpdating, setIsFullUpdating] = useState(false);
   const [actionMessage, setActionMessage] = useState('');
-  const [showSyncActions, setShowSyncActions] = useState(false);
   const [showBusyModal, setShowBusyModal] = useState(false);
   const [quickRangePreset, setQuickRangePreset] = useState('quarter_to_today');
   const [selectedTeam, setSelectedTeam] = useState('');
@@ -634,35 +631,6 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
     }
   }
 
-  async function handleFullUpdate() {
-    setIsFullUpdating(true);
-    setActionMessage('');
-
-    try {
-      const response = await fullUpdatePersonalHours(user, {
-        ...dateRange,
-        compensatoryDays,
-        target: selectedTarget,
-        fullSync: true,
-      });
-      setLastUpdatedAt(response.data.lastUpdatedAt ?? lastUpdatedAt);
-      setActionMessage(response.data.message || '已触发全量更新。');
-      await handleQuery({
-        ...dateRange,
-        compensatoryDays,
-        target: selectedTarget,
-      });
-    } catch (error) {
-      if (isUpdateBusyError(error)) {
-        showBusyHint();
-        return;
-      }
-      setActionMessage(`全量更新失败：${error?.message || '未知错误'}`);
-    } finally {
-      setIsFullUpdating(false);
-    }
-  }
-
   function escapeCsvCell(value) {
     const text = value === null || value === undefined ? '' : String(value);
     if (text.includes('"') || text.includes(',') || text.includes('\n') || text.includes('\r')) {
@@ -760,41 +728,12 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
               </button>
               <button
                 type="button"
-                onClick={() => setShowSyncActions((prev) => !prev)}
-                disabled={isUpdating || isFullUpdating}
-                aria-expanded={showSyncActions}
-                aria-label={showSyncActions ? '收起同步' : '展开同步'}
-                className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-medium disabled:opacity-60 ${
-                  showSyncActions
-                    ? 'border-slate-900 bg-slate-900 text-white'
-                    : 'border-slate-200 bg-white text-slate-700'
-                }`}
+                onClick={handleUpdate}
+                disabled={isUpdating}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 disabled:opacity-60"
               >
-                <span>同步</span>
-                <span className={`text-xs ${showSyncActions ? 'text-white' : 'text-slate-500'}`} aria-hidden="true">
-                  {showSyncActions ? '◀' : '▶'}
-                </span>
+                {isUpdating ? '同步中...' : '同步'}
               </button>
-              {showSyncActions ? (
-                <>
-                  <button
-                    type="button"
-                    onClick={handleUpdate}
-                    disabled
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-400 disabled:opacity-60"
-                  >
-                    更新
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleFullUpdate}
-                    disabled
-                    className="whitespace-nowrap rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-400 disabled:opacity-60"
-                  >
-                    全量更新
-                  </button>
-                </>
-              ) : null}
             </div>
           </div>
         </div>

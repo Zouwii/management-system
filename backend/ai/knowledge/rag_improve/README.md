@@ -1,99 +1,83 @@
 # RAG 检索对照试验工作台
 
-> 6 项工作，按依赖顺序执行。每完成一项打勾。
+> A vs B 对照实验：基线 vs 基线+Cross-Encoder 重排
 
 ---
 
 ## 工作清单
 
-### [x] 1. 标注测试集 ✅ 完成
+### [x] 1. 标注测试集 ✅
 
-**方法**: TREC Pooling（三路检索合并）+ LLM relevance judgment + 人工复核
+**方法**: TREC Pooling（三路检索合并）+ LLM-as-Judge（deepseek-v4-pro）
 
-**文件**: `test_queries.json`（26 条查询，`relevant_chunk_ids` 已标注）
+**文件**: `test_queries.json`（26 条，135 个标注 chunk，0 空题）
 
-**脚本**: `llm_label.py` — 执行标注
+**脚本**:
 ```bash
-python -m ai.knowledge.rag_improve.llm_label
+python -m ai.knowledge.rag_improve.step01_build_testset              # 全量标注
+python -m ai.knowledge.rag_improve.step01_build_testset --retry-empty  # 只补标空题
+python -m ai.knowledge.rag_improve.step02_auto_label                  # 自动预标注（备用）
 ```
 
-**文档**: `docs/step1-annotation.md` — 完整方法说明
-**参考**: `docs/how-to-build-testset.md` — 业界标准做法对比
+**文档**: `docs/02-how-to-build-testset.md` — TREC Pooling + LLM-as-Judge 完整方法
 
 ---
 
-### [ ] 2. 建新向量表 + 安装模型
+### [x] 2. 建新向量表 + 安装模型 ✅
 
-**建表 SQL** (在 pgvector 库执行):
-```sql
-CREATE TABLE IF NOT EXISTS chunk_vectors_bgem3 (
-    id SERIAL PRIMARY KEY,
-    chunk_id INTEGER NOT NULL UNIQUE,
-    embedding vector(1024),
-    created_at TIMESTAMP DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS idx_cv_bgem3_ivfflat
-    ON chunk_vectors_bgem3 USING ivfflat (embedding vector_cosine_ops);
+**pgvector 表**（已建）:
+- `chunk_vectors` — bge-small 512d（当前生产用）
+- `chunk_vectors_bgem3` — bge-m3 1024d（后续实验用）
+- `chunk_vectors_large` — bge-large 1024d（后续实验用）
 
-CREATE TABLE IF NOT EXISTS chunk_vectors_large (
-    id SERIAL PRIMARY KEY,
-    chunk_id INTEGER NOT NULL UNIQUE,
-    embedding vector(1024),
-    created_at TIMESTAMP DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS idx_cv_large_ivfflat
-    ON chunk_vectors_large USING ivfflat (embedding vector_cosine_ops);
-```
-
-**安装模型**:
-```bash
-pip install sentence-transformers>=3.0 FlagEmbedding
-# 模型首次加载自动下载到 ~/.cache/huggingface/
-# bge-m3 ~2.2GB, bge-large ~1.3GB, reranker-v2-m3 ~1.1GB, reranker-large ~2.2GB
-```
+**已下载模型** (`local_models/BAAI/`):
+- `bge-large-zh-v1.5` — 1.3GB ✅
+- `bge-reranker-v2-m3` — 2.2GB ✅（当前实验用）
+- `bge-m3` — 下载未完成，C/D 组实验前需重下
 
 ---
 
 ### [ ] 3. 批量编码存量 chunk → 新向量表
 
-**文件**: `encode_vectors.py`（待开发）
+**文件**: `step06_encode_vectors.py`
 
-用 bge-m3 和 bge-large 分别编码 11528 条 chunk，写入 `chunk_vectors_bgem3` 和 `chunk_vectors_large`。
-
----
-
-### [ ] 4. 实现 5 组检索策略
-
-**文件**: `strategies.py`（待开发）
-
-| 组 | 嵌入模型 | 检索方式 | 重排 | 向量表 |
-|----|---------|---------|------|--------|
-| A | bge-small 512d | Hybrid RRF | 无 | chunk_vectors ✅ |
-| B | bge-small 512d | Hybrid RRF | bge-reranker-v2-m3 | chunk_vectors ✅ |
-| C | bge-m3 1024d | 纯向量 dense+sparse | 无 | chunk_vectors_bgem3 |
-| D | bge-m3 1024d | 纯向量 | bge-reranker-v2-m3 | chunk_vectors_bgem3 |
-| E | bge-large 1024d | Hybrid RRF | bge-reranker-large | chunk_vectors_large |
+A vs B 实验**不需要**这一步（直接用 `chunk_vectors`）。C/D/E 组实验前再跑。
 
 ---
 
-### [ ] 5. 实现评估指标
+### [x] 4. 实现检索策略 ✅
 
-**文件**: `metrics.py`（待开发）
+**文件**: `step03_strategies.py`
 
-- Recall@5: 前 5 条命中正确答案的比例
-- MRR: 第一个正确答案排名的倒数均值
-- nDCG@5: 归一化折损累积增益
+| 组 | 嵌入 | 检索 | 重排 | 状态 |
+|----|-----|------|------|------|
+| A | bge-small 512d | Hybrid RRF | 无 | ✅ |
+| B（v1/v2） | bge-small 512d | Hybrid RRF | v2-m3 / 双路 | ✅ 已废弃 |
+| **B（v3）** | bge-small 512d | Hybrid RRF top-20 | **bge-reranker-base** | **✅ 推荐** |
 
 ---
 
-### [ ] 6. 跑实验 + 输出报告
+### [x] 5. 实现评估指标 ✅
 
-**文件**: `runner.py`（待开发）
+**文件**: `step04_metrics.py`
 
-对 5 组策略跑全部 25 题，输出对比表：
-- 总表：5 组 × 3 指标
-- 细分表：按查询类型（技术文档/会议/表格/跨文档）
-- 最终推荐方案
+- Recall@5 — 前 5 条命中正确答案的比例
+- MRR — 第一个正确答案排名的倒数均值
+- nDCG@5 — 归一化折损累积增益
+
+---
+
+### [x] 6. 跑实验 + 输出报告 ✅
+
+| 版本 | 策略 | 模型 | Recall@5 | 本地 | 服务器 (i7) |
+|------|------|------|----------|------|------------|
+| v1 | 单路 Hybrid | v2-m3 (2.2GB) | 63.3% | 38s | ~2-3s |
+| v2 | 双路召回 | v2-m3 (2.2GB) | 60.0% | 40s | 证伪 |
+| **v3** | **单路 Hybrid** | **base (280MB)** | **59.6%** | 5s | **~1s** ✅ |
+
+**部署**：服务器 CPU 跑 base ~1s/query，`reranker_model="v2-m3"` 可切高精度模式。
+
+详见 [`docs/01-RAG检索优化-调研与实验方案.md`](./docs/01-RAG检索优化-调研与实验方案.md)
 
 ---
 
@@ -101,22 +85,21 @@ pip install sentence-transformers>=3.0 FlagEmbedding
 
 ```
 rag_improve/
-├── README.md              ← 你正在看的
-├── test_queries.json      ← 标注测试集 (25条)
-├── annotate.py            ← 交互式标注工具
-├── docs/
-│   ├── 13-rag-retrieval-benchmark.md   ← 对照试验方案设计
-│   └── 10-RAG检索调研与优化方案.md      ← RAG 全景调研
-├── encode_vectors.py      ← [待开发] 批量编码
-├── strategies.py          ← [待开发] 5 组检索策略
-├── metrics.py             ← [待开发] 评估指标
-└── runner.py              ← [待开发] 评测主程序
+├── README.md                        ← 你正在看的
+├── test_queries.json                ← 标注测试集 (26 题, 135 chunks)
+│
+├── step01_build_testset.py          ← 主标注流水线 (TREC Pooling + LLM)
+├── step02_auto_label.py             ← 自动预标注 (source_doc 匹配备用)
+├── step03_strategies.py             ← A/B 检索策略定义
+├── step04_metrics.py                ← Recall@K / MRR / nDCG@K
+├── step05_runner.py                 ← 对照实验运行器
+├── step06_encode_vectors.py         ← 批量编码 bge-large/bge-m3 (后续用)
+├── step07_annotate.py               ← 交互式标注工具 (备用)
+│
+└── docs/
+    ├── 01-RAG检索优化-调研与实验方案.md   ← 主文档：调研 + 实验方案
+    ├── 02-how-to-build-testset.md       ← 测试集构建方法论
+    ├── 03-step1-annotation.md           ← Step1 标注说明
+    ├── 04-10-RAG检索调研与优化方案.md     ← 全景调研 (leagcy)
+    └── 05-13-rag-retrieval-benchmark.md  ← 5组实验设计 (legacy)
 ```
-
----
-
-## 面试素材
-
-> 我对 RAG 检索质量做了系统的 A/B 对照试验，构建了 25 条标注测试集覆盖 4 种查询类型，
-> 对比了 5 种策略组合（基线/加重排/换模型/叠加），用 Recall@5、MRR、nDCG@5 做横向对比。
-> 最终选型基于数据而非直觉 —— XX 方案相比基线 recall 提升了 XX%。

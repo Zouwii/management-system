@@ -147,11 +147,31 @@ def parse_response(text: str, chunks: list[dict]) -> list[int]:
 
 
 def main():
-    queries = json.loads(TEST_QUERIES_PATH.read_text(encoding="utf-8"))
-    total = len(queries)
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--retry-empty", action="store_true", help="只重新标注 relevant_chunk_ids 为空的题目")
+    ap.add_argument("--ids", type=str, default="", help="逗号分隔的 query id 列表，只标注这些")
+    args = ap.parse_args()
+
+    all_queries = json.loads(TEST_QUERIES_PATH.read_text(encoding="utf-8"))
+    # 建立 id -> 全量列表索引的映射，方便回写
+    id_to_idx = {q["id"]: idx for idx, q in enumerate(all_queries)}
+
+    if args.ids:
+        target_ids = set(int(x.strip()) for x in args.ids.split(",") if x.strip())
+        work_list = [q for q in all_queries if q["id"] in target_ids]
+    elif args.retry_empty:
+        work_list = [q for q in all_queries if not q.get("relevant_chunk_ids")]
+    else:
+        work_list = all_queries
+
+    total = len(work_list)
+    if total == 0:
+        print("没有需要标注的题目")
+        return
     print(f"共 {total} 道题，Pooling 三路检索 + deepseek-v4-pro 标注\n")
 
-    for i, q in enumerate(queries):
+    for i, q in enumerate(work_list):
         query_text = q["query"]
         print(f"[{i+1}/{total}] #{q['id']} {query_text[:40]}...", end=" ", flush=True)
 
@@ -160,6 +180,11 @@ def main():
         if not candidates:
             q["relevant_chunk_ids"] = []
             print("无候选 chunk")
+            # 回写全量
+            all_queries[id_to_idx[q["id"]]] = q
+            TEST_QUERIES_PATH.write_text(
+                json.dumps(all_queries, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
             continue
 
         # 2. 构造 prompt → 调 LLM
@@ -175,16 +200,17 @@ def main():
         q["relevant_chunk_ids"] = sorted(relevant_ids)
         print(f"候选{len(candidates)}个 → {len(relevant_ids)} 个相关")
 
-        # 4. 每次写入
+        # 4. 回写到全量列表并落盘
+        all_queries[id_to_idx[q["id"]]] = q
         TEST_QUERIES_PATH.write_text(
-            json.dumps(queries, ensure_ascii=False, indent=2), encoding="utf-8"
+            json.dumps(all_queries, ensure_ascii=False, indent=2), encoding="utf-8"
         )
 
         time.sleep(0.5)
 
-    # 统计
-    total_labels = sum(len(q.get("relevant_chunk_ids", [])) for q in queries)
-    empty = sum(1 for q in queries if not q.get("relevant_chunk_ids"))
+    # 统计（基于全量）
+    total_labels = sum(len(q.get("relevant_chunk_ids", [])) for q in all_queries)
+    empty = sum(1 for q in all_queries if not q.get("relevant_chunk_ids"))
     print(f"\n完成: {total_labels} 个标注, {empty} 道题无相关结果")
 
 

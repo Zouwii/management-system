@@ -1,7 +1,7 @@
 """Update lock management for task sync operations.
 
 Provides distributed-mutex-style locking via the UpdateLock DB table.
-Used by full_update_service and projects.py to prevent concurrent syncs.
+Used by tb_incremental_update_service, tb_full_update_service, and projects.py to prevent concurrent syncs.
 """
 
 from datetime import datetime, timedelta, timezone

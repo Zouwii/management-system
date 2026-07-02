@@ -619,53 +619,6 @@ export function realUpdatePersonalHours(_user, payload) {
     });
 }
 
-export function realFullUpdatePersonalHours(_user, payload) {
-  const user = _user || {};
-  const target = payload?.target || user?.user_id || user?.name || 'ALL';
-  const targetLabel = target === 'ALL' ? '全部人员' : target;
-
-  return Promise.resolve()
-    .then(async () => {
-      await ensureNoGlobalUpdateLock();
-      const projectId = await fetchProjectId();
-      const userids = await fetchUserids(user);
-      const executorIds = resolveExecutorIdsByTarget(user, target, userids);
-      const resolvedTargetLabel = resolveTargetLabelByUserids(target, userids) || targetLabel;
-      // 全量更新是全项目口径，不按人员分批触发；只需一次调用即可。
-      const requestUserId = String(user?.user_id || executorIds[0] || '').trim();
-      if (!requestUserId) {
-        throw new Error('missing userId');
-      }
-      await httpRequest('/bt/full_update', {
-        method: 'POST',
-        body: JSON.stringify({
-          userId: requestUserId,
-          projectId,
-          maxResults: 500,
-          maxPages: 200,
-        }),
-      });
-
-      await httpRequest('/bt/config/touch_last_update_time', { method: 'POST' });
-      const tr = await fetchLastUpdateTime();
-      return {
-        code: 200,
-        error: '',
-        data: {
-          fullSync: true,
-          message: `已触发${resolvedTargetLabel}的全量更新。`,
-          lastUpdatedAt: tr.lastUpdateTime || '',
-        },
-      };
-    })
-    .catch((error) => {
-      if (isUpdateBusyError(error?.message)) {
-        throw new Error('更新中');
-      }
-      throw error;
-    });
-}
-
 export function realFetchPerformanceHistory(_user, params = {}) {
   return httpRequest(appendQuery('/dashboard/performance-history', {
     target: params.target,
