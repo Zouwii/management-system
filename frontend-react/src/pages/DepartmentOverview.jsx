@@ -109,11 +109,11 @@ function getLastQuarterRange() {
   };
 }
 
-const TIME_PRESETS = {
-  quarter_to_today: { label: '本季度至今', get: getCurrentQuarterRange },
-  quarter: { label: '本季度', get: getFullQuarterRange },
-  last_quarter: { label: '上季度', get: getLastQuarterRange },
-};
+const TIME_PRESETS = [
+  { key: 'last_quarter', label: '上季度', get: getLastQuarterRange },
+  { key: 'quarter', label: '本季度', get: getFullQuarterRange },
+  { key: 'quarter_to_today', label: '本季度至今天', get: getCurrentQuarterRange },
+];
 
 const TEAM_BAND_STYLES = {
   对接组: {
@@ -321,7 +321,7 @@ export default function DepartmentOverview() {
               />
             </label>
             <div className="flex items-center gap-2">
-              {Object.entries(TIME_PRESETS).map(([key, { label, get }]) => (
+              {TIME_PRESETS.map(({ key, label, get }) => (
                 <button
                   key={key}
                   type="button"
