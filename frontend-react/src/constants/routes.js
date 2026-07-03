@@ -10,7 +10,6 @@ export const ROUTE_PATHS = {
   PERSONAL_HOURS: '/employee/personal-hours',
   PERFORMANCE: '/employee/performance',
   AI_ANALYSIS: '/employee/ai-analysis',
-  PERMISSIONS: '/manager/permissions',
   WORKDAY_COSTHOUR: '/manager/workday-costhour',
 };
 

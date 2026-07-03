@@ -712,7 +712,6 @@ export default function WorkdayCostHourStats() {
     <ManagerLayout>
       <SectionTitle
         title="工作日耗时"
-        desc="按季度查看部门、小组、项目和成员维度的工作日耗时数据。"
       />
 
       {error ? (
@@ -729,27 +728,30 @@ export default function WorkdayCostHourStats() {
       ) : null}
 
       <Card className="p-5">
-        <div className="flex flex-col items-start justify-between gap-4 md:flex-row md:items-end">
-        <div className="w-full md:w-auto">
-          <label className="mb-1 block text-sm font-medium text-slate-600">统计时间</label>
-          <select
-            value={quarter}
-            onChange={(e) => setQuarter(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-400 md:w-72"
-          >
-            {QUARTER_OPTIONS.map((q) => (
-              <option key={q.value} value={q.value}>{q.label}</option>
-            ))}
-          </select>
-        </div>
-        <button
-          type="button"
-          onClick={handleQuery}
-          disabled={loading}
-          className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
-        >
-          {loading ? '查询中...' : '查询'}
-        </button>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="text-lg font-semibold text-slate-900">筛选时间</div>
+          <div className="flex w-full flex-wrap items-center gap-3 md:w-auto">
+            <label className="flex items-center gap-2 whitespace-nowrap text-sm text-slate-600">
+              <span className="shrink-0">统计季度</span>
+              <select
+                value={quarter}
+                onChange={(e) => setQuarter(e.target.value)}
+                className="w-[220px] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-400"
+              >
+                {QUARTER_OPTIONS.map((q) => (
+                  <option key={q.value} value={q.value}>{q.label}</option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={handleQuery}
+              disabled={loading}
+              className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-slate-700 disabled:opacity-50"
+            >
+              {loading ? '查询中...' : '查询'}
+            </button>
+          </div>
         </div>
       </Card>
 

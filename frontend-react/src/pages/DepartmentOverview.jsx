@@ -74,17 +74,18 @@ function formatScore(value) {
   return score > 0 ? score.toFixed(2) : '-';
 }
 
-function formatDateInput(date) {
+function formatDateTimeInput(date) {
   const pad = (value) => String(value).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+    + `T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 }
 
 function getCurrentQuarterRange() {
   const now = new Date();
   const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
   return {
-    startDate: formatDateInput(new Date(now.getFullYear(), quarterStartMonth, 1)),
-    endDate: formatDateInput(now),
+    startDate: formatDateTimeInput(new Date(now.getFullYear(), quarterStartMonth, 1, 0, 0, 0)),
+    endDate: formatDateTimeInput(new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)),
   };
 }
 
@@ -92,8 +93,8 @@ function getFullQuarterRange() {
   const now = new Date();
   const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
   return {
-    startDate: formatDateInput(new Date(now.getFullYear(), quarterStartMonth, 1)),
-    endDate: formatDateInput(new Date(now.getFullYear(), quarterStartMonth + 3, 0)),
+    startDate: formatDateTimeInput(new Date(now.getFullYear(), quarterStartMonth, 1, 0, 0, 0)),
+    endDate: formatDateTimeInput(new Date(now.getFullYear(), quarterStartMonth + 3, 0, 23, 59, 59)),
   };
 }
 
@@ -103,8 +104,8 @@ function getLastQuarterRange() {
   const lastQuarterStartMonth = currentQuarter === 0 ? 9 : (currentQuarter - 1) * 3;
   const lastQuarterYear = currentQuarter === 0 ? now.getFullYear() - 1 : now.getFullYear();
   return {
-    startDate: formatDateInput(new Date(lastQuarterYear, lastQuarterStartMonth, 1)),
-    endDate: formatDateInput(new Date(lastQuarterYear, lastQuarterStartMonth + 3, 0)),
+    startDate: formatDateTimeInput(new Date(lastQuarterYear, lastQuarterStartMonth, 1, 0, 0, 0)),
+    endDate: formatDateTimeInput(new Date(lastQuarterYear, lastQuarterStartMonth + 3, 0, 23, 59, 59)),
   };
 }
 
@@ -112,6 +113,28 @@ const TIME_PRESETS = {
   quarter_to_today: { label: '本季度至今', get: getCurrentQuarterRange },
   quarter: { label: '本季度', get: getFullQuarterRange },
   last_quarter: { label: '上季度', get: getLastQuarterRange },
+};
+
+const TEAM_BAND_STYLES = {
+  对接组: {
+    band: 'border-violet-500 bg-gradient-to-r from-violet-100 via-violet-50 to-white',
+    dot: 'bg-violet-500',
+    title: 'text-violet-950',
+    count: 'border-violet-200 bg-white/80 text-violet-700',
+  },
+  导航组: {
+    band: 'border-sky-500 bg-gradient-to-r from-sky-100 via-sky-50 to-white',
+    dot: 'bg-sky-500',
+    title: 'text-sky-950',
+    count: 'border-sky-200 bg-white/80 text-sky-700',
+  },
+};
+
+const DEFAULT_TEAM_BAND_STYLE = {
+  band: 'border-slate-400 bg-gradient-to-r from-slate-100 via-slate-50 to-white',
+  dot: 'bg-slate-400',
+  title: 'text-slate-900',
+  count: 'border-slate-200 bg-white/80 text-slate-600',
 };
 
 function buildMemberRows(rows) {
@@ -261,7 +284,6 @@ export default function DepartmentOverview() {
     <ManagerLayout>
       <SectionTitle
         title="部门有效工时"
-        desc="先按时间查看对接组和导航组的工作分配、完成情况，再看成员明细。"
         right={(
           <div className="flex flex-wrap justify-end gap-2 text-sm">
             <div className="rounded-full border border-slate-200 bg-white px-3 py-1.5">{quarterLabel}</div>
@@ -271,31 +293,34 @@ export default function DepartmentOverview() {
       />
 
       <Card className="p-5">
-        <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="text-lg font-semibold text-slate-900">筛选时间</div>
-            <div className="mt-1 text-sm text-slate-500">按所选时间查看小组工作分配和完成情况。</div>
           </div>
-          <div className="grid w-full gap-3 md:w-auto md:grid-cols-[180px_180px_auto]">
-            <label className="text-sm text-slate-600">
-              <span className="mb-1 block">开始日期</span>
+          <div className="flex w-full flex-wrap items-center gap-3 md:w-auto">
+            <label className="flex items-center gap-2 whitespace-nowrap text-sm text-slate-600">
+              <span className="shrink-0">开始时间</span>
               <input
-                type="date"
+                type="datetime-local"
+                step="1"
                 value={dateRange.startDate}
                 onChange={(event) => setDateRange((prev) => ({ ...prev, startDate: event.target.value }))}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-400"
+                max={dateRange.endDate || undefined}
+                className="w-[220px] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-400"
               />
             </label>
-            <label className="text-sm text-slate-600">
-              <span className="mb-1 block">结束日期</span>
+            <label className="flex items-center gap-2 whitespace-nowrap text-sm text-slate-600">
+              <span className="shrink-0">结束时间</span>
               <input
-                type="date"
+                type="datetime-local"
+                step="1"
                 value={dateRange.endDate}
                 onChange={(event) => setDateRange((prev) => ({ ...prev, endDate: event.target.value }))}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-400"
+                min={dateRange.startDate || undefined}
+                className="w-[220px] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-400"
               />
             </label>
-            <div className="flex items-end gap-2 pb-0.5">
+            <div className="flex items-center gap-2">
               {Object.entries(TIME_PRESETS).map(([key, { label, get }]) => (
                 <button
                   key={key}
@@ -385,7 +410,6 @@ export default function DepartmentOverview() {
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
           <div>
             <div className="text-lg font-semibold text-slate-900">部门成员</div>
-            <div className="mt-1 text-sm text-slate-500">按小组查看每个人的工时；展开后显示绩效。</div>
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <div className="text-sm text-slate-500">
@@ -431,11 +455,17 @@ export default function DepartmentOverview() {
 
         {Object.entries(teamGroups).map(([team, teamRows]) => {
           const sortedRows = sortRows(teamRows, sortConfig);
+          const bandStyle = TEAM_BAND_STYLES[team] ?? DEFAULT_TEAM_BAND_STYLE;
           return (
-            <div key={team} className="border-b border-slate-100 last:border-b-0">
-              <div className="flex items-center justify-between bg-slate-50 px-5 py-3">
-                <div className="font-semibold text-slate-900">{team}</div>
-                <div className="text-sm text-slate-500">{teamRows.length} 人</div>
+            <div key={team} className="border-b border-slate-200 last:border-b-0">
+              <div className={`flex items-center justify-between border-l-4 px-5 py-3.5 ${bandStyle.band}`}>
+                <div className="flex items-center gap-2.5">
+                  <span className={`h-2.5 w-2.5 rounded-full ${bandStyle.dot}`} aria-hidden="true" />
+                  <div className={`font-semibold ${bandStyle.title}`}>{team}</div>
+                </div>
+                <div className={`rounded-full border px-3 py-1 text-xs font-semibold ${bandStyle.count}`}>
+                  {teamRows.length} 人
+                </div>
               </div>
               <div className="overflow-x-auto">
                 <table className={`${showPerformance ? 'min-w-[1050px] max-w-[1200px]' : 'min-w-[800px] max-w-[920px]'} table-fixed text-left text-sm`}>

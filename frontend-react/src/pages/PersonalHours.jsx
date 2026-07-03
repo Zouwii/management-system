@@ -544,7 +544,7 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
         ...prev,
         [field]: value,
       };
-      // 前端限制：终止时间不能早于起始时间
+      // 前端限制：结束时间不能早于开始时间
       if (next.startDate && next.endDate && next.endDate < next.startDate) {
         if (field === 'startDate') {
           next.endDate = next.startDate;
@@ -588,7 +588,7 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
     };
 
     if (queryPayload?.startDate && queryPayload?.endDate && queryPayload.endDate < queryPayload.startDate) {
-      setActionMessage('终止时间不能早于起始时间。');
+      setActionMessage('结束时间不能早于开始时间。');
       return;
     }
     setIsQuerying(true);
@@ -724,7 +724,7 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
       <Card className="p-6">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <div className="text-lg font-semibold">时间区间</div>
+            <div className="text-lg font-semibold">筛选条件</div>
           </div>
           <div className="flex flex-col items-start gap-3">
             <div className="flex items-start gap-2">
@@ -803,27 +803,32 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
             </div>
           </div>
         ) : null}
-        <div className="mt-5 rounded-3xl border border-slate-200 bg-slate-50 p-4">
-          <div className="grid grid-cols-[88px_minmax(0,1fr)_88px_minmax(0,1fr)_auto] items-center gap-3">
-            <div className="text-sm text-slate-500">起始时间</div>
-            <input
-              type="datetime-local"
-              step="1"
-              value={dateRange.startDate}
-              onChange={(event) => handleDateChange('startDate', event.target.value)}
-              max={dateRange.endDate || undefined}
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
-            />
-            <div className="text-sm text-slate-500">终止时间</div>
-            <input
-              type="datetime-local"
-              step="1"
-              value={dateRange.endDate}
-              onChange={(event) => handleDateChange('endDate', event.target.value)}
-              min={dateRange.startDate || undefined}
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
-            />
-            <div className="flex flex-nowrap gap-2">
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+          <div className="flex items-center">
+            <div className="flex w-full flex-wrap items-center gap-3">
+              <label className="flex items-center gap-2 whitespace-nowrap text-sm text-slate-600">
+                <span className="shrink-0">开始时间</span>
+                <input
+                  type="datetime-local"
+                  step="1"
+                  value={dateRange.startDate}
+                  onChange={(event) => handleDateChange('startDate', event.target.value)}
+                  max={dateRange.endDate || undefined}
+                  className="w-[220px] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-400"
+                />
+              </label>
+              <label className="flex items-center gap-2 whitespace-nowrap text-sm text-slate-600">
+                <span className="shrink-0">结束时间</span>
+                <input
+                  type="datetime-local"
+                  step="1"
+                  value={dateRange.endDate}
+                  onChange={(event) => handleDateChange('endDate', event.target.value)}
+                  min={dateRange.startDate || undefined}
+                  className="w-[220px] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-400"
+                />
+              </label>
+              <div className="flex flex-nowrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => {
@@ -884,6 +889,7 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
               >
                 本季度至今天
               </button>
+              </div>
             </div>
           </div>
         </div>

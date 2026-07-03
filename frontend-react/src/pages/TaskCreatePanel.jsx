@@ -1,6 +1,16 @@
 const fieldClass = 'w-full rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-[13px] leading-5 text-slate-800 outline-none transition focus:border-sky-300';
 const labelClass = 'mb-1 text-[12px] font-medium leading-4 text-slate-500';
 
+function toDateTimeLocalValue(value) {
+  if (!value) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(value))) return `${value}T00:00:00`;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value).slice(0, 19);
+  const pad = (part) => String(part).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+    + `T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
 export default function TaskCreatePanel({
   draft,
   setDraft,
@@ -78,21 +88,25 @@ export default function TaskCreatePanel({
 
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <div className={labelClass}>开始日期</div>
+            <div className={labelClass}>开始时间</div>
             <input
-              type="date"
+              type="datetime-local"
+              step="1"
               className={fieldClass}
-              value={draft.startDate ? draft.startDate.slice(0, 10) : ''}
+              value={toDateTimeLocalValue(draft.startDate)}
               onChange={(event) => setDraft((current) => ({ ...current, startDate: event.target.value }))}
+              max={toDateTimeLocalValue(draft.dueDate) || undefined}
             />
           </div>
           <div>
-            <div className={labelClass}>结束日期</div>
+            <div className={labelClass}>结束时间</div>
             <input
-              type="date"
+              type="datetime-local"
+              step="1"
               className={fieldClass}
-              value={draft.dueDate ? draft.dueDate.slice(0, 10) : ''}
+              value={toDateTimeLocalValue(draft.dueDate)}
               onChange={(event) => setDraft((current) => ({ ...current, dueDate: event.target.value }))}
+              min={toDateTimeLocalValue(draft.startDate) || undefined}
             />
           </div>
         </div>

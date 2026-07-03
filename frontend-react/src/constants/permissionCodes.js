@@ -7,7 +7,6 @@ export const PAGE_PERMISSION_CODES = {
   PERSONAL_HOURS: 'page.personal_hours',
   PERFORMANCE: 'page.performance',
   AI_ANALYSIS: 'page.ai_analysis',
-  PERMISSIONS: 'page.permissions',
   PROTOTYPE: 'page.prototype',
   WORKDAY_COSTHOUR: 'page.workday_costhour',
 };

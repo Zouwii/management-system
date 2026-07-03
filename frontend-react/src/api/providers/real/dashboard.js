@@ -240,8 +240,8 @@ async function ensureNoGlobalUpdateLock() {
 
 export function realFetchDepartmentOverview(_user, params = {}) {
   return httpRequest(appendQuery('/bt/dashboard/department-overview', {
-    startDate: params.startDate,
-    endDate: params.endDate,
+    startDate: toUtcISOString(params.startDate),
+    endDate: toUtcISOString(params.endDate),
   }));
 }
 
@@ -267,8 +267,8 @@ export function realFetchNavTeamDetail(_user, params = {}) {
         body: JSON.stringify({
           teamId: '0',
           projectId,
-          start_time: formatLocalInput(start),
-          end_time: formatLocalInput(end),
+          start_time: params.startDate || formatLocalInput(start),
+          end_time: params.endDate || formatLocalInput(end),
           exclude_character_zero: true,
         }),
       });
@@ -306,8 +306,8 @@ export function realFetchIntegrationTeamDetail(_user, params = {}) {
         body: JSON.stringify({
           teamId: '1',
           projectId,
-          start_time: formatLocalInput(start),
-          end_time: formatLocalInput(end),
+          start_time: params.startDate || formatLocalInput(start),
+          end_time: params.endDate || formatLocalInput(end),
           exclude_character_zero: true,
         }),
       });

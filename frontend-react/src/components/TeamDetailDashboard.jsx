@@ -60,6 +60,18 @@ function getRiskRowClass(level) {
   return '';
 }
 
+function RiskExplanation({ metric }) {
+  return (
+    <span className="block space-y-1 whitespace-nowrap text-left">
+      <span className="mb-1.5 block border-b border-slate-600 pb-1.5 text-slate-200">{metric}</span>
+      <span className="block"><span className="font-semibold text-rose-300">高风险：</span>&lt; 50%</span>
+      <span className="block"><span className="font-semibold text-amber-300">中风险：</span>≥ 50% 且 &lt; 80%</span>
+      <span className="block"><span className="font-semibold text-sky-300">低风险：</span>≥ 80% 且 &lt; 100%</span>
+      <span className="block"><span className="font-semibold text-emerald-300">充足：</span>≥ 100%</span>
+    </span>
+  );
+}
+
 function getPerformanceBand(score) {
   if (score >= 2) {
     return '杰出';
@@ -170,6 +182,35 @@ function parseQuarterLabel(label) {
   return { year: Number(match[1]), quarter: Number(match[2]) };
 }
 
+function buildExpectedDateRange(view) {
+  const now = new Date();
+  const pad = (value) => String(value).padStart(2, '0');
+  const format = (date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+    + `T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
+
+  if (view === 'last_quarter') {
+    const lastQuarterStartMonth = quarterStartMonth === 0 ? 9 : quarterStartMonth - 3;
+    const lastQuarterYear = quarterStartMonth === 0 ? now.getFullYear() - 1 : now.getFullYear();
+    return {
+      startDate: format(new Date(lastQuarterYear, lastQuarterStartMonth, 1, 0, 0, 0)),
+      endDate: format(new Date(lastQuarterYear, lastQuarterStartMonth + 3, 0, 23, 59, 59)),
+    };
+  }
+
+  if (view === 'current') {
+    return {
+      startDate: format(new Date(now.getFullYear(), quarterStartMonth, 1, 0, 0, 0)),
+      endDate: format(new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)),
+    };
+  }
+
+  return {
+    startDate: format(new Date(now.getFullYear(), quarterStartMonth, 1, 0, 0, 0)),
+    endDate: format(new Date(now.getFullYear(), quarterStartMonth + 3, 0, 23, 59, 59)),
+  };
+}
+
 export default function TeamDetailDashboard({
   title,
   desc,
@@ -201,23 +242,7 @@ export default function TeamDetailDashboard({
   const [allocationSort, setAllocationSort] = useState('none');
   const [completionSort, setCompletionSort] = useState('none');
   const [expectedView, setExpectedView] = useState(initialExpectedView);
-
-  const dateRange = useMemo(() => {
-    const now = new Date();
-    const pad = (n) => String(n).padStart(2, '0');
-    const fmt = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-    const qm = Math.floor(now.getMonth() / 3) * 3;
-    if (expectedView === 'last_quarter') {
-      const cq = Math.floor(now.getMonth() / 3);
-      const lqm = cq === 0 ? 9 : (cq - 1) * 3;
-      const ly = cq === 0 ? now.getFullYear() - 1 : now.getFullYear();
-      return { startDate: fmt(new Date(ly, lqm, 1, 0, 0, 0)), endDate: fmt(new Date(ly, lqm + 3, 0, 23, 59, 59)) };
-    }
-    if (expectedView === 'current') {
-      return { startDate: fmt(new Date(now.getFullYear(), qm, 1, 0, 0, 0)), endDate: fmt(new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)) };
-    }
-    return { startDate: fmt(new Date(now.getFullYear(), qm, 1, 0, 0, 0)), endDate: fmt(new Date(now.getFullYear(), qm + 3, 0, 23, 59, 59)) };
-  }, [expectedView]);
+  const [dateRange, setDateRange] = useState(() => buildExpectedDateRange(initialExpectedView));
 
   const [performanceMemberFilter, setPerformanceMemberFilter] = useState('全部');
   const [performanceScoreFilter, setPerformanceScoreFilter] = useState(initialPerformanceScore);
@@ -256,7 +281,7 @@ export default function TeamDetailDashboard({
   useEffect(() => {
     let active = true;
 
-    fetcher(user, { expected: expectedView }).then((response) => {
+    fetcher(user, { expected: expectedView, ...dateRange }).then((response) => {
       if (!active) {
         return;
       }
@@ -281,7 +306,7 @@ export default function TeamDetailDashboard({
     return () => {
       active = false;
     };
-  }, [expectedView, fallbackRows, fetcher, teamKey, user]);
+  }, [dateRange, expectedView, fallbackRows, fetcher, teamKey, user]);
 
   useEffect(() => {
     const nextExpectedView = searchParams.get('expected') === 'current' ? 'current' : 'quarter';
@@ -297,9 +322,27 @@ export default function TeamDetailDashboard({
     })[searchParams.get('performanceScore') || ''] ?? '全部绩效';
 
     setExpectedView(nextExpectedView);
+    setDateRange(buildExpectedDateRange(nextExpectedView));
     setHoursAbnormalFilter(nextHoursAbnormal);
     setPerformanceScoreFilter(nextPerformanceScore);
   }, [searchParams]);
+
+  function applyExpectedView(view) {
+    setExpectedView(view);
+    setDateRange(buildExpectedDateRange(view));
+  }
+
+  function handleDateRangeChange(field, value) {
+    setExpectedView('custom');
+    setDateRange((current) => {
+      const next = { ...current, [field]: value };
+      if (next.startDate && next.endDate && next.endDate < next.startDate) {
+        if (field === 'startDate') next.endDate = next.startDate;
+        else next.startDate = next.endDate;
+      }
+      return next;
+    });
+  }
 
   useEffect(() => {
     if (memberOptions.includes(hoursMemberFilter)) return;
@@ -426,7 +469,14 @@ export default function TeamDetailDashboard({
   const avgFinalPerformance = visiblePerformanceRows.length
     ? (visiblePerformanceRows.reduce((sum, row) => sum + row.finalScore, 0) / visiblePerformanceRows.length).toFixed(2)
     : '0.00';
-  const expectedConfig = expectedView === 'current'
+  const expectedConfig = expectedView === 'custom'
+    ? {
+        label: '筛选区间预期有效工时',
+        description: '当前筛选时间范围内的预期有效工时',
+        summaryValue: teamHoursSummary.selectedExpectedHours,
+        rowValue: 'selectedExpectedHours',
+      }
+    : expectedView === 'current'
     ? {
         label: '本季度至今天预期有效工时',
         description: '当前筛选成员本季度截至今天的预期有效工时',
@@ -465,24 +515,34 @@ export default function TeamDetailDashboard({
         </div>
         <div className="border-b border-slate-200 bg-white px-5 py-4">
           {/* 第一行：时间区间 */}
-          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
-            <div className="grid grid-cols-[72px_minmax(0,1fr)_72px_minmax(0,1fr)_auto] items-center gap-3">
-              <div className="text-sm text-slate-500">起始时间</div>
-              <input type="datetime-local" step="1" value={dateRange.startDate} disabled
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500 outline-none cursor-not-allowed" />
-              <div className="text-sm text-slate-500">终止时间</div>
-              <input type="datetime-local" step="1" value={dateRange.endDate} disabled
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500 outline-none cursor-not-allowed" />
-              <div className="flex flex-nowrap gap-2">
-                <button type="button" onClick={() => setExpectedView('last_quarter')}
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+            <div className="flex items-center">
+              <div className="flex w-full flex-wrap items-center gap-3">
+                <label className="flex items-center gap-2 whitespace-nowrap text-sm text-slate-600">
+                  <span className="shrink-0">开始时间</span>
+                  <input type="datetime-local" step="1" value={dateRange.startDate}
+                    onChange={(event) => handleDateRangeChange('startDate', event.target.value)}
+                    max={dateRange.endDate || undefined}
+                    className="w-[220px] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-400" />
+                </label>
+                <label className="flex items-center gap-2 whitespace-nowrap text-sm text-slate-600">
+                  <span className="shrink-0">结束时间</span>
+                  <input type="datetime-local" step="1" value={dateRange.endDate}
+                    onChange={(event) => handleDateRangeChange('endDate', event.target.value)}
+                    min={dateRange.startDate || undefined}
+                    className="w-[220px] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-400" />
+                </label>
+                <div className="flex flex-nowrap items-center gap-2">
+                <button type="button" onClick={() => applyExpectedView('last_quarter')}
                   className={`whitespace-nowrap rounded-full border px-3 py-2 text-sm font-medium ${expectedView === 'last_quarter' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}>
                   上季度</button>
-                <button type="button" onClick={() => setExpectedView('quarter')}
+                <button type="button" onClick={() => applyExpectedView('quarter')}
                   className={`whitespace-nowrap rounded-full border px-3 py-2 text-sm font-medium ${expectedView === 'quarter' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}>
                   本季度</button>
-                <button type="button" onClick={() => setExpectedView('current')}
+                <button type="button" onClick={() => applyExpectedView('current')}
                   className={`whitespace-nowrap rounded-full border px-3 py-2 text-sm font-medium ${expectedView === 'current' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}>
                   本季度至今天</button>
+                </div>
               </div>
             </div>
           </div>
@@ -583,20 +643,18 @@ export default function TeamDetailDashboard({
               <tr>
                 <th className="px-5 py-4 text-left font-medium">姓名</th>
                 <th className="px-5 py-4 text-left font-medium">岗位</th>
-                <th className="px-5 py-4 text-left font-medium">{expectedConfig.label}</th>
-                <th className="px-5 py-4 text-left font-medium">当前已排总有效工时</th>
-                <th className="px-5 py-4 text-left font-medium">当前已完成有效工时</th>
-                <th className="px-5 py-4 text-left font-medium">季度逾期总有效工时</th>
-                <th className="px-5 py-4 text-left font-medium">季度逾期完成工时</th>
+                <th className="border-t-4 border-violet-400 bg-violet-100 px-5 py-4 text-left font-semibold text-violet-900">{expectedConfig.label}</th>
+                <th className="border-t-4 border-sky-400 bg-sky-100 px-5 py-4 text-left font-semibold text-sky-900">当前已排总有效工时</th>
+                <th className="border-t-4 border-emerald-400 bg-emerald-100 px-5 py-4 text-left font-semibold text-emerald-900">当前已完成有效工时</th>
+                <th className="border-t-4 border-amber-400 bg-amber-100 px-5 py-4 text-left font-semibold text-amber-900">季度逾期总有效工时</th>
+                <th className="border-t-4 border-rose-400 bg-rose-100 px-5 py-4 text-left font-semibold text-rose-900">季度逾期完成工时</th>
                 <th className="px-5 py-4 text-left font-medium">
                   <div className="flex items-center gap-1">
                     任务分配差值
                     <span className="group relative cursor-help text-slate-400">
                       <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" /></svg>
-                      <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1 hidden w-44 rounded-lg bg-slate-800 px-3 py-2 text-[11px] leading-relaxed font-normal text-white group-hover:block">
-                        已排工时 / 季度预期有效工时<br/>
-                        &lt;50%=高风险 · 50~80%=中风险<br/>
-                        80~100%=低风险 · ≥100%=充足
+                      <span className="pointer-events-none absolute top-full left-1/2 z-20 mt-1 hidden -translate-x-1/2 rounded-lg bg-slate-800 px-3 py-2 text-[11px] leading-relaxed font-normal text-white shadow-lg group-hover:block">
+                        <RiskExplanation metric="已排工时 / 季度预期有效工时" />
                       </span>
                     </span>
                   </div>
@@ -606,10 +664,8 @@ export default function TeamDetailDashboard({
                     任务完成差值
                     <span className="group relative cursor-help text-slate-400">
                       <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" /></svg>
-                      <span className="pointer-events-none absolute top-full right-0 mt-1 hidden w-44 rounded-lg bg-slate-800 px-3 py-2 text-[11px] leading-relaxed font-normal text-white group-hover:block">
-                        已完成工时 / 季度预期有效工时<br/>
-                        &lt;50%=高风险 · 50~80%=中风险<br/>
-                        80~100%=低风险 · ≥100%=充足
+                      <span className="pointer-events-none absolute top-full right-0 z-20 mt-1 hidden rounded-lg bg-slate-800 px-3 py-2 text-[11px] leading-relaxed font-normal text-white shadow-lg group-hover:block">
+                        <RiskExplanation metric="已完成工时 / 季度预期有效工时" />
                       </span>
                     </span>
                   </div>
@@ -628,11 +684,11 @@ export default function TeamDetailDashboard({
                     </Link>
                   </td>
                   <td className="px-5 py-4 text-slate-600">{row.role}</td>
-                  <td className="px-5 py-4 text-slate-600">{formatRawDays(row[expectedConfig.rowValue])}天</td>
-                  <td className="px-5 py-4 text-slate-600">{formatRawDays(row.scheduledHours)}天</td>
-                  <td className="px-5 py-4 text-slate-600">{formatRawDays(row.completedHours)}天</td>
-                  <td className="px-5 py-4 text-slate-600">{formatRawDays(row.overdueEffectiveHours)}天</td>
-                  <td className="px-5 py-4 text-slate-600">{formatRawDays(row.overdueCompletedHours)}天</td>
+                  <td className="bg-violet-50/70 px-5 py-4 font-medium text-violet-800">{formatRawDays(row[expectedConfig.rowValue])}天</td>
+                  <td className="bg-sky-50/70 px-5 py-4 font-medium text-sky-800">{formatRawDays(row.scheduledHours)}天</td>
+                  <td className="bg-emerald-50/70 px-5 py-4 font-medium text-emerald-800">{formatRawDays(row.completedHours)}天</td>
+                  <td className="bg-amber-50/70 px-5 py-4 font-medium text-amber-800">{formatRawDays(row.overdueEffectiveHours)}天</td>
+                  <td className="bg-rose-50/70 px-5 py-4 font-medium text-rose-800">{formatRawDays(row.overdueCompletedHours)}天</td>
                   <td className="px-5 py-4">
                     <div className={`flex items-center gap-2 font-medium ${row.allocationInsufficient ? 'text-rose-700' : 'text-emerald-700'}`}>
                       <span>{row.allocationDelta > 0 ? '+' : ''}{formatRawDays(row.allocationDelta)}天</span>
@@ -658,7 +714,7 @@ export default function TeamDetailDashboard({
           <div className="mt-1 text-sm text-slate-500">按季度查看每个成员的绩效结果，默认展示当前最新季度。</div>
         </div>
         <div className="border-b border-slate-200 bg-white px-5 py-4">
-          <div className="grid gap-3 xl:grid-cols-[220px_180px_180px_auto_auto]">
+          <div className="grid gap-3 xl:grid-cols-[220px_180px_180px_max-content_1fr]">
             <select
               value={performanceMemberFilter}
               onChange={(event) => setPerformanceMemberFilter(event.target.value)}
@@ -691,9 +747,9 @@ export default function TeamDetailDashboard({
               type="button"
               onClick={() => setAppliedQuarter(selectedQuarter)}
               disabled={perfLoading}
-              className="rounded-full bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
+              className="w-fit justify-self-start rounded-full bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
             >
-              {perfLoading ? '查询中...' : '查询季度'}
+              {perfLoading ? '查询中...' : '查询'}
             </button>
             <div className="flex items-center justify-end text-sm text-slate-500">
               平均最终绩效

@@ -4,7 +4,6 @@ import IntegrationTeamDetail from '../pages/IntegrationTeamDetail';
 import PersonalHoursByRole from '../pages/PersonalHoursByRole';
 import PerformancePage from '../pages/PerformancePage';
 import AIAnalysisPage from '../pages/AIAnalysisPage';
-import PermissionPage from '../pages/PermissionPage';
 import LoginPage from '../pages/LoginPage';
 import Prototype from '../pages/Prototype';
 import WorkdayCostHourStats from '../pages/WorkdayCostHourStats';
@@ -63,14 +62,6 @@ export const appRouteConfig = [
     allowedRoles: [ROLES.EMPLOYEE, ROLES.MANAGER, ROLES.ADMIN],
     permissionCode: PAGE_PERMISSION_CODES.AI_ANALYSIS,
     element: <AIAnalysisPage />,
-  },
-  {
-    path: ROUTE_PATHS.PERMISSIONS,
-    label: '权限管理',
-    menu: true,
-    allowedRoles: [ROLES.ADMIN],
-    permissionCode: PAGE_PERMISSION_CODES.PERMISSIONS,
-    element: <PermissionPage />,
   },
   {
     path: ROUTE_PATHS.PROTOTYPE,

@@ -62,12 +62,4 @@ export const sideMenuConfig = [
     allowedRoles: [ROLES.EMPLOYEE, ROLES.MANAGER, ROLES.ADMIN],
     permissionCode: PAGE_PERMISSION_CODES.AI_ANALYSIS,
   },
-  {
-    path: ROUTE_PATHS.PERMISSIONS,
-    label: '权限管理',
-    employeeLabel: '权限管理',
-    section: '系统管理',
-    allowedRoles: [ROLES.ADMIN],
-    permissionCode: PAGE_PERMISSION_CODES.PERMISSIONS,
-  },
 ];
