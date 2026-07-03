@@ -495,7 +495,7 @@ def init_database() -> None:
                 "start_time": start_dt.isoformat(),
                 "end_time": end_dt.isoformat(),
                 # character -> coefficient（工时折算系数映射）
-                "workhour_character_coefficients": '{"0":0.4,"1":0.7,"2":0.7,"3":1.0,"4":0.7}',
+                "workhour_character_coefficients": '{"0":0.4,"1":0.8,"2":0.8,"3":1.0,"4":0.8,"5":0.5}',
                 # UI 展示“上次更新时间”（固定为 1970，避免每次启动都更新时间）
                 "last_update_time": "1970-01-01T00:00:00+00:00",
                 # 自动更新配置

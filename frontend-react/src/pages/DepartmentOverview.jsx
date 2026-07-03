@@ -97,6 +97,23 @@ function getFullQuarterRange() {
   };
 }
 
+function getLastQuarterRange() {
+  const now = new Date();
+  const currentQuarter = Math.floor(now.getMonth() / 3);
+  const lastQuarterStartMonth = currentQuarter === 0 ? 9 : (currentQuarter - 1) * 3;
+  const lastQuarterYear = currentQuarter === 0 ? now.getFullYear() - 1 : now.getFullYear();
+  return {
+    startDate: formatDateInput(new Date(lastQuarterYear, lastQuarterStartMonth, 1)),
+    endDate: formatDateInput(new Date(lastQuarterYear, lastQuarterStartMonth + 3, 0)),
+  };
+}
+
+const TIME_PRESETS = {
+  quarter_to_today: { label: '本季度至今', get: getCurrentQuarterRange },
+  quarter: { label: '本季度', get: getFullQuarterRange },
+  last_quarter: { label: '上季度', get: getLastQuarterRange },
+};
+
 function buildMemberRows(rows) {
   return rows.map((row) => {
     const expectedHours = getExpectedHours(row);
@@ -185,6 +202,7 @@ export default function DepartmentOverview() {
   const [lastUpdatedAt, setLastUpdatedAt] = useState('');
   const [apiQuarter, setApiQuarter] = useState(null);
   const [dateRange, setDateRange] = useState(() => getCurrentQuarterRange());
+  const [timePreset, setTimePreset] = useState('quarter_to_today');
   const [showPerformance, setShowPerformance] = useState(false);
   const [sortConfig, setSortConfig] = useState({ key: '', direction: 'asc' });
 
@@ -258,7 +276,7 @@ export default function DepartmentOverview() {
             <div className="text-lg font-semibold text-slate-900">筛选时间</div>
             <div className="mt-1 text-sm text-slate-500">按所选时间查看小组工作分配和完成情况。</div>
           </div>
-          <div className="grid w-full gap-3 md:w-auto md:grid-cols-[180px_180px_auto_auto]">
+          <div className="grid w-full gap-3 md:w-auto md:grid-cols-[180px_180px_auto]">
             <label className="text-sm text-slate-600">
               <span className="mb-1 block">开始日期</span>
               <input
@@ -277,20 +295,22 @@ export default function DepartmentOverview() {
                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-400"
               />
             </label>
-            <button
-              type="button"
-              onClick={() => setDateRange(getCurrentQuarterRange())}
-              className="self-end rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              本季度至今
-            </button>
-            <button
-              type="button"
-              onClick={() => setDateRange(getFullQuarterRange())}
-              className="self-end rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-slate-700"
-            >
-              本季度
-            </button>
+            <div className="flex items-end gap-2 pb-0.5">
+              {Object.entries(TIME_PRESETS).map(([key, { label, get }]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => { setTimePreset(key); setDateRange(get()); }}
+                  className={`whitespace-nowrap rounded-full border px-3 py-2 text-sm font-medium ${
+                    timePreset === key
+                      ? 'border-slate-900 bg-slate-900 text-white'
+                      : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </Card>

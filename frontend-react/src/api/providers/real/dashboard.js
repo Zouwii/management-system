@@ -803,3 +803,7 @@ export function realRecalcMemberPerformance(payload = {}) {
     }),
   });
 }
+
+export function realSyncAllUsers() {
+  return httpRequest('/bt/sync_all_users', { method: 'POST' });
+}

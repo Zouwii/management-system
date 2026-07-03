@@ -210,21 +210,20 @@ def create_app() -> Flask:
         except Exception as e:
             print("[auto_sync] KB大更新 error:", repr(e))
 
-        # 3) TB大更新（DEV增量 + Issue增量）
-        print("[auto_sync] [3/3] TB大更新...")
+        # 3) TB大更新（清表全量重拉所有用户）
+        print("[auto_sync] [3/3] TB大更新（清表全量）...")
         try:
             from base.sync.task_sync import tb_full_update_service
             user_id, project_id = _resolve_sync_user_project()
-            if not user_id or not project_id:
-                print("[auto_sync] TB大更新 skipped: missing userId/projectId")
+            if not project_id:
+                print("[auto_sync] TB大更新 skipped: missing projectId")
             else:
-                result = tb_full_update_service({"userId": user_id, "projectId": project_id})
+                result = tb_full_update_service({"projectId": project_id})
                 if result.get("success"):
-                    dev_data = result.get("data", {}).get("dev", {})
-                    issue_data = result.get("data", {}).get("issue", {})
-                    dev_bc = dev_data.get("incremental_bc", {})
-                    issue_detail = issue_data.get("issue_incremental_detail", {})
-                    print(f"[auto_sync] TB大更新 done  DEV: inc={dev_bc.get('count',0)} ok={dev_bc.get('ok',0)} fail={dev_bc.get('fail',0)}  Issue: inc={issue_detail.get('count',0)} ok={issue_detail.get('ok',0)} fail={issue_detail.get('fail',0)}")
+                    d = result.get("data", {})
+                    dev = d.get("dev", {})
+                    issue = d.get("issue", {})
+                    print(f"[auto_sync] TB大更新 done  users={d.get('user_count', 0)}  DEV: {dev.get('ok',0)}ok/{dev.get('fail',0)}fail  Issue: {issue.get('ok',0)}ok/{issue.get('fail',0)}fail  truncated={d.get('truncated', False)}")
                 else:
                     print("[auto_sync] TB大更新 failed:", result.get("error", "unknown"))
         except Exception as e:

@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import {
   fetchPersonalHoursMembers,
   queryPersonalHours,
-  updatePersonalHours,
+  syncAllUsers,
 } from '../api/dashboard';
 import Card from '../components/Card';
 import SectionTitle from '../components/SectionTitle';
@@ -492,10 +492,9 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     const hours = String(date.getHours()).padStart(2, '0');
-    const minutePart = String(date.getMinutes()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
     const seconds = String(date.getSeconds()).padStart(2, '0');
-
-    return `${year}-${month}-${day}T${hours}:${minutePart}:${seconds}`;
+    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
   }
 
   function formatRawDays(value) {
@@ -511,6 +510,24 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
     const end = useTodayEnd
       ? new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
       : new Date(now.getFullYear(), quarterStartMonth + 3, 0, 23, 59, 59);
+
+    return {
+      startDate: formatInputDateTime(start),
+      endDate: formatInputDateTime(end),
+      compensatoryDays,
+      target: selectedTarget,
+    };
+  }
+
+  function buildLastQuarterRange() {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentQuarter = Math.floor(currentMonth / 3);
+    // 上季度起始月
+    const lastQuarterStartMonth = currentQuarter === 0 ? 9 : (currentQuarter - 1) * 3;
+    const lastQuarterYear = currentQuarter === 0 ? now.getFullYear() - 1 : now.getFullYear();
+    const start = new Date(lastQuarterYear, lastQuarterStartMonth, 1, 0, 0, 0);
+    const end = new Date(lastQuarterYear, lastQuarterStartMonth + 3, 0, 23, 59, 59);
 
     return {
       startDate: formatInputDateTime(start),
@@ -613,13 +630,10 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
     setActionMessage('');
 
     try {
-      const response = await updatePersonalHours(user, {
-        ...dateRange,
-        compensatoryDays,
-        target: selectedTarget,
-      });
-      setLastUpdatedAt(response.data.lastUpdatedAt ?? lastUpdatedAt);
-      setActionMessage(response.data.message || '已触发工时更新。');
+      const response = await syncAllUsers(user);
+      const d = response?.data || {};
+      setLastUpdatedAt(d.beijing_now ?? lastUpdatedAt);
+      setActionMessage(`已同步 ${d.ok ?? 0}/${d.user_count ?? 0} 人` + (d.fail ? `，${d.fail} 人失败` : ''));
     } catch (error) {
       if (isUpdateBusyError(error)) {
         showBusyHint();
@@ -790,7 +804,7 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
           </div>
         ) : null}
         <div className="mt-5 rounded-3xl border border-slate-200 bg-slate-50 p-4">
-          <div className="grid grid-cols-[88px_minmax(0,1fr)_88px_minmax(0,1fr)_auto_1fr_88px_120px] items-center gap-3">
+          <div className="grid grid-cols-[88px_minmax(0,1fr)_88px_minmax(0,1fr)_auto] items-center gap-3">
             <div className="text-sm text-slate-500">起始时间</div>
             <input
               type="datetime-local"
@@ -810,6 +824,26 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
               className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none"
             />
             <div className="flex flex-nowrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  const nextRange = buildLastQuarterRange();
+                  setQuickRangePreset('last_quarter');
+                  setDateRange({
+                    startDate: nextRange.startDate,
+                    endDate: nextRange.endDate,
+                  });
+                  handleQuery(nextRange);
+                }}
+                disabled={isQuerying}
+                className={`whitespace-nowrap rounded-full border px-3 py-2 text-sm font-medium disabled:opacity-60 ${
+                  quickRangePreset === 'last_quarter'
+                    ? 'border-slate-900 bg-slate-900 text-white'
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                上季度
+              </button>
               <button
                 type="button"
                 onClick={() => {
@@ -850,19 +884,6 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
               >
                 本季度至今天
               </button>
-            </div>
-            <div />
-            <div className="text-sm text-right text-slate-500">调休天数</div>
-            <div className="flex items-center rounded-2xl border border-slate-200 bg-white">
-              <input
-                type="number"
-                min="0"
-                step="0.5"
-                value={compensatoryDays}
-                onChange={(event) => setCompensatoryDays(event.target.value)}
-                className="w-full rounded-l-2xl bg-white px-4 py-3 text-sm text-slate-700 outline-none"
-              />
-              <div className="rounded-r-2xl border-l border-slate-200 px-4 py-3 text-sm text-slate-500">天</div>
             </div>
           </div>
         </div>

@@ -201,6 +201,24 @@ export default function TeamDetailDashboard({
   const [allocationSort, setAllocationSort] = useState('none');
   const [completionSort, setCompletionSort] = useState('none');
   const [expectedView, setExpectedView] = useState(initialExpectedView);
+
+  const dateRange = useMemo(() => {
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    const fmt = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    const qm = Math.floor(now.getMonth() / 3) * 3;
+    if (expectedView === 'last_quarter') {
+      const cq = Math.floor(now.getMonth() / 3);
+      const lqm = cq === 0 ? 9 : (cq - 1) * 3;
+      const ly = cq === 0 ? now.getFullYear() - 1 : now.getFullYear();
+      return { startDate: fmt(new Date(ly, lqm, 1, 0, 0, 0)), endDate: fmt(new Date(ly, lqm + 3, 0, 23, 59, 59)) };
+    }
+    if (expectedView === 'current') {
+      return { startDate: fmt(new Date(now.getFullYear(), qm, 1, 0, 0, 0)), endDate: fmt(new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)) };
+    }
+    return { startDate: fmt(new Date(now.getFullYear(), qm, 1, 0, 0, 0)), endDate: fmt(new Date(now.getFullYear(), qm + 3, 0, 23, 59, 59)) };
+  }, [expectedView]);
+
   const [performanceMemberFilter, setPerformanceMemberFilter] = useState('全部');
   const [performanceScoreFilter, setPerformanceScoreFilter] = useState(initialPerformanceScore);
   const performanceQuarters = useMemo(() => generateQuarterOptions(), []);
@@ -446,7 +464,30 @@ export default function TeamDetailDashboard({
           <div className="text-lg font-semibold">工时情况</div>
         </div>
         <div className="border-b border-slate-200 bg-white px-5 py-4">
-          <div className="grid gap-3 xl:grid-cols-[repeat(4,minmax(0,1fr))_auto]">
+          {/* 第一行：时间区间 */}
+          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
+            <div className="grid grid-cols-[72px_minmax(0,1fr)_72px_minmax(0,1fr)_auto] items-center gap-3">
+              <div className="text-sm text-slate-500">起始时间</div>
+              <input type="datetime-local" step="1" value={dateRange.startDate} disabled
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500 outline-none cursor-not-allowed" />
+              <div className="text-sm text-slate-500">终止时间</div>
+              <input type="datetime-local" step="1" value={dateRange.endDate} disabled
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500 outline-none cursor-not-allowed" />
+              <div className="flex flex-nowrap gap-2">
+                <button type="button" onClick={() => setExpectedView('last_quarter')}
+                  className={`whitespace-nowrap rounded-full border px-3 py-2 text-sm font-medium ${expectedView === 'last_quarter' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}>
+                  上季度</button>
+                <button type="button" onClick={() => setExpectedView('quarter')}
+                  className={`whitespace-nowrap rounded-full border px-3 py-2 text-sm font-medium ${expectedView === 'quarter' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}>
+                  本季度</button>
+                <button type="button" onClick={() => setExpectedView('current')}
+                  className={`whitespace-nowrap rounded-full border px-3 py-2 text-sm font-medium ${expectedView === 'current' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}>
+                  本季度至今天</button>
+              </div>
+            </div>
+          </div>
+          {/* 第二行：成员 + 排序 + 工作日 */}
+          <div className="mt-3 grid gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto]">
             <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
                 <span className="whitespace-nowrap text-sm text-slate-500">成员</span>
                 <select
@@ -459,18 +500,6 @@ export default function TeamDetailDashboard({
                   ))}
                 </select>
               </div>
-            <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
-                <span className="whitespace-nowrap text-sm text-slate-500">时间范围</span>
-                <select
-                  value={expectedView}
-                  onChange={(event) => setExpectedView(event.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
-                >
-                  <option value="quarter">本季度</option>
-                  <option value="current">本季度至今天</option>
-                  <option value="last_quarter">上季度</option>
-                </select>
-            </div>
             <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
                 <span className="whitespace-nowrap text-sm text-slate-500">分配差值排序</span>
                 <select
@@ -559,8 +588,32 @@ export default function TeamDetailDashboard({
                 <th className="px-5 py-4 text-left font-medium">当前已完成有效工时</th>
                 <th className="px-5 py-4 text-left font-medium">季度逾期总有效工时</th>
                 <th className="px-5 py-4 text-left font-medium">季度逾期完成工时</th>
-                <th className="px-5 py-4 text-left font-medium">任务分配差值</th>
-                <th className="px-5 py-4 text-left font-medium">任务完成差值</th>
+                <th className="px-5 py-4 text-left font-medium">
+                  <div className="flex items-center gap-1">
+                    任务分配差值
+                    <span className="group relative cursor-help text-slate-400">
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" /></svg>
+                      <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-1 hidden w-44 rounded-lg bg-slate-800 px-3 py-2 text-[11px] leading-relaxed font-normal text-white group-hover:block">
+                        已排工时 / 季度预期有效工时<br/>
+                        &lt;50%=高风险 · 50~80%=中风险<br/>
+                        80~100%=低风险 · ≥100%=充足
+                      </span>
+                    </span>
+                  </div>
+                </th>
+                <th className="px-5 py-4 text-left font-medium">
+                  <div className="flex items-center gap-1">
+                    任务完成差值
+                    <span className="group relative cursor-help text-slate-400">
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" /></svg>
+                      <span className="pointer-events-none absolute top-full right-0 mt-1 hidden w-44 rounded-lg bg-slate-800 px-3 py-2 text-[11px] leading-relaxed font-normal text-white group-hover:block">
+                        已完成工时 / 季度预期有效工时<br/>
+                        &lt;50%=高风险 · 50~80%=中风险<br/>
+                        80~100%=低风险 · ≥100%=充足
+                      </span>
+                    </span>
+                  </div>
+                </th>
               </tr>
             </thead>
             <tbody>

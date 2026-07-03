@@ -1567,7 +1567,7 @@ def sync_project_details_in_time_range_service(payload: Dict[str, Any]) -> Dict[
 def normal_incremental_update_service(payload: Dict[str, Any], skip_update_time: bool = False) -> Dict[str, Any]:
     """
     普通更新（按钮专用）：
-    1) 增量窗口：last_update_time -> config.end_time（季度末）
+    1) 增量窗口：last_update_time → 现在（无上界）
     2) 对增量结果写入 A，并对变更任务写入 B/C
        （_sync_one_detail_to_b_and_c 已覆盖：新增/内容变更→B，逾期状态变更→C增删）
     """
@@ -1577,47 +1577,35 @@ def normal_incremental_update_service(payload: Dict[str, Any], skip_update_time:
     if not user_id or not project_id:
         return {"success": False, "error": "missing userId or projectId", "data": {}}
 
-    # 1) 读取 last_update_time + 季度末 end_time
+    # 1) 读取 last_update_time
     from base.api_monitor import BJ_TZ
     now_bj = datetime.now(BJ_TZ)
     last_raw = _get_config_value("last_update_time")
     last_dt = _cmp_dt_utc(_parse_iso_dt(last_raw)) if last_raw else None
-    end_cfg_raw = _get_config_value("end_time")
-    end_cfg_dt = _cmp_dt_utc(_parse_iso_dt(end_cfg_raw)) if end_cfg_raw else None
-    if not end_cfg_dt:
-        return {"success": False, "error": "missing or invalid config.end_time", "data": {}}
-    end_cfg_dt = _normalize_day_end_utc(end_cfg_dt)
 
     # 2) 读取 config.start_time（仅用于 last_update_time 缺省时的兜底）
     start_cfg_raw = _get_config_value("start_time")
     selected_start_dt = _cmp_dt_utc(_parse_iso_dt(str(start_cfg_raw or "")))
-    if not selected_start_dt:
-        return {"success": False, "error": "missing or invalid config.start_time", "data": {}}
-    if selected_start_dt > end_cfg_dt:
-        return {"success": False, "error": "config.start_time must be <= config.end_time", "data": {}}
 
     # last_update_time 缺省时：用 start_dt 作为增量起点，避免全量打爆
     if not last_dt:
+        if not selected_start_dt:
+            return {"success": False, "error": "missing or invalid config.start_time", "data": {}}
         last_dt = selected_start_dt
         last_raw = _format_dt_for_tql_utc(last_dt)
-    if last_dt > end_cfg_dt:
-        last_dt = end_cfg_dt
 
     updated_threshold = _format_dt_for_tql_utc(last_dt)
-    updated_upper = _format_dt_for_tql_utc(end_cfg_dt)
 
     max_results = int(payload.get("maxResults", 500) or 500)
     max_pages = int(payload.get("maxPages", 200) or 200)
 
-    # 3) 钉钉增量拉列表：updated >= last_update_time AND updated <= 当前时刻
+    # 3) 钉钉增量拉列表：updated >= last_update_time（无上界）
     inc_payload = dict(payload)
     inc_payload.update(
         {
             "userId": user_id,
             "projectId": project_id,
-            "query": "(updated >= '{t0}') AND (updated <= '{t1}')".format(
-                t0=updated_threshold, t1=updated_upper
-            ),
+            "query": "(updated >= '{t0}')".format(t0=updated_threshold),
             "maxResults": max_results,
             "maxPages": max_pages,
             "force_refresh": True,
@@ -1742,8 +1730,6 @@ def normal_incremental_update_service(payload: Dict[str, Any], skip_update_time:
             "last_update_time_before": str(last_raw or ""),
             "incremental_query": {
                 "updated_gte": updated_threshold,
-                "updated_lte": updated_upper,
-                "quarter_end_time": end_cfg_dt.isoformat(),
                 "maxResults": max_results,
                 "maxPages": max_pages,
             },
@@ -1759,7 +1745,7 @@ def normal_incremental_update_service(payload: Dict[str, Any], skip_update_time:
 def normal_issue_incremental_update_service(payload: Dict[str, Any], skip_update_time: bool = False) -> Dict[str, Any]:
     """
     Program Issue 增量更新：
-    1) 增量窗口：last_update_time -> config.end_time（季度末）
+    1) 增量窗口：last_update_time → 现在（无上界）
     2) 对增量结果写入 ProgramIssue A 表，并对变更任务写入 ProgramIssueDetail
     """
     payload = dict(payload or {})
@@ -1772,27 +1758,17 @@ def normal_issue_incremental_update_service(payload: Dict[str, Any], skip_update
     now_bj = datetime.now(BJ_TZ)
     last_raw = _get_config_value("last_update_time")
     last_dt = _cmp_dt_utc(_parse_iso_dt(last_raw)) if last_raw else None
-    end_cfg_raw = _get_config_value("end_time")
-    end_cfg_dt = _cmp_dt_utc(_parse_iso_dt(end_cfg_raw)) if end_cfg_raw else None
-    if not end_cfg_dt:
-        return {"success": False, "error": "missing or invalid config.end_time", "data": {}}
-    end_cfg_dt = _normalize_day_end_utc(end_cfg_dt)
 
     start_cfg_raw = _get_config_value("start_time")
     selected_start_dt = _cmp_dt_utc(_parse_iso_dt(str(start_cfg_raw or "")))
-    if not selected_start_dt:
-        return {"success": False, "error": "missing or invalid config.start_time", "data": {}}
-    if selected_start_dt > end_cfg_dt:
-        return {"success": False, "error": "config.start_time must be <= config.end_time", "data": {}}
 
     if not last_dt:
+        if not selected_start_dt:
+            return {"success": False, "error": "missing or invalid config.start_time", "data": {}}
         last_dt = selected_start_dt
         last_raw = _format_dt_for_tql_utc(last_dt)
-    if last_dt > end_cfg_dt:
-        last_dt = end_cfg_dt
 
     updated_threshold = _format_dt_for_tql_utc(last_dt)
-    updated_upper = _format_dt_for_tql_utc(end_cfg_dt)
 
     max_results = int(payload.get("maxResults", 500) or 500)
     max_pages = int(payload.get("maxPages", 200) or 200)
@@ -1804,9 +1780,7 @@ def normal_issue_incremental_update_service(payload: Dict[str, Any], skip_update
             "userId": user_id,
             "projectId": project_id,
             "scenarioFieldConfigIds": [ISSUE_SCENARIO_FIELD_CONFIG_ID],
-            "query": "(updated >= '{t0}') AND (updated <= '{t1}')".format(
-                t0=updated_threshold, t1=updated_upper
-            ),
+            "query": "(updated >= '{t0}')".format(t0=updated_threshold),
             "maxResults": max_results,
             "maxPages": max_pages,
             "force_refresh": True,
@@ -1917,8 +1891,6 @@ def normal_issue_incremental_update_service(payload: Dict[str, Any], skip_update
             "last_update_time_before": str(last_raw or ""),
             "incremental_query": {
                 "updated_gte": updated_threshold,
-                "updated_lte": updated_upper,
-                "quarter_end_time": end_cfg_dt.isoformat(),
                 "maxResults": max_results,
                 "maxPages": max_pages,
             },
@@ -1972,18 +1944,19 @@ def tb_incremental_update_service(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def tb_full_update_service(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """TB大更新：DEV增量 + Issue增量，统一管理锁和 last_update_time。
+    """TB全量更新（每月1号）：清空工时三表，全量重拉所有用户。
 
-    封装了 normal_incremental_update_service + normal_issue_incremental_update_service，
-    DEV/Issue 共用 skip_update_time=True，最后统一写入 last_update_time。
+    1) TRUNCATE project_tasks / project_task_details / project_task_overdue_details
+    2) last_update_time 重置为 epoch（保证全量拉取）
+    3) 遍历 user_character 所有用户，DEV + Issue 全量拉取
+    4) 统一推进 last_update_time
 
-    注意：刷新季度末（update_endtime_service）由调用方（每月1号定时任务）独立执行。
+    注意：知识库更新由调用方独立执行，此处不动。
     """
     payload = dict(payload or {})
-    user_id = str(payload.get("userId") or payload.get("userid") or "").strip()
     project_id = str(payload.get("projectId") or payload.get("projectid") or "").strip()
-    if not user_id or not project_id:
-        return {"success": False, "error": "missing userId or projectId", "data": {}}
+    if not project_id:
+        return {"success": False, "error": "missing projectId", "data": {}}
 
     from base.config.service import is_full_sync_enabled
     if not is_full_sync_enabled():
@@ -1994,51 +1967,78 @@ def tb_full_update_service(payload: Dict[str, Any]) -> Dict[str, Any]:
     if not lock.get("ok"):
         return {"success": False, "error": lock.get("error", "update is in progress"), "data": lock.get("lock") or {}}
 
-    dev_out: Dict[str, Any] = {}
-    issue_out: Dict[str, Any] = {}
     try:
-        shared = {"userId": user_id, "projectId": project_id}
+        # 1) 清空工时三表
+        print("[tb_full] TRUNCATE 工时三表...")
+        sess = SessionLocal()
+        try:
+            sess.execute(text("DELETE FROM project_task_overdue_details"))
+            sess.execute(text("DELETE FROM project_task_details"))
+            sess.execute(text("DELETE FROM project_tasks"))
+            sess.commit()
+            print("[tb_full] 工时三表已清空")
+        except Exception as e:
+            sess.rollback()
+            print("[tb_full] 清表失败:", repr(e))
+            return {"success": False, "error": "truncate tables failed: {}".format(e), "data": {}}
+        finally:
+            sess.close()
 
-        # 2) DEV增量
-        print("[tb_full] DEV增量...")
-        dev_out = normal_incremental_update_service(shared, skip_update_time=True)
-        if dev_out.get("success"):
-            d = dev_out.get("data", {})
-            bc = d.get("incremental_bc", {})
-            print(f"[tb_full] DEV done  inc={bc.get('count',0)}  ok={bc.get('ok',0)}  fail={bc.get('fail',0)}")
-        else:
-            print("[tb_full] DEV failed:", dev_out.get("error", "unknown"))
+        # 2) 重置 last_update_time 为 epoch（保证全量拉取）
+        _upsert_config_value("last_update_time", "1970-01-01T00:00:00+00:00")
+        print("[tb_full] last_update_time → epoch")
 
-        # 3) Issue增量
-        print("[tb_full] Issue增量...")
-        issue_out = normal_issue_incremental_update_service(shared, skip_update_time=True)
-        if issue_out.get("success"):
-            d = issue_out.get("data", {})
-            detail = d.get("issue_incremental_detail", {})
-            print(f"[tb_full] Issue done  inc={detail.get('count',0)}  ok={detail.get('ok',0)}  fail={detail.get('fail',0)}")
-        else:
-            print("[tb_full] Issue failed:", issue_out.get("error", "unknown"))
+        # 3) 获取所有用户
+        sess2 = SessionLocal()
+        try:
+            rows = sess2.query(DbUserCharacter.user_id).all()
+            user_ids = [str(r[0]).strip() for r in rows if r and str(r[0]).strip()]
+        finally:
+            sess2.close()
 
-        # 统一更新 last_update_time
-        if dev_out.get("success") or issue_out.get("success"):
-            from base.api_monitor import BJ_TZ
-            now_bj = datetime.now(BJ_TZ).isoformat()
-            sess = SessionLocal()
-            try:
-                _upsert_config_value("last_update_time", now_bj)
-                sess.commit()
-                print(f"[tb_full] last_update_time → {now_bj}")
-            except Exception as e:
-                sess.rollback()
-                print("[tb_full] last_update_time 更新失败:", repr(e))
-            finally:
-                sess.close()
+        if not user_ids:
+            return {"success": False, "error": "no users found in user_character", "data": {}}
+
+        dev_ok = 0
+        dev_fail = 0
+        issue_ok = 0
+        issue_fail = 0
+        total_bc_count = 0
+
+        for uid in user_ids:
+            shared = {"userId": uid, "projectId": project_id}
+
+            # DEV
+            dev_out = normal_incremental_update_service(shared, skip_update_time=True)
+            if dev_out.get("success"):
+                dev_ok += 1
+                total_bc_count += dev_out.get("data", {}).get("incremental_bc", {}).get("count", 0)
+            else:
+                dev_fail += 1
+
+            # Issue
+            issue_out = normal_issue_incremental_update_service(shared, skip_update_time=True)
+            if issue_out.get("success"):
+                issue_ok += 1
+            else:
+                issue_fail += 1
+
+        print(f"[tb_full] DEV: {dev_ok}ok/{dev_fail}fail  Issue: {issue_ok}ok/{issue_fail}fail  users: {len(user_ids)}  bc_total: {total_bc_count}")
+
+        # 4) 统一推进 last_update_time
+        from base.api_monitor import BJ_TZ
+        now_bj = datetime.now(BJ_TZ).isoformat()
+        _upsert_config_value("last_update_time", now_bj)
+        print(f"[tb_full] last_update_time → {now_bj}")
 
         return {
             "success": True,
             "data": {
-                "dev": dev_out.get("data") or {},
-                "issue": issue_out.get("data") or {},
+                "beijing_now": now_bj,
+                "user_count": len(user_ids),
+                "dev": {"ok": dev_ok, "fail": dev_fail},
+                "issue": {"ok": issue_ok, "fail": issue_fail},
+                "truncated": True,
             },
         }
     finally:

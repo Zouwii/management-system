@@ -53,7 +53,7 @@ def _to_character(value, default: int = 0) -> int:
 def _member_role_label_from_user_character(character_value, is_nav_lead, is_servo_lead):
     """Map character integer to Chinese role label.
 
-    0=组长, 1=软件开发工程师, 2=软件应用工程师, 3=应用工程师, 4=算法工程师
+    0=组长, 1=软件开发工程师, 2=软件应用工程师, 3=应用工程师, 4=算法工程师, 5=实习生
     """
     try:
         c = int(character_value)
@@ -69,6 +69,8 @@ def _member_role_label_from_user_character(character_value, is_nav_lead, is_serv
         return "应用工程师"
     if c == 4:
         return "算法工程师"
+    if c == 5:
+        return "实习生"
     return "软件开发工程师"
 
 

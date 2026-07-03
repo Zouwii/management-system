@@ -31,6 +31,7 @@ _ROLE_MAP = {
     2: "软件应用工程师",
     3: "应用工程师",
     4: "算法工程师",
+    5: "实习生",
 }
 
 def _get_role(character: int) -> str:

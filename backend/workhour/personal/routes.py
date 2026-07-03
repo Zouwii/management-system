@@ -174,7 +174,7 @@ def _build_default_personal_hours_payload(user, target: str):
 
     start_time = _to_datetime_local_value(tr.get("start_time") or "")
     end_time = _to_datetime_local_value(tr.get("end_time") or "")
-    last_update_time = _to_datetime_local_value(tr.get("last_update_time") or "")
+    last_update_time = str(tr.get("last_update_time") or "")
 
     dashboard = {
         "defaultRange": {"startDate": start_time, "endDate": end_time},

@@ -878,6 +878,14 @@ export function mockRecalcMemberPerformance(_payload = {}) {
   });
 }
 
+export function mockSyncAllUsers() {
+  return Promise.resolve({
+    code: 200,
+    error: '',
+    data: { user_count: 0, ok: 0, fail: 0, message: 'mock sync ok' },
+  });
+}
+
 export function mockFetchTeamPerformance(_user, _params = {}) {
   return Promise.resolve({
     code: 200,

@@ -743,6 +743,8 @@ def _member_role_label_from_user_character(character_value: Any) -> str:
         return "应用工程师"
     if c == 4:
         return "算法工程师"
+    if c == 5:
+        return "实习生"
     return "软件开发工程师"
 
 

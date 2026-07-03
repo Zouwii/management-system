@@ -34,6 +34,7 @@ import {
   mockFetchTeams,
   mockFetchMembers,
   mockRecalcMemberPerformance,
+  mockSyncAllUsers,
 } from './providers/mock/dashboard';
 import {
   realFetchAIInsightList,
@@ -70,6 +71,7 @@ import {
   realFetchTeams,
   realFetchMembers,
   realRecalcMemberPerformance,
+  realSyncAllUsers,
 } from './providers/real/dashboard';
 
 export const fetchDepartmentOverview = createApiSwitch(mockFetchDepartmentOverview, realFetchDepartmentOverview);
@@ -121,4 +123,5 @@ export const fetchTeams = createApiSwitch(mockFetchTeams, realFetchTeams);
 export const fetchMembers = createApiSwitch(mockFetchMembers, realFetchMembers);
 
 export const recalcMemberPerformance = createApiSwitch(mockRecalcMemberPerformance, realRecalcMemberPerformance);
+export const syncAllUsers = createApiSwitch(mockSyncAllUsers, realSyncAllUsers);
 

@@ -104,6 +104,9 @@ def register(bp, ok, fail):
             keywords = _extract_keywords_from_tasks(tasks)
 
         if not keywords:
+            if not tasks:
+                _log("step2 search-kb: empty tasks, returning empty chunks")
+                return ok({"chunks": [], "search_query": ""})
             return fail("missing keywords", code=400)
 
         from ai.task_analysis.retrieval import search_kb
@@ -128,6 +131,16 @@ def register(bp, ok, fail):
         chunks = body.get("chunks") or []
 
         if not tasks or not stats:
+            if not tasks:
+                _log("step3 generate-report: empty tasks, returning placeholder")
+                return ok({
+                    "requirement_radar": {"keywords": []},
+                    "autonomous_suggestions": {"suggestions": []},
+                    "capability_suggestions": {"suggestions": []},
+                    "task_risk_analysis": {
+                        "detail": "当前季度暂未查询到任务数据，请先创建 TB 任务单。点击下方「AI创建任务单」面板，使用 AI 辅助创建本季度的工作任务。",
+                    },
+                })
             return fail("missing tasks or stats from step 1", code=400)
 
         from ai.task_analysis.analysis import generate_report
