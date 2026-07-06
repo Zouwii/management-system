@@ -223,7 +223,7 @@ export default function TeamDetailDashboard({
   const initialExpectedParam = searchParams.get('expected');
   const initialExpectedView = ['quarter', 'current', 'last_quarter'].includes(initialExpectedParam)
     ? initialExpectedParam
-    : 'quarter';
+    : 'current';
   const initialHoursAbnormal = ({
     abnormal: '只看异常成员',
     allocation: '只看分配不足',
@@ -309,7 +309,10 @@ export default function TeamDetailDashboard({
   }, [dateRange, expectedView, fallbackRows, fetcher, teamKey, user]);
 
   useEffect(() => {
-    const nextExpectedView = searchParams.get('expected') === 'current' ? 'current' : 'quarter';
+    const expectedParam = searchParams.get('expected');
+    const nextExpectedView = ['quarter', 'current', 'last_quarter'].includes(expectedParam)
+      ? expectedParam
+      : 'current';
     const nextHoursAbnormal = ({
       abnormal: '只看异常成员',
       allocation: '只看分配不足',
