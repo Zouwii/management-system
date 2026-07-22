@@ -44,16 +44,15 @@
 
 ### 设计文档
 
-**kb-rag** — 知识库 & RAG
+**RAG** — 知识库检索增强
+
 | 文档 | 说明 |
 |------|------|
-| [ai/design/kb-rag/04-knowledge-service-design.md](ai/design/kb-rag/04-knowledge-service-design.md) | 知识库服务设计 |
-| [ai/design/kb-rag/05-kb-database-design.md](ai/design/kb-rag/05-kb-database-design.md) | 知识库数据库设计 |
-| [ai/design/kb-rag/06-knowledge-base-rag.md](ai/design/kb-rag/06-knowledge-base-rag.md) | 知识库 RAG 方案 |
-| [ai/design/kb-rag/13-rag-retrieval-benchmark.md](ai/design/kb-rag/13-rag-retrieval-benchmark.md) | RAG 检索基准 |
-| [ai/design/kb-rag/14-rag-fidelity-experiment.md](ai/design/kb-rag/14-rag-fidelity-experiment.md) | RAG 保真度实验 |
+| [ai/rag/RAG-设计.md](ai/rag/RAG-设计.md) | 系统设计：架构、DB、检索策略、API |
+| [ai/rag/RAG-对照试验.md](ai/rag/RAG-对照试验.md) | 对照试验：检索基准、保真度、测试集 |
+| [ai/rag/RAG-优化方案.md](ai/rag/RAG-优化方案.md) | 优化路线：Phase 1-3、模型选型、待办 |
 
-**task** — 任务创建 & 分析
+**其他设计**
 | 文档 | 说明 |
 |------|------|
 | [ai/design/task/07-ai-task-analysis-design.md](ai/design/task/07-ai-task-analysis-design.md) | 任务分析设计 |
@@ -70,15 +69,6 @@
 | [ai/design/architecture/03-multi-user-design.md](ai/design/architecture/03-multi-user-design.md) | 多用户设计 |
 | [ai/design/architecture/11-ai-architecture.md](ai/design/architecture/11-ai-architecture.md) | AI 整体架构 |
 | [ai/design/architecture/钉钉API调用分析.md](ai/design/architecture/钉钉API调用分析.md) | 钉钉 API 分析 |
-
-### RAG 实验
-| 文档 | 说明 |
-|------|------|
-| [ai/rag-experiments/01-RAG检索优化-调研与实验方案.md](ai/rag-experiments/01-RAG检索优化-调研与实验方案.md) | 检索优化调研 |
-| [ai/rag-experiments/02-how-to-build-testset.md](ai/rag-experiments/02-how-to-build-testset.md) | 测试集构建 |
-| [ai/rag-experiments/03-step1-annotation.md](ai/rag-experiments/03-step1-annotation.md) | 标注流程 |
-| [ai/rag-experiments/04-10-RAG检索调研与优化方案.md](ai/rag-experiments/04-10-RAG检索调研与优化方案.md) | 检索优化方案 |
-| [ai/rag-experiments/05-13-rag-retrieval-benchmark.md](ai/rag-experiments/05-13-rag-retrieval-benchmark.md) | 检索基准测试 |
 
 ### 领域规则
 | 文档 | 说明 |
