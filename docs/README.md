@@ -45,24 +45,38 @@
 | [ai/dev-server-diff.md](ai/dev-server-diff.md) | 开发环境与服务器差异 |
 | [ai/ai-module-readme.md](ai/ai-module-readme.md) | AI 模块总览 |
 
-### 设计文档（编号历史）
+### 设计文档
+
+**kb-rag** — 知识库 & RAG
 | 文档 | 说明 |
 |------|------|
-| [ai/design/01-why-rag-over-skill.md](ai/design/01-why-rag-over-skill.md) | 为什么用 RAG 而非 Skill |
-| [ai/design/02-execution-scheme.md](ai/design/02-execution-scheme.md) | 执行方案 |
-| [ai/design/03-multi-user-design.md](ai/design/03-multi-user-design.md) | 多用户设计 |
-| [ai/design/04-knowledge-service-design.md](ai/design/04-knowledge-service-design.md) | 知识库服务设计 |
-| [ai/design/05-kb-database-design.md](ai/design/05-kb-database-design.md) | 知识库数据库设计 |
-| [ai/design/06-knowledge-base-rag.md](ai/design/06-knowledge-base-rag.md) | 知识库 RAG 方案 |
-| [ai/design/07-ai-task-analysis-design.md](ai/design/07-ai-task-analysis-design.md) | 任务分析设计 |
-| [ai/design/08-mcp-server-design.md](ai/design/08-mcp-server-design.md) | MCP Server 设计 |
-| [ai/design/09-rules-skills-cleanup.md](ai/design/09-rules-skills-cleanup.md) | Rules/Skills 清理 |
-| [ai/design/09-task-creation-paths.md](ai/design/09-task-creation-paths.md) | 任务创建路径 |
-| [ai/design/11-ai-architecture.md](ai/design/11-ai-architecture.md) | AI 整体架构 |
-| [ai/design/12-claude-config-layout.md](ai/design/12-claude-config-layout.md) | Claude 配置布局 |
-| [ai/design/13-rag-retrieval-benchmark.md](ai/design/13-rag-retrieval-benchmark.md) | RAG 检索基准 |
-| [ai/design/14-rag-fidelity-experiment.md](ai/design/14-rag-fidelity-experiment.md) | RAG 保真度实验 |
-| [ai/design/钉钉API调用分析.md](ai/design/钉钉API调用分析.md) | 钉钉 API 分析 |
+| [ai/design/kb-rag/01-why-rag-over-skill.md](ai/design/kb-rag/01-why-rag-over-skill.md) | 为什么用 RAG 而非 Skill |
+| [ai/design/kb-rag/04-knowledge-service-design.md](ai/design/kb-rag/04-knowledge-service-design.md) | 知识库服务设计 |
+| [ai/design/kb-rag/05-kb-database-design.md](ai/design/kb-rag/05-kb-database-design.md) | 知识库数据库设计 |
+| [ai/design/kb-rag/06-knowledge-base-rag.md](ai/design/kb-rag/06-knowledge-base-rag.md) | 知识库 RAG 方案 |
+| [ai/design/kb-rag/13-rag-retrieval-benchmark.md](ai/design/kb-rag/13-rag-retrieval-benchmark.md) | RAG 检索基准 |
+| [ai/design/kb-rag/14-rag-fidelity-experiment.md](ai/design/kb-rag/14-rag-fidelity-experiment.md) | RAG 保真度实验 |
+
+**task** — 任务创建 & 分析
+| 文档 | 说明 |
+|------|------|
+| [ai/design/task/07-ai-task-analysis-design.md](ai/design/task/07-ai-task-analysis-design.md) | 任务分析设计 |
+| [ai/design/task/09-task-creation-paths.md](ai/design/task/09-task-creation-paths.md) | 任务创建路径 |
+
+**mcp** — MCP Server
+| 文档 | 说明 |
+|------|------|
+| [ai/design/mcp/08-mcp-server-design.md](ai/design/mcp/08-mcp-server-design.md) | MCP Server 设计 |
+
+**architecture** — 架构 & 基础设施
+| 文档 | 说明 |
+|------|------|
+| [ai/design/architecture/02-execution-scheme.md](ai/design/architecture/02-execution-scheme.md) | 执行方案 |
+| [ai/design/architecture/03-multi-user-design.md](ai/design/architecture/03-multi-user-design.md) | 多用户设计 |
+| [ai/design/architecture/11-ai-architecture.md](ai/design/architecture/11-ai-architecture.md) | AI 整体架构 |
+| [ai/design/architecture/12-claude-config-layout.md](ai/design/architecture/12-claude-config-layout.md) | Claude 配置布局 |
+| [ai/design/architecture/09-rules-skills-cleanup.md](ai/design/architecture/09-rules-skills-cleanup.md) | Rules/Skills 清理 |
+| [ai/design/architecture/钉钉API调用分析.md](ai/design/architecture/钉钉API调用分析.md) | 钉钉 API 分析 |
 
 ### RAG 实验
 | 文档 | 说明 |
