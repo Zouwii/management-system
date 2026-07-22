@@ -40,17 +40,13 @@
 | 文档 | 说明 |
 |------|------|
 | [ai/MCP_使用说明.md](ai/MCP_使用说明.md) | MCP Server 使用说明：连接方式、Tools、Resources |
-| [ai/ai-development-analysis.md](ai/ai-development-analysis.md) | AI 开发全流程：知识库、任务分析、Teambition 创建、MCP |
 | [ai/ai-tbcreate-design.md](ai/ai-tbcreate-design.md) | Teambition 任务创建设计 |
-| [ai/dev-server-diff.md](ai/dev-server-diff.md) | 开发环境与服务器差异 |
-| [ai/ai-module-readme.md](ai/ai-module-readme.md) | AI 模块总览 |
 
 ### 设计文档
 
 **kb-rag** — 知识库 & RAG
 | 文档 | 说明 |
 |------|------|
-| [ai/design/kb-rag/01-why-rag-over-skill.md](ai/design/kb-rag/01-why-rag-over-skill.md) | 为什么用 RAG 而非 Skill |
 | [ai/design/kb-rag/04-knowledge-service-design.md](ai/design/kb-rag/04-knowledge-service-design.md) | 知识库服务设计 |
 | [ai/design/kb-rag/05-kb-database-design.md](ai/design/kb-rag/05-kb-database-design.md) | 知识库数据库设计 |
 | [ai/design/kb-rag/06-knowledge-base-rag.md](ai/design/kb-rag/06-knowledge-base-rag.md) | 知识库 RAG 方案 |
@@ -71,11 +67,8 @@
 **architecture** — 架构 & 基础设施
 | 文档 | 说明 |
 |------|------|
-| [ai/design/architecture/02-execution-scheme.md](ai/design/architecture/02-execution-scheme.md) | 执行方案 |
 | [ai/design/architecture/03-multi-user-design.md](ai/design/architecture/03-multi-user-design.md) | 多用户设计 |
 | [ai/design/architecture/11-ai-architecture.md](ai/design/architecture/11-ai-architecture.md) | AI 整体架构 |
-| [ai/design/architecture/12-claude-config-layout.md](ai/design/architecture/12-claude-config-layout.md) | Claude 配置布局 |
-| [ai/design/architecture/09-rules-skills-cleanup.md](ai/design/architecture/09-rules-skills-cleanup.md) | Rules/Skills 清理 |
 | [ai/design/architecture/钉钉API调用分析.md](ai/design/architecture/钉钉API调用分析.md) | 钉钉 API 分析 |
 
 ### RAG 实验
