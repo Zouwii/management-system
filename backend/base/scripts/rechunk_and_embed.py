@@ -44,10 +44,10 @@ def log(entry: dict) -> None:
 
 def check_state() -> dict:
     """查询当前数据库状态并打印。"""
-    from base.db.engine import SessionLocal, PgVectorSessionLocal
+    from base.db.engine import KbSessionLocal, PgVectorSessionLocal
     from sqlalchemy import text
 
-    db = SessionLocal()
+    db = KbSessionLocal()
     try:
         doc_total = db.execute(text("SELECT COUNT(*) FROM kb_documents")).scalar()
         doc_with_content = db.execute(
@@ -103,9 +103,9 @@ def run_rechunk(doc_id: str = "") -> dict:
     from ai.knowledge.chunker import chunk_document
     from ai.knowledge.models import KbDocument, KbChunk
     from ai.knowledge.models import create_kb_fts, drop_kb_fts
-    from base.db.engine import SessionLocal, engine
+    from base.db.engine import KbSessionLocal, kb_engine
 
-    db = SessionLocal()
+    db = KbSessionLocal()
     try:
         if doc_id:
             docs = db.query(KbDocument).filter(
@@ -154,8 +154,8 @@ def run_rechunk(doc_id: str = "") -> dict:
         # 重建 FTS 索引
         print("  重建全文索引...")
         try:
-            drop_kb_fts(engine)
-            create_kb_fts(engine)
+            drop_kb_fts(kb_engine)
+            create_kb_fts(kb_engine)
         except Exception as e:
             print(f"  FTS 索引重建失败（MySQL 会自动维护）: {e}")
 

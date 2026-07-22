@@ -96,14 +96,6 @@ API_BT_ROUTE_INDEX: List[Dict[str, str]] = [
         "service": "base.sync.task_sync.sync_project_details_in_time_range_service",
     },
     {
-        "module": "updates",
-        "method": "POST",
-        "path": "/api/bt/incremental_update",
-        "desc": "TB小更新：DEV增量（基于 last_update_time）",
-        "handler": "route_registry.updates.incremental_update",
-        "service": "base.sync.task_sync.tb_incremental_update_service",
-    },
-    {
         "module": "projects",
         "method": "POST",
         "path": "/api/bt/query_project_tasks",

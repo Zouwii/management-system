@@ -366,11 +366,6 @@ def personal_hours_update():
     if not user:
         return _fail("unauthenticated", code=401, data={})
 
-    # 检查是否全局禁用同步
-    from base.config.service import is_full_sync_enabled
-    if not is_full_sync_enabled():
-        return _fail("sync is disabled (config.knowledge_sync_enabled = partial or false)", code=503, data={})
-
     payload = request.get_json(silent=True) or {}
     is_full_sync = bool(payload.get("fullSync"))
 

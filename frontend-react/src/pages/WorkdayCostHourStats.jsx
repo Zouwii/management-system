@@ -9,6 +9,8 @@ import {
   fetchWorkdayCosthourMemberSummary,
   fetchWorkdayCosthourProjectNameDetail,
   fetchWorkdays,
+  fetchAttendance,
+  saveAttendance,
 } from '../api/dashboard';
 
 // ── 动态季度选项（基于当前年份） ──
@@ -293,8 +295,9 @@ function DualBarChart({ data = {}, title = '' }) {
 
 // ── 有效工时组别管理表 ──
 
-function EffectiveHourManageTable({ teams = [], selectedTeamId, onTeamChange, members = [], standardDays = 0, adjustments = {}, onAdjustmentChange }) {
+function EffectiveHourManageTable({ teams = [], selectedTeamId, onTeamChange, members = [], standardDays = 0, adjustments = {}, onAdjustmentChange, onSave, saving = false }) {
   const selectedMembers = members.filter((m) => !selectedTeamId || m.teamId === selectedTeamId);
+  const hasAdjustments = Object.keys(adjustments).length > 0;
 
   return (
     <Card className="overflow-hidden p-0">
@@ -318,6 +321,16 @@ function EffectiveHourManageTable({ teams = [], selectedTeamId, onTeamChange, me
               ))}
             </select>
           </div>
+          {onSave && (
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={saving}
+              className="rounded-xl bg-sky-600 px-5 py-2 text-sm font-medium text-white hover:bg-sky-700 disabled:opacity-50 transition-colors"
+            >
+              {saving ? '保存中...' : (hasAdjustments ? '保存修改' : '保存')}
+            </button>
+          )}
         </div>
       </div>
 
@@ -616,6 +629,8 @@ export default function WorkdayCostHourStats() {
   const [manageTeamId, setManageTeamId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState(null);
 
   // 接口1：各小组汇总
   const [teamData, setTeamData] = useState({ timeRange: {}, total: {}, teams: [] });
@@ -643,13 +658,14 @@ export default function WorkdayCostHourStats() {
     const payload = { start_time: quarterOption.start, end_time: quarterOption.end };
 
     try {
-      const [tRes, dRes, sRes, mRes, pnRes, wRes] = await Promise.all([
+      const [tRes, dRes, sRes, mRes, pnRes, wRes, aRes] = await Promise.all([
         fetchWorkdayCosthourTeamSummary(payload),
         fetchWorkdayCosthourDeptAggregate(payload),
         fetchWorkdayCosthourTaskDetail(payload),
         fetchWorkdayCosthourMemberSummary(payload),
         fetchWorkdayCosthourProjectNameDetail(payload),
         fetchWorkdays(payload),
+        fetchAttendance(payload),
       ]);
       const t = tRes?.data || {};
       setTeamData({ timeRange: t.timeRange || {}, total: t.total || {}, teams: t.teams || [] });
@@ -675,6 +691,19 @@ export default function WorkdayCostHourStats() {
 
       const wd = wRes?.data?.workday_count ?? wRes?.data?.effective_workday_count ?? wRes?.data?.workdays ?? null;
       setWorkdayCount(wd);
+
+      // 回填持久化的出勤数据
+      const attRecords = aRes?.data?.records || [];
+      if (attRecords.length > 0) {
+        const attMap = {};
+        attRecords.forEach((r) => {
+          attMap[r.user_id] = {
+            overtimeDays: r.overtime_days,
+            leaveDays: r.leave_days,
+          };
+        });
+        setMemberAdjustments(attMap);
+      }
     } catch (err) {
       console.error('工作日耗时数据加载失败:', err);
       setError(err?.message || '数据加载失败，请稍后重试');
@@ -702,6 +731,37 @@ export default function WorkdayCostHourStats() {
       },
     }));
   }, []);
+
+  const handleSaveAttendance = useCallback(async () => {
+    setSaving(true);
+    setSaveMsg(null);
+    const records = memberData.members.map((m) => {
+      const adj = memberAdjustments[m.userId] || {};
+      return {
+        user_id: m.userId,
+        user_name: m.userName,
+        team_id: m.teamId,
+        overtime_days: Number(adj.overtimeDays || 0),
+        leave_days: Number(adj.leaveDays || 0),
+      };
+    });
+    try {
+      const res = await saveAttendance({
+        start_time: quarterOption.start,
+        records,
+      });
+      if (res?.code === 200 || res?.data) {
+        setSaveMsg({ type: 'success', text: `已保存 ${res?.data?.saved_count || records.length} 条记录` });
+      } else {
+        setSaveMsg({ type: 'error', text: res?.error || res?.message || '保存失败' });
+      }
+    } catch (err) {
+      setSaveMsg({ type: 'error', text: err?.message || '保存失败' });
+    } finally {
+      setSaving(false);
+      setTimeout(() => setSaveMsg(null), 3000);
+    }
+  }, [memberData.members, memberAdjustments, quarterOption]);
 
   const currentTeam = useMemo(
     () => teamData.teams.find((t) => t.teamId === selectedTeamId) || teamData.teams[0] || {},
@@ -769,7 +829,16 @@ export default function WorkdayCostHourStats() {
               standardDays={workdayCount || 0}
               adjustments={memberAdjustments}
               onAdjustmentChange={handleAdjustmentChange}
+              onSave={handleSaveAttendance}
+              saving={saving}
             />
+            {saveMsg && (
+              <div className={`rounded-xl px-4 py-2 text-sm font-medium ${
+                saveMsg.type === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+              }`}>
+                {saveMsg.text}
+              </div>
+            )}
 
             <Card className="overflow-hidden p-0">
               <div className="flex flex-col items-start justify-between gap-4 border-b border-slate-200 bg-slate-50 px-5 py-4 md:flex-row md:items-center">

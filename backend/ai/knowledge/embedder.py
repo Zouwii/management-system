@@ -9,7 +9,7 @@ from typing import Optional
 os.environ.setdefault("OMP_NUM_THREADS", "1")
 os.environ.setdefault("MKL_NUM_THREADS", "1")
 
-from base.db.engine import PgVectorSessionLocal, SessionLocal
+from base.db.engine import KbSessionLocal, PgVectorSessionLocal
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ def embed_chunks(
     model = _get_model()
     dim = model.get_embedding_dimension()
 
-    mysql = SessionLocal()
+    kb = KbSessionLocal()
     pg = PgVectorSessionLocal()
     stats = {"chunk_total": 0, "embedded": 0, "skipped": 0, "errors": 0}
 
@@ -62,9 +62,9 @@ def embed_chunks(
                 "JOIN kb_documents d ON c.doc_id = d.doc_id "
                 "WHERE d.workspace_id = :ws_id"
             )
-            total = mysql.execute(count_sql, {"ws_id": workspace_id}).scalar()
+            total = kb.execute(count_sql, {"ws_id": workspace_id}).scalar()
         else:
-            total = mysql.execute(text("SELECT COUNT(*) FROM kb_chunks")).scalar()
+            total = kb.execute(text("SELECT COUNT(*) FROM kb_chunks")).scalar()
         stats["chunk_total"] = total
 
         offset = 0
@@ -80,7 +80,7 @@ def embed_chunks(
                     "WHERE d.workspace_id = :ws_id "
                     "ORDER BY c.id LIMIT :limit OFFSET :offset"
                 )
-                rows = mysql.execute(
+                rows = kb.execute(
                     sel, {"ws_id": workspace_id, "limit": batch_limit, "offset": offset}
                 ).fetchall()
             else:
@@ -88,7 +88,7 @@ def embed_chunks(
                     "SELECT id, content FROM kb_chunks "
                     "ORDER BY id LIMIT :limit OFFSET :offset"
                 )
-                rows = mysql.execute(
+                rows = kb.execute(
                     sel, {"limit": batch_limit, "offset": offset}
                 ).fetchall()
 
@@ -141,5 +141,5 @@ def embed_chunks(
 
         return stats
     finally:
-        mysql.close()
+        kb.close()
         pg.close()

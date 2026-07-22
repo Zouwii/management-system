@@ -28,13 +28,15 @@ import {
   mockFetchWorkdayCosthourMemberSummary,
   mockFetchWorkdayCosthourProjectNameDetail,
   mockFetchWorkdays,
+  mockFetchAttendance,
+  mockSaveAttendance,
   mockFetchTeamImportUsers,
   mockBatchImportScores,
   mockUpdateMemberPerformance,
   mockFetchTeams,
   mockFetchMembers,
   mockRecalcMemberPerformance,
-  mockSyncAllUsers,
+  mockIncreaseSync,
 } from './providers/mock/dashboard';
 import {
   realFetchAIInsightList,
@@ -65,13 +67,15 @@ import {
   realFetchWorkdayCosthourMemberSummary,
   realFetchWorkdayCosthourProjectNameDetail,
   realFetchWorkdays,
+  realFetchAttendance,
+  realSaveAttendance,
   realFetchTeamImportUsers,
   realBatchImportScores,
   realUpdateMemberPerformance,
   realFetchTeams,
   realFetchMembers,
   realRecalcMemberPerformance,
-  realSyncAllUsers,
+  realIncreaseSync,
 } from './providers/real/dashboard';
 
 export const fetchDepartmentOverview = createApiSwitch(mockFetchDepartmentOverview, realFetchDepartmentOverview);
@@ -114,6 +118,8 @@ export const fetchWorkdayCosthourTaskDetail = createApiSwitch(mockFetchWorkdayCo
 export const fetchWorkdayCosthourMemberSummary = createApiSwitch(mockFetchWorkdayCosthourMemberSummary, realFetchWorkdayCosthourMemberSummary);
 export const fetchWorkdayCosthourProjectNameDetail = createApiSwitch(mockFetchWorkdayCosthourProjectNameDetail, realFetchWorkdayCosthourProjectNameDetail);
 export const fetchWorkdays = createApiSwitch(mockFetchWorkdays, realFetchWorkdays);
+export const fetchAttendance = createApiSwitch(mockFetchAttendance, realFetchAttendance);
+export const saveAttendance = createApiSwitch(mockSaveAttendance, realSaveAttendance);
 
 export const fetchTeamImportUsers = createApiSwitch(mockFetchTeamImportUsers, realFetchTeamImportUsers);
 export const batchImportScores = createApiSwitch(mockBatchImportScores, realBatchImportScores);
@@ -123,5 +129,5 @@ export const fetchTeams = createApiSwitch(mockFetchTeams, realFetchTeams);
 export const fetchMembers = createApiSwitch(mockFetchMembers, realFetchMembers);
 
 export const recalcMemberPerformance = createApiSwitch(mockRecalcMemberPerformance, realRecalcMemberPerformance);
-export const syncAllUsers = createApiSwitch(mockSyncAllUsers, realSyncAllUsers);
+export const increaseSync = createApiSwitch(mockIncreaseSync, realIncreaseSync);
 

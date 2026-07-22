@@ -12,20 +12,26 @@ MySQL：TB_TOOL_BT_USE_MYSQL=1，库名默认 tb_tool_bt（可用 TB_TOOL_BT_DB_
 
 from base.db.engine import (
     engine,
+    kb_engine,
     perf_engine,
     get_session,
+    get_kb_session,
     get_perf_session,
     init_db,
+    KbSessionLocal,
     SessionLocal,
     PerfSessionLocal,
 )
 
 __all__ = [
     "engine",
+    "kb_engine",
     "perf_engine",
     "get_session",
+    "get_kb_session",
     "get_perf_session",
     "init_db",
+    "KbSessionLocal",
     "SessionLocal",
     "PerfSessionLocal",
 ]

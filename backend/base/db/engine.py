@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 
-from base.db.config import DATABASE_URI, PERF_DATABASE_URI, PGVECTOR_DATABASE_URI
+from base.db.config import DATABASE_URI, KB_DATABASE_URI, PERF_DATABASE_URI, ONSITE_DATABASE_URI, PGVECTOR_DATABASE_URI
 from base.db.orm import Base  # 导入即注册 ProjectTask 等到 Base.metadata
 
 # SQLite 下多线程需 check_same_thread=False（Flask 每请求一线程）
@@ -14,6 +14,10 @@ if DATABASE_URI.startswith("sqlite"):
 _perf_connect_args = {}
 if PERF_DATABASE_URI.startswith("sqlite"):
     _perf_connect_args["check_same_thread"] = False
+
+_kb_connect_args = {}
+if KB_DATABASE_URI.startswith("sqlite"):
+    _kb_connect_args["check_same_thread"] = False
 
 # 主业务库（任务/配置等）
 engine = create_engine(
@@ -35,6 +39,30 @@ perf_engine = create_engine(
 
 PerfSessionLocal = scoped_session(sessionmaker(bind=perf_engine, autoflush=False, autocommit=False, future=True))
 
+# 知识库专用引擎（kb_documents / kb_chunks）
+kb_engine = create_engine(
+    KB_DATABASE_URI,
+    connect_args=_kb_connect_args,
+    future=True,
+    pool_pre_ping=True,
+)
+
+KbSessionLocal = scoped_session(sessionmaker(bind=kb_engine, autoflush=False, autocommit=False, future=True))
+
+# onsite_problem 专用库
+_onsite_connect_args = {}
+if ONSITE_DATABASE_URI.startswith("sqlite"):
+    _onsite_connect_args["check_same_thread"] = False
+
+onsite_engine = create_engine(
+    ONSITE_DATABASE_URI,
+    connect_args=_onsite_connect_args,
+    future=True,
+    pool_pre_ping=True,
+)
+
+OnsiteSessionLocal = scoped_session(sessionmaker(bind=onsite_engine, autoflush=False, autocommit=False, future=True))
+
 # pgvector（PostgreSQL）embedding 专用引擎
 pgvector_engine = create_engine(
     PGVECTOR_DATABASE_URI,
@@ -48,18 +76,22 @@ PgVectorSessionLocal = scoped_session(sessionmaker(bind=pgvector_engine, autoflu
 def _table_registry():
     """
     表注册清单（可视化管理，类似 Go 的 createSQLs/dropSQLs 列表）。
+    返回三个列表：(main_tables, perf_tables, kb_tables)
     """
     # 延迟导入以避免循环
     from base.db.orm import (
         Config as DbConfig,
+        MemberAttendance,
         NavPerfQuarterResult,
+        OnsiteProblemDetail,
+        OnsiteProblemTask,
         ProgramIssue,
         ProgramIssueDetail,
         ProjectTask,
         ProjectTaskDetail,
         ProjectTaskOverdueDetail,
-        SyncFailure,
         ServoPerfQuarterResult,
+        SyncFailure,
         SyncRun,
         UpdateLock,
         UserCharacter as DbUserCharacter,
@@ -77,15 +109,21 @@ def _table_registry():
         ("config", DbConfig.__table__),
         ("update_locks", UpdateLock.__table__),
         ("user_character", DbUserCharacter.__table__),
-        # knowledge base
-        ("kb_documents", KbDocument.__table__),
-        ("kb_chunks", KbChunk.__table__),
+        ("member_attendance", MemberAttendance.__table__),
     ]
     perf_tables = [
         ("nav_perf_quarter_result", NavPerfQuarterResult.__table__),
         ("servo_perf_quarter_result", ServoPerfQuarterResult.__table__),
     ]
-    return main_tables, perf_tables
+    kb_tables = [
+        ("kb_documents", KbDocument.__table__),
+        ("kb_chunks", KbChunk.__table__),
+    ]
+    onsite_tables = [
+        ("onsite_problem_tasks", OnsiteProblemTask.__table__),
+        ("onsite_problem_details", OnsiteProblemDetail.__table__),
+    ]
+    return main_tables, perf_tables, kb_tables, onsite_tables
 
 
 def _execute_table_ops(bind, table_entries, action: str) -> None:
@@ -113,13 +151,15 @@ def init_database() -> None:
 
     设计目标：初始化内容“可视化、可读、可维护”。
     """
-    main_tables, perf_tables = _table_registry()
+    main_tables, perf_tables, kb_tables, onsite_tables = _table_registry()
     # seed 阶段会直接使用这两个 ORM 模型
     from base.db.orm import Config as DbConfig, UserCharacter as DbUserCharacter
 
     print("[init_db] creating tables (no drop) ...")
     _execute_table_ops(engine, main_tables, "create")
     _execute_table_ops(perf_engine, perf_tables, "create")
+    _execute_table_ops(kb_engine, kb_tables, "create")
+    _execute_table_ops(onsite_engine, onsite_tables, "create")
 
     # 兼容无迁移环境：尝试为 B/C 表补齐新字段/新表（SQLite 场景常见）
     try:
@@ -575,10 +615,10 @@ def init_database() -> None:
         print("[init_db] config init failed:", repr(e))
         pass
 
-    # ── knowledge base FTS index ───────────────────────────────
+    # ── knowledge base FTS index (on kb_engine) ──────────────────
     try:
         from ai.knowledge.models import create_kb_fts
-        create_kb_fts(engine)
+        create_kb_fts(kb_engine)
     except Exception:
         pass
 
@@ -598,3 +638,8 @@ def get_session():
 def get_perf_session():
     """获取绩效专用库的会话。"""
     return PerfSessionLocal()
+
+
+def get_kb_session():
+    """获取知识库专用库的会话。"""
+    return KbSessionLocal()

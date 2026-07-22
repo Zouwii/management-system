@@ -3,6 +3,11 @@
 Multi-user support via contextvars - SSE mode extracts user identity from
 query parameters (?user_id=xxx or ?user_name=xxx), stdio mode uses env vars.
 
+Session identity persistence: when an SSE connection is established with user
+credentials, the session_id is captured from the endpoint event and stored,
+so subsequent POST requests to /messages/ can recover the user identity
+without needing user_name/user_id in every request URL.
+
 Resources live in mcp/resources/ (symlinks → ../../domain and ../../skills).
 Tools are delegated to mcp/tools/*.py modules.
 """
@@ -11,6 +16,9 @@ from __future__ import annotations
 
 import contextvars
 import os
+import re
+import threading
+import time
 from pathlib import Path
 from urllib.parse import unquote
 
@@ -24,6 +32,52 @@ _SKILL_DIR = _RESOURCE_DIR / "skills"      # → ../../skills  (ai/skills/)
 
 _current_user_id: contextvars.ContextVar[str] = contextvars.ContextVar("mcp_user_id", default="")
 _current_user_name: contextvars.ContextVar[str] = contextvars.ContextVar("mcp_user_name", default="")
+
+# ── Session → User mapping (for SSE POST request identity recovery) ────────
+
+_session_user_map: dict[str, tuple[str, str, float]] = {}  # session_id → (user_id, user_name, created_at)
+_session_lock = threading.Lock()
+_SESSION_TTL = 3600 * 24  # 24 hours
+
+
+def _session_cleanup() -> None:
+    """Remove expired session entries."""
+    now = time.time()
+    with _session_lock:
+        expired = [sid for sid, (_, _, ts) in _session_user_map.items() if now - ts > _SESSION_TTL]
+        for sid in expired:
+            del _session_user_map[sid]
+
+
+def _session_store(session_id: str, user_id: str, user_name: str) -> None:
+    """Persist user identity for an SSE session."""
+    if not session_id or (not user_id and not user_name):
+        return
+    with _session_lock:
+        _session_user_map[session_id] = (user_id, user_name, time.time())
+        if len(_session_user_map) % 100 == 0:
+            _session_cleanup()
+
+
+def _session_lookup(session_id: str) -> tuple[str, str]:
+    """Retrieve user identity for a session, with TTL check."""
+    if not session_id:
+        return "", ""
+    with _session_lock:
+        entry = _session_user_map.get(session_id)
+        if entry is None:
+            return "", ""
+        uid, name, ts = entry
+        if time.time() - ts > _SESSION_TTL:
+            del _session_user_map[session_id]
+            return "", ""
+        return uid, name
+
+
+def _session_remove(session_id: str) -> None:
+    """Remove session entry (e.g. on disconnect)."""
+    with _session_lock:
+        _session_user_map.pop(session_id, None)
 
 
 def _get_user_id() -> str:
@@ -102,6 +156,11 @@ class UserContextMiddleware:
 
     Accepts user_id or user_name (or both). If only name is given,
     auto-resolves user_id from the database.
+
+    For SSE transport: captures session_id from the endpoint event during
+    SSE connection setup and persists (session_id → user) in a server-side
+    map. Subsequent POST requests to /messages/ recover identity from this
+    map using the session_id in the URL.
     """
 
     def __init__(self, app):
@@ -119,25 +178,68 @@ class UserContextMiddleware:
                 k, v = part.split("=", 1)
                 params[unquote(k)] = unquote(v)
 
+        path = scope.get("path", "")
+
+        # ── Extract user_id / user_name from request ──
         user_id = params.get("user_id", "").strip()
         user_name = params.get("user_name", "").strip()
 
+        # ── For POST /messages/: recover user from session store ──
+        if not user_id and not user_name and path.startswith("/messages"):
+            session_id = params.get("session_id", "").strip()
+            if session_id:
+                user_id, user_name = _session_lookup(session_id)
+
+        # ── Fallback: Bearer token ──
         if not user_id:
             headers = dict(scope.get("headers", []))
             auth = headers.get(b"authorization", b"").decode()
             if auth.startswith("Bearer "):
                 user_id = auth[7:].strip()
 
+        # ── Resolve user_id from name if needed ──
         if user_name and not user_id:
             user_id = _resolve_user_id_from_name(user_name)
 
-        token_id = _current_user_id.set(user_id)
-        token_name = _current_user_name.set(user_name)
-        try:
-            await self.app(scope, receive, send)
-        finally:
-            _current_user_id.reset(token_id)
-            _current_user_name.reset(token_name)
+        is_sse_connect = (path == "/sse" or path.startswith("/sse")) and (user_id or user_name)
+
+        if is_sse_connect:
+            # ── SSE connection: intercept response to capture session_id ──
+            body_buffer = b""
+
+            async def wrapped_send(message):
+                nonlocal body_buffer
+                if message["type"] == "http.response.body":
+                    body = message.get("body", b"")
+                    if body:
+                        body_buffer += body
+                    # Parse SSE events from accumulated buffer
+                    text = body_buffer.decode("utf-8", errors="ignore")
+                    match = re.search(
+                        r'event:\s*endpoint\s*\ndata:\s*/messages/\?session_id=([a-zA-Z0-9_-]+)',
+                        text,
+                    )
+                    if match:
+                        session_id = match.group(1)
+                        _session_store(session_id, user_id, user_name)
+                        body_buffer = b""  # reset to avoid re-matching on subsequent chunks
+                await send(message)
+
+            token_id = _current_user_id.set(user_id)
+            token_name = _current_user_name.set(user_name)
+            try:
+                await self.app(scope, receive, wrapped_send)
+            finally:
+                _current_user_id.reset(token_id)
+                _current_user_name.reset(token_name)
+        else:
+            token_id = _current_user_id.set(user_id)
+            token_name = _current_user_name.set(user_name)
+            try:
+                await self.app(scope, receive, send)
+            finally:
+                _current_user_id.reset(token_id)
+                _current_user_name.reset(token_name)
 
 
 # ── Resources (domain rules + skill workflows) ───────────────────────────────

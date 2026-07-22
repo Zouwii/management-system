@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy import text
 
-from base.db.engine import SessionLocal, PgVectorSessionLocal, engine
+from base.db.engine import KbSessionLocal, PgVectorSessionLocal, kb_engine
 
 
 def search_chunks(
@@ -23,8 +23,8 @@ def search_chunks(
     if not query or not query.strip():
         return []
 
-    dialect = engine.dialect.name
-    db = SessionLocal()
+    dialect = kb_engine.dialect.name
+    db = KbSessionLocal()
     try:
         if dialect == "mysql":
             rows = _search_mysql(db, query.strip(), top_k, workspace_id)
@@ -124,7 +124,7 @@ def search_vector(
     vec_str = "[" + ",".join(str(x) for x in q_emb) + "]"
 
     pg = PgVectorSessionLocal()
-    mysql = SessionLocal()
+    kb = KbSessionLocal()
     try:
         # Step 1: find nearest chunk_ids in pgvector
         pg_sql = text(
@@ -150,7 +150,7 @@ def search_vector(
                 f"FROM kb_chunks c JOIN kb_documents d ON c.doc_id = d.doc_id "
                 f"WHERE c.id IN ({placeholders}) AND d.workspace_id = :ws_id"
             )
-            mrows = mysql.execute(
+            mrows = kb.execute(
                 mysql_sql,
                 {f"id_{i}": cid for i, cid in enumerate(chunk_ids)}
                 | {"ws_id": workspace_id},
@@ -162,7 +162,7 @@ def search_vector(
                 f"FROM kb_chunks c JOIN kb_documents d ON c.doc_id = d.doc_id "
                 f"WHERE c.id IN ({placeholders})"
             )
-            mrows = mysql.execute(
+            mrows = kb.execute(
                 mysql_sql,
                 {f"id_{i}": cid for i, cid in enumerate(chunk_ids)},
             ).fetchall()
@@ -186,7 +186,7 @@ def search_vector(
         return []
     finally:
         pg.close()
-        mysql.close()
+        kb.close()
 
 
 _RRF_K = 60

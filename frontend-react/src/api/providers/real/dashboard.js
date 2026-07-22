@@ -757,6 +757,22 @@ export function realFetchWorkdays(payload = {}) {
   });
 }
 
+// ── 员工出勤表 ──
+
+export function realFetchAttendance(payload = {}) {
+  return httpRequest('/bt/stats/attendance/get', {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+  });
+}
+
+export function realSaveAttendance(payload = {}) {
+  return httpRequest('/bt/stats/attendance/save', {
+    method: 'POST',
+    body: JSON.stringify(payload || {}),
+  });
+}
+
 // ── 绩效导入 ──
 
 export function realFetchTeamImportUsers(params = {}) {
@@ -804,6 +820,6 @@ export function realRecalcMemberPerformance(payload = {}) {
   });
 }
 
-export function realSyncAllUsers() {
-  return httpRequest('/bt/sync_all_users', { method: 'POST' });
+export function realIncreaseSync() {
+  return httpRequest('/bt/increase_sync', { method: 'POST' });
 }

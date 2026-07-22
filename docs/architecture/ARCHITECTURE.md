@@ -226,22 +226,26 @@ POST /api/bt/auth/local/login    → user_id + password → authenticate_local_u
 
 认证链路函数：`base/auth/routes.py` → `base/auth/service.py:authenticate_dingtalk_user()` 或 `authenticate_local_user()` → `resolve_user_profile()`
 
-### 数据同步
+## 同步管控
+
+详见 [同步与锁设计文档](./sync-and-lock.md)。
+
+五种同步、两个开关、三层拦截、分布式锁、API 限额机制均在该文档中定义。
+
+### 数据同步 API
 
 ```
-POST /api/bt/full_update              → 全量更新（A表 + 线程池 B/C）
-POST /api/bt/time_range_update        → 按时间范围更新 A+B（不更新 C）
-POST /api/bt/db/sync/project-tasks    → 同步 A 表（项目任务列表）
-POST /api/bt/db/sync/task-detail      → 同步单条 B 表记录
-POST /api/bt/db/sync/task-details-batch → 批量同步 B 表记录
-GET  /api/bt/update_lock_status       → 查询同步锁状态
+POST /api/bt/incremental_update        → 本体开发部 增量（A+B+C）
+POST /api/bt/full_update               → 本体开发部 全量（清表重拉）
+POST /api/bt/time_range_update         → 按时间范围更新 A+B
+POST /api/bt/query_project_tasks       → 查询项目任务列表
+POST /api/bt/query_task_details        → 查询单任务明细
+POST /api/bt/onsite/sync               → 现场问题全量同步（A+B）
+POST /api/bt/db/sync/project-tasks     → 仅同步 A 表
+POST /api/bt/db/sync/task-detail       → 仅同步单条 B 表
+POST /api/bt/db/sync/task-details-batch → 批量同步 B 表
+GET  /api/bt/update_lock_status        → 查询同步锁状态
 ```
-
-所有同步入口在 `runtime/sync_disabled` 标记文件存在时返回 503（离线模式保护），检查点在 `base/sync/routes.py` 和 `base/projects/routes.py` 的 `_is_sync_disabled()` 函数。
-
-full_update 流程：`base/sync/routes.py:full_update()` → 获取分布式锁 → `base/sync/task_sync.py:full_update_service()` → 释放锁
-
-锁机制：`base/sync/lock.py` 操作 `update_locks` 表，TTL 防死锁。并发请求返回 409。
 
 ### AI 知识库同步 → 检索 → 分析
 

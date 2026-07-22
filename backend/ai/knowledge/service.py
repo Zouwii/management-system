@@ -149,6 +149,9 @@ class DingTalkKnowledgeClient:
         start = time.time()
         params = dict(params or {})
         try:
+            from base.api_monitor import check_api_allowed
+            if not check_api_allowed():
+                return {"ok": False, "error": "daily API limit reached", "data": {}, "status": 429}
             resp = requests.get(url, headers=self._headers(), params=params, timeout=self._timeout)
             elapsed = int((time.time() - start) * 1000)
             try:

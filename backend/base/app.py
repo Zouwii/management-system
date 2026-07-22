@@ -134,10 +134,14 @@ def create_app() -> Flask:
 
     # 后台：APScheduler 定时触发同步任务。
     #   每周一 04:00 → TB小更新 + KB小更新
-    #   每月 1 号 04:00 → 刷新季度末 + KB大更新 + TB大更新
     #   API 用量由 ApiCallMonitor 自动管控：
-    #     80% 软限 → knowledge_sync_enabled='partial' → is_full_sync_enabled() 为 false
-    #     100% 硬限 → knowledge_sync_enabled='false' → is_sync_enabled() 为 false
+    #     100% 硬限 → daily_sync_enabled='false' → is_sync_enabled() 为 false
+    #
+    #   ⚠️ 月大同步已关闭（2026-07-16），全量清表重拉改为手动操作。
+    #   需要手动执行时，取消注释下面三行，重启服务即可：
+    #     from base.sync.task_sync import tb_full_update_service
+    #     project_id = ...  # 从 _resolve_sync_user_project() 获取
+    #     tb_full_update_service({"projectId": project_id})
     from zoneinfo import ZoneInfo
     from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -173,61 +177,62 @@ def create_app() -> Flask:
 
         return user_id, project_id
 
-    def _do_monthly_sync():
-        """每月 1 号 04:00：刷新季度末 + KB大更新 + TB大更新。"""
-        print("[auto_sync] === 每月1号：刷新季度末 + KB大更新 + TB大更新 ===")
-
-        from base.api_monitor import monitor as _api_monitor
-        _api_monitor._ensure_state()
-        from base.config.service import is_full_sync_enabled
-        if not is_full_sync_enabled():
-            print("[auto_sync] SKIP — full sync disabled (软限或硬限)")
-            return
-
-        # 1) 刷新季度末
-        print("[auto_sync] [1/3] 刷新季度末...")
-        try:
-            from base.config.service import update_endtime_service
-            end_result = update_endtime_service()
-            if end_result.get("success"):
-                print(f"[auto_sync] end_time 已更新: {end_result.get('end_time', '?')}")
-            else:
-                print("[auto_sync] end_time 更新失败:", end_result.get("error", "unknown"))
-        except Exception as e:
-            print("[auto_sync] end_time 更新异常:", repr(e))
-
-        # 2) KB大更新
-        print("[auto_sync] [2/3] KB大更新...")
-        try:
-            from ai.knowledge.auto_sync import kb_full_sync
-            kb_result = kb_full_sync()
-            if kb_result.get("ok"):
-                s = kb_result.get("sync", {})
-                e = kb_result.get("embed", {})
-                print(f"[auto_sync] KB大更新 done  synced={s.get('totalSynced',0)}  failed={s.get('totalFailed',0)}  embed={e.get('embedded',0)}  elapsed={kb_result.get('durationSec',0):.1f}s")
-            else:
-                print("[auto_sync] KB大更新 failed:", kb_result.get("error", "unknown"))
-        except Exception as e:
-            print("[auto_sync] KB大更新 error:", repr(e))
-
-        # 3) TB大更新（清表全量重拉所有用户）
-        print("[auto_sync] [3/3] TB大更新（清表全量）...")
-        try:
-            from base.sync.task_sync import tb_full_update_service
-            user_id, project_id = _resolve_sync_user_project()
-            if not project_id:
-                print("[auto_sync] TB大更新 skipped: missing projectId")
-            else:
-                result = tb_full_update_service({"projectId": project_id})
-                if result.get("success"):
-                    d = result.get("data", {})
-                    dev = d.get("dev", {})
-                    issue = d.get("issue", {})
-                    print(f"[auto_sync] TB大更新 done  users={d.get('user_count', 0)}  DEV: {dev.get('ok',0)}ok/{dev.get('fail',0)}fail  Issue: {issue.get('ok',0)}ok/{issue.get('fail',0)}fail  truncated={d.get('truncated', False)}")
-                else:
-                    print("[auto_sync] TB大更新 failed:", result.get("error", "unknown"))
-        except Exception as e:
-            print("[auto_sync] TB大更新 error:", repr(e))
+    # ── 月大同步已关闭（2026-07-16），保留函数供手动恢复 ──
+    # def _do_monthly_sync():
+    #     """每月 1 号 04:00：刷新季度末 + KB大更新 + TB大更新。"""
+    #     print("[auto_sync] === 每月1号：刷新季度末 + KB大更新 + TB大更新 ===")
+    #
+    #     from base.api_monitor import monitor as _api_monitor
+    #     _api_monitor._ensure_state()
+    #     from base.config.service import is_full_sync_enabled
+    #     if not is_full_sync_enabled():
+    #         print("[auto_sync] SKIP — full sync disabled (软限或硬限)")
+    #         return
+    #
+    #     # 1) 刷新季度末
+    #     print("[auto_sync] [1/3] 刷新季度末...")
+    #     try:
+    #         from base.config.service import update_endtime_service
+    #         end_result = update_endtime_service()
+    #         if end_result.get("success"):
+    #             print(f"[auto_sync] end_time 已更新: {end_result.get('end_time', '?')}")
+    #         else:
+    #             print("[auto_sync] end_time 更新失败:", end_result.get("error", "unknown"))
+    #     except Exception as e:
+    #         print("[auto_sync] end_time 更新异常:", repr(e))
+    #
+    #     # 2) KB大更新
+    #     print("[auto_sync] [2/3] KB大更新...")
+    #     try:
+    #         from ai.knowledge.auto_sync import kb_full_sync
+    #         kb_result = kb_full_sync()
+    #         if kb_result.get("ok"):
+    #             s = kb_result.get("sync", {})
+    #             e = kb_result.get("embed", {})
+    #             print(f"[auto_sync] KB大更新 done  synced={s.get('totalSynced',0)}  failed={s.get('totalFailed',0)}  embed={e.get('embedded',0)}  elapsed={kb_result.get('durationSec',0):.1f}s")
+    #         else:
+    #             print("[auto_sync] KB大更新 failed:", kb_result.get("error", "unknown"))
+    #     except Exception as e:
+    #         print("[auto_sync] KB大更新 error:", repr(e))
+    #
+    #     # 3) TB大更新（清表全量重拉所有用户）
+    #     print("[auto_sync] [3/3] TB大更新（清表全量）...")
+    #     try:
+    #         from base.sync.task_sync import tb_full_update_service
+    #         user_id, project_id = _resolve_sync_user_project()
+    #         if not project_id:
+    #             print("[auto_sync] TB大更新 skipped: missing projectId")
+    #         else:
+    #             result = tb_full_update_service({"projectId": project_id})
+    #             if result.get("success"):
+    #                 d = result.get("data", {})
+    #                 dev = d.get("dev", {})
+    #                 issue = d.get("issue", {})
+    #                 print(f"[auto_sync] TB大更新 done  users={d.get('user_count', 0)}  DEV: {dev.get('ok',0)}ok/{dev.get('fail',0)}fail  Issue: {issue.get('ok',0)}ok/{issue.get('fail',0)}fail  truncated={d.get('truncated', False)}")
+    #             else:
+    #                 print("[auto_sync] TB大更新 failed:", result.get("error", "unknown"))
+    #     except Exception as e:
+    #         print("[auto_sync] TB大更新 error:", repr(e))
 
     def _do_weekly_sync():
         """每周一 04:00：TB小更新 + KB小更新。"""
@@ -235,32 +240,54 @@ def create_app() -> Flask:
             print("[auto_sync] 周一但为1号，由月度大同步负责，跳过周同步")
             return
 
-        print("[auto_sync] === 周一：TB小更新 + KB小更新 ===")
+        print("[auto_sync] === 周一：TB团队增量 + KB小更新 ===")
 
         from base.api_monitor import monitor as _api_monitor
         _api_monitor._ensure_state()
-        from base.config.service import is_full_sync_enabled
-        if not is_full_sync_enabled():
-            print("[auto_sync] SKIP — full sync disabled (软限或硬限)")
-            return
 
-        # 1) TB小更新（DEV增量）
-        print("[auto_sync] [1/2] TB小更新...")
+        # 1) TB团队增量（全用户 DEV + Issue）
+        print("[auto_sync] [1/2] TB团队小更新...")
         try:
-            from base.sync.task_sync import tb_incremental_update_service
-            user_id, project_id = _resolve_sync_user_project()
-            if not user_id or not project_id:
-                print("[auto_sync] TB小更新 skipped: missing userId/projectId")
+            from base.sync.task_sync import normal_incremental_update_service, normal_issue_incremental_update_service, _upsert_config_value
+            from base.db.engine import SessionLocal
+            from base.db.orm import UserCharacter as DbUserCharacter
+            from base.config.service import get_config_projectids
+            from base.api_monitor import BJ_TZ
+
+            projectids = get_config_projectids() or {}
+            project_id = str(next(iter(projectids.values())) or "").strip()
+            if not project_id:
+                print("[auto_sync] TB团队小更新 skipped: missing projectId")
             else:
-                result = tb_incremental_update_service({"userId": user_id, "projectId": project_id})
-                if result.get("success"):
-                    dev_data = result.get("data", {}).get("dev", {})
-                    dev_bc = dev_data.get("incremental_bc", {})
-                    print(f"[auto_sync] TB小更新 done  DEV: inc={dev_bc.get('count',0)} ok={dev_bc.get('ok',0)} fail={dev_bc.get('fail',0)}")
+                sess = SessionLocal()
+                try:
+                    rows = sess.query(DbUserCharacter.user_id).all()
+                    user_ids = [str(r[0]).strip() for r in rows if r and str(r[0]).strip()]
+                finally:
+                    sess.close()
+
+                if not user_ids:
+                    print("[auto_sync] TB团队小更新 skipped: no users")
                 else:
-                    print("[auto_sync] TB小更新 failed:", result.get("error", "unknown"))
+                    dev_ok = dev_fail = issue_ok = issue_fail = 0
+                    for uid in user_ids:
+                        shared = {"userId": uid, "projectId": project_id}
+                        dev_out = normal_incremental_update_service(shared, skip_update_time=True)
+                        if dev_out.get("success"):
+                            dev_ok += 1
+                        else:
+                            dev_fail += 1
+                        issue_out = normal_issue_incremental_update_service(shared, skip_update_time=True)
+                        if issue_out.get("success"):
+                            issue_ok += 1
+                        else:
+                            issue_fail += 1
+
+                    now_bj = datetime.now(BJ_TZ)
+                    _upsert_config_value("last_update_time", now_bj.isoformat())
+                    print(f"[auto_sync] TB团队小更新 done  users={len(user_ids)}  DEV: {dev_ok}ok/{dev_fail}fail  Issue: {issue_ok}ok/{issue_fail}fail")
         except Exception as e:
-            print("[auto_sync] TB小更新 error:", repr(e))
+            print("[auto_sync] TB团队小更新 error:", repr(e))
 
         # 2) KB小更新
         print("[auto_sync] [2/2] KB小更新...")
@@ -276,10 +303,11 @@ def create_app() -> Flask:
         except Exception as e:
             print("[auto_sync] KB小更新 error:", repr(e))
 
-    _sync_scheduler.add_job(
-        _do_monthly_sync, 'cron', day=1, hour=4, minute=0,
-        id='monthly_sync', misfire_grace_time=3600,
-    )
+    # ── 月大同步已关闭（2026-07-16），取消 scheduler 注册 ──
+    # _sync_scheduler.add_job(
+    #     _do_monthly_sync, 'cron', day=1, hour=4, minute=0,
+    #     id='monthly_sync', misfire_grace_time=3600,
+    # )
     _sync_scheduler.add_job(
         _do_weekly_sync, 'cron', day_of_week='mon', hour=4, minute=0,
         id='weekly_sync', misfire_grace_time=3600,

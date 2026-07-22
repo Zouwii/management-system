@@ -27,7 +27,7 @@ from flask import request, session
 from ai.knowledge.models import KbDocument
 from ai.knowledge.parser import parse_document
 from ai.knowledge.service import DingTalkKnowledgeClient
-from base.db.engine import SessionLocal
+from base.db.engine import KbSessionLocal, SessionLocal
 
 
 # ── helpers ────────────────────────────────────────────────────
@@ -90,7 +90,7 @@ def _cache_document(node_id: str, workspace_id: str, title: str,
                     category: str = "",
                     remote_modified_at: str = "") -> bool:
     """Upsert a document. Returns True if the document was new or content changed."""
-    db = SessionLocal()
+    db = KbSessionLocal()
     try:
         existing = db.query(KbDocument).filter(KbDocument.doc_id == node_id).first()
         now = datetime.now(timezone.utc)
@@ -143,7 +143,7 @@ def _cache_document(node_id: str, workspace_id: str, title: str,
 
 
 def _cached_document(node_id: str) -> dict | None:
-    db = SessionLocal()
+    db = KbSessionLocal()
     try:
         row = db.query(KbDocument).filter(KbDocument.doc_id == node_id).first()
         if row and row.content:
@@ -181,7 +181,7 @@ def _sync_workspace(client, workspace_id: str, root_id: str, limit: int = 0,
     skipped_unchanged: int = 0
 
     # 预加载缓存：{doc_id: (content, category, remote_modified_at)}
-    db = SessionLocal()
+    db = KbSessionLocal()
     try:
         rows = db.query(
             KbDocument.doc_id, KbDocument.content,
@@ -429,10 +429,6 @@ def register(bp, ok, fail):
         if not union_id:
             return fail("not logged in", code=401)
 
-        from base.config.service import is_full_sync_enabled
-        if not is_full_sync_enabled():
-            return fail("full sync is temporarily disabled", code=503, data={})
-
         body = request.get_json(silent=True) or {}
         workspace_id = str(body.get("workspace_id") or "").strip()
         if not workspace_id:
@@ -485,9 +481,6 @@ def register(bp, ok, fail):
         if not union_id:
             return fail("not logged in", code=401)
 
-        from base.config.service import is_full_sync_enabled
-        if not is_full_sync_enabled():
-            return fail("full sync is temporarily disabled", code=503, data={})
 
         client = DingTalkKnowledgeClient(union_id)
 
@@ -627,7 +620,7 @@ def register(bp, ok, fail):
 
         from ai.knowledge.auto_sync import _rechunk_documents
 
-        db = SessionLocal()
+        db = KbSessionLocal()
         try:
             if rechunk_all:
                 docs = db.query(KbDocument).filter(KbDocument.content != "").all()
@@ -642,11 +635,11 @@ def register(bp, ok, fail):
             if not rechunk_result.get("ok"):
                 return fail(rechunk_result.get("error", "rechunk failed"), code=500)
 
-            # Refresh FTS index
+            # Refresh FTS index (on kb_engine)
             from ai.knowledge.models import create_kb_fts, drop_kb_fts
-            from base.db.engine import engine as _engine
-            drop_kb_fts(_engine)
-            create_kb_fts(_engine)
+            from base.db.engine import kb_engine as _kb_engine
+            drop_kb_fts(_kb_engine)
+            create_kb_fts(_kb_engine)
 
             result = {
                 "chunkedDocs": rechunk_result["chunkedDocs"],
@@ -658,14 +651,30 @@ def register(bp, ok, fail):
                 from base.db.engine import PgVectorSessionLocal
                 from sqlalchemy import text as sa_text
 
+                # Step 1: get all valid chunk IDs from KB database
+                valid_ids = [
+                    r[0] for r in
+                    db.execute(sa_text("SELECT id FROM kb_chunks")).fetchall()
+                ]
+
+                # Step 2: clean orphan vectors in pgvector
                 pg = PgVectorSessionLocal()
                 try:
-                    orphaned = pg.execute(
-                        sa_text(
-                            "DELETE FROM chunk_vectors WHERE chunk_id NOT IN "
-                            "(SELECT id FROM kb_chunks)"
+                    if valid_ids:
+                        placeholders = ",".join(
+                            [f":id_{i}" for i in range(len(valid_ids))]
                         )
-                    )
+                        orphaned = pg.execute(
+                            sa_text(
+                                f"DELETE FROM chunk_vectors "
+                                f"WHERE chunk_id NOT IN ({placeholders})"
+                            ),
+                            {f"id_{i}": cid for i, cid in enumerate(valid_ids)},
+                        )
+                    else:
+                        orphaned = pg.execute(
+                            sa_text("DELETE FROM chunk_vectors")
+                        )
                     pg.commit()
                     result["orphanedVectors"] = orphaned.rowcount
                 except Exception:

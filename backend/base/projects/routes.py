@@ -14,14 +14,18 @@ from base.sync.lock import (
     _acquire_update_lock,
     _release_update_lock,
     DEFAULT_UPDATE_LOCK_KEY,
+    SyncBlocked,
+    sync_guard,
+    LOCK_BENTI,
 )
 from base.sync.task_sync import (
     normal_incremental_update_service,
+    normal_issue_incremental_update_service,
     sync_project_details_in_time_range_service,
     sync_project_tasks_to_db,
     _upsert_config_value,
 )
-from base.config.service import is_sync_enabled, is_full_sync_enabled
+from base.config.service import is_sync_enabled
 
 
 def register(bp, ok, fail):
@@ -38,8 +42,6 @@ def register(bp, ok, fail):
             if not (payload.get("projectId") or payload.get("projectid")):
                 return fail("missing projectId", code=400, data={})
             if str(payload.get("sync_ab_by_config_time_range") or "").strip().lower() in {"1", "true", "yes", "on"}:
-                if not is_full_sync_enabled():
-                    return fail("sync is temporarily disabled (offline mode)", code=503, data={})
                 user_id = str(payload.get("userId") or payload.get("userid") or "").strip()
                 owner = "{}@{}".format(user_id or "unknown", int(time.time()))
                 lock = _acquire_update_lock(DEFAULT_UPDATE_LOCK_KEY, owner)
@@ -53,8 +55,6 @@ def register(bp, ok, fail):
                 finally:
                     _release_update_lock(DEFAULT_UPDATE_LOCK_KEY, owner)
             if str(payload.get("sync_ab_by_time_range") or "").strip().lower() in {"1", "true", "yes", "on"}:
-                if not is_full_sync_enabled():
-                    return fail("sync is temporarily disabled (offline mode)", code=503, data={})
                 out = sync_project_details_in_time_range_service(payload)
                 if out.get("success"):
                     return ok(out.get("data") or {})
@@ -84,19 +84,13 @@ def register(bp, ok, fail):
         except Exception as e:
             return fail(str(e), code=500, data={})
 
-    @bp.route("/sync_all_users", methods=["POST"])
-    def sync_all_users():
-        """同步 user_character 表中所有用户，使用同一个 last_update_time 快照。"""
-        if not is_full_sync_enabled():
-            return fail("sync is temporarily disabled (offline mode)", code=503, data={})
-
-        owner = "sync_all@{}".format(int(time.time()))
-        lock = _acquire_update_lock(DEFAULT_UPDATE_LOCK_KEY, owner)
-        if not lock.get("ok"):
-            return fail(lock.get("error", "update is in progress"), code=409, data=lock.get("lock") or {})
+    @bp.route("/increase_sync", methods=["POST"])
+    def increase_sync():
+        """增量同步 user_character 表中所有用户，使用同一个 last_update_time 快照。"""
 
         try:
-            from base.db.orm import UserCharacter as DbUserCharacter
+            with sync_guard(LOCK_BENTI, owner := "increase@{}".format(int(time.time()))):
+                from base.db.orm import UserCharacter as DbUserCharacter
             from base.db.engine import SessionLocal
             from base.config.service import get_config_projectids
             from base.api_monitor import BJ_TZ
@@ -118,20 +112,32 @@ def register(bp, ok, fail):
             if not user_ids:
                 return fail("no users found in user_character", code=400)
 
-            # 逐用户同步，skip_update_time=True 避免每个用户推进 last_update_time
-            ok_count = 0
-            fail_count = 0
+            # 逐用户同步 DEV + Issue，skip_update_time=True 避免每个用户推进 last_update_time
+            dev_ok = 0
+            dev_fail = 0
+            issue_ok = 0
+            issue_fail = 0
             errors = []
             for uid in user_ids:
-                out = normal_incremental_update_service(
+                dev_out = normal_incremental_update_service(
                     {"userId": uid, "projectId": project_id},
                     skip_update_time=True,
                 )
-                if out.get("success"):
-                    ok_count += 1
+                if dev_out.get("success"):
+                    dev_ok += 1
                 else:
-                    fail_count += 1
-                    errors.append({"userId": uid, "error": out.get("error")})
+                    dev_fail += 1
+                    errors.append({"userId": uid, "type": "dev", "error": dev_out.get("error")})
+
+                issue_out = normal_issue_incremental_update_service(
+                    {"userId": uid, "projectId": project_id},
+                    skip_update_time=True,
+                )
+                if issue_out.get("success"):
+                    issue_ok += 1
+                else:
+                    issue_fail += 1
+                    errors.append({"userId": uid, "type": "issue", "error": issue_out.get("error")})
 
             # 所有用户同步完成后，推进 last_update_time 一次
             now_bj = dt.now(BJ_TZ)
@@ -140,12 +146,14 @@ def register(bp, ok, fail):
             return ok({
                 "beijing_now": now_bj.isoformat(),
                 "user_count": len(user_ids),
-                "ok": ok_count,
-                "fail": fail_count,
+                "dev": {"ok": dev_ok, "fail": dev_fail},
+                "issue": {"ok": issue_ok, "fail": issue_fail},
                 "errors": errors[:20],
             })
-        finally:
-            _release_update_lock(DEFAULT_UPDATE_LOCK_KEY, owner)
+        except SyncBlocked as e:
+            return fail(str(e), code=503, data={})
+        except Exception as e:
+            return fail(str(e), code=500, data={})
 
     @bp.route("/query_task_details", methods=["POST"])
     def query_task_details():

@@ -825,6 +825,26 @@ export function mockFetchWorkdays() {
   return delay({ code: 200, data: { workday_count: 59, workdays: 59 } });
 }
 
+// ── 员工出勤表 Mock ──
+
+export function mockFetchAttendance() {
+  return delay({
+    code: 200,
+    data: {
+      records: [
+        { user_id: 'u1', user_name: '张三', team_id: 'nav', overtime_days: 2, leave_days: 1, year: 2026, quarter: 1 },
+        { user_id: 'u2', user_name: '李四', team_id: 'servo', overtime_days: 0, leave_days: 0.5, year: 2026, quarter: 1 },
+      ],
+      year: 2026,
+      quarter: 1,
+    },
+  });
+}
+
+export function mockSaveAttendance() {
+  return delay({ code: 200, data: { saved_count: 2, year: 2026, quarter: 1 } });
+}
+
 // ── 绩效导入 Mock ──
 
 export function mockFetchTeamImportUsers() {
@@ -878,7 +898,7 @@ export function mockRecalcMemberPerformance(_payload = {}) {
   });
 }
 
-export function mockSyncAllUsers() {
+export function mockIncreaseSync() {
   return Promise.resolve({
     code: 200,
     error: '',

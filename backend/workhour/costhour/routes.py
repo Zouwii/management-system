@@ -10,6 +10,10 @@ from workhour.costhour.service import (
     workday_costhour_team_project_detail_service,
     workday_costhour_project_name_detail_service,
 )
+from workhour.costhour.attendance import (
+    get_attendance_service,
+    save_attendance_service,
+)
 
 
 def register(bp, ok, fail):
@@ -76,5 +80,31 @@ def register(bp, ok, fail):
             if result.get("success"):
                 return ok(result.get("data") or {})
             return fail(result.get("error", "project name detail aggregate failed"), code=400, data=result.get("data"))
+        except Exception as e:
+            return fail(str(e), code=500, data={})
+
+    # ── 员工出勤表 读取 ──
+
+    @bp.route("/stats/attendance/get", methods=["POST"])
+    def stats_attendance_get():
+        try:
+            payload = request.get_json(silent=True) or {}
+            result = get_attendance_service(payload)
+            if result.get("success"):
+                return ok(result.get("data") or {})
+            return fail(result.get("error", "failed to fetch attendance records"), code=400, data=result.get("data"))
+        except Exception as e:
+            return fail(str(e), code=500, data={})
+
+    # ── 员工出勤表 保存/更新 ──
+
+    @bp.route("/stats/attendance/save", methods=["POST"])
+    def stats_attendance_save():
+        try:
+            payload = request.get_json(silent=True) or {}
+            result = save_attendance_service(payload)
+            if result.get("success"):
+                return ok(result.get("data") or {})
+            return fail(result.get("error", "failed to save attendance records"), code=400, data=result.get("data"))
         except Exception as e:
             return fail(str(e), code=500, data={})

@@ -28,7 +28,7 @@ BACKEND_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 sys.path.insert(0, str(BACKEND_ROOT))
 
 import torch
-from base.db.engine import PgVectorSessionLocal, SessionLocal
+from base.db.engine import KbSessionLocal, PgVectorSessionLocal
 from sqlalchemy import text
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -53,7 +53,7 @@ MODEL_CFG = {
 
 
 def get_chunks(limit=None):
-    db = SessionLocal()
+    db = KbSessionLocal()
     try:
         if limit:
             rows = db.execute(

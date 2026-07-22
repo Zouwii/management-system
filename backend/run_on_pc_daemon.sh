@@ -13,7 +13,7 @@ DB_HOST="${DB_HOST:-127.0.0.1}"
 DB_PORT="${DB_PORT:-3306}"
 DB_USER="${DB_USER:-tb_tool_app}"
 DB_PASSWORD="${DB_PASSWORD:-123456}"
-DB_NAME="${DB_NAME:-tb_management}"
+DB_NAME="${DB_NAME:-benti_management}"
 
 INIT_MYSQL="${INIT_MYSQL:-0}"
 MYSQL_ROOT_USER="${MYSQL_ROOT_USER:-root}"

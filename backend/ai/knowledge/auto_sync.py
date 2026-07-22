@@ -18,7 +18,7 @@ from ai.knowledge.embedder import embed_chunks
 from ai.knowledge.models import KbDocument, KbChunk
 from ai.knowledge.routes import _sync_workspace
 from ai.knowledge.service import DingTalkKnowledgeClient, get_known_workspaces
-from base.db.engine import SessionLocal
+from base.db.engine import KbSessionLocal, SessionLocal
 
 logger = logging.getLogger(__name__)
 
@@ -151,7 +151,7 @@ def _rechunk_documents(doc_ids: List[str]) -> dict:
         })
         return {"ok": True, "chunkedDocs": 0, "totalChunks": 0, "skipped": True}
 
-    db = SessionLocal()
+    db = KbSessionLocal()
     try:
         total_chunks = 0
         docs = db.query(KbDocument).filter(
@@ -204,16 +204,6 @@ def sync_all_and_embed(union_id: str = "", check_modified: bool = False) -> dict
     check_modified=False: KB增量（仅拉取未缓存的新文档）
     check_modified=True:  KB变更（对比 modified_at，重拉已变更文档）
     """
-    from base.config.service import is_full_sync_enabled
-
-    if not is_full_sync_enabled():
-        msg = "sync is disabled (config.knowledge_sync_enabled = partial or false)"
-        print(f"[auto_sync] ABORT: {msg}")
-        _sync_log({
-            "ts": int(time.time()), "phase": "pipeline", "event": "abort",
-            "error": msg,
-        })
-        return {"ok": False, "error": msg}
 
     if not union_id:
         union_id = _resolve_union_id()

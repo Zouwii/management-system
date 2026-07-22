@@ -1,16 +1,23 @@
-"""SQLAlchemy ORM models for knowledge base documents and chunks."""
+"""SQLAlchemy ORM models for knowledge base documents and chunks.
+
+These models belong to a separate KB database (default: kb_storage),
+using KbBase instead of the main Base from base.db.orm.
+"""
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
 
 from sqlalchemy import DateTime, Index, Integer, String, Text
-from sqlalchemy.orm import Mapped, mapped_column
-
-from base.db.orm import Base
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
-class KbDocument(Base):
+class KbBase(DeclarativeBase):
+    """Declarative base for knowledge-base tables (kb_storage database)."""
+    pass
+
+
+class KbDocument(KbBase):
     __tablename__ = "kb_documents"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -40,7 +47,7 @@ class KbDocument(Base):
     )
 
 
-class KbChunk(Base):
+class KbChunk(KbBase):
     __tablename__ = "kb_chunks"
     __table_args__ = (
         Index("idx_kb_chunks_doc", "doc_id", "chunk_index"),
@@ -70,13 +77,19 @@ ALTER TABLE kb_chunks ADD FULLTEXT INDEX ft_kb_chunks_content (content) WITH PAR
 """
 
 
-def create_kb_fts(engine) -> None:
+def create_kb_fts(engine=None) -> None:
     """Create full-text search index on kb_chunks.content.
 
     SQLite: FTS5 virtual table (external content mode).
     MySQL:  FULLTEXT INDEX (built-in InnoDB full-text).
+
+    If engine is None, uses the KB database engine (kb_engine).
     """
     from sqlalchemy import text
+
+    if engine is None:
+        from base.db.engine import kb_engine
+        engine = kb_engine
 
     dialect = engine.dialect.name
     with engine.begin() as conn:
@@ -92,9 +105,16 @@ def create_kb_fts(engine) -> None:
                 pass
 
 
-def drop_kb_fts(engine) -> None:
-    """Drop FTS index (for rebuild scenarios)."""
+def drop_kb_fts(engine=None) -> None:
+    """Drop FTS index (for rebuild scenarios).
+
+    If engine is None, uses the KB database engine (kb_engine).
+    """
     from sqlalchemy import text
+
+    if engine is None:
+        from base.db.engine import kb_engine
+        engine = kb_engine
 
     dialect = engine.dialect.name
     with engine.begin() as conn:

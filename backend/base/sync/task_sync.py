@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from base.db.engine import SessionLocal
 from base.db.orm import Config as DbConfig
@@ -103,6 +103,27 @@ def _get_config_value(type_: str) -> str:
         return str(getattr(row, "value", "") or "") if row else ""
     finally:
         sess.close()
+
+
+def _safe_last_update_time() -> datetime:
+    """读取 last_update_time，自动修正异常值。
+
+    保护规则：
+    - 缺失/空值 → 回退到 365 天前并写回 DB
+    - 早于 365 天前 → 回退到 365 天前并写回 DB
+    - 正常值 → 原样返回
+    """
+    floor = datetime.now(timezone.utc) - timedelta(days=365)
+    raw = _get_config_value("last_update_time")
+    dt_val = _cmp_dt_utc(_parse_iso_dt(raw)) if raw else None
+
+    if not dt_val or dt_val < floor:
+        corrected = floor.isoformat()
+        print(f"[safe_last_update_time] corrected: '{raw or '<empty>'}' → {corrected}")
+        _upsert_config_value("last_update_time", corrected)
+        return floor
+
+    return dt_val
 
 
 def _upsert_config_value(type_: str, value: str) -> None:
@@ -1201,12 +1222,8 @@ def sync_project_details_in_time_range_service(payload: Dict[str, Any]) -> Dict[
     if not user_id or not project_id:
         return {"success": False, "error": "missing userId or projectId", "data": {}}
 
-    # 增量起点：读 config.last_update_time，无记录则退回到今天-1天
-    last_update_raw = _get_config_value("last_update_time")
-    last_update_dt = _parse_iso_dt(last_update_raw)
-    if not last_update_dt:
-        last_update_dt = datetime.now(timezone.utc) - timedelta(days=1)
-    last_update_dt = _cmp_dt_utc(last_update_dt)
+    # 增量起点：读 last_update_time（自动修正异常值）
+    last_update_dt = _safe_last_update_time()
 
     # 窗口终点：用前端传的 endDate，或回退到今天
     end_dt = _parse_iso_dt(payload.get("endDate") or payload.get("end_time") or payload.get("endTime"))
@@ -1577,23 +1594,11 @@ def normal_incremental_update_service(payload: Dict[str, Any], skip_update_time:
     if not user_id or not project_id:
         return {"success": False, "error": "missing userId or projectId", "data": {}}
 
-    # 1) 读取 last_update_time
+    # 1) 读取 last_update_time（自动修正异常值）
     from base.api_monitor import BJ_TZ
     now_bj = datetime.now(BJ_TZ)
-    last_raw = _get_config_value("last_update_time")
-    last_dt = _cmp_dt_utc(_parse_iso_dt(last_raw)) if last_raw else None
-
-    # 2) 读取 config.start_time（仅用于 last_update_time 缺省时的兜底）
-    start_cfg_raw = _get_config_value("start_time")
-    selected_start_dt = _cmp_dt_utc(_parse_iso_dt(str(start_cfg_raw or "")))
-
-    # last_update_time 缺省时：用 start_dt 作为增量起点，避免全量打爆
-    if not last_dt:
-        if not selected_start_dt:
-            return {"success": False, "error": "missing or invalid config.start_time", "data": {}}
-        last_dt = selected_start_dt
-        last_raw = _format_dt_for_tql_utc(last_dt)
-
+    last_dt = _safe_last_update_time()
+    last_raw = _format_dt_for_tql_utc(last_dt)
     updated_threshold = _format_dt_for_tql_utc(last_dt)
 
     max_results = int(payload.get("maxResults", 500) or 500)
@@ -1756,18 +1761,8 @@ def normal_issue_incremental_update_service(payload: Dict[str, Any], skip_update
 
     from base.api_monitor import BJ_TZ
     now_bj = datetime.now(BJ_TZ)
-    last_raw = _get_config_value("last_update_time")
-    last_dt = _cmp_dt_utc(_parse_iso_dt(last_raw)) if last_raw else None
-
-    start_cfg_raw = _get_config_value("start_time")
-    selected_start_dt = _cmp_dt_utc(_parse_iso_dt(str(start_cfg_raw or "")))
-
-    if not last_dt:
-        if not selected_start_dt:
-            return {"success": False, "error": "missing or invalid config.start_time", "data": {}}
-        last_dt = selected_start_dt
-        last_raw = _format_dt_for_tql_utc(last_dt)
-
+    last_dt = _safe_last_update_time()
+    last_raw = _format_dt_for_tql_utc(last_dt)
     updated_threshold = _format_dt_for_tql_utc(last_dt)
 
     max_results = int(payload.get("maxResults", 500) or 500)
@@ -1902,144 +1897,133 @@ def normal_issue_incremental_update_service(payload: Dict[str, Any], skip_update
 
 # ---------------------------------------------------------------------------
 # 便捷入口：四个主体函数
-#   tb_incremental_update_service — TB小更新：DEV增量 only
-#   tb_full_update_service        — TB大更新：DEV增量 + Issue增量
+#   tb_full_update_service        — ⚠️ 已关闭 (2026-07-16)，改为手动执行。见文件底部注释
+#   increase_sync (in base/projects/routes.py) — 当前团队同步唯一入口
 # ---------------------------------------------------------------------------
 
-def tb_incremental_update_service(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """TB小更新：仅 DEV增量，不处理 Issue。
 
-    封装 normal_incremental_update_service + 分布式锁。
-    last_update_time 由 normal_incremental_update_service 自行管理（skip_update_time=False）。
-    """
-    payload = dict(payload or {})
-    user_id = str(payload.get("userId") or payload.get("userid") or "").strip()
-    project_id = str(payload.get("projectId") or payload.get("projectid") or "").strip()
-    if not user_id or not project_id:
-        return {"success": False, "error": "missing userId or projectId", "data": {}}
-
-    from base.config.service import is_full_sync_enabled
-    if not is_full_sync_enabled():
-        return {"success": False, "error": "sync is disabled (partial or false)", "data": {}}
-
-    owner = "tb_incremental@{}".format(int(time.time()))
-    lock = _acquire_update_lock(DEFAULT_UPDATE_LOCK_KEY, owner)
-    if not lock.get("ok"):
-        return {"success": False, "error": lock.get("error", "update is in progress"), "data": lock.get("lock") or {}}
-
-    try:
-        dev_out = normal_incremental_update_service(
-            {"userId": user_id, "projectId": project_id},
-            skip_update_time=False,
-        )
-        if dev_out.get("success"):
-            d = dev_out.get("data", {})
-            bc = d.get("incremental_bc", {})
-            print(f"[tb_incremental] DEV done  inc={bc.get('count',0)}  ok={bc.get('ok',0)}  fail={bc.get('fail',0)}")
-        else:
-            print("[tb_incremental] DEV failed:", dev_out.get("error", "unknown"))
-        return {"success": dev_out.get("success", False), "data": {"dev": dev_out.get("data") or {}}}
-    finally:
-        _release_update_lock(DEFAULT_UPDATE_LOCK_KEY, owner)
-
-
-def tb_full_update_service(payload: Dict[str, Any]) -> Dict[str, Any]:
-    """TB全量更新（每月1号）：清空工时三表，全量重拉所有用户。
-
-    1) TRUNCATE project_tasks / project_task_details / project_task_overdue_details
-    2) last_update_time 重置为 epoch（保证全量拉取）
-    3) 遍历 user_character 所有用户，DEV + Issue 全量拉取
-    4) 统一推进 last_update_time
-
-    注意：知识库更新由调用方独立执行，此处不动。
-    """
-    payload = dict(payload or {})
-    project_id = str(payload.get("projectId") or payload.get("projectid") or "").strip()
-    if not project_id:
-        return {"success": False, "error": "missing projectId", "data": {}}
-
-    from base.config.service import is_full_sync_enabled
-    if not is_full_sync_enabled():
-        return {"success": False, "error": "sync is disabled (partial or false)", "data": {}}
-
-    owner = "tb_full@{}".format(int(time.time()))
-    lock = _acquire_update_lock(DEFAULT_UPDATE_LOCK_KEY, owner)
-    if not lock.get("ok"):
-        return {"success": False, "error": lock.get("error", "update is in progress"), "data": lock.get("lock") or {}}
-
-    try:
-        # 1) 清空工时三表
-        print("[tb_full] TRUNCATE 工时三表...")
-        sess = SessionLocal()
-        try:
-            sess.execute(text("DELETE FROM project_task_overdue_details"))
-            sess.execute(text("DELETE FROM project_task_details"))
-            sess.execute(text("DELETE FROM project_tasks"))
-            sess.commit()
-            print("[tb_full] 工时三表已清空")
-        except Exception as e:
-            sess.rollback()
-            print("[tb_full] 清表失败:", repr(e))
-            return {"success": False, "error": "truncate tables failed: {}".format(e), "data": {}}
-        finally:
-            sess.close()
-
-        # 2) 重置 last_update_time 为 epoch（保证全量拉取）
-        _upsert_config_value("last_update_time", "1970-01-01T00:00:00+00:00")
-        print("[tb_full] last_update_time → epoch")
-
-        # 3) 获取所有用户
-        sess2 = SessionLocal()
-        try:
-            rows = sess2.query(DbUserCharacter.user_id).all()
-            user_ids = [str(r[0]).strip() for r in rows if r and str(r[0]).strip()]
-        finally:
-            sess2.close()
-
-        if not user_ids:
-            return {"success": False, "error": "no users found in user_character", "data": {}}
-
-        dev_ok = 0
-        dev_fail = 0
-        issue_ok = 0
-        issue_fail = 0
-        total_bc_count = 0
-
-        for uid in user_ids:
-            shared = {"userId": uid, "projectId": project_id}
-
-            # DEV
-            dev_out = normal_incremental_update_service(shared, skip_update_time=True)
-            if dev_out.get("success"):
-                dev_ok += 1
-                total_bc_count += dev_out.get("data", {}).get("incremental_bc", {}).get("count", 0)
-            else:
-                dev_fail += 1
-
-            # Issue
-            issue_out = normal_issue_incremental_update_service(shared, skip_update_time=True)
-            if issue_out.get("success"):
-                issue_ok += 1
-            else:
-                issue_fail += 1
-
-        print(f"[tb_full] DEV: {dev_ok}ok/{dev_fail}fail  Issue: {issue_ok}ok/{issue_fail}fail  users: {len(user_ids)}  bc_total: {total_bc_count}")
-
-        # 4) 统一推进 last_update_time
-        from base.api_monitor import BJ_TZ
-        now_bj = datetime.now(BJ_TZ).isoformat()
-        _upsert_config_value("last_update_time", now_bj)
-        print(f"[tb_full] last_update_time → {now_bj}")
-
-        return {
-            "success": True,
-            "data": {
-                "beijing_now": now_bj,
-                "user_count": len(user_ids),
-                "dev": {"ok": dev_ok, "fail": dev_fail},
-                "issue": {"ok": issue_ok, "fail": issue_fail},
-                "truncated": True,
-            },
-        }
-    finally:
-        _release_update_lock(DEFAULT_UPDATE_LOCK_KEY, owner)
+# ═══════════════════════════════════════════════════════════════════════
+# tb_full_update_service — TB大更新（清表全量）
+#
+# ⚠️ 已关闭（2026-07-16）。
+#    此函数会清空全部 A/B/C/program_issue 表并全量重拉所有用户，
+#    月 API 配额消耗极大（每人 2 次 × 用户数），改为手动执行。
+#
+# 手动执行方式（进入 backend 目录后 Python shell）：
+#
+#     from base.sync.task_sync import tb_full_update_service
+#     from base.dingtalk_client import get_config_projectids
+#     pids = get_config_projectids()
+#     pid = next(iter(pids.values()))
+#     result = tb_full_update_service({"projectId": pid})
+#     print(result)
+#
+# ═══════════════════════════════════════════════════════════════════════
+#
+# def tb_full_update_service(payload: Dict[str, Any]) -> Dict[str, Any]:
+#     """TB全量更新：清空工时五表，全量重拉所有用户。
+#
+#     1) TRUNCATE 五表 (project_tasks / project_task_details / project_task_overdue_details / program_issue / program_issue_detail)
+#     2) last_update_time 重置为 365 天前（限定重拉范围，避免全量打爆）
+#     3) 遍历 user_character 所有用户，DEV + Issue 全量拉取
+#     4) 统一推进 last_update_time
+#
+#     注意：知识库更新由调用方独立执行，此处不动。
+#     """
+#     payload = dict(payload or {})
+#     project_id = str(payload.get("projectId") or payload.get("projectid") or "").strip()
+#     if not project_id:
+#         return {"success": False, "error": "missing projectId", "data": {}}
+#
+#     from base.config.service import is_full_sync_enabled
+#     if not is_full_sync_enabled():
+#         return {"success": False, "error": "sync is disabled (full_sync_enabled = false)", "data": {}}
+#
+#     owner = "tb_full@{}".format(int(time.time()))
+#     lock = _acquire_update_lock(DEFAULT_UPDATE_LOCK_KEY, owner)
+#     if not lock.get("ok"):
+#         return {"success": False, "error": lock.get("error", "update is in progress"), "data": lock.get("lock") or {}}
+#
+#     from base.api_monitor import enter_full_sync_mode, leave_full_sync_mode
+#     enter_full_sync_mode()
+#
+#     try:
+#         # 1) 清空工时五表（DEV + Issue）
+#         print("[tb_full] TRUNCATE 工时五表...")
+#         sess = SessionLocal()
+#         try:
+#             sess.execute(text("DELETE FROM project_task_overdue_details"))
+#             sess.execute(text("DELETE FROM project_task_details"))
+#             sess.execute(text("DELETE FROM project_tasks"))
+#             sess.execute(text("DELETE FROM program_issue_detail"))
+#             sess.execute(text("DELETE FROM program_issue"))
+#             sess.commit()
+#             print("[tb_full] 工时五表已清空")
+#         except Exception as e:
+#             sess.rollback()
+#             print("[tb_full] 清表失败:", repr(e))
+#             return {"success": False, "error": "truncate tables failed: {}".format(e), "data": {}}
+#         finally:
+#             sess.close()
+#
+#         # 2) 重置 last_update_time 为 365 天前（限定重拉范围，避免全量打爆）
+#         one_year_ago = (datetime.now(timezone.utc) - timedelta(days=365)).isoformat()
+#         _upsert_config_value("last_update_time", one_year_ago)
+#         print(f"[tb_full] last_update_time → 365 days ago: {one_year_ago}")
+#
+#         # 3) 获取所有用户
+#         sess2 = SessionLocal()
+#         try:
+#             rows = sess2.query(DbUserCharacter.user_id).all()
+#             user_ids = [str(r[0]).strip() for r in rows if r and str(r[0]).strip()]
+#         finally:
+#             sess2.close()
+#
+#         if not user_ids:
+#             return {"success": False, "error": "no users found in user_character", "data": {}}
+#
+#         dev_ok = 0
+#         dev_fail = 0
+#         issue_ok = 0
+#         issue_fail = 0
+#         total_bc_count = 0
+#
+#         for uid in user_ids:
+#             shared = {"userId": uid, "projectId": project_id}
+#
+#             # DEV
+#             dev_out = normal_incremental_update_service(shared, skip_update_time=True)
+#             if dev_out.get("success"):
+#                 dev_ok += 1
+#                 total_bc_count += dev_out.get("data", {}).get("incremental_bc", {}).get("count", 0)
+#             else:
+#                 dev_fail += 1
+#
+#             # Issue
+#             issue_out = normal_issue_incremental_update_service(shared, skip_update_time=True)
+#             if issue_out.get("success"):
+#                 issue_ok += 1
+#             else:
+#                 issue_fail += 1
+#
+#         print(f"[tb_full] DEV: {dev_ok}ok/{dev_fail}fail  Issue: {issue_ok}ok/{issue_fail}fail  users: {len(user_ids)}  bc_total: {total_bc_count}")
+#
+#         # 4) 统一推进 last_update_time
+#         from base.api_monitor import BJ_TZ
+#         now_bj = datetime.now(BJ_TZ).isoformat()
+#         _upsert_config_value("last_update_time", now_bj)
+#         print(f"[tb_full] last_update_time → {now_bj}")
+#
+#         return {
+#             "success": True,
+#             "data": {
+#                 "beijing_now": now_bj,
+#                 "user_count": len(user_ids),
+#                 "dev": {"ok": dev_ok, "fail": dev_fail},
+#                 "issue": {"ok": issue_ok, "fail": issue_fail},
+#                 "truncated": True,
+#             },
+#         }
+#     finally:
+#         leave_full_sync_mode()
+#         _release_update_lock(DEFAULT_UPDATE_LOCK_KEY, owner)

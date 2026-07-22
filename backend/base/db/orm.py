@@ -397,6 +397,28 @@ class ServoPerfQuarterResult(_PerfQuarterResultMixin, Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
 
 
+class MemberAttendance(Base):
+    """员工出勤调整表：按用户+季度持久化加班/请假天数。
+
+    前端 员工出勤表 中的加班/请假字段持久化存储，
+    同一用户+同一季度只保留一条记录，保存时 upsert 覆盖。
+    """
+
+    __tablename__ = "member_attendance"
+    __table_args__ = (UniqueConstraint("user_id", "year", "quarter", name="uq_member_attendance_user_quarter"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    user_name: Mapped[str] = mapped_column(String(128), nullable=False, default="")
+    team_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    year: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    quarter: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    overtime_days: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    leave_days: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.now)
+
+
 class ApiCallLog(Base):
     """钉钉 API 调用日志（持久化统计）。"""
 
@@ -409,3 +431,112 @@ class ApiCallLog(Base):
     latency_ms: Mapped[int] = mapped_column(Integer, default=0)
     error_msg: Mapped[str] = mapped_column(String(500), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
+# ─────────────────────────────────────────────────────────────
+# onsite_problem A/B 表
+# ─────────────────────────────────────────────────────────────
+
+
+class OnsiteProblemTask(Base):
+    """现场问题跟踪 — A 表：列表快照。"""
+
+    __tablename__ = "onsite_problem_tasks"
+    __table_args__ = (UniqueConstraint("project_id", "task_id", name="uq_onsite_problem_task"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    task_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    project_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+
+    content: Mapped[str] = mapped_column(Text, default="")
+    scenario_field_config_id: Mapped[str] = mapped_column(String(64), default="")
+    stage_id: Mapped[str] = mapped_column(String(64), default="")
+    task_list_id: Mapped[str] = mapped_column(String(64), default="")
+    task_stage_id: Mapped[str] = mapped_column(String(64), default="")
+    taskflow_status_id: Mapped[str] = mapped_column(String(64), default="")
+
+    executor_id: Mapped[str] = mapped_column(String(64), default="")
+    creator_id: Mapped[str] = mapped_column(String(64), default="")
+
+    due_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    start_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    ding_created: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    ding_updated: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    note: Mapped[str] = mapped_column(Text, default="")
+    priority: Mapped[int] = mapped_column(Integer, default=0)
+    progress: Mapped[int] = mapped_column(Integer, default=0)
+    visible: Mapped[str] = mapped_column(String(32), default="members")
+
+    is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_done: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    ancestor_ids: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    involve_members: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    tag_ids: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    labels: Mapped[Optional[List[Any]]] = mapped_column(JSON, nullable=True)
+    customfield_ids: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+
+    raw_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    list_synced_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class OnsiteProblemDetail(Base):
+    """现场问题跟踪 — B 表：任务明细，解析关键 customField。"""
+
+    __tablename__ = "onsite_problem_details"
+    __table_args__ = (UniqueConstraint("task_id", "query_user_id", name="uq_onsite_problem_detail"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    project_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    task_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    query_user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    unique_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+
+    content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    executor_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    creator_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    scenario_field_config_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    taskflow_status_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    task_list_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    task_stage_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    due_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    start_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    is_done: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    is_archived: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    priority: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    progress: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    visible: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+
+    tag_ids: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    involve_members: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    ancestor_ids: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    labels: Mapped[Optional[List[Any]]] = mapped_column(JSON, nullable=True)
+
+    # ── 拆列：customField 解析 ──
+    # ── 解析后的 customField ──
+    # 基础模板
+    vehicle_model: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)    # 车型 (659369d3)
+    carrier_type: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)      # 载具配置 (637c2e2f)
+    occurrence_frequency: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)  # 复现概率 (62c51d82)
+    software_version: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)  # JZTOTAL包版本 (6645bd4d)
+    problem_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)      # 问题描述 (624e4bf0)
+    investigation_conclusion: Mapped[Optional[str]] = mapped_column(Text, nullable=True) # 排查结论 (69241440)
+    doc_value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)                # 排查文档价值 (69241431)
+    investigation_doc: Mapped[Optional[str]] = mapped_column(Text, nullable=True) # 排查文档 (69241391)
+    attachments: Mapped[Optional[str]] = mapped_column(Text, nullable=True)              # 其他附件信息 (625f75e9)
+    # 扩展模板
+    problem_category: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)  # 问题类型分类 (691a9554)
+    problem_module: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)     # 问题模块分类 (691a95f3)
+    guide_doc: Mapped[Optional[str]] = mapped_column(Text, nullable=True)         # 指导文档 (62651ead)
+    formal_version: Mapped[Optional[str]] = mapped_column(Text, nullable=True)     # 正式版本 (625f8339)
+    root_cause: Mapped[Optional[str]] = mapped_column(Text, nullable=True)               # 原因分析 (625f8317)
+    solution: Mapped[Optional[str]] = mapped_column(Text, nullable=True)                 # 解决方案 (625f8329)
+    submitter: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)          # 提交者 (68f63735)
+
+    custom_fields_json: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    raw_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    fetched_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -84,8 +84,10 @@ def query_project_tasks_service(payload: Dict[str, Any]) -> Dict[str, Any]:
     )
     params = {
         "maxResults": payload.get("maxResults", 500),
-        "query": payload.get("query", ""),
     }
+    query = payload.get("query", "")
+    if query:
+        params["query"] = query
 
     force_refresh = bool(payload.get("force_refresh"))
     use_cache = (not provided_token) and (not force_refresh)
@@ -113,6 +115,13 @@ def query_project_tasks_service(payload: Dict[str, Any]) -> Dict[str, Any]:
             return cached
 
     def _do_request(token: str, req_params: Dict[str, Any]):
+        from base.api_monitor import check_api_allowed
+        if not check_api_allowed():
+            return {
+                "success": False,
+                "error": "daily API limit reached, request blocked",
+                "meta": {"endpoint": "/v1.0/project/users/{userId}/projectIds/{projectId}/tasks"},
+            }
         _start = time.time()
         resp = requests.get(
             url,
@@ -146,10 +155,11 @@ def query_project_tasks_service(payload: Dict[str, Any]) -> Dict[str, Any]:
         refresh_error = ""
 
         while page_count < max_pages:
-            req_params = {
+            req_params: Dict[str, Any] = {
                 "maxResults": params.get("maxResults"),
-                "query": params.get("query"),
             }
+            if params.get("query"):
+                req_params["query"] = params["query"]
             if current_next_token:
                 req_params["nextToken"] = current_next_token
 
@@ -300,6 +310,13 @@ def query_user_tasks_service(payload: Dict[str, Any]) -> Dict[str, Any]:
     }
 
     def _do_request(token: str):
+        from base.api_monitor import check_api_allowed
+        if not check_api_allowed():
+            return {
+                "success": False,
+                "error": "daily API limit reached, request blocked",
+                "meta": {"endpoint": "/v1.0/project/users/{userId}/tasks"},
+            }
         _start = time.time()
         resp = requests.get(
             url,

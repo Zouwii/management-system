@@ -1,9 +1,16 @@
 """Update lock management for task sync operations.
 
 Provides distributed-mutex-style locking via the UpdateLock DB table.
-Used by tb_incremental_update_service, tb_full_update_service, and projects.py to prevent concurrent syncs.
+sync_guard: unified context manager combining switch check + lock.
+
+Lock keys registry:
+  LOCK_WORKHOUR_UPDATE — 团队增量同步、本体清表全量
+  LOCK_ONSITE_SYNC     — 现场问题全量
+
+新增同步 → 在下方 LOCK_* 加一个常量, 调用处用 sync_guard(LOCK_XXX, owner).
 """
 
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
@@ -11,7 +18,17 @@ from base.db.engine import SessionLocal
 from base.db.orm import UpdateLock
 
 DEFAULT_UPDATE_LOCK_TTL_SEC = 60 * 30
-DEFAULT_UPDATE_LOCK_KEY = "workhour_update:all"
+
+# ── Lock key registry ──────────────────────────────────────
+LOCK_BENTI   = "benti_lock"    # 本体开发部：团队增量、清表全量
+LOCK_ONSITE  = "onsite_lock"   # 现场问题全量
+
+# backward compat
+DEFAULT_UPDATE_LOCK_KEY = LOCK_BENTI
+
+
+class SyncBlocked(Exception):
+    """Raised when sync is blocked by switch or lock."""
 
 
 def _cmp_dt_utc(dt):
@@ -126,3 +143,28 @@ def get_update_lock_status(lock_key: str = DEFAULT_UPDATE_LOCK_KEY) -> Dict[str,
 _acquire_update_lock = acquire_update_lock
 _release_update_lock = release_update_lock
 _get_update_lock_status = get_update_lock_status
+
+
+# ── unified sync guard ──────────────────────────────────────
+
+@contextmanager
+def sync_guard(lock_key: str, owner: str, ttl_sec: int = DEFAULT_UPDATE_LOCK_TTL_SEC):
+    """统一同步管控：开关 + 分布式锁。
+
+    API 限额检查在 service 层 (check_api_allowed)，每次请求都拦截。
+
+    Raises:
+        SyncBlocked: 被开关或锁阻断.
+    """
+    from base.config.service import is_sync_enabled
+    if not is_sync_enabled():
+        raise SyncBlocked("sync is disabled (hard limit)")
+
+    lock = acquire_update_lock(lock_key, owner, ttl_sec)
+    if not lock.get("ok"):
+        raise SyncBlocked(lock.get("error", "update is in progress"))
+
+    try:
+        yield
+    finally:
+        release_update_lock(lock_key, owner)

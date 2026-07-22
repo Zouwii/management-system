@@ -10,7 +10,7 @@
 | 用户 | jz |
 | 密码 | 1 |
 | 应用路径 | /home/jz/zhr/tb_tool_bt/ |
-| MySQL | mysql -u root -p123456 tb_management |
+| MySQL | mysql -u root -p123456 benti_management |
 | 服务端口 | 5002 |
 | API 前缀 | http://172.19.3.79:5002/api/bt |
 
