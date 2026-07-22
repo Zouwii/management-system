@@ -40,7 +40,6 @@
 | 文档 | 说明 |
 |------|------|
 | [ai/MCP_使用说明.md](ai/MCP_使用说明.md) | MCP Server 使用说明：连接方式、Tools、Resources |
-| [ai/ai-tbcreate-design.md](ai/ai-tbcreate-design.md) | Teambition 任务创建设计 |
 
 ### 设计文档
 
@@ -91,6 +90,5 @@
 
 | 文档 | 说明 |
 |------|------|
-| [ops/server-connection.md](ops/server-connection.md) | 服务器连接：SSH、日志、数据库查询、重启、同步控制 |
-| [ops/sync-disabled-record.md](ops/sync-disabled-record.md) | 同步禁用记录 |
+| [ops/server-connection.md](ops/server-connection.md) | 服务器连接：SSH、日志、数据库、重启、同步控制、离线模式 |
 
