@@ -254,176 +254,178 @@ def sync_onsite_b_table_from_a(user_id: str) -> Dict[str, Any]:
     if not task_specs:
         return {"success": True, "data": {"task_count": 0, "upserted": 0, "failed": 0}}
 
-    b_session = OnsiteSessionLocal()
-    upserted = 0
-    failed = 0
-    failures: List[Dict[str, Any]] = []
-    pending_commit = 0
-    batch_size = 20
+    # ── 线程 worker ──────────────────────────────────────────
+    def _upsert_row(sess, item, tid, ex_id):
+        vehicle_model = _extract_custom_field_title(item, CF_VEHICLE_MODEL)
+        carrier_type = _extract_custom_field_title(item, CF_CARRIER_TYPE)
+        occurrence_frequency = _extract_custom_field_title(item, CF_OCCURRENCE_FREQUENCY)
+        software_version = _extract_custom_field_title(item, CF_SOFTWARE_VERSION)
+        problem_description = _extract_custom_field_title(item, CF_PROBLEM_DESCRIPTION)
+        investigation_conclusion = _extract_custom_field_title(item, CF_INVESTIGATION_CONCLUSION)
+        doc_value = _extract_custom_field_title(item, CF_DOC_VALUE)
+        investigation_doc = _extract_custom_field_title(item, CF_INVESTIGATION_DOC)
+        attachments = _extract_attachment_titles(item, CF_ATTACHMENTS)
+        problem_category = _extract_custom_field_title(item, CF_PROBLEM_CATEGORY)
+        problem_module = _extract_custom_field_title(item, CF_PROBLEM_MODULE)
+        guide_doc = _extract_custom_field_title(item, CF_GUIDE_DOC)
+        formal_version = _extract_custom_field_title(item, CF_FORMAL_VERSION)
+        root_cause = _extract_custom_field_title(item, CF_ROOT_CAUSE)
+        solution = _extract_custom_field_title(item, CF_SOLUTION)
+        submitter = _extract_custom_field_title(item, CF_SUBMITTER)
 
-    try:
-        for spec in task_specs:
-            tid = spec["task_id"]
-            ex_id = spec["executor_id"]
+        cfs = item.get("customFields") or item.get("customfields")
+        try:
+            raw_blob = json.dumps(item, ensure_ascii=False)
+        except Exception:
+            raw_blob = None
 
-            # 每次用自己的 executorId 调详情 API
-            dres = query_user_tasks_service({
-                "userId": ex_id,
-                "taskId": tid,
-                "force_refresh": True,
-            })
-            if not dres.get("success"):
-                failed += 1
-                failures.append({"taskId": tid, "executorId": ex_id, "error": dres.get("error")})
-                continue
+        now = datetime.now(timezone.utc)
+        stmt = select(OnsiteProblemDetail).where(
+            OnsiteProblemDetail.task_id == tid,
+            OnsiteProblemDetail.query_user_id == ex_id,
+        )
+        row = sess.scalars(stmt).first()
+        if row:
+            row.project_id = str(item.get("projectId") or "")
+            row.unique_id = int(item.get("uniqueId")) if item.get("uniqueId") is not None else None
+            row.content = str(item.get("content") or "")
+            row.executor_id = str(item.get("executorId") or "")
+            row.creator_id = str(item.get("creatorId") or "")
+            row.scenario_field_config_id = str(item.get("scenarioFieldConfigId") or item.get("scenariofieldconfigId") or "")
+            row.taskflow_status_id = str(item.get("taskflowStatusId") or item.get("taskflowstatusId") or "")
+            row.task_list_id = str(item.get("taskListId") or "")
+            row.task_stage_id = str(item.get("taskStageId") or "")
+            row.due_date = _parse_iso_dt(item.get("dueDate"))
+            row.start_date = _parse_iso_dt(item.get("startDate"))
+            row.is_done = bool(item.get("isDone"))
+            row.is_archived = bool(item.get("isArchived"))
+            row.priority = int(item.get("priority") or 0)
+            row.progress = int(item.get("progress") or 0)
+            row.note = str(item.get("note") or "")
+            row.visible = str(item.get("visible") or "")
+            row.tag_ids = _str_list(item.get("tagIds"))
+            row.involve_members = _str_list(item.get("involveMembers"))
+            row.ancestor_ids = _str_list(item.get("ancestorIds"))
+            row.labels = item.get("labels") if isinstance(item.get("labels"), list) else None
+            row.vehicle_model = vehicle_model
+            row.carrier_type = carrier_type
+            row.occurrence_frequency = occurrence_frequency
+            row.software_version = software_version
+            row.problem_description = problem_description
+            row.investigation_conclusion = investigation_conclusion
+            row.doc_value = doc_value
+            row.investigation_doc = investigation_doc
+            row.attachments = attachments
+            row.problem_category = problem_category
+            row.problem_module = problem_module
+            row.guide_doc = guide_doc
+            row.formal_version = formal_version
+            row.root_cause = root_cause
+            row.solution = solution
+            row.submitter = submitter
+            row.custom_fields_json = cfs
+            row.raw_json = raw_blob
+            row.fetched_at = now
+        else:
+            sess.add(OnsiteProblemDetail(
+                project_id=str(item.get("projectId") or ""),
+                task_id=tid,
+                query_user_id=ex_id,
+                unique_id=int(item.get("uniqueId")) if item.get("uniqueId") is not None else None,
+                content=str(item.get("content") or ""),
+                executor_id=str(item.get("executorId") or ""),
+                creator_id=str(item.get("creatorId") or ""),
+                scenario_field_config_id=str(item.get("scenarioFieldConfigId") or item.get("scenariofieldconfigId") or ""),
+                taskflow_status_id=str(item.get("taskflowStatusId") or item.get("taskflowstatusId") or ""),
+                task_list_id=str(item.get("taskListId") or ""),
+                task_stage_id=str(item.get("taskStageId") or ""),
+                due_date=_parse_iso_dt(item.get("dueDate")),
+                start_date=_parse_iso_dt(item.get("startDate")),
+                is_done=bool(item.get("isDone")),
+                is_archived=bool(item.get("isArchived")),
+                priority=int(item.get("priority") or 0),
+                progress=int(item.get("progress") or 0),
+                note=str(item.get("note") or ""),
+                visible=str(item.get("visible") or ""),
+                tag_ids=_str_list(item.get("tagIds")),
+                involve_members=_str_list(item.get("involveMembers")),
+                ancestor_ids=_str_list(item.get("ancestorIds")),
+                labels=item.get("labels") if isinstance(item.get("labels"), list) else None,
+                vehicle_model=vehicle_model,
+                carrier_type=carrier_type,
+                occurrence_frequency=occurrence_frequency,
+                software_version=software_version,
+                problem_description=problem_description,
+                investigation_conclusion=investigation_conclusion,
+                doc_value=doc_value,
+                investigation_doc=investigation_doc,
+                attachments=attachments,
+                problem_category=problem_category,
+                problem_module=problem_module,
+                guide_doc=guide_doc,
+                formal_version=formal_version,
+                root_cause=root_cause,
+                solution=solution,
+                submitter=submitter,
+                custom_fields_json=cfs,
+                raw_json=raw_blob,
+                fetched_at=now,
+            ))
 
-            item = _extract_detail_item(dres)
-            if not item:
-                failed += 1
-                failures.append({"taskId": tid, "executorId": ex_id, "error": "empty detail"})
-                continue
+    def _worker(specs_slice: List[Dict[str, str]]) -> Dict[str, Any]:
+        upserted = 0
+        failures: List[Dict[str, Any]] = []
+        sess = OnsiteSessionLocal()
+        pending = 0
+        try:
+            for spec in specs_slice:
+                tid = spec["task_id"]
+                ex_id = spec["executor_id"]
+                dres = query_user_tasks_service({"userId": ex_id, "taskId": tid, "force_refresh": True})
+                if not dres.get("success"):
+                    failures.append({"taskId": tid, "executorId": ex_id, "error": dres.get("error")})
+                    continue
+                item = _extract_detail_item(dres)
+                if not item:
+                    failures.append({"taskId": tid, "executorId": ex_id, "error": "empty detail"})
+                    continue
+                _upsert_row(sess, item, tid, ex_id)
+                pending += 1
+                if pending >= 20:
+                    sess.commit()
+                    pending = 0
+                upserted += 1
+            if pending > 0:
+                sess.commit()
+        except Exception as e:
+            sess.rollback()
+            failures.append({"error": str(e)})
+        finally:
+            sess.close()
+        return {"upserted": upserted, "failures": failures}
 
-            # 解析全部 customField
-            vehicle_model = _extract_custom_field_title(item, CF_VEHICLE_MODEL)
-            carrier_type = _extract_custom_field_title(item, CF_CARRIER_TYPE)
-            occurrence_frequency = _extract_custom_field_title(item, CF_OCCURRENCE_FREQUENCY)
-            software_version = _extract_custom_field_title(item, CF_SOFTWARE_VERSION)
-            problem_description = _extract_custom_field_title(item, CF_PROBLEM_DESCRIPTION)
-            investigation_conclusion = _extract_custom_field_title(item, CF_INVESTIGATION_CONCLUSION)
-            doc_value = _extract_custom_field_title(item, CF_DOC_VALUE)
-            investigation_doc = _extract_custom_field_title(item, CF_INVESTIGATION_DOC)
-            attachments = _extract_attachment_titles(item, CF_ATTACHMENTS)
-            problem_category = _extract_custom_field_title(item, CF_PROBLEM_CATEGORY)
-            problem_module = _extract_custom_field_title(item, CF_PROBLEM_MODULE)
-            guide_doc = _extract_custom_field_title(item, CF_GUIDE_DOC)
-            formal_version = _extract_custom_field_title(item, CF_FORMAL_VERSION)
-            root_cause = _extract_custom_field_title(item, CF_ROOT_CAUSE)
-            solution = _extract_custom_field_title(item, CF_SOLUTION)
-            submitter = _extract_custom_field_title(item, CF_SUBMITTER)
+    # ── 并行处理 ────────────────────────────────────────────
+    thread_count = 5
+    slices: List[List[Dict[str, str]]] = [[] for _ in range(thread_count)]
+    for i, spec in enumerate(task_specs):
+        slices[i % thread_count].append(spec)
 
-            cfs = item.get("customFields") or item.get("customfields")
-            try:
-                raw_blob = json.dumps(item, ensure_ascii=False)
-            except Exception:
-                raw_blob = None
-
-            now = datetime.now(timezone.utc)
-
-            stmt = select(OnsiteProblemDetail).where(
-                OnsiteProblemDetail.task_id == tid,
-                OnsiteProblemDetail.query_user_id == ex_id,
-            )
-            row = b_session.scalars(stmt).first()
-            if row:
-                row.project_id = str(item.get("projectId") or "")
-                row.unique_id = int(item.get("uniqueId")) if item.get("uniqueId") is not None else None
-                row.content = str(item.get("content") or "")
-                row.executor_id = str(item.get("executorId") or "")
-                row.creator_id = str(item.get("creatorId") or "")
-                row.scenario_field_config_id = str(item.get("scenarioFieldConfigId") or item.get("scenariofieldconfigId") or "")
-                row.taskflow_status_id = str(item.get("taskflowStatusId") or item.get("taskflowstatusId") or "")
-                row.task_list_id = str(item.get("taskListId") or "")
-                row.task_stage_id = str(item.get("taskStageId") or "")
-                row.due_date = _parse_iso_dt(item.get("dueDate"))
-                row.start_date = _parse_iso_dt(item.get("startDate"))
-                row.is_done = bool(item.get("isDone"))
-                row.is_archived = bool(item.get("isArchived"))
-                row.priority = int(item.get("priority") or 0)
-                row.progress = int(item.get("progress") or 0)
-                row.note = str(item.get("note") or "")
-                row.visible = str(item.get("visible") or "")
-                row.tag_ids = _str_list(item.get("tagIds"))
-                row.involve_members = _str_list(item.get("involveMembers"))
-                row.ancestor_ids = _str_list(item.get("ancestorIds"))
-                row.labels = item.get("labels") if isinstance(item.get("labels"), list) else None
-                # 拆列
-                row.vehicle_model = vehicle_model
-                row.carrier_type = carrier_type
-                row.occurrence_frequency = occurrence_frequency
-                row.software_version = software_version
-                row.problem_description = problem_description
-                row.investigation_conclusion = investigation_conclusion
-                row.doc_value = doc_value
-                row.investigation_doc = investigation_doc
-                row.attachments = attachments
-                row.problem_category = problem_category
-                row.problem_module = problem_module
-                row.guide_doc = guide_doc
-                row.formal_version = formal_version
-                row.root_cause = root_cause
-                row.solution = solution
-                row.submitter = submitter
-                row.custom_fields_json = cfs
-                row.raw_json = raw_blob
-                row.fetched_at = now
-            else:
-                b_session.add(OnsiteProblemDetail(
-                    project_id=str(item.get("projectId") or ""),
-                    task_id=tid,
-                    query_user_id=ex_id,
-                    unique_id=int(item.get("uniqueId")) if item.get("uniqueId") is not None else None,
-                    content=str(item.get("content") or ""),
-                    executor_id=str(item.get("executorId") or ""),
-                    creator_id=str(item.get("creatorId") or ""),
-                    scenario_field_config_id=str(item.get("scenarioFieldConfigId") or item.get("scenariofieldconfigId") or ""),
-                    taskflow_status_id=str(item.get("taskflowStatusId") or item.get("taskflowstatusId") or ""),
-                    task_list_id=str(item.get("taskListId") or ""),
-                    task_stage_id=str(item.get("taskStageId") or ""),
-                    due_date=_parse_iso_dt(item.get("dueDate")),
-                    start_date=_parse_iso_dt(item.get("startDate")),
-                    is_done=bool(item.get("isDone")),
-                    is_archived=bool(item.get("isArchived")),
-                    priority=int(item.get("priority") or 0),
-                    progress=int(item.get("progress") or 0),
-                    note=str(item.get("note") or ""),
-                    visible=str(item.get("visible") or ""),
-                    tag_ids=_str_list(item.get("tagIds")),
-                    involve_members=_str_list(item.get("involveMembers")),
-                    ancestor_ids=_str_list(item.get("ancestorIds")),
-                    labels=item.get("labels") if isinstance(item.get("labels"), list) else None,
-                    # 拆列
-                    vehicle_model=vehicle_model,
-                    carrier_type=carrier_type,
-                    occurrence_frequency=occurrence_frequency,
-                    software_version=software_version,
-                    problem_description=problem_description,
-                    investigation_conclusion=investigation_conclusion,
-                    doc_value=doc_value,
-                    investigation_doc=investigation_doc,
-                    attachments=attachments,
-                    problem_category=problem_category,
-                    problem_module=problem_module,
-                    guide_doc=guide_doc,
-                    formal_version=formal_version,
-                    root_cause=root_cause,
-                    solution=solution,
-                    submitter=submitter,
-                    custom_fields_json=cfs,
-                    raw_json=raw_blob,
-                    fetched_at=now,
-                ))
-
-            pending_commit += 1
-            if pending_commit >= batch_size:
-                b_session.commit()
-                pending_commit = 0
-            upserted += 1
-
-        if pending_commit > 0:
-            b_session.commit()
-    except Exception as e:
-        b_session.rollback()
-        return {"success": False, "error": str(e), "data": {}}
-    finally:
-        b_session.close()
+    total_upserted = 0
+    total_failures: List[Dict[str, Any]] = []
+    with ThreadPoolExecutor(max_workers=thread_count) as pool:
+        futures = [pool.submit(_worker, sl) for sl in slices if sl]
+        for fut in futures:
+            r = fut.result()
+            total_upserted += r.get("upserted", 0)
+            total_failures.extend(r.get("failures") or [])
 
     return {
         "success": True,
         "data": {
             "task_count": len(task_specs),
-            "upserted": upserted,
-            "failed": failed,
-            "failures": failures[:20],
+            "upserted": total_upserted,
+            "failed": len(total_failures),
+            "failures": total_failures[:20],
         },
     }
 
