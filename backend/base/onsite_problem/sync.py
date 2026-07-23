@@ -156,11 +156,14 @@ def sync_onsite_a_table(payload: Dict[str, Any],
     user_id = str(payload.get("userId") or payload.get("userid") or "").strip()
 
     if query_result is None:
+        now = datetime.now(timezone.utc)
+        year_start = "{}-01-01T00:00:00.000Z".format(now.year)
         qp = {
             "userId": user_id,
             "projectId": ONSITE_PROJECT_ID,
+            "query": "(dueDate >= '{}')".format(year_start),
             "maxResults": 100,
-            "maxPages": payload.get("maxPages", 20),
+            "maxPages": 100,
             "force_refresh": bool(payload.get("force_refresh")),
         }
         query_result = query_project_tasks_service(qp)
