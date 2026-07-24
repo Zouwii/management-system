@@ -462,17 +462,19 @@ def register(bp, ok, fail):
         check_modified=false: 仅拉取新文档
         check_modified=true:  对比 remote_modified_at 重拉变更文档
         """
-        union_id = _current_union_id()
-        if not union_id:
-            return fail("not logged in", code=401)
-
         body = request.get_json(silent=True) or {}
         workspace_id = str(body.get("workspace_id") or "").strip()
         if not workspace_id:
             return fail("missing workspace_id", code=400)
 
-        limit = max(0, int(body.get("limit") or 0))  # 0 = no limit
+        limit = max(0, int(body.get("limit") or 0))
         check_modified = str(body.get("check_modified") or "").lower() in ("1", "true", "yes")
+
+        union_id = str(body.get("union_id") or "").strip()
+        if not union_id:
+            union_id = _current_union_id()
+        if not union_id:
+            return fail("not logged in", code=401)
 
         client = DingTalkKnowledgeClient(union_id)
 
