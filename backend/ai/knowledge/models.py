@@ -9,6 +9,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from sqlalchemy import DateTime, Index, Integer, String, Text
+from sqlalchemy.dialects.mysql import MEDIUMTEXT
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -17,34 +18,52 @@ class KbBase(DeclarativeBase):
     pass
 
 
+class KbNode(KbBase):
+    """A 表 — 目录树快照（FOLDER + FILE）"""
+    __tablename__ = "kb_nodes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    node_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True, unique=True)
+    workspace_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    parent_id: Mapped[str] = mapped_column(String(128), default="", index=True)
+    name: Mapped[str] = mapped_column(String(512), nullable=False)
+    node_type: Mapped[str] = mapped_column(String(16), nullable=False)    # FOLDER / FILE
+    category: Mapped[str] = mapped_column(String(16), default="")         # ALIDOC / WORKBOOK / OTHER
+    has_children: Mapped[bool] = mapped_column(default=False)
+    depth: Mapped[int] = mapped_column(Integer, default=0)
+    breadcrumb: Mapped[str] = mapped_column(String(1024), default="")
+    remote_modified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    sync_status: Mapped[str] = mapped_column(String(16), default="pending")  # pending / synced / failed
+    sync_error: Mapped[str] = mapped_column(String(500), default="")
+    synced_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc))
+
+
 class KbDocument(KbBase):
+    """B 表 — 文档正文（仅 FILE 节点的内容）"""
     __tablename__ = "kb_documents"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    doc_id: Mapped[str] = mapped_column(String(128), unique=True, nullable=False, index=True)
+    node_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True, unique=True)
     workspace_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(512), nullable=False)
-    node_type: Mapped[str] = mapped_column(String(16), default="FILE")
-    parent_id: Mapped[str] = mapped_column(String(128), default="")
-    content: Mapped[str] = mapped_column(Text, default="")
-    raw_json: Mapped[str] = mapped_column(Text, default="")
+    content: Mapped[str] = mapped_column(MEDIUMTEXT, default="")
+    raw_json: Mapped[str] = mapped_column(MEDIUMTEXT, default="")
+    error_code: Mapped[str | None] = mapped_column(String(16), nullable=True, index=True)
+    fetch_status: Mapped[str] = mapped_column(String(16), default="pending")  # pending / success / failed
+    fail_reason: Mapped[str] = mapped_column(String(500), default="")
     synced_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
-    )
-    remote_modified_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True, default=None,
-        comment="DingTalk API 最后修改时间，用于判断是否需要重新拉取"
-    )
-    category: Mapped[str] = mapped_column(String(16), default="")
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
-    )
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
-    )
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc))
 
 
 class KbChunk(KbBase):

@@ -24,7 +24,7 @@ from typing import List
 
 from flask import request, session
 
-from ai.knowledge.models import KbDocument
+from ai.knowledge.models import KbNode, KbDocument
 from ai.knowledge.parser import parse_document
 from ai.knowledge.service import DingTalkKnowledgeClient
 from base.db.engine import KbSessionLocal, SessionLocal
@@ -84,71 +84,13 @@ def _dt_to_iso(dt) -> str:
 
 # ── cache helpers ──────────────────────────────────────────────
 
-def _cache_document(node_id: str, workspace_id: str, title: str,
-                    content: str, node_type: str = "FILE",
-                    parent_id: str = "", raw_json: str = "",
-                    category: str = "",
-                    remote_modified_at: str = "") -> bool:
-    """Upsert a document. Returns True if the document was new or content changed."""
-    db = KbSessionLocal()
-    try:
-        existing = db.query(KbDocument).filter(KbDocument.doc_id == node_id).first()
-        now = datetime.now(timezone.utc)
-        # 解析远程修改时间
-        rmt = None
-        if remote_modified_at:
-            try:
-                rmt = datetime.fromisoformat(remote_modified_at.replace("Z", "+00:00"))
-            except Exception:
-                pass
-
-        if existing:
-            if existing.content == content and existing.title == title:
-                existing.synced_at = now
-                if rmt:
-                    existing.remote_modified_at = rmt
-                if category:
-                    existing.category = category
-                db.commit()
-                return False
-            existing.title = title
-            existing.content = content
-            existing.node_type = node_type
-            existing.parent_id = parent_id
-            existing.workspace_id = workspace_id
-            existing.raw_json = raw_json
-            existing.category = category or existing.category
-            existing.remote_modified_at = rmt
-            existing.synced_at = now
-            existing.updated_at = now
-        else:
-            db.add(KbDocument(
-                doc_id=node_id,
-                workspace_id=workspace_id,
-                title=title,
-                node_type=node_type,
-                parent_id=parent_id,
-                content=content,
-                raw_json=raw_json,
-                category=category,
-                remote_modified_at=rmt,
-                synced_at=now,
-                created_at=now,
-                updated_at=now,
-            ))
-        db.commit()
-        return True
-    finally:
-        db.close()
-
-
 def _cached_document(node_id: str) -> dict | None:
     db = KbSessionLocal()
     try:
-        row = db.query(KbDocument).filter(KbDocument.doc_id == node_id).first()
+        row = db.query(KbDocument).filter(KbDocument.node_id == node_id).first()
         if row and row.content:
             return {
-                "nodeId": row.doc_id,
+                "nodeId": row.node_id,
                 "title": row.title,
                 "workspaceId": row.workspace_id,
                 "content": row.content,
@@ -163,133 +105,228 @@ def _cached_document(node_id: str) -> dict | None:
 
 # ── workspace sync (module-level, shared with auto_sync) ────────
 
+def _parse_dingtalk_time(ts_str: str):
+    """钉钉时间格式: 2026-07-23T12:17Z → datetime(UTC)"""
+    if not ts_str:
+        return None
+    try:
+        return datetime.fromisoformat(str(ts_str).replace("Z", "+00:00"))
+    except Exception:
+        return None
+
+
+def _upsert_node(db, node_id: str, workspace_id: str, parent_id: str,
+                 name: str, node_type: str, category: str,
+                 has_children: bool, depth: int, breadcrumb: str,
+                 remote_modified_at, now: datetime):
+    """Upsert a kb_node. Returns True if new or changed."""
+    existing = db.query(KbNode).filter(KbNode.node_id == node_id).first()
+    rmt = _parse_dingtalk_time(remote_modified_at) if isinstance(remote_modified_at, str) else remote_modified_at
+    changed = False
+
+    if existing:
+        if (existing.name != name or existing.category != category or
+            existing.has_children != has_children or existing.breadcrumb != breadcrumb or
+            existing.depth != depth):
+            changed = True
+        existing.name = name
+        existing.parent_id = parent_id
+        existing.category = category
+        existing.has_children = has_children
+        existing.depth = depth
+        existing.breadcrumb = breadcrumb
+        existing.node_type = node_type
+        existing.remote_modified_at = rmt
+        existing.sync_status = "synced"
+        existing.sync_error = ""
+        existing.synced_at = now
+        existing.updated_at = now
+    else:
+        db.add(KbNode(
+            node_id=node_id, workspace_id=workspace_id, parent_id=parent_id,
+            name=name, node_type=node_type, category=category,
+            has_children=has_children, depth=depth, breadcrumb=breadcrumb,
+            remote_modified_at=rmt, sync_status="synced",
+            synced_at=now, created_at=now, updated_at=now))
+        changed = True
+    return changed
+
+
+def _upsert_document(db, node_id: str, workspace_id: str, title: str,
+                     content: str, raw_json: str, now: datetime) -> bool:
+    """Upsert a kb_document. Returns True if content changed."""
+    existing = db.query(KbDocument).filter(KbDocument.node_id == node_id).first()
+    changed = False
+
+    if existing:
+        if existing.content != content:
+            changed = True
+        existing.title = title
+        existing.content = content
+        existing.raw_json = raw_json
+        existing.fetch_status = "success"
+        existing.fail_reason = ""
+        existing.synced_at = now
+        existing.updated_at = now
+    else:
+        db.add(KbDocument(
+            node_id=node_id, workspace_id=workspace_id, title=title,
+            content=content, raw_json=raw_json, fetch_status="success",
+            synced_at=now, created_at=now, updated_at=now))
+        changed = True
+    return changed
+
+
 def _sync_workspace(client, workspace_id: str, root_id: str, limit: int = 0,
                     check_modified: bool = False) -> dict:
-    """Walk a workspace tree, cache documents.
+    """新 schema 同步: 遍历目录树 → kb_nodes, 下载正文 → kb_documents.
 
-    check_modified=False: 仅拉取未缓存过的新 ALIDOC 文档。
-    check_modified=True:  对比 remote_modified_at，重新拉取已变更的文档。
+    check_modified=False: 跳过已同步的 ALIDOC 文档（不做全量对比）。
+    check_modified=True:  对比 remote_modified_at，重拉已变更文档。
 
-    Returns {syncedCount, syncedIds, failedCount, errors, skippedWorkbooks,
-             skippedCached, skippedUnchanged}.
+    Returns {syncedNodes, syncedDocs, changedDocIds, failedNodes,
+             failedDocs, skippedWorkbooks, skippedCached, skippedUnchanged}.
     """
-    synced: List[str] = []
-    changed_ids: List[str] = []
-    errors: List[dict] = []
+    synced_node_ids: List[str] = []
+    synced_doc_ids: List[str] = []
+    changed_doc_ids: List[str] = []
+    failed_nodes: List[dict] = []
+    failed_docs: List[dict] = []
     skipped_workbooks: int = 0
     skipped_cached: int = 0
     skipped_unchanged: int = 0
 
-    # 预加载缓存：{doc_id: (content, category, remote_modified_at)}
     db = KbSessionLocal()
+    now = datetime.now(timezone.utc)
+
+    # 预加载已有文档缓存（用于增量判断）
     try:
-        rows = db.query(
-            KbDocument.doc_id, KbDocument.content,
-            KbDocument.category, KbDocument.remote_modified_at,
-        ).filter(KbDocument.workspace_id == workspace_id).all()
-        cache = {
-            r[0]: {"content": r[1] or "", "category": r[2] or "",
-                   "remote_modified_at": r[3]}
-            for r in rows
+        cached_docs = {
+            r.node_id: {"content": r.content or "", "remote_modified_at": None}
+            for r in db.query(KbDocument).filter(
+                KbDocument.workspace_id == workspace_id,
+                KbDocument.fetch_status == "success"
+            ).all()
         }
     finally:
-        db.close()
+        pass  # db is kept open for the walk
 
-    def _parse_modified_time(ts_str: str):
-        """解析钉钉返回的时间字符串 -> datetime(UTC)"""
-        if not ts_str:
-            return None
-        try:
-            return datetime.fromisoformat(str(ts_str).replace("Z", "+00:00"))
-        except Exception:
-            return None
+    ws_name = workspace_id  # will be updated from root node
+    BATCH_SIZE = 100  # 每处理 100 个节点 commit 一次
 
-    def _walk(parent_id: str):
-        nonlocal skipped_workbooks, skipped_cached, skipped_unchanged
-        if limit and len(synced) >= limit:
+    def _walk(parent_id: str, breadcrumb: str, depth: int):
+        nonlocal skipped_workbooks, skipped_cached, skipped_unchanged, ws_name
+
+        if limit and len(synced_doc_ids) >= limit:
             return
+
         result = client.list_nodes(workspace_id, parent_id)
         if not result.get("ok"):
-            err_detail = result.get("error", "")
+            err = result.get("error", "")
             status = result.get("status", "?")
-            errors.append({"parentId": parent_id, "error": err_detail, "status": status})
-            print(f"[sync-error] list_nodes failed parentId={parent_id} status={status} error={err_detail}")
+            failed_nodes.append({"parentId": parent_id, "error": err, "status": status})
+            print(f"[sync-error] list_nodes failed parentId={parent_id} status={status} error={err}")
             return
 
         for n in result["data"]:
-            if limit and len(synced) >= limit:
+            if limit and len(synced_doc_ids) >= limit:
                 return
+
             nid = n["nodeId"]
             ntype = n["type"]
-            title = n["name"]
+            name = n["name"]
+            cat = (n.get("category") or "").strip().upper()
+            hc = bool(n.get("hasChildren", False))
+            rmt = n.get("modifiedTime", "")
+            bc = breadcrumb + " / " + name if breadcrumb else name
+
+            # ── 写入 kb_nodes（FOLDER + FILE 都写）──
+            node_changed = _upsert_node(
+                db, nid, workspace_id, parent_id, name, ntype, cat,
+                hc, depth, bc, rmt, now)
+            synced_node_ids.append(nid)
+
+            # 批量 commit：每 BATCH_SIZE 个节点提交一次
+            if len(synced_node_ids) % BATCH_SIZE == 0:
+                try:
+                    db.commit()
+                except Exception as e:
+                    db.rollback()
+                    print(f"[sync-error] batch commit failed: {e}")
 
             if ntype == "FOLDER":
-                _walk(nid)
-            elif ntype == "FILE":
-                category = (n.get("category") or "").strip().upper()
-                remote_mod = n.get("modifiedTime", "")
+                # 继续递归
+                _walk(nid, bc, depth + 1)
 
-                # 1. 跳过非文档
-                if category != "ALIDOC":
+            elif ntype == "FILE":
+                # 只处理 ALIDOC
+                if cat != "ALIDOC":
                     skipped_workbooks += 1
                     continue
 
-                cached = cache.get(nid)
-
-                # 2. check_modified=False：已缓存 → 跳过
+                # 增量跳过逻辑
                 if not check_modified:
+                    cached = cached_docs.get(nid)
                     if cached and cached["content"]:
                         skipped_cached += 1
                         continue
 
-                # 3. check_modified=True：对比修改时间，未变 → 跳过
-                if check_modified and cached and cached["content"]:
-                    last_rmt = cached["remote_modified_at"]
-                    cur_rmt = _parse_modified_time(remote_mod)
-                    if last_rmt and cur_rmt and cur_rmt <= last_rmt:
-                        skipped_unchanged += 1
-                        continue
+                if check_modified:
+                    cached = cached_docs.get(nid)
+                    if cached and cached["content"]:
+                        last_rmt = cached.get("remote_modified_at")
+                        cur_rmt = _parse_dingtalk_time(rmt)
+                        if last_rmt and cur_rmt and cur_rmt <= last_rmt:
+                            skipped_unchanged += 1
+                            continue
 
-                # 需要拉取内容
+                # 下载正文
                 try:
-                    blocks = client.get_document_blocks(nid)
-                    if not blocks.get("ok"):
-                        err_detail = blocks.get("error", "")
-                        status = blocks.get("status", "?")
-                        errors.append({"nodeId": nid, "title": title, "error": "blocks failed", "detail": err_detail, "status": status})
-                        print(f"[sync-error] blocks failed nodeId={nid} title={title} status={status} error={err_detail}")
+                    blocks_resp = client.get_document_blocks(nid)
+                    if not blocks_resp.get("ok"):
+                        err = blocks_resp.get("error", "")
+                        st = blocks_resp.get("status", "?")
+                        failed_docs.append({"nodeId": nid, "title": name, "error": err, "status": st})
+                        print(f"[sync-error] blocks failed nodeId={nid} title={name} status={st} error={err}")
                         continue
 
-                    parsed = parse_document(blocks["data"], "blocks")
+                    parsed = parse_document(blocks_resp["data"], "blocks")
+                    content = parsed["markdown"]
+                    raw = json.dumps(blocks_resp, ensure_ascii=False)
 
-                    changed = _cache_document(
-                        node_id=nid,
-                        workspace_id=workspace_id,
-                        title=title,
-                        content=parsed["markdown"],
-                        node_type="FILE",
-                        parent_id=parent_id or "",
-                        category=category,
-                        raw_json=json.dumps(n, ensure_ascii=False),
-                        remote_modified_at=remote_mod,
-                    )
-                    synced.append(nid)
-                    if changed:
-                        changed_ids.append(nid)
+                    doc_changed = _upsert_document(
+                        db, nid, workspace_id, name, content, raw, now)
+                    synced_doc_ids.append(nid)
+                    if doc_changed:
+                        changed_doc_ids.append(nid)
+
                 except Exception as e:
-                    errors.append({"nodeId": nid, "title": title, "error": str(e)})
-                    print(f"[sync-error] exception nodeId={nid} title={title} error={str(e)}")
+                    failed_docs.append({"nodeId": nid, "title": name, "error": str(e)})
+                    print(f"[sync-error] exception nodeId={nid} title={name} error={str(e)}")
 
-    _walk(root_id)
+    # 写入 root 节点
+    _upsert_node(db, root_id, workspace_id, "", ws_name, "FOLDER", "", True, 0, ws_name, None, now)
+
+    # 开始遍历
+    try:
+        _walk(root_id, ws_name, 1)
+        db.commit()  # 最终提交剩余节点
+    except Exception as e:
+        db.rollback()
+        print(f"[sync-error] walk exception: {e}")
+    finally:
+        db.close()
+
     return {
-        "syncedCount": len(synced),
-        "changedCount": len(changed_ids),
-        "syncedIds": changed_ids,
-        "failedCount": len(errors),
+        "syncedNodes": len(synced_node_ids),
+        "syncedDocs": len(synced_doc_ids),
+        "changedDocIds": changed_doc_ids,
+        "failedNodes": len(failed_nodes),
+        "failedDocs": len(failed_docs),
         "skippedWorkbooks": skipped_workbooks,
         "skippedCached": skipped_cached,
         "skippedUnchanged": skipped_unchanged,
-        "errors": errors[:20],
+        "errors": (failed_nodes + failed_docs)[:20],
     }
 
 
@@ -460,8 +497,10 @@ def register(bp, ok, fail):
         return ok({
             "workspaceId": workspace_id,
             "workspaceName": ws_name,
-            "syncedCount": result["syncedCount"],
-            "failedCount": result["failedCount"],
+            "syncedNodes": result["syncedNodes"],
+            "syncedDocs": result["syncedDocs"],
+            "failedNodes": result["failedNodes"],
+            "failedDocs": result["failedDocs"],
             "skippedWorkbooks": result.get("skippedWorkbooks", 0),
             "skippedCached": result.get("skippedCached", 0),
             "skippedUnchanged": result.get("skippedUnchanged", 0),
@@ -508,6 +547,7 @@ def register(bp, ok, fail):
         started = time.time()
         total_synced = 0
         total_failed = 0
+        total_nodes = 0
         total_skipped_wb = 0
         total_skipped_cached = 0
         total_skipped_unchanged = 0
@@ -521,16 +561,22 @@ def register(bp, ok, fail):
             results.append({
                 "workspaceId": ws_id,
                 "name": ws_name,
-                "syncedCount": r["syncedCount"],
-                "failedCount": r["failedCount"],
+                "syncedNodes": r["syncedNodes"],
+                "syncedDocs": r["syncedDocs"],
+                "failedNodes": r["failedNodes"],
+                "failedDocs": r["failedDocs"],
                 "skippedWorkbooks": r.get("skippedWorkbooks", 0),
                 "skippedCached": r.get("skippedCached", 0),
                 "skippedUnchanged": r.get("skippedUnchanged", 0),
                 "errors": r["errors"],
                 "durationSec": ws_elapsed,
             })
-            total_synced += r["syncedCount"]
-            total_failed += r["failedCount"]
+            total_synced += r["syncedDocs"]
+            total_failed += r["failedDocs"]
+            total_skipped_wb += r.get("skippedWorkbooks", 0)
+            total_skipped_cached += r.get("skippedCached", 0)
+            total_skipped_unchanged += r.get("skippedUnchanged", 0)
+            total_nodes += r["syncedNodes"]
             total_skipped_wb += r.get("skippedWorkbooks", 0)
             total_skipped_cached += r.get("skippedCached", 0)
             total_skipped_unchanged += r.get("skippedUnchanged", 0)

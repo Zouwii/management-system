@@ -80,6 +80,7 @@ def _table_registry():
     """
     # 延迟导入以避免循环
     from base.db.orm import (
+        ApiCallLog,
         Config as DbConfig,
         MemberAttendance,
         NavPerfQuarterResult,
@@ -96,9 +97,10 @@ def _table_registry():
         UpdateLock,
         UserCharacter as DbUserCharacter,
     )
-    from ai.knowledge.models import KbDocument, KbChunk
+    from ai.knowledge.models import KbNode, KbDocument, KbChunk
 
     main_tables = [
+        ("api_call_logs", ApiCallLog.__table__),
         ("project_tasks", ProjectTask.__table__),
         ("program_issue", ProgramIssue.__table__),
         ("project_task_details", ProjectTaskDetail.__table__),
@@ -116,6 +118,7 @@ def _table_registry():
         ("servo_perf_quarter_result", ServoPerfQuarterResult.__table__),
     ]
     kb_tables = [
+        ("kb_nodes", KbNode.__table__),
         ("kb_documents", KbDocument.__table__),
         ("kb_chunks", KbChunk.__table__),
     ]

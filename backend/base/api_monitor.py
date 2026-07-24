@@ -146,8 +146,8 @@ class ApiCallMonitor:
         self._ensure_state()
 
     def _daily_limit(self) -> int:
-        """当日硬限额（100%）：临时调高到 100000"""
-        return 100000
+        """当日硬限额（100%）：临时调高到 2000000"""
+        return 2000000
 
     def _soft_limit(self) -> int:
         """当日软限额（80%）：硬限额 × 0.8"""
