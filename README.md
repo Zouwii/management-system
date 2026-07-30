@@ -14,7 +14,7 @@
 | 季度绩效 | 个人绩效历史、档位与趋势、团队成员批量导入、单人编辑和重新计算 |
 | 数据同步 | Teambition 项目任务增量同步、现场问题同步、需求池同步、同步锁与 API 调用监控 |
 | AI 助理 | 任务与绩效分析、知识库浏览/同步/检索/问答、任务草稿、Teambition 任务创建、交互终端 |
-| 知识沉淀 | RAG 检索优化材料、错误码知识库、现场问题分析、业务与数据库设计文档 |
+| 知识沉淀 | RAG 检索优化材料、AI 领域规则、业务流程以及数据库和运维设计文档 |
 
 ## 2 技术栈
 
@@ -65,7 +65,7 @@
 │   ├── pyproject.toml           # Python 依赖
 │   └── .env.example             # 后端环境变量示例
 ├── docs/                        # 架构、业务、数据库、AI 和运维文档
-├── scripts/                     # 打包、部署、同步与运维脚本
+├── scripts/                     # 打包、部署与 MCP 配置脚本
 ├── pgvector-compose.yml         # pgvector 本地服务
 └── onekey-deploy.sh             # 打包并部署
 ```
@@ -104,7 +104,16 @@
 - 可选：MySQL，用于接近生产环境的数据存储
 - 可选：Docker Compose，用于启动 pgvector 语义向量库
 
-### 5.2 仅运行前端 mock
+### 5.2 选择运行方式
+
+本地开发支持以下两种方式：
+
+| 方式 | 启动内容 | 适用场景 | 前端热更新 |
+| --- | --- | --- | --- |
+| mock 模式 | 仅启动 Vite 前端，使用前端模拟数据 | 页面布局、样式、组件、路由和普通交互开发 | 支持 |
+| real 联调模式 | 启动 Flask、MCP SSE 和 Vite，连接真实接口 | 数据库、钉钉登录、数据同步、绩效导入和 AI 功能验证 | 支持 |
+
+### 5.3 方式一：前端 mock 模式
 
 仓库中的 `frontend-react/.env` 默认设置为 `VITE_API_MODE=mock`。
 
@@ -114,7 +123,9 @@ npm ci
 npm run mock
 ```
 
-访问 `http://localhost:5173/login`，可使用以下演示账号：
+启动后访问 `http://localhost:5173/login`。修改 `frontend-react/src/` 下的代码并保存后，Vite 会自动更新页面，不需要手动重启。
+
+mock 模式不启动 Flask、MySQL、pgvector 或 MCP，因此不适合验证真实登录、后端接口、数据同步和 AI 知识库功能。登录时可使用以下演示账号：
 
 | 账号 | 密码 | 角色 |
 | --- | --- | --- |
@@ -123,12 +134,30 @@ npm run mock
 | `servoManager` | `123456` | 对接组主管 |
 | `admin` | `123456` | 管理员 |
 
-### 5.3 前后端联调
+### 5.4 方式二：真实后端一键联调
 
-复制后端配置并启动 Flask：
+需要使用真实后端接口开发时，可在项目根目录运行：
 
 ```bash
-cp backend/.env.example backend/.env
+./debug-deploy.sh
+```
+
+该脚本会释放本机 `5001`、`5200` 端口，并依次启动：
+
+- Flask 后端：`http://localhost:5001`
+- MCP SSE：`http://localhost:5200/sse`
+- Vite 前端：`http://localhost:5173`
+
+修改 `frontend-react/src/` 下的代码并保存后，Vite 会通过 HMR 自动更新页面。当前 Flask 启动入口未开启代码自动重载；修改后端 Python 代码后，需要按 `Ctrl+C` 停止脚本并重新运行。
+
+无论本地使用 mock 还是 real 模式，正式部署时 `scripts/02-package.sh` 都会默认以 `VITE_API_MODE=real` 重新构建前端，不会把 mock 模式部署到服务器。
+
+### 5.5 手动启动真实前后端
+
+首次运行时复制后端配置，然后启动 Flask：
+
+```bash
+test -f backend/.env || cp backend/.env.example backend/.env
 cd backend
 poetry install --no-root
 poetry run python app.py
@@ -146,7 +175,7 @@ Vite 会把 `/api` 请求代理到 `http://localhost:5001`，前端访问地址�
 
 未配置 MySQL 时，后端业务数据库默认使用 `backend/data/` 下的 SQLite 文件。钉钉登录和实际业务数据同步仍需要有效的钉钉应用配置。
 
-### 5.4 启用知识库向量检索
+### 5.6 启用知识库向量检索
 
 知识库的关键词检索可使用业务数据库；语义向量检索需要 PostgreSQL + pgvector：
 
@@ -236,72 +265,32 @@ bash run_on_pc_daemon.sh status
 
 ## 9 常用脚本
 
-### 9.1 开发、打包与部署
+仓库清理后，仅保留当前开发和发布流程仍在使用的脚本：
 
 | 脚本 | 功能 | 关键行为与注意事项 |
 | --- | --- | --- |
-| [`debug-deploy.sh`](debug-deploy.sh) | 一键启动本地联调环境 | 释放 `5001`、`5200` 端口，依次启动 Flask、MCP SSE 和 Vite real 模式；按 `Ctrl+C` 后清理后端和 MCP 进程。依赖 Poetry、npm、curl 和 fuser |
-| [`backend/run_on_pc_daemon.sh`](backend/run_on_pc_daemon.sh) | 管理后端守护进程 | 支持 `start/stop/restart/status/logs`；启动时检查运行环境、安装依赖、按需创建 `.env`，可通过 `INIT_MYSQL=1` 初始化 MySQL；默认服务端口为 `5002` |
-| [`scripts/01-install-hooks.sh`](scripts/01-install-hooks.sh) | 安装仓库 `pre-push` Hook | 设计用途是把 `.githooks/pre-push` 安装到 `.git/hooks/`。当前脚本以 `scripts/` 作为路径基准，无法找到仓库根目录下的 Hook，修正路径前不建议直接使用 |
-| [`scripts/02-package.sh`](scripts/02-package.sh) | 构建并生成部署包 | 默认以 `VITE_API_MODE=real` 构建前端，将产物写入后端静态目录；复制后端和共享 AI skills，排除 `.venv`、数据、运行日志、本地模型与缓存，输出时间戳命名的 `tar/tb_tool_bt_backend-*.tar.gz` |
-| [`scripts/03-deploy.sh`](scripts/03-deploy.sh) | 部署最新压缩包 | 找到 `tar/` 中最新包并上传到脚本内指定服务器；远端替换项目目录前暂存并恢复 `.venv`、`.env`、`data` 和 `local_models`，随后重启守护进程；部署成功前流程中会删除本地压缩包 |
-| [`scripts/04-tag-package.sh`](scripts/04-tag-package.sh) | 创建版本 Tag 并打包 | 用法为 `./scripts/04-tag-package.sh <tag> [message] [--push]`；创建本地 Tag 后调用 `02-package.sh`，指定 `--push` 时再推送 Tag |
-| [`onekey-deploy.sh`](onekey-deploy.sh) | 串联打包和部署 | 顺序执行 `02-package.sh` 与 `03-deploy.sh`。该流程会更新远程项目并重启服务，只适用于已确认目标服务器的正式部署 |
+| [`debug-deploy.sh`](debug-deploy.sh) | 一键启动本地联调环境 | 释放 `5001`、`5200` 端口，启动 Flask、MCP SSE 和 Vite real 模式；前端支持热更新，按 `Ctrl+C` 后清理后端和 MCP 进程 |
+| [`backend/run_on_pc_daemon.sh`](backend/run_on_pc_daemon.sh) | 管理后端守护进程 | 支持 `start/stop/restart/status/logs`；启动时检查运行环境、安装依赖并按需创建 `.env`，可通过 `INIT_MYSQL=1` 初始化 MySQL；默认端口为 `5002` |
+| [`scripts/02-package.sh`](scripts/02-package.sh) | 构建并生成部署包 | 默认以 `real` 模式构建前端；复制后端和共享 AI skills，排除 `.venv`、业务数据、运行日志、本地模型与缓存，生成 `tar/tb_tool_bt_backend-<时间>.tar.gz` |
+| [`scripts/03-deploy.sh`](scripts/03-deploy.sh) | 部署最新压缩包 | 选择 `tar/` 中最新包上传到脚本内指定服务器；替换远程项目时保留并恢复 `.venv`、`.env`、`data` 和 `local_models`，然后重启守护进程；上传后会删除本地压缩包 |
+| [`onekey-deploy.sh`](onekey-deploy.sh) | 一键打包并部署 | 依次执行 `scripts/02-package.sh` 和 `scripts/03-deploy.sh` |
+| [`scripts/setup-mcp.sh`](scripts/setup-mcp.sh) | 配置 Claude Code 使用 TB MCP | 交互式读取用户名，备份并重写 `~/.claude/mcp.json`，同时启用 `tb-mcp`；会修改当前用户的 Claude 全局配置 |
 
-常用本地联调命令：
-
-```bash
-./debug-deploy.sh
-```
-
-常用发布命令：
+打包但不部署：
 
 ```bash
 ./scripts/02-package.sh
-./scripts/04-tag-package.sh v1.4.0 "release v1.4.0"
 ```
 
-部署脚本内包含固定的远程目标配置，并会替换服务器上的现有项目目录。执行 `scripts/03-deploy.sh` 或 `onekey-deploy.sh` 前，必须先核对脚本中的目标环境、待上传包和远端备份策略。
-
-### 9.2 数据同步与知识库脚本
-
-| 脚本 | 功能 | 运行前提或副作用 |
-| --- | --- | --- |
-| [`sync-onsite-a-loop.sh`](sync-onsite-a-loop.sh) | 从当前游标循环续拉现场问题 A 表 | 调用本机 `5002` 服务，不重置游标，不触发 B 表；参数为钉钉 `userId` |
-| [`sync-onsite-loop.sh`](sync-onsite-loop.sh) | 重新执行现场问题完整同步 | 调用脚本内指定的远程服务，先重置现场问题游标，再循环调用 `/onsite/sync` 同步 A、B 表；会改变同步游标 |
-| [`sync-reqpool-a-loop.sh`](sync-reqpool-a-loop.sh) | 从当前游标循环续拉需求池 A 表 | 调用本机 `5002` 服务，不重置游标，不触发 B 表；参数为钉钉 `userId` |
-| [`sync-reqpool-loop.sh`](sync-reqpool-loop.sh) | 重置后重新拉取需求池 A 表 | 调用脚本内指定的远程服务，先重置需求池游标，再循环调用 `/req-pool/sync-a`；当前实现只同步 A 表 |
-| [`scripts/kb_raw_sync.py`](scripts/kb_raw_sync.py) | 绕过 Flask 直接拉取钉钉知识库 | 不写 `api_call_logs`，默认筛选 priority 99 的知识库并写入本地 SQLite；支持 `--estimate-only`、`--ws`、`--uid`、`--db` 和 `--dump-sql` |
-| [`scripts/selective_sync.py`](scripts/selective_sync.py) | 定向同步指定知识库文件夹 | 支持递归、只预览、下载正文，并可写入 `errcode_documents` 或 `kb_documents`；当前实现包含服务器代码路径和 MySQL 连接假设，适合目标服务器环境 |
-| [`scripts/errcode_asset_extractor.py`](scripts/errcode_asset_extractor.py) | 提取错误码文档中的图片、附件和表格引用 | 支持单个 `doc_id` 或 `--all`，结果写入 `errcode_assets`；依赖知识库用户身份和目标 MySQL 表 |
-| [`scripts/kb_sync_measure.sh`](scripts/kb_sync_measure.sh) | 测量多个知识库同步的钉钉 API 用量 | 逐库调用同步 API并生成运行日志和汇总；开始时会清空主库 `api_call_logs`，仅可在明确允许重置统计数据的测试环境执行 |
-
-断点续拉示例：
+打包并部署：
 
 ```bash
-./sync-onsite-a-loop.sh <userId>
-./sync-reqpool-a-loop.sh <userId>
+./onekey-deploy.sh
 ```
 
-知识库同步预估示例：
+部署脚本包含固定的远程目标配置，并会替换服务器上的现有项目目录。执行 `scripts/03-deploy.sh` 或 `onekey-deploy.sh` 前，必须核对目标服务器、待上传包以及远端保留目录。
 
-```bash
-cd scripts
-python3 kb_raw_sync.py --estimate-only
-python3 selective_sync.py <workspace_id> <folder_node_id> --recursive --dry-run
-```
-
-### 9.3 MCP 与历史 DiagKit 脚本
-
-| 脚本 | 功能 | 当前状态 |
-| --- | --- | --- |
-| [`setup-mcp.sh`](setup-mcp.sh) | 配置 Claude Code 连接 TB MCP SSE 服务 | 交互式读取用户名，备份并重写 `~/.claude/mcp.json`，同时更新 `~/.claude/settings.local.json`；会修改当前用户的全局 Claude 配置 |
-| [`scripts/deploy-diagkit-scripts.sh`](scripts/deploy-diagkit-scripts.sh) | 上传 DiagKit 服务、登录代理和清理脚本 | 面向脚本内指定服务器，并会在远端安装系统依赖 |
-| [`scripts/manage-diagkit-ttyd.sh`](scripts/manage-diagkit-ttyd.sh) | 远程管理 DiagKit ttyd 服务 | 通过 SSH 调用远端服务脚本，支持 `start/stop/restart/status` |
-| [`scripts/diagkit-ttyd-service.sh`](scripts/diagkit-ttyd-service.sh) | 管理 auth-proxy 与 ttyd 进程 | 对外 auth-proxy 和内部 ttyd 双进程结构，同时注册过期诊断材料清理任务 |
-| [`scripts/diagkit-cleanup.sh`](scripts/diagkit-cleanup.sh) | 清理过期诊断原始材料 | 默认删除 7 天前 Case 中的 `raw/`、`extracted/` 和 `tmp/`，保留报告等文本产物；支持 `--dry-run` |
-
-DiagKit 已在 `onekey-deploy.sh` 中标记为废弃，并从主部署链路移除，当前由 diagnosis-agent 替代。以上脚本仅作为历史兼容和专项运维工具，不应随常规平台发布自动执行。
+现场问题、需求池和知识库的一次性循环同步工具，以及旧 DiagKit 运维脚本已从本仓库移除；相关业务能力仍通过 Flask API 提供。
 
 ## 10 质量检查
 
@@ -325,5 +314,4 @@ npm run build
 - [工作日耗时设计](docs/business/workday-costhour-design.md)
 - [AI 架构](docs/ai/design/architecture/11-ai-architecture.md)
 - [MCP 使用说明](docs/ai/MCP_使用说明.md)
-- [错误码系统](docs/error-code-system/README.md)
 - [服务器运维说明](docs/ops/server-connection.md)
