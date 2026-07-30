@@ -20,8 +20,9 @@ from base.db.orm import UpdateLock
 DEFAULT_UPDATE_LOCK_TTL_SEC = 60 * 30
 
 # ── Lock key registry ──────────────────────────────────────
-LOCK_BENTI   = "benti_lock"    # 本体开发部：团队增量、清表全量
-LOCK_ONSITE  = "onsite_lock"   # 现场问题全量
+LOCK_BENTI    = "benti_lock"    # 本体开发部：团队增量、清表全量
+LOCK_ONSITE   = "onsite_lock"   # 现场问题全量
+LOCK_REQ_POOL = "req_pool_lock" # 需求池全量
 
 # backward compat
 DEFAULT_UPDATE_LOCK_KEY = LOCK_BENTI

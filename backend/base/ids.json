@@ -22,7 +22,8 @@
     "访客组":{
       "戴舒炜": { "userId": "012563513725212033", "character": 9, "team_id": 0, "is_nav_lead": true,  "is_servo_lead": true },
       "孙逸超": { "userId": "0133111623653734", "character": 9, "team_id": 0, "is_nav_lead": true,  "is_servo_lead": true },
-      "陈颖": { "userId": "22086800621231694", "character": 9, "team_id": 0, "is_nav_lead": true,  "is_servo_lead": true }
+      "陈颖": { "userId": "22086800621231694", "character": 9, "team_id": 0, "is_nav_lead": true,  "is_servo_lead": true },
+      "高益":   { "userId": "01271557291259250", "character": 9, "team_id": 0, "is_nav_lead": true,  "is_servo_lead": true }
     }
   },
   "projectids": {

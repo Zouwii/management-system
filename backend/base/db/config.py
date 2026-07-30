@@ -25,6 +25,7 @@ DEFAULT_MYSQL_DB_NAME = "benti_management"
 DEFAULT_PERF_DB_NAME = "perf_quarter_result"
 DEFAULT_KB_DB_NAME = "kb_storage"
 DEFAULT_ONSITE_DB_NAME = "onsite_problem"
+DEFAULT_REQ_POOL_DB_NAME = "req_pool"
 
 
 def env_bt(name: str, default: Optional[str] = None) -> Optional[str]:
@@ -114,6 +115,26 @@ elif (env_bt("USE_MYSQL") or "").lower() in ("1", "true", "yes"):
     )
 else:
     ONSITE_DATABASE_URI = DEFAULT_ONSITE_SQLITE_URI
+
+# req_pool 数据库 URI
+_default_req_pool_sqlite_path = _DATA_DIR / "req_pool.db"
+DEFAULT_REQ_POOL_SQLITE_URI = f"sqlite:///{_default_req_pool_sqlite_path}"
+
+_req_pool_explicit = (env_bt("REQ_POOL_DATABASE_URI") or "").strip()
+if _req_pool_explicit:
+    REQ_POOL_DATABASE_URI = _req_pool_explicit
+elif (env_bt("USE_MYSQL") or "").lower() in ("1", "true", "yes"):
+    user = env_bt("DB_USER", "root") or "root"
+    password = env_bt("DB_PASSWORD", "") or ""
+    host = env_bt("DB_HOST", "127.0.0.1") or "127.0.0.1"
+    port = env_bt("DB_PORT", "3306") or "3306"
+    req_pool_name = env_bt("REQ_POOL_DB_NAME", DEFAULT_REQ_POOL_DB_NAME) or DEFAULT_REQ_POOL_DB_NAME
+    REQ_POOL_DATABASE_URI = (
+        f"mysql+pymysql://{quote_plus(user)}:{quote_plus(password)}"
+        f"@{host}:{port}/{req_pool_name}?charset=utf8mb4"
+    )
+else:
+    REQ_POOL_DATABASE_URI = DEFAULT_REQ_POOL_SQLITE_URI
 
 # ── pgvector (PostgreSQL) — embedding vector storage ─────────────
 

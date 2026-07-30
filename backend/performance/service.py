@@ -119,13 +119,23 @@ def fill_member_input_service(payload: Dict[str, Any]) -> Dict[str, Any]:
 
     hour_score = payload.get("work_hour_score", payload.get("hour_score", payload.get("hourScore")))
     manager_score = payload.get("supervisor_score", payload.get("manager_score", payload.get("managerScore")))
-    if hour_score is None or manager_score is None:
-        return {"success": False, "error": "missing hour_score or manager_score", "data": {}}
 
     now = datetime.now(timezone.utc)
     session = PerfSessionLocal()
     try:
         Model = _select_model_by_team_id(user_id)
+
+        # 0 + 空 → 删除已有记录
+        if (hour_score == 0 and manager_score is None) or (hour_score is None and manager_score == 0):
+            stmt = select(Model).where(Model.year == year, Model.quarter == quarter, Model.user_id == user_id)
+            row = session.scalars(stmt).first()
+            if row:
+                session.delete(row)
+                session.commit()
+            return {"success": True, "data": {"deleted": True}}
+
+        if hour_score is None or manager_score is None:
+            return {"success": False, "error": "missing hour_score or manager_score", "data": {}}
         is_lead = _get_is_team_lead(user_id)
 
         # ── 上季度结余：优先用手动覆盖值，否则自动查询上季 new_carry ──
@@ -148,6 +158,7 @@ def fill_member_input_service(payload: Dict[str, Any]) -> Dict[str, Any]:
 
         stmt = select(Model).where(Model.year == year, Model.quarter == quarter, Model.user_id == user_id)
         row = session.scalars(stmt).first()
+        already_calculated = row is not None and row.calc_status == "calculated"
         if row:
             row.is_team_lead = is_lead
             row.rule_code = payload.get("rule_code", payload.get("ruleCode")) or row.rule_code
@@ -155,7 +166,8 @@ def fill_member_input_service(payload: Dict[str, Any]) -> Dict[str, Any]:
             row.supervisor_score = float(manager_score)
             row.prev_carry_balance = prev_carry
             row.prev_decay_value = prev_decay
-            row.calc_status = "filled"
+            if not already_calculated:
+                row.calc_status = "filled"
             row.updated_at = now
         else:
             row = Model(
@@ -176,8 +188,8 @@ def fill_member_input_service(payload: Dict[str, Any]) -> Dict[str, Any]:
 
         session.commit()
 
-        # 非组长 + 有输入 → 自动触发计算
-        if not is_lead and hour_score is not None and manager_score is not None:
+        # 有输入 → 自动触发计算（含组长），已计算过的不重复算
+        if not already_calculated and hour_score is not None and manager_score is not None:
             calc_result = calculate_member_quarter_performance_service({
                 "year": year, "quarter": quarter, "user_id": user_id,
             })
@@ -291,18 +303,30 @@ def calculate_member_quarter_performance_service(payload: Dict[str, Any]) -> Dic
         if not row:
             return {"success": False, "error": "perf_quarter_result not found (need import first)", "data": {}}
 
-        if bool(row.is_team_lead):
-            return {"success": False, "error": "this endpoint only supports member(is_team_lead=false)", "data": {}}
-
         if row.work_hour_score is None or row.supervisor_score is None:
             return {"success": False, "error": "missing input hour_score/manager_score", "data": {}}
 
-        # 1. 从本行读取上季度结余/衰减（import 时已写入）
-        prev_carry_balance = _round3(row.prev_carry_balance)
-        prev_decay_value = _round3(row.prev_decay_value)
+        # 1. 重新查询上一季度 new_carry，而非读本行旧值
+        prev_year, prev_q = _prev_year_quarter(year, quarter)
+        prev_stmt = select(Model).where(
+            Model.year == prev_year, Model.quarter == prev_q, Model.user_id == user_id,
+        )
+        prev_row = session.scalars(prev_stmt).first()
+        prev_carry_balance = _round3(prev_row.new_carry_balance if prev_row else 0.0)
+        prev_decay_value = _round3(prev_carry_balance * Decimal("0.25"))
 
-        # 2. 总体绩效
-        overall_score = _member_overall_score(row.work_hour_score, row.supervisor_score)
+        # 回写到本行，保持 prev_carry/prev_decay 与实际一致
+        row.prev_carry_balance = float(prev_carry_balance)
+        row.prev_decay_value = float(prev_decay_value)
+
+        # 2. 总体绩效（组长用平方公式）
+        if bool(row.is_team_lead):
+            overall_score = _round3(
+                Decimal(str(row.work_hour_score)) ** 2 * Decimal("0.6")
+                + Decimal(str(row.supervisor_score)) * Decimal("0.4")
+            )
+        else:
+            overall_score = _member_overall_score(row.work_hour_score, row.supervisor_score)
 
         # 3. 档位判断
         interval_lower, interval_upper = _threshold_interval_by_overall(overall_score)
@@ -507,7 +531,25 @@ def update_member_performance_service(payload: Dict[str, Any]) -> Dict[str, Any]
         stmt = select(Model).where(Model.year == year, Model.quarter == quarter, Model.user_id == user_id)
         row = session.scalars(stmt).first()
         if not row:
-            return {"success": False, "error": "record not found", "data": {}}
+            # 编辑模式下记录不存在 → 自动创建
+            is_lead = _get_is_team_lead(user_id)
+            row = Model(
+                year=year,
+                quarter=quarter,
+                user_id=user_id,
+                is_team_lead=is_lead,
+                rule_code="default_rule_code",
+                calc_status="filled",
+                prev_carry_balance=0.0,
+                prev_decay_value=0.0,
+                final_score=0.0,
+                new_carry_balance=0.0,
+                carry_decay_value=0.0,
+                created_at=now,
+                updated_at=now,
+            )
+            session.add(row)
+            session.flush()
 
         # 字段名映射：前端 camelCase → 后端 ORM snake_case
         FIELD_MAP = {
@@ -539,6 +581,10 @@ def update_member_performance_service(payload: Dict[str, Any]) -> Dict[str, Any]
         # prev_decay_value 恒为 prev_carry_balance * 0.25
         if row.prev_carry_balance is not None:
             row.prev_decay_value = float(_round3(Decimal(str(row.prev_carry_balance)) * Decimal("0.25")))
+
+        # carry_decay_value 恒为 new_carry_balance * 0.25
+        if row.new_carry_balance is not None:
+            row.carry_decay_value = float(_round3(Decimal(str(row.new_carry_balance)) * Decimal("0.25")))
 
         if updated == 0:
             return {"success": False, "error": "no fields to update", "data": {}}

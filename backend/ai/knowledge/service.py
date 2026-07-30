@@ -281,6 +281,11 @@ class DingTalkKnowledgeClient:
 
     # ── content ────────────────────────────────────────────────
 
+    # ⛔ overwriteContent is PERMANENTLY DISABLED.
+    # Calling POST /v1.0/doc/suites/documents/<id>/overwriteContent
+    # will irreversibly overwrite the document content.
+    # See CLAUDE.md safety rules.
+
     def get_document_blocks(self, node_id: str) -> Dict[str, Any]:
         """Get document content as block array.
 

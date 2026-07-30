@@ -41,7 +41,18 @@
 | 业务 | 数据来源 | 持久化目标 |
 |------|-----------|------------|
 | **A：任务列表** | `GET /v1.0/project/users/{userId}/projectIds/{projectId}/tasks` | 定期同步，全量 upsert |
-| **B：任务明细** | `GET /v1.0/project/users/{userId}/tasks?taskId=…` | 逐条拉取，解析常用 customField 拆列，其余存 raw_json |
+| **B：任务明细** | TB Open API via 钉钉代理 `open.teambition.com/api/v3` | 逐条拉取详情 + 评论 + 附件 |
+
+### 2.1 为什么用 TB Open API 替代钉钉项目 API
+
+钉钉项目 API (`v1.0/project/users/{userId}/tasks`) 只返回任务元数据和 customField，**没有评论、活动流、附件信息**。
+
+TB Open API via proxy 单次调用可拿到：
+- 任务详情（含完整的 customField value + metaString）
+- 评论流（`task/{id}/activity/list`，按时间正序分页）
+- 附件元数据（`file/query/by-resource-ids`，含 fileName/fileSize/mimeType/pre-signed downloadUrl）
+
+新旧方法并存：B 表同步默认走 TB Open API，老 DingTalk 接口保留不删但不再调用。
 
 ---
 
@@ -147,7 +158,71 @@
 | `occurrence_frequency` | VARCHAR(32) | `62c51d82...` | **复现概率** |
 | `software_version` | VARCHAR(32) | `6645bd4d...` | **JZTOTAL包版本** |
 
-### 6.3 兜底
+### 6.3 评论流 + 附件流（新增）
+
+| 列名 | 类型 | 说明 |
+|------|------|------|
+| `comments_json` | MEDIUMTEXT | NULL | 评论流 JSON，按时间正序 |
+| `attachments_json` | MEDIUMTEXT | NULL | 附件流 JSON，含 metadata |
+
+#### comments_json 结构
+
+```json
+[
+  {
+    "idx": 1,
+    "content": "@王炜 有没有btlog文件",
+    "creator_id": "61c2cc471c7126a5e03555ff",
+    "create_time": "2026-07-24T07:33:09.000Z",
+    "attachment_indices": []          // 引用 attachments_json 的 idx
+  },
+  {
+    "idx": 2,
+    "content": "行为树的配置开一下",
+    "creator_id": "...",
+    "create_time": "2026-07-24T07:24:13.000Z",
+    "attachment_indices": [3]
+  }
+]
+```
+
+- `idx`：同一 task 内按时间正序递增编号，从 1 开始
+- `attachment_indices`：引用 `attachments_json` 中对应附件的 `idx`，无附件则为空数组
+
+#### attachments_json 结构
+
+```json
+[
+  {
+    "idx": 1,
+    "resource_id": "task:6a50a.../cf:625f7.../file:6a50a...",
+    "file_name": "10.146.127.149 2026_7_10 15_30_33.png",
+    "file_size": 182550,
+    "mime_type": "image/png",
+    "source": "customfield",
+    "cf_id": "625f75e9882430143f5bfd0a",
+    "comment_idx": null
+  },
+  {
+    "idx": 2,
+    "resource_id": "task:6a50a.../activity:6a544.../file:6a544...",
+    "file_name": "btlog.tar.gz",
+    "file_size": 5242880,
+    "mime_type": "application/gzip",
+    "source": "comment",
+    "cf_id": null,
+    "comment_idx": 3
+  }
+]
+```
+
+- `idx`：同一 task 内全局递增，供 `comments_json.attachment_indices` 引用
+- `resource_id`：TB 附件唯一标识，用于重新签名获取 downloadUrl
+- `source`：`"customfield"` 来自任务详情字段，`"comment"` 来自评论附件
+- `comment_idx`：`source=comment` 时指向所属评论的 `idx`；`source=customfield` 时为 null
+- **不存 `download_url`**：预签名 URL 有效期约 2 小时，存 `resource_id` 按需重新签名
+
+### 6.4 兜底
 
 | 列名 | 类型 | 说明 |
 |------|------|------|
@@ -169,8 +244,35 @@
 
 ---
 
-## 8. 修订记录
+## 8. 同步流程
+
+```
+A 表同步（不变）
+  └─ DingTalk 项目 API → onsite_problem_tasks
+
+B 表同步（改用 TB Open API via proxy）
+  ├─ 从 A 表读取 task_id 列表
+  ├─ 每条 task_id：
+  │   ├─ GET task/query            → 任务详情 + customField 解析
+  │   ├─ GET task/{id}/activity/list → 评论流（翻页到底）
+  │   │   └─ 筛选 action=comment，提取评论内容 + 附件 fileId
+  │   └─ POST file/query/by-resource-ids → 附件元数据（fileName/size/type）
+  │       └─ 构建 attachments_json（加 idx）
+  │       └─ 评论中的 attachment_indices 指向 attachments_json.idx
+  └─ upsert onsite_problem_details（含 comments_json + attachments_json）
+```
+
+**认证**: 代理托管 TB AppId/SecretKey，JWT 由代理服务端签发。客户端仅需 proxyToken + unionId。
+
+**附件策略**:
+- 只存元数据（resource_id, file_name, file_size, mime_type）
+- 不存 download_url（2h 过期）
+- 不自动下载文件（存储成本不可控）
+- 排查时按 resource_id 重新签名获取下载链接
+
+## 9. 修订记录
 
 | 日期 | 说明 |
 |------|------|
 | 2026-07-22 | 初稿：customField 16个全部确认，A/B 表设计 |
+| 2026-07-24 | B 表新增 `comments_json` + `attachments_json`；同步方法从钉钉项目 API 切换到 TB Open API via proxy |

@@ -8,6 +8,36 @@ const QUARTERS = [1, 2, 3, 4];
 
 function toNum(v) { return v === '' || v == null ? null : parseFloat(v); }
 
+function mapMembers(list) {
+  // 成员显示顺序
+  const ORDER = [
+    '何鸿颉', '王睿', '邹宏睿', '潘铮', '何华', '郑世玉', '陈文斌', '蒲曲', '钟昌郎',
+    '沈旭东', '李赫', '刘力璋', '戴宇庆', '谢宇迪',
+  ];
+  const orderMap = new Map(ORDER.map((n, i) => [n, i]));
+
+  return list.map((m) => ({
+    ...m,
+    _wh:  m.workHourScore       ?? '',
+    _sp:  m.supervisorScore     ?? '',
+    _pcb: m.prevCarryBalance    ?? 0,
+    _os:  m.overallScore        ?? '',
+    _cv:  m.compensationValue   ?? '',
+    _ov:  m.overflowValue       ?? '',
+    _fs:  m.finalScore          ?? '',
+    _ncb: m.newCarryBalance     ?? '',
+    _cdv: m.carryDecayValue     ?? '',
+    _cs:  m.companyScore        ?? '',
+  })).sort((a, b) => {
+    // 组长排最前
+    if (a.isTeamLead !== b.isTeamLead) return a.isTeamLead ? -1 : 1;
+    // 然后按预定顺序
+    const ai = orderMap.get(a.userName) ?? 999;
+    const bi = orderMap.get(b.userName) ?? 999;
+    return ai - bi;
+  });
+}
+
 export default function PerfImportModal({ open, onClose }) {
   const [year, setYear] = useState(CURRENT_YEAR);
   const [quarter, setQuarter] = useState(CURRENT_QUARTER);
@@ -39,19 +69,7 @@ export default function PerfImportModal({ open, onClose }) {
     fetchTeamImportUsers({ year, quarter, team })
       .then((res) => {
         if (res?.data?.members) {
-          setMembers(res.data.members.map((m) => ({
-            ...m,
-            _wh:  m.workHourScore       ?? '',
-            _sp:  m.supervisorScore     ?? '',
-            _pcb: m.prevCarryBalance    ?? 0,
-            _os:  m.overallScore        ?? '',
-            _cv:  m.compensationValue   ?? '',
-            _ov:  m.overflowValue       ?? '',
-            _fs:  m.finalScore          ?? '',
-            _ncb: m.newCarryBalance     ?? '',
-            _cdv: m.carryDecayValue     ?? '',
-            _cs:  m.companyScore        ?? '',
-          })));
+          setMembers(mapMembers(res.data.members));
         }
       })
       .catch(() => setMessage('加载失败'))
@@ -63,6 +81,28 @@ export default function PerfImportModal({ open, onClose }) {
     setMessage('');
 
     try {
+      if (!editCalc) {
+        // 导入模式：有人只填了一个分（且不是 0），弹提醒。0 视为豁免
+        const incompleteMembers = members.filter(
+          (m) => {
+            const wh = parseFloat(m._wh);
+            const sp = parseFloat(m._sp);
+            if (wh === 0 && isNaN(sp)) return false; // 0 + 空，豁免
+            if (isNaN(wh) && sp === 0) return false; // 空 + 0，豁免
+            if (isNaN(wh) && isNaN(sp)) return false; // 都空，豁免
+            if (!isNaN(wh) && isNaN(sp)) return true;  // 只填了工时
+            if (isNaN(wh) && !isNaN(sp)) return true;  // 只填了主管
+            return false;
+          }
+        );
+        if (incompleteMembers.length > 0) {
+          const names = incompleteMembers.map((m) => m.userName).join('、');
+          setMessage(`⚠️ 以下成员只填了一个分，请补全：${names}`);
+          setSaving(false);
+          return;
+        }
+      }
+
       if (editCalc) {
         const editable = members.filter((m) =>
           m._wh !== '' || m._sp !== '' || m.calcStatus
@@ -98,15 +138,24 @@ export default function PerfImportModal({ open, onClose }) {
           }
         }
         setMessage(`保存完成: ${ok} 成功, ${fail} 失败`);
+
+        // 保存后自动刷新，确保编辑模式展开明细看到最新结果
+        const res = await fetchTeamImportUsers({ year, quarter, team });
+        if (res?.data?.members) {
+          setMembers(mapMembers(res.data.members));
+        }
       } else {
         const toSave = members
-          .filter((m) => m._wh !== '' || m._sp !== '')
+          .filter((m) => {
+            if (m._wh === '' && m._sp === '') return false;
+            return true;
+          })
           .map((m) => {
             const item = {
               userId: m.userId,
-              workHourScore: toNum(m._wh),
-              supervisorScore: toNum(m._sp),
             };
+            if (m._wh !== '') item.workHourScore = toNum(m._wh);
+            if (m._sp !== '') item.supervisorScore = toNum(m._sp);
             // 用户手动改了上季结余才传，否则后端自动查询
             if (parseFloat(m._pcb || 0) !== 0) {
               item.prevCarryBalance = parseFloat(m._pcb);
@@ -123,6 +172,11 @@ export default function PerfImportModal({ open, onClose }) {
         const res = await batchImportScores({ year, quarter, team, members: toSave });
         if (res?.data?.ok !== undefined) {
           setMessage(`导入完成: ${res.data.ok} 成功, ${res.data.fail} 失败`);
+        }
+        // 保存后自动刷新，展示计算结果
+        const ref = await fetchTeamImportUsers({ year, quarter, team });
+        if (ref?.data?.members) {
+          setMembers(mapMembers(ref.data.members));
         }
       }
     } catch {
@@ -169,19 +223,7 @@ export default function PerfImportModal({ open, onClose }) {
       // 刷新数据
       const res = await fetchTeamImportUsers({ year, quarter, team });
       if (res?.data?.members) {
-        setMembers(res.data.members.map((r) => ({
-          ...r,
-          _wh:  r.workHourScore       ?? '',
-          _sp:  r.supervisorScore     ?? '',
-          _pcb: r.prevCarryBalance    ?? 0,
-          _os:  r.overallScore        ?? '',
-          _cv:  r.compensationValue   ?? '',
-          _ov:  r.overflowValue       ?? '',
-          _fs:  r.finalScore          ?? '',
-          _ncb: r.newCarryBalance     ?? '',
-          _cdv: r.carryDecayValue     ?? '',
-          _cs:  r.companyScore        ?? '',
-        })));
+        setMembers(mapMembers(res.data.members));
       }
     } catch {
       // ignore
@@ -194,10 +236,10 @@ export default function PerfImportModal({ open, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-      <Card className={`w-full ${editCalc ? 'max-w-6xl' : 'max-w-3xl'} max-h-[85vh] flex flex-col`}>
+      <Card className={`w-full ${editCalc ? 'max-w-7xl' : 'max-w-3xl'} max-h-[85vh] flex flex-col`}>
         {/* header */}
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-          <h2 className="text-lg font-semibold text-slate-900">导入/编辑</h2>
+          <h2 className="text-lg font-semibold text-slate-900">{editCalc ? '编辑' : '录入'}</h2>
           <button
             onClick={onClose}
             className="rounded-full p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
@@ -244,20 +286,7 @@ export default function PerfImportModal({ open, onClose }) {
               fetchTeamImportUsers({ year, quarter, team })
                 .then((res) => {
                   if (res?.data?.members) {
-                    setMembers(res.data.members.map((m) => ({
-                      ...m,
-                      _wh:  m.workHourScore       ?? '',
-                      _sp:  m.supervisorScore     ?? '',
-                      _pcb: m.prevCarryBalance    ?? 0,
-                      _pdv: m.prevDecayValue      ?? 0,
-                      _os:  m.overallScore        ?? '',
-                      _cv:  m.compensationValue   ?? '',
-                      _ov:  m.overflowValue       ?? '',
-                      _fs:  m.finalScore          ?? '',
-                      _ncb: m.newCarryBalance     ?? '',
-                      _cdv: m.carryDecayValue     ?? '',
-                      _cs:  m.companyScore        ?? '',
-                    })));
+                    setMembers(mapMembers(res.data.members));
                   }
                 })
                 .finally(() => setLoading(false));
@@ -299,7 +328,7 @@ export default function PerfImportModal({ open, onClose }) {
           ) : (
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-slate-50 text-slate-500">
-                <tr>
+                <tr className="[&_th]:whitespace-nowrap">
                   <th className="px-4 py-3 text-left font-medium w-10"></th>
                   <th className="px-3 py-3 text-left font-medium">姓名</th>
                   <th className="px-3 py-3 text-left font-medium bg-blue-100/50 text-blue-700">工时绩效</th>
@@ -313,6 +342,7 @@ export default function PerfImportModal({ open, onClose }) {
                   {editCalc ? (
                     <>
                       <th className="px-2 py-3 text-left font-medium bg-emerald-100/50 text-emerald-700">总体绩效</th>
+                      <th className="px-1 py-3 text-left font-medium text-violet-700">结余绩效</th>
                       {showDetail ? (
                         <>
                           <th className="px-1 py-3 text-left font-medium text-slate-400">补偿值</th>
@@ -344,12 +374,14 @@ export default function PerfImportModal({ open, onClose }) {
                     <td className="px-3 py-2">
                       <input type="number" step="0.01" min="0" max="3" value={m._wh}
                         onChange={(e) => { const cp = [...members]; cp[i] = { ...cp[i], _wh: e.target.value }; setMembers(cp); }}
-                        className="w-18 rounded-lg border border-slate-200 px-1.5 py-1 text-sm outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-200" placeholder="1.0" />
+                        disabled={editCalc}
+                        className={`w-18 rounded-lg border px-1.5 py-1 text-sm outline-none ${editCalc ? 'border-slate-100 bg-slate-50 text-slate-400 cursor-not-allowed' : 'border-slate-200 focus:border-sky-400 focus:ring-1 focus:ring-sky-200'}`} placeholder="1.0" />
                     </td>
                     <td className="px-3 py-2">
                       <select value={m._sp}
                         onChange={(e) => { const cp = [...members]; cp[i] = { ...cp[i], _sp: e.target.value }; setMembers(cp); }}
-                        className="w-20 rounded-lg border border-slate-200 px-1.5 py-1 text-sm outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-200">
+                        disabled={editCalc}
+                        className={`w-20 rounded-lg border px-1.5 py-1 text-sm outline-none ${editCalc ? 'border-slate-100 bg-slate-50 text-slate-400 cursor-not-allowed' : 'border-slate-200 focus:border-sky-400 focus:ring-1 focus:ring-sky-200'}`}>
                         <option value="">-</option>
                         {[0, 0.5, 0.8, 1.0, 1.2, 1.5, 2.0].map((v) => (<option key={v} value={v}>{v}</option>))}
                       </select>
@@ -372,6 +404,11 @@ export default function PerfImportModal({ open, onClose }) {
                           <input type="number" step="0.001" min="0" max="5" value={m._os}
                             onChange={(e) => { const cp = [...members]; cp[i] = { ...cp[i], _os: e.target.value }; setMembers(cp); }}
                             className="w-18 rounded-lg border border-slate-200 px-1.5 py-1 text-sm outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-200" />
+                        </td>
+                        <td className="px-1 py-2 text-center">
+                          <span className="text-xs font-medium text-violet-700">
+                            {(parseFloat(m._os || 0) + parseFloat(m._pcb || 0)).toFixed(3)}
+                          </span>
                         </td>
                         {showDetail ? (
                           <>
@@ -422,7 +459,7 @@ export default function PerfImportModal({ open, onClose }) {
                           className="text-xs text-sky-600 hover:text-sky-800 hover:underline cursor-pointer"
                           title="点击触发计算"
                         >
-                          待计算
+                          计算
                         </button>
                       ) : m.calcStatus === 'archived' ? (
                         <span className="text-xs text-slate-400">已归档</span>

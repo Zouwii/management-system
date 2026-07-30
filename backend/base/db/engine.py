@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 
-from base.db.config import DATABASE_URI, KB_DATABASE_URI, PERF_DATABASE_URI, ONSITE_DATABASE_URI, PGVECTOR_DATABASE_URI
+from base.db.config import DATABASE_URI, KB_DATABASE_URI, PERF_DATABASE_URI, ONSITE_DATABASE_URI, REQ_POOL_DATABASE_URI, PGVECTOR_DATABASE_URI
 from base.db.orm import Base  # 导入即注册 ProjectTask 等到 Base.metadata
 
 # SQLite 下多线程需 check_same_thread=False（Flask 每请求一线程）
@@ -63,6 +63,20 @@ onsite_engine = create_engine(
 
 OnsiteSessionLocal = scoped_session(sessionmaker(bind=onsite_engine, autoflush=False, autocommit=False, future=True))
 
+# req_pool 专用库
+_req_pool_connect_args = {}
+if REQ_POOL_DATABASE_URI.startswith("sqlite"):
+    _req_pool_connect_args["check_same_thread"] = False
+
+req_pool_engine = create_engine(
+    REQ_POOL_DATABASE_URI,
+    connect_args=_req_pool_connect_args,
+    future=True,
+    pool_pre_ping=True,
+)
+
+ReqPoolSessionLocal = scoped_session(sessionmaker(bind=req_pool_engine, autoflush=False, autocommit=False, future=True))
+
 # pgvector（PostgreSQL）embedding 专用引擎
 pgvector_engine = create_engine(
     PGVECTOR_DATABASE_URI,
@@ -91,6 +105,8 @@ def _table_registry():
         ProjectTask,
         ProjectTaskDetail,
         ProjectTaskOverdueDetail,
+        ReqPoolDetail,
+        ReqPoolTask,
         ServoPerfQuarterResult,
         SyncFailure,
         SyncRun,
@@ -126,7 +142,11 @@ def _table_registry():
         ("onsite_problem_tasks", OnsiteProblemTask.__table__),
         ("onsite_problem_details", OnsiteProblemDetail.__table__),
     ]
-    return main_tables, perf_tables, kb_tables, onsite_tables
+    req_pool_tables = [
+        ("req_pool_tasks", ReqPoolTask.__table__),
+        ("req_pool_details", ReqPoolDetail.__table__),
+    ]
+    return main_tables, perf_tables, kb_tables, onsite_tables, req_pool_tables
 
 
 def _execute_table_ops(bind, table_entries, action: str) -> None:
@@ -154,7 +174,7 @@ def init_database() -> None:
 
     设计目标：初始化内容“可视化、可读、可维护”。
     """
-    main_tables, perf_tables, kb_tables, onsite_tables = _table_registry()
+    main_tables, perf_tables, kb_tables, onsite_tables, req_pool_tables = _table_registry()
     # seed 阶段会直接使用这两个 ORM 模型
     from base.db.orm import Config as DbConfig, UserCharacter as DbUserCharacter
 
@@ -163,6 +183,7 @@ def init_database() -> None:
     _execute_table_ops(perf_engine, perf_tables, "create")
     _execute_table_ops(kb_engine, kb_tables, "create")
     _execute_table_ops(onsite_engine, onsite_tables, "create")
+    _execute_table_ops(req_pool_engine, req_pool_tables, "create")
 
     # 兼容无迁移环境：尝试为 B/C 表补齐新字段/新表（SQLite 场景常见）
     try:

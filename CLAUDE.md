@@ -258,6 +258,17 @@ rm backend/runtime/sync_disabled
 bash run_on_pc_daemon.sh restart
 ```
 
+## ⛔ 安全红线
+
+**永远禁止修改钉钉上的任何内容。无例外。**
+
+- 禁止调用 `overwriteContent` 或任何钉钉写入 API
+- 禁止修改知识库内容、节点、权限
+- 禁止创建/编辑/删除钉钉文档
+- 禁止创建/修改/删除 Teambition 任务（除非用户明确通过 MCP 或 tbcreate 模块手动操作）
+- 禁止修改钉钉用户信息、组织架构
+- 所有钉钉 API 调用**默认只读**，任何写入操作必须先经用户逐次确认
+
 ## 约定
 
 - Python 函数使用 Google-style docstring（Args / Returns / Raises）

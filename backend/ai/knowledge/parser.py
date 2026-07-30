@@ -59,6 +59,15 @@ def blocks_to_markdown(blocks: List[dict]) -> str:
             lines.append(f"```{lang}\n{text}\n```")
         elif bt == "table":
             lines.append(_dingtalk_table_to_md(body))
+        elif bt == "columns":
+            # Recurse into children blocks inside columns
+            inner = _convert_columns(body)
+            if inner:
+                lines.append(inner)
+        elif bt == "attachment":
+            name = (body.get("name") or "").strip()
+            if name:
+                lines.append(f"[附件: {name}]")
         elif bt == "unknown":
             continue
         else:
@@ -75,29 +84,59 @@ def blocks_to_markdown(blocks: List[dict]) -> str:
 
 
 def _dingtalk_table_to_md(body: dict) -> str:
-    """Convert a DingTalk table block to markdown table."""
+    """Convert a DingTalk table block to markdown table.
+
+    cells is a 2D array: cells[row][col].
+    Dimensions come from rowSize/colSize (rowCount/colCount are null in API).
+    """
     cells = body.get("cells") or []
     if not cells:
         return ""
-    row_count = body.get("rowCount", 1)
-    col_count = body.get("colCount", len(cells))
+
+    # Use rowSize/colSize; fall back to deriving from 2D array
+    row_count = body.get("rowSize") or body.get("rowCount") or len(cells)
+    if cells and isinstance(cells[0], list):
+        col_count = body.get("colSize") or body.get("colCount") or len(cells[0])
+    else:
+        col_count = body.get("colSize") or body.get("colCount") or len(cells)
+
     lines: List[str] = []
     for r in range(row_count):
-        row_cells = []
+        if r >= len(cells):
+            break
+        row_cells: List[str] = []
         for c in range(col_count):
-            idx = r * col_count + c
-            cell_text = ""
-            if idx < len(cells):
-                cell = cells[idx]
-                if isinstance(cell, dict):
-                    cell_text = (cell.get("text") or cell.get("value") or "").strip()
-                else:
-                    cell_text = str(cell)
+            cell = cells[r][c] if c < len(cells[r]) else ""
+            if isinstance(cell, dict):
+                cell_text = (cell.get("text") or cell.get("value") or "").strip()
+            else:
+                cell_text = str(cell)
             row_cells.append(cell_text)
         lines.append("| " + " | ".join(row_cells) + " |")
         if r == 0:
             lines.append("| " + " | ".join("---" for _ in range(col_count)) + " |")
     return "\n".join(lines)
+
+
+def _convert_columns(body: dict) -> str:
+    """Recurse into columns.children and convert nested blocks to markdown.
+
+    columns.children is a list of columns; each column is a list of blocks.
+    """
+    children = body.get("children") or []
+    if not children:
+        return ""
+
+    all_parts: List[str] = []
+    for column_blocks in children:
+        if not isinstance(column_blocks, list):
+            continue
+        # Recurse: use blocks_to_markdown on the column's block list
+        inner = blocks_to_markdown(column_blocks)
+        if inner:
+            all_parts.append(inner)
+
+    return "\n\n".join(all_parts)
 
 
 # ── workbook → Markdown ────────────────────────────────────────

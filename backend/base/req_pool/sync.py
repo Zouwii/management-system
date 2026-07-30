@@ -1,8 +1,8 @@
 """
-现场问题跟踪 — A/B 表同步逻辑.
+需求池 — A/B 表同步逻辑.
 
-A 表: onsite_problem_tasks (列表快照)
-B 表: onsite_problem_details (明细, 解析 customField)
+A 表: req_pool_tasks (列表快照)
+B 表: req_pool_details (明细, 解析 customField)
 """
 
 from __future__ import annotations
@@ -15,15 +15,15 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy import select
 
-from base.db.engine import OnsiteSessionLocal, SessionLocal
-from base.db.orm import Config as DbConfig, OnsiteProblemDetail, OnsiteProblemTask
-from base.projects.task_service import query_project_tasks_service, query_user_tasks_service
+from base.db.engine import ReqPoolSessionLocal, SessionLocal
+from base.db.orm import Config as DbConfig, ReqPoolDetail, ReqPoolTask
+from base.projects.task_service import query_project_tasks_service
 
 # ── A 表游标持久化（断点续拉）─────────────────────────────────
-_CURSOR_CONFIG_TYPE = "onsite_a_cursor"
+_CURSOR_CONFIG_TYPE = "req_pool_a_cursor"
 
 
-def _get_onsite_a_cursor() -> Optional[str]:
+def _get_req_pool_a_cursor() -> Optional[str]:
     """读取上次 A 表同步的 nextToken 游标；无则返回 None."""
     session = SessionLocal()
     try:
@@ -36,7 +36,7 @@ def _get_onsite_a_cursor() -> Optional[str]:
         session.close()
 
 
-def _set_onsite_a_cursor(next_token: Optional[str]) -> None:
+def _set_req_pool_a_cursor(next_token: Optional[str]) -> None:
     """写入/清除 A 表同步游标."""
     session = SessionLocal()
     try:
@@ -57,10 +57,10 @@ def _set_onsite_a_cursor(next_token: Optional[str]) -> None:
         session.close()
 
 
-def reset_onsite_a_cursor() -> Dict[str, Any]:
+def reset_req_pool_a_cursor() -> Dict[str, Any]:
     """清空 A 表游标，下次同步从头开始."""
-    cursor_before = _get_onsite_a_cursor()
-    _set_onsite_a_cursor(None)
+    cursor_before = _get_req_pool_a_cursor()
+    _set_req_pool_a_cursor(None)
     return {
         "success": True,
         "data": {
@@ -70,9 +70,9 @@ def reset_onsite_a_cursor() -> Dict[str, Any]:
     }
 
 
-def get_onsite_a_cursor_status() -> Dict[str, Any]:
+def get_req_pool_a_cursor_status() -> Dict[str, Any]:
     """查询当前 A 表游标状态."""
-    cursor = _get_onsite_a_cursor()
+    cursor = _get_req_pool_a_cursor()
     return {
         "success": True,
         "data": {
@@ -82,26 +82,19 @@ def get_onsite_a_cursor_status() -> Dict[str, Any]:
     }
 
 # ── 项目常量 ─────────────────────────────────────────────────
-ONSITE_PROJECT_ID = "616e6868a46ec51df166f4cd"
-ONSITE_SCENARIO_FIELD_CONFIG_ID = "616e686948312307a5a9f994"
+REQ_POOL_PROJECT_ID = "631710f1ac04e183d048d326"
 
 # ── customField ID 常量 ──────────────────────────────────────
-CF_VEHICLE_MODEL            = "659369d32ae435dd0b3c803e"  # 车型 (cascading)
-CF_CARRIER_TYPE             = "637c2e2ffbb56c003fdd74e9"  # 载具配置 (dropDown)
-CF_OCCURRENCE_FREQUENCY     = "62c51d82d7ab965fbdebd686"  # 复现概率 (dropDown)
-CF_SOFTWARE_VERSION         = "6645bd4d22e1f70dadb953f6"  # JZTOTAL包版本 (dropDown)
-CF_PROBLEM_DESCRIPTION      = "624e4bf0972b3d03d3008c4c"  # 问题描述 (text)
-CF_INVESTIGATION_CONCLUSION = "69241440caabefe748f91359"  # 排查结论 (rtf)
-CF_DOC_VALUE                = "692414313ffb7e9afc4e9f43"  # 排查文档价值 (dropDown)
-CF_INVESTIGATION_DOC        = "6924139133e26574155ea68b"  # 排查文档 (lookup2)
-CF_ATTACHMENTS              = "625f75e9882430143f5bfd0a"  # 其他附件信息 (work)
-CF_PROBLEM_CATEGORY         = "691a95544ce9d3d5a5e541e1"  # 问题类型分类 (cascading)
-CF_PROBLEM_MODULE           = "691a95f304c9e52bc9058bd6"  # 问题模块分类 (dropDown)
-CF_GUIDE_DOC                = "62651eadef4cf6063244aa5c"  # 指导文档 (lookup)
-CF_FORMAL_VERSION           = "625f8339882430143f5c0b9a"  # 正式版本 (text)
-CF_ROOT_CAUSE               = "625f8317d472ef3d5c2f39a4"  # 原因分析 (text)
-CF_SOLUTION                 = "625f8329b416f5118bb099b2"  # 解决方案 (text)
-CF_SUBMITTER                = "68f637359ae2d0854e946cb3"  # 提交者 (text)
+CF_REQ_SOURCE       = "631716de7f7344003f3ece70"  # 需求来源 (dropDown)
+CF_TITLE            = "631715ae6b9968003f9d8663"  # 标题 (text)
+CF_BRANCH           = "636243182a3467003f8421fd"  # 主干/分支 (dropDown)
+CF_RELEASE_VERSION  = "650d01985926ce31ac8567ec"  # 发布版本 (dropDown)
+CF_PACKAGE_VERSION  = "63ff1addd450590017455ec0"  # 子包版本 (text)
+CF_PRD_DOC          = "634e8177cc2f290040ad67b5"  # PRD文档 (lookup2)
+CF_DEV_DOC          = "634e81ba28f0e20040b97303"  # 研发文档 (lookup2)
+CF_TEST_CASE        = "634e8825fddc0e003feca663"  # 测试用例 (lookup2)
+CF_TEST_REPORT      = "634e81d65e75170040a27116"  # 测试报告 (lookup2)
+CF_BIZ_OWNER        = "65f2ca0eae786a9021262156"  # 业务负责人 (lookup)
 
 
 # ── helpers ──────────────────────────────────────────────────
@@ -122,13 +115,13 @@ def _parse_iso_dt(value: Any) -> Optional[datetime]:
 
 def _extract_custom_field_title(item: Dict[str, Any], cfid: str) -> Optional[str]:
     """从 customFields 中按 cfId 取第一个 value 的 title."""
-    cfs = item.get("customFields") or item.get("customfields") or []
+    cfs = item.get("customfields") or item.get("customFields") or []
     if not isinstance(cfs, list):
         return None
     for cf in cfs:
         if not isinstance(cf, dict):
             continue
-        if str(cf.get("customFieldId") or cf.get("customfieldId") or cf.get("cfId") or "") != cfid:
+        if str(cf.get("cfId") or cf.get("customFieldId") or cf.get("customfieldId") or "") != cfid:
             continue
         values = cf.get("value") or []
         if isinstance(values, list) and values:
@@ -136,28 +129,6 @@ def _extract_custom_field_title(item: Dict[str, Any], cfid: str) -> Optional[str
             if isinstance(first, dict):
                 return str(first.get("title") or "").strip() or None
             return str(first).strip() or None
-    return None
-
-
-def _extract_attachment_titles(item: Dict[str, Any], cfid: str) -> Optional[str]:
-    """从 customFields 的 work 类型中提取所有附件文件名，用分号拼接."""
-    cfs = item.get("customFields") or item.get("customfields") or []
-    if not isinstance(cfs, list):
-        return None
-    for cf in cfs:
-        if not isinstance(cf, dict):
-            continue
-        if str(cf.get("customFieldId") or cf.get("customfieldId") or cf.get("cfId") or "") != cfid:
-            continue
-        values = cf.get("value") or []
-        if isinstance(values, list) and values:
-            titles = []
-            for v in values:
-                if isinstance(v, dict):
-                    t = str(v.get("title") or "").strip()
-                    if t:
-                        titles.append(t)
-            return "; ".join(titles) if titles else None
     return None
 
 
@@ -169,7 +140,7 @@ def _str_list(lst: Any) -> Optional[List[str]]:
 
 # ── A 表写入 ─────────────────────────────────────────────────
 
-def _apply_task_dict_to_onsite_a(obj: OnsiteProblemTask, d: Dict[str, Any], synced_at: datetime) -> None:
+def _apply_task_dict_to_req_a(obj: ReqPoolTask, d: Dict[str, Any], synced_at: datetime) -> None:
     obj.task_id = str(d.get("taskId") or "")
     obj.project_id = str(d.get("projectId") or "")
     obj.content = str(d.get("content") or "")
@@ -195,7 +166,6 @@ def _apply_task_dict_to_onsite_a(obj: OnsiteProblemTask, d: Dict[str, Any], sync
     obj.involve_members = _str_list(d.get("involveMembers"))
     obj.tag_ids = _str_list(d.get("tagIds"))
     obj.labels = d.get("labels") if isinstance(d.get("labels"), list) else None
-    # customfield_ids: 只存 id 列表
     cfs = d.get("customfields") or d.get("customFields") or []
     obj.customfield_ids = [str(cf.get("customfieldId") or cf.get("customFieldId") or "")
                            for cf in cfs if isinstance(cf, dict)
@@ -207,27 +177,24 @@ def _apply_task_dict_to_onsite_a(obj: OnsiteProblemTask, d: Dict[str, Any], sync
     obj.list_synced_at = synced_at
 
 
-def sync_onsite_a_table(payload: Dict[str, Any],
-                        query_result: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def sync_req_pool_a_table(payload: Dict[str, Any],
+                           query_result: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
-    拉项目任务列表并 upsert A 表 onsite_problem_tasks.
+    拉项目任务列表并 upsert A 表 req_pool_tasks.
 
     断点续拉：若 Config 表存有上次同步的 nextToken 游标，则接着上次的位置翻页；
     拉完全量后自动清除游标；force_refresh=True 时忽略游标从头拉.
-
-    若传入 query_result (已调用的 query_project_tasks_service 返回值), 则不再请求.
     """
     payload = dict(payload or {})
     user_id = str(payload.get("userId") or payload.get("userid") or "").strip()
     force_refresh = bool(payload.get("force_refresh"))
 
-    # ── 读游标 ──
-    saved_cursor = None if force_refresh else _get_onsite_a_cursor()
+    saved_cursor = None if force_refresh else _get_req_pool_a_cursor()
 
     if query_result is None:
         qp = {
             "userId": user_id,
-            "projectId": ONSITE_PROJECT_ID,
+            "projectId": REQ_POOL_PROJECT_ID,
             "maxResults": 100,
             "maxPages": 100,
             "force_refresh": force_refresh or (saved_cursor is None),
@@ -246,7 +213,7 @@ def sync_onsite_a_table(payload: Dict[str, Any],
     all_rows = ding.get("result") if isinstance(ding.get("result"), list) else []
 
     now = datetime.now(timezone.utc)
-    session = OnsiteSessionLocal()
+    session = ReqPoolSessionLocal()
     upserted = 0
     try:
         for d in all_rows:
@@ -256,16 +223,16 @@ def sync_onsite_a_table(payload: Dict[str, Any],
             tid = str(d.get("taskId") or "")
             if not pid or not tid:
                 continue
-            stmt = select(OnsiteProblemTask).where(
-                OnsiteProblemTask.project_id == pid,
-                OnsiteProblemTask.task_id == tid,
+            stmt = select(ReqPoolTask).where(
+                ReqPoolTask.project_id == pid,
+                ReqPoolTask.task_id == tid,
             )
             existing = session.scalars(stmt).first()
             if existing:
-                _apply_task_dict_to_onsite_a(existing, d, now)
+                _apply_task_dict_to_req_a(existing, d, now)
             else:
-                row = OnsiteProblemTask()
-                _apply_task_dict_to_onsite_a(row, d, now)
+                row = ReqPoolTask()
+                _apply_task_dict_to_req_a(row, d, now)
                 session.add(row)
             upserted += 1
         session.commit()
@@ -275,9 +242,8 @@ def sync_onsite_a_table(payload: Dict[str, Any],
     finally:
         session.close()
 
-    # ── 存游标 ──
     next_token = ding.get("nextToken")
-    _set_onsite_a_cursor(next_token)
+    _set_req_pool_a_cursor(next_token)
 
     return {
         "success": True,
@@ -296,27 +262,21 @@ def sync_onsite_a_table(payload: Dict[str, Any],
 
 # ── B 表同步（TB Open API via proxy，含评论+附件）───────────────
 
-def _upsert_detail_row(sess, task: Dict[str, Any], tid: str, user_id: str,
-                       comments_json, attachments_json):
-    """单条 B 表 upsert 逻辑，供单线程和多线程共用."""
-    from base.db.orm import OnsiteProblemDetail
+def _upsert_req_detail_row(sess, task: Dict[str, Any], tid: str, user_id: str,
+                            comments_json, attachments_json):
+    """单条 B 表 upsert 逻辑."""
+    from base.db.orm import ReqPoolDetail
 
-    vehicle_model = _extract_custom_field_title(task, CF_VEHICLE_MODEL)
-    carrier_type = _extract_custom_field_title(task, CF_CARRIER_TYPE)
-    occurrence_frequency = _extract_custom_field_title(task, CF_OCCURRENCE_FREQUENCY)
-    software_version = _extract_custom_field_title(task, CF_SOFTWARE_VERSION)
-    problem_description = _extract_custom_field_title(task, CF_PROBLEM_DESCRIPTION)
-    investigation_conclusion = _extract_custom_field_title(task, CF_INVESTIGATION_CONCLUSION)
-    doc_value = _extract_custom_field_title(task, CF_DOC_VALUE)
-    investigation_doc = _extract_custom_field_title(task, CF_INVESTIGATION_DOC)
-    attachments_text = _extract_attachment_titles(task, CF_ATTACHMENTS)
-    problem_category = _extract_custom_field_title(task, CF_PROBLEM_CATEGORY)
-    problem_module = _extract_custom_field_title(task, CF_PROBLEM_MODULE)
-    guide_doc = _extract_custom_field_title(task, CF_GUIDE_DOC)
-    formal_version = _extract_custom_field_title(task, CF_FORMAL_VERSION)
-    root_cause = _extract_custom_field_title(task, CF_ROOT_CAUSE)
-    solution = _extract_custom_field_title(task, CF_SOLUTION)
-    submitter = _extract_custom_field_title(task, CF_SUBMITTER)
+    req_source = _extract_custom_field_title(task, CF_REQ_SOURCE)
+    title = _extract_custom_field_title(task, CF_TITLE)
+    branch = _extract_custom_field_title(task, CF_BRANCH)
+    release_version = _extract_custom_field_title(task, CF_RELEASE_VERSION)
+    package_version = _extract_custom_field_title(task, CF_PACKAGE_VERSION)
+    prd_doc = _extract_custom_field_title(task, CF_PRD_DOC)
+    dev_doc = _extract_custom_field_title(task, CF_DEV_DOC)
+    test_case = _extract_custom_field_title(task, CF_TEST_CASE)
+    test_report = _extract_custom_field_title(task, CF_TEST_REPORT)
+    biz_owner = _extract_custom_field_title(task, CF_BIZ_OWNER)
     cfs = task.get("customfields") or task.get("customFields")
     try:
         raw_blob = json.dumps(task, ensure_ascii=False)
@@ -324,7 +284,7 @@ def _upsert_detail_row(sess, task: Dict[str, Any], tid: str, user_id: str,
         raw_blob = None
 
     now = datetime.now(timezone.utc)
-    stmt = select(OnsiteProblemDetail).where(OnsiteProblemDetail.task_id == tid)
+    stmt = select(ReqPoolDetail).where(ReqPoolDetail.task_id == tid)
     row = sess.scalars(stmt).first()
     if row:
         row.content = str(task.get("content") or "")
@@ -338,30 +298,24 @@ def _upsert_detail_row(sess, task: Dict[str, Any], tid: str, user_id: str,
         row.priority = int(task.get("priority") or 0)
         row.progress = int(task.get("progress") or 0)
         row.note = str(task.get("note") or "")
-        row.vehicle_model = vehicle_model
-        row.carrier_type = carrier_type
-        row.occurrence_frequency = occurrence_frequency
-        row.software_version = software_version
-        row.problem_description = problem_description
-        row.investigation_conclusion = investigation_conclusion
-        row.doc_value = doc_value
-        row.investigation_doc = investigation_doc
-        row.attachments = attachments_text
-        row.problem_category = problem_category
-        row.problem_module = problem_module
-        row.guide_doc = guide_doc
-        row.formal_version = formal_version
-        row.root_cause = root_cause
-        row.solution = solution
-        row.submitter = submitter
+        row.req_source = req_source
+        row.title = title
+        row.branch = branch
+        row.release_version = release_version
+        row.package_version = package_version
+        row.prd_doc = prd_doc
+        row.dev_doc = dev_doc
+        row.test_case = test_case
+        row.test_report = test_report
+        row.biz_owner = biz_owner
         row.custom_fields_json = cfs
         row.raw_json = raw_blob
         row.comments_json = comments_json
         row.attachments_json = attachments_json
         row.fetched_at = now
     else:
-        sess.add(OnsiteProblemDetail(
-            project_id=str(task.get("projectId") or ONSITE_PROJECT_ID),
+        sess.add(ReqPoolDetail(
+            project_id=str(task.get("projectId") or REQ_POOL_PROJECT_ID),
             task_id=tid,
             query_user_id=user_id,
             content=str(task.get("content") or ""),
@@ -375,22 +329,16 @@ def _upsert_detail_row(sess, task: Dict[str, Any], tid: str, user_id: str,
             priority=int(task.get("priority") or 0),
             progress=int(task.get("progress") or 0),
             note=str(task.get("note") or ""),
-            vehicle_model=vehicle_model,
-            carrier_type=carrier_type,
-            occurrence_frequency=occurrence_frequency,
-            software_version=software_version,
-            problem_description=problem_description,
-            investigation_conclusion=investigation_conclusion,
-            doc_value=doc_value,
-            investigation_doc=investigation_doc,
-            attachments=attachments_text,
-            problem_category=problem_category,
-            problem_module=problem_module,
-            guide_doc=guide_doc,
-            formal_version=formal_version,
-            root_cause=root_cause,
-            solution=solution,
-            submitter=submitter,
+            req_source=req_source,
+            title=title,
+            branch=branch,
+            release_version=release_version,
+            package_version=package_version,
+            prd_doc=prd_doc,
+            dev_doc=dev_doc,
+            test_case=test_case,
+            test_report=test_report,
+            biz_owner=biz_owner,
             custom_fields_json=cfs,
             raw_json=raw_blob,
             comments_json=comments_json,
@@ -399,14 +347,14 @@ def _upsert_detail_row(sess, task: Dict[str, Any], tid: str, user_id: str,
         ))
 
 
-def _b_worker(task_ids: List[str], user_id: str) -> Dict[str, Any]:
+def _req_b_worker(task_ids: List[str], user_id: str) -> Dict[str, Any]:
     """单个线程的 B 表同步 worker：拉代理 API + upsert DB."""
     from base.onsite_problem.tb_proxy import fetch_task_with_comments
 
     upserted = 0
     failed = 0
     errors: List[Dict[str, Any]] = []
-    sess = OnsiteSessionLocal()
+    sess = ReqPoolSessionLocal()
     pending = 0
     try:
         for tid in task_ids:
@@ -417,7 +365,7 @@ def _b_worker(task_ids: List[str], user_id: str) -> Dict[str, Any]:
                 errors.append({"task_id": tid, "error": str(e)})
                 continue
 
-            _upsert_detail_row(
+            _upsert_req_detail_row(
                 sess, result["task"], tid, user_id,
                 result["comments_json"], result["attachments_json"],
             )
@@ -436,17 +384,12 @@ def _b_worker(task_ids: List[str], user_id: str) -> Dict[str, Any]:
     return {"upserted": upserted, "failed": failed, "errors": errors}
 
 
-def sync_onsite_b_table_via_proxy(user_id: str,
-                                  thread_count: int = 5,
-                                  skip_existing: bool = False) -> Dict[str, Any]:
+def sync_req_pool_b_table_via_proxy(user_id: str,
+                                     thread_count: int = 5,
+                                     skip_existing: bool = False) -> Dict[str, Any]:
     """
     从 A 表读取所有 task, 经 TB Open API via proxy 拉详情 + 评论 + 附件,
-    多线程 upsert B 表 onsite_problem_details（含 comments_json + attachments_json）.
-
-    Args:
-        user_id: 用户 ID
-        thread_count: 并行线程数，默认 5
-        skip_existing: True 时跳过 B 表已有记录的 task
+    多线程 upsert B 表 req_pool_details（含 comments_json + attachments_json）.
     """
     user_id = str(user_id).strip()
     if not user_id:
@@ -459,11 +402,11 @@ def sync_onsite_b_table_via_proxy(user_id: str,
     if not proxy_ok:
         return {"success": False, "error": f"TB 代理凭据无效: {proxy_msg}", "data": {}}
 
-    a_session = OnsiteSessionLocal()
+    a_session = ReqPoolSessionLocal()
     try:
         tasks = (
-            a_session.query(OnsiteProblemTask)
-            .filter(OnsiteProblemTask.project_id == ONSITE_PROJECT_ID)
+            a_session.query(ReqPoolTask)
+            .filter(ReqPoolTask.project_id == REQ_POOL_PROJECT_ID)
             .all()
         )
         all_task_ids = [t.task_id for t in tasks if t.task_id]
@@ -473,14 +416,13 @@ def sync_onsite_b_table_via_proxy(user_id: str,
     if not all_task_ids:
         return {"success": True, "data": {"task_count": 0, "upserted": 0, "failed": 0}}
 
-    # ── skip_existing: 跳过 B 表已有的 task ──
     if skip_existing:
-        b_session = OnsiteSessionLocal()
+        b_session = ReqPoolSessionLocal()
         try:
             existing_ids = set(
                 row[0] for row in
-                b_session.query(OnsiteProblemDetail.task_id)
-                .filter(OnsiteProblemDetail.task_id.in_(all_task_ids))
+                b_session.query(ReqPoolDetail.task_id)
+                .filter(ReqPoolDetail.task_id.in_(all_task_ids))
                 .all()
             )
         finally:
@@ -497,7 +439,6 @@ def sync_onsite_b_table_via_proxy(user_id: str,
             "data": {"task_count": 0, "upserted": 0, "failed": 0, "skipped": skipped},
         }
 
-    # ── 分片，多线程并行 ──
     tc = max(1, min(thread_count, len(all_task_ids)))
     slices: List[List[str]] = [[] for _ in range(tc)]
     for i, tid in enumerate(all_task_ids):
@@ -508,7 +449,7 @@ def sync_onsite_b_table_via_proxy(user_id: str,
     all_errors: List[Dict[str, Any]] = []
 
     with ThreadPoolExecutor(max_workers=tc) as pool:
-        futures = [pool.submit(_b_worker, sl, user_id) for sl in slices if sl]
+        futures = [pool.submit(_req_b_worker, sl, user_id) for sl in slices if sl]
         for fut in futures:
             r = fut.result()
             total_upserted += r.get("upserted", 0)
@@ -529,23 +470,20 @@ def sync_onsite_b_table_via_proxy(user_id: str,
 
 # ── 全量同步入口 ──────────────────────────────────────────────
 
-def sync_onsite_full(payload: Dict[str, Any]) -> Dict[str, Any]:
+def sync_req_pool_full(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
     全量同步：拉列表 → 写 A 表 → 写 B 表.
-    POST 传入: { userId }
     """
     payload = dict(payload or {})
     user_id = str(payload.get("userId") or payload.get("userid") or "").strip()
     if not user_id:
         return {"success": False, "error": "missing userId", "data": {}}
 
-    # Step 1: 拉列表 → 写 A 表
-    a_res = sync_onsite_a_table({"userId": user_id, "force_refresh": True})
+    a_res = sync_req_pool_a_table({"userId": user_id, "force_refresh": True})
     if not a_res.get("success"):
         return {"success": False, "error": a_res.get("error", "A table sync failed"), "data": a_res}
 
-    # Step 2: 从 A 表读任务 → TB Open API via proxy → 写 B 表（含评论+附件）
-    b_res = sync_onsite_b_table_via_proxy(user_id)
+    b_res = sync_req_pool_b_table_via_proxy(user_id)
 
     return {
         "success": a_res.get("success"),
