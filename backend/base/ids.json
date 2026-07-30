@@ -20,6 +20,13 @@
       "戴宇庆": { "userId": "01183307230324910099", "character": 1, "team_id": 1, "is_nav_lead": false, "is_servo_lead": false },
       "谢宇迪": { "userId": "246760621135238117", "character": 5, "team_id": 1, "is_nav_lead": false, "is_servo_lead": false }
     },
+    "算法组": {
+      "刘丰": { "userId": "0525436259671512", "character": 4, "team_id": 2, "is_nav_lead": false, "is_servo_lead": true },
+      "琚玲":   { "userId": "2464543025951000", "character": 4, "team_id": 2, "is_nav_lead": false, "is_servo_lead": false },
+      "高尔峰": { "userId": "555363695138848564", "character": 4, "team_id": 2, "is_nav_lead": false, "is_servo_lead": false },
+      "邵京": { "userId": "22665556381168535", "character": 4, "team_id": 2, "is_nav_lead": false, "is_servo_lead": false },
+      "庞涛": { "userId": "2409506118778941", "character": 4, "team_id": 2, "is_nav_lead": false, "is_servo_lead": false }
+    },
     "访客组":{
       "戴舒炜": { "userId": "012563513725212033", "character": 9, "team_id": 0, "is_nav_lead": true,  "is_servo_lead": true },
       "孙逸超": { "userId": "0133111623653734", "character": 9, "team_id": 0, "is_nav_lead": true,  "is_servo_lead": true },

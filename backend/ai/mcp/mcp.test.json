@@ -8,6 +8,10 @@
         "MCP_USER_ID": "250124013220811839",
         "MCP_USER_NAME": "何鸿颉"
       }
+    },
+    "钉钉文档": {
+      "type": "streamable-http",
+      "url": "https://mcp-gw.dingtalk.com/server/d278fc7e6564857f4ef6adeb204182f00225772bd9b9542cd8351d8e85f820ba?key=8687a5e8add755c924eb14fc625cb07d"
     }
   }
 }
