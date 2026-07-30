@@ -318,7 +318,7 @@ def check_proxy_health() -> Tuple[bool, str]:
         status = e.response.status_code if e.response is not None else "?"
         if status == 401 or status == 403:
             return False, (
-                "凭据已过期或无权限。请通过诊断终端 (diagkit) 获取新的 proxyToken 和 unionId，"
+                "凭据已过期或无权限。请联系管理员更新 proxyToken 和 unionId，"
                 "然后调用 POST /onsite/update-proxy 更新凭据。"
             )
         return False, f"代理请求失败: HTTP {status}"

@@ -10,7 +10,8 @@
       "郑世玉": { "userId": "265352386036276420", "character": 3, "team_id": 0, "is_nav_lead": false, "is_servo_lead": false },
       "陈文斌": { "userId": "312542394537803309", "character": 3, "team_id": 0, "is_nav_lead": false, "is_servo_lead": false },
       "蒲曲": { "userId": "27274739521079424", "character": 4, "team_id": 0, "is_nav_lead": false, "is_servo_lead": false },
-      "钟昌郎": { "userId": "495200335237410081", "character": 3, "team_id": 0, "is_nav_lead": false, "is_servo_lead": false }
+      "钟昌郎": { "userId": "495200335237410081", "character": 3, "team_id": 0, "is_nav_lead": false, "is_servo_lead": false },
+      "杨沅钋": { "userId": "396813112226338830", "character": 4, "team_id": 0, "is_nav_lead": false, "is_servo_lead": false }
     },
     "对接组": {
       "沈旭东": { "userId": "234765171227529303", "character": 0, "team_id": 1, "is_nav_lead": false, "is_servo_lead": true },
