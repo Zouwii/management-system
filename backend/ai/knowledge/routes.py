@@ -184,11 +184,13 @@ def _sync_workspace(client, workspace_id: str, root_id: str, limit: int = 0,
     check_modified=False: 跳过已同步的 ALIDOC 文档（不做全量对比）。
     check_modified=True:  对比 remote_modified_at，重拉已变更文档。
 
-    Returns {syncedNodes, syncedDocs, changedDocIds, failedNodes,
+    raw_json 置空 —— markdown 正文后续由 MCP 下载脚本 + fill-markdown 接口回填。
+
+    Returns {syncedNodes, syncedDocs, syncedDocIds, changedDocIds, failedNodes,
              failedDocs, skippedWorkbooks, skippedCached, skippedUnchanged}.
     """
     synced_node_ids: List[str] = []
-    synced_doc_ids: List[str] = []
+    synced_doc_ids: List[dict] = []
     changed_doc_ids: List[str] = []
     failed_nodes: List[dict] = []
     failed_docs: List[dict] = []
@@ -292,11 +294,12 @@ def _sync_workspace(client, workspace_id: str, root_id: str, limit: int = 0,
 
                     parsed = parse_document(blocks_resp["data"], "blocks")
                     content = parsed["markdown"]
-                    raw = json.dumps(blocks_resp, ensure_ascii=False)
 
                     doc_changed = _upsert_document(
-                        db, nid, workspace_id, name, content, raw, now)
-                    synced_doc_ids.append(nid)
+                        db, nid, workspace_id, name, content, "", now)
+                    synced_doc_ids.append({
+                        "node_id": nid, "title": name, "breadcrumb": bc,
+                    })
                     if doc_changed:
                         changed_doc_ids.append(nid)
 
@@ -320,6 +323,7 @@ def _sync_workspace(client, workspace_id: str, root_id: str, limit: int = 0,
     return {
         "syncedNodes": len(synced_node_ids),
         "syncedDocs": len(synced_doc_ids),
+        "syncedDocIds": synced_doc_ids,
         "changedDocIds": changed_doc_ids,
         "failedNodes": len(failed_nodes),
         "failedDocs": len(failed_docs),
@@ -501,6 +505,7 @@ def register(bp, ok, fail):
             "workspaceName": ws_name,
             "syncedNodes": result["syncedNodes"],
             "syncedDocs": result["syncedDocs"],
+            "syncedDocIds": result["syncedDocIds"],
             "failedNodes": result["failedNodes"],
             "failedDocs": result["failedDocs"],
             "skippedWorkbooks": result.get("skippedWorkbooks", 0),
@@ -565,6 +570,7 @@ def register(bp, ok, fail):
                 "name": ws_name,
                 "syncedNodes": r["syncedNodes"],
                 "syncedDocs": r["syncedDocs"],
+                "syncedDocIds": r["syncedDocIds"],
                 "failedNodes": r["failedNodes"],
                 "failedDocs": r["failedDocs"],
                 "skippedWorkbooks": r.get("skippedWorkbooks", 0),
@@ -1129,3 +1135,74 @@ def register(bp, ok, fail):
             return ok(stats)
         except Exception as e:
             return fail(str(e), code=500)
+
+    @bp.route("/ai/knowledge/documents/fill-markdown", methods=["POST"])
+    def ai_knowledge_fill_markdown():
+        """将 MCP 下载的 markdown 文件回填到 kb_documents.raw_json。
+
+        Body: { "markdown_dir": "/path/to/markdown" }
+        递归扫描目录下所有 {node_id}.md 文件（由 dingtalk-download-by-nodes.py 生成）。
+
+        行为：
+        - 递归扫描目录下所有 .md 文件
+        - 按文件名（node_id）匹配 kb_documents 记录
+        - 将 markdown 内容写入 raw_json 字段
+        - 跳过非 node_id 格式的 .md 文件（如 _download_summary.md）
+        """
+        body = request.get_json(silent=True) or {}
+        md_dir = str(body.get("markdown_dir") or "").strip()
+        if not md_dir:
+            return fail("missing markdown_dir", code=400)
+
+        from pathlib import Path
+        p = Path(md_dir)
+        if not p.is_dir():
+            return fail(f"markdown_dir not found: {md_dir}", code=404)
+
+        # 递归收集所有 .md 文件，跳过以下划线开头的摘要文件
+        md_files = sorted(
+            f for f in p.rglob("*.md")
+            if not f.name.startswith("_")
+        )
+        if not md_files:
+            return ok({"filled": 0, "skipped": 0, "errors": 0, "message": "no .md files found"})
+
+        db = KbSessionLocal()
+        now = datetime.now(timezone.utc)
+        filled = 0
+        skipped = 0
+        errors = 0
+
+        try:
+            for f in md_files:
+                node_id = f.stem  # 文件名去掉 .md 即为 node_id
+                try:
+                    content = f.read_text(encoding="utf-8")
+                except Exception as e:
+                    errors += 1
+                    print(f"[fill-markdown] read error {f}: {e}")
+                    continue
+
+                row = db.query(KbDocument).filter(KbDocument.node_id == node_id).first()
+                if not row:
+                    skipped += 1
+                    continue
+
+                row.raw_json = content
+                row.updated_at = now
+                filled += 1
+
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            return fail(str(e), code=500)
+        finally:
+            db.close()
+
+        return ok({
+            "filled": filled,
+            "skipped": skipped,
+            "errors": errors,
+            "total_files": len(md_files),
+            "markdown_dir": md_dir,
+        })
