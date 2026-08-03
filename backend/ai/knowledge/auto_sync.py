@@ -1,4 +1,4 @@
-"""Knowledge-base pipeline: metadata -> Markdown -> rechunk -> embed.
+"""Knowledge-base pipeline: metadata -> Markdown -> optional rechunk/embed.
 
 Called by:
   - Daemon thread in app.py on a schedule (default: 04:00 BJT)
@@ -26,6 +26,8 @@ from ai.knowledge.service import DingTalkKnowledgeClient, get_known_workspaces
 from base.db.engine import KbSessionLocal, SessionLocal
 
 logger = logging.getLogger(__name__)
+
+_AUTO_CHUNK_EMBED_ENV = "KB_AUTO_CHUNK_EMBED_ENABLED"
 
 _LOG_FILE = (
     Path(__file__).resolve().parent.parent.parent
@@ -62,6 +64,17 @@ def _resolve_union_id() -> str:
     finally:
         db.close()
     return ""
+
+
+def _auto_chunk_embed_enabled() -> bool:
+    """Whether sync may automatically rebuild chunks and vectors.
+
+    Disabled by default while the Markdown import path is being stabilized.
+    Explicit manual rechunk/reembed endpoints are intentionally unaffected.
+    """
+    return str(os.getenv(_AUTO_CHUNK_EMBED_ENV) or "").strip().lower() in (
+        "1", "true", "yes", "on",
+    )
 
 
 def _sync_all_workspaces(client: DingTalkKnowledgeClient,
@@ -131,7 +144,12 @@ def _sync_all_workspaces(client: DingTalkKnowledgeClient,
         total_failed += r["failedNodes"] + r["failedDocs"]
         skipped_info = ""
         if "skippedWorkbooks" in r:
-            skipped_info = f" skippedWb={r['skippedWorkbooks']} skippedCached={r.get('skippedCached',0)} skippedUnchanged={r.get('skippedUnchanged',0)}"
+            skipped_info = (
+                f" skippedWb={r['skippedWorkbooks']}"
+                f" skippedCached={r.get('skippedCached',0)}"
+                f" skippedUnchanged={r.get('skippedUnchanged',0)}"
+                f" skippedLegacy={r.get('skippedLegacy',0)}"
+            )
         print(
             f"[auto_sync] workspace={ws_name} queued={len(ws_documents)}"
             f" failed={r['failedNodes'] + r['failedDocs']}{skipped_info} elapsed={ws_elapsed:.1f}s"
@@ -225,10 +243,13 @@ def _rechunk_documents(doc_ids: List[str]) -> dict:
 
 def sync_all_and_embed(union_id: str = "", check_modified: bool = False,
                        limit: int = 0, ws_limit: int = 0) -> dict:
-    """Run the full pipeline: sync metadata -> Markdown -> rechunk -> embed.
+    """Sync metadata and Markdown, with optional automatic rechunk/embed.
 
     check_modified=False: KB增量（仅拉取未缓存的新文档）
     check_modified=True:  KB变更（对比 modified_at，重拉已变更文档）
+
+    Automatic rechunk/embed is disabled by default. Set
+    KB_AUTO_CHUNK_EMBED_ENABLED=true to restore phases 3 and 4.
     """
 
     if not union_id:
@@ -327,6 +348,51 @@ def sync_all_and_embed(union_id: str = "", check_modified: bool = False,
         return overall
 
     changed_ids = markdown_result["changedIds"]
+
+    # Markdown backfill is not stable yet. Keep downloaded content in
+    # kb_documents, but do not mutate existing chunks or vectors unless the
+    # automatic post-processing switch is explicitly enabled.
+    if not _auto_chunk_embed_enabled():
+        reason = f"disabled; set {_AUTO_CHUNK_EMBED_ENV}=true to enable"
+        overall["autoChunkEmbedEnabled"] = False
+        overall["rechunk"] = {
+            "ok": True,
+            "skipped": True,
+            "reason": reason,
+            "changedDocs": len(changed_ids),
+        }
+        overall["embed"] = {
+            "ok": True,
+            "skipped": True,
+            "reason": reason,
+        }
+        overall["ok"] = bool(markdown_result["ok"])
+        if not overall["ok"]:
+            overall["error"] = "one or more Markdown downloads failed"
+        overall["durationSec"] = round(time.time() - started, 1)
+        _log(
+            "phases 3/4 skipped — automatic rechunk and embedding are disabled; "
+            f"Markdown changed={len(changed_ids)}"
+        )
+        _sync_log({
+            "ts": int(time.time()),
+            "phase": "pipeline",
+            "event": "postprocess_skipped",
+            "reason": reason,
+            "changed_docs": len(changed_ids),
+        })
+        _sync_log({
+            "ts": int(time.time()),
+            "phase": "pipeline",
+            "event": "done",
+            "duration_sec": overall["durationSec"],
+            "phase1_elapsed": phase1_elapsed,
+            "phase2_elapsed": phase2_elapsed,
+            "postprocess_skipped": True,
+        })
+        return overall
+
+    overall["autoChunkEmbedEnabled"] = True
 
     # Phase 3: rechunk only documents whose Markdown body changed.
     _log(f"phase 3/4 — rechunking {len(changed_ids)} changed documents...")

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import unittest
 from datetime import datetime, timezone
 from types import SimpleNamespace
@@ -10,7 +11,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from ai.knowledge import auto_sync, markdown_sync, routes
-from ai.knowledge.models import KbBase, KbChunk, KbDocument
+from ai.knowledge.models import KbBase, KbChunk, KbDocument, KbNode
 
 
 class _FakeResponse:
@@ -124,6 +125,8 @@ class MarkdownDownloadTests(unittest.TestCase):
 
         self.assertTrue(session.committed)
         self.assertEqual(successful_row.content, "# New")
+        sync_meta = json.loads(successful_row.raw_json)["_management_system"]
+        self.assertEqual(sync_meta["source"], "mcp_markdown")
         self.assertEqual(failed_row.content, "old-must-survive")
         self.assertEqual(failed_row.fetch_status, "success")
         self.assertEqual(failed_row.fail_reason, "timeout")
@@ -201,6 +204,118 @@ class PipelineTests(unittest.TestCase):
         self.assertTrue(routes._has_markdown_source(markdown))
         self.assertTrue(routes._has_markdown_source(local))
 
+    def test_weekly_sync_skips_legacy_and_queues_only_managed_delta(self):
+        engine = create_engine("sqlite:///:memory:")
+        KbBase.metadata.create_all(engine)
+        session_factory = sessionmaker(bind=engine)
+        old_time = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        new_time = "2026-02-01T00:00:00Z"
+
+        db = session_factory()
+        for node_id in ("legacy", "unchanged", "changed", "retry"):
+            db.add(KbNode(
+                node_id=node_id,
+                workspace_id="ws-1",
+                parent_id="root-1",
+                name=node_id,
+                node_type="FILE",
+                category="ALIDOC",
+                has_children=False,
+                depth=1,
+                breadcrumb=node_id,
+                remote_modified_at=old_time,
+                sync_status="synced",
+                synced_at=old_time,
+                created_at=old_time,
+                updated_at=old_time,
+            ))
+        db.add_all([
+            KbDocument(
+                node_id="legacy", workspace_id="ws-1", title="legacy",
+                content="legacy body", raw_json=json.dumps({"ok": True, "data": {}}),
+                fetch_status="failed", synced_at=old_time,
+                created_at=old_time, updated_at=old_time,
+            ),
+            KbDocument(
+                node_id="unchanged", workspace_id="ws-1", title="unchanged",
+                content="# unchanged",
+                raw_json=json.dumps({
+                    "markdown": "# unchanged",
+                    "_management_system": {
+                        "source": "mcp_markdown",
+                        "contentRemoteModifiedTime": old_time.isoformat(),
+                    },
+                }),
+                fetch_status="success", synced_at=old_time,
+                created_at=old_time, updated_at=old_time,
+            ),
+            KbDocument(
+                node_id="changed", workspace_id="ws-1", title="changed",
+                content="# old",
+                raw_json=json.dumps({
+                    "markdown": "# old",
+                    "_management_system": {
+                        "source": "mcp_markdown",
+                        "contentRemoteModifiedTime": old_time.isoformat(),
+                    },
+                }),
+                fetch_status="success", synced_at=old_time,
+                created_at=old_time, updated_at=old_time,
+            ),
+            KbDocument(
+                node_id="retry", workspace_id="ws-1", title="retry",
+                content="",
+                raw_json=json.dumps({
+                    "_management_system": {"source": "mcp_pending"},
+                }),
+                fetch_status="failed", synced_at=old_time,
+                created_at=old_time, updated_at=old_time,
+            ),
+        ])
+        db.commit()
+        db.close()
+
+        nodes = []
+        for node_id in ("legacy", "unchanged", "changed", "retry", "new"):
+            modified = old_time.isoformat()
+            if node_id == "changed":
+                modified = new_time
+            nodes.append({
+                "nodeId": node_id,
+                "type": "FILE",
+                "name": node_id,
+                "category": "ALIDOC",
+                "hasChildren": False,
+                "modifiedTime": modified,
+            })
+        client = SimpleNamespace(list_nodes=lambda _workspace, _parent: {
+            "ok": True,
+            "data": nodes,
+        })
+
+        with patch.object(routes, "KbSessionLocal", session_factory):
+            result = routes._sync_workspace(
+                client, "ws-1", "root-1", check_modified=True
+            )
+
+        queued = {item["node_id"] for item in result["syncedDocIds"]}
+        self.assertEqual(queued, {"changed", "retry", "new"})
+        self.assertEqual(result["skippedLegacy"], 1)
+        self.assertEqual(result["skippedUnchanged"], 1)
+
+        db = session_factory()
+        try:
+            legacy = db.query(KbDocument).filter_by(node_id="legacy").one()
+            new = db.query(KbDocument).filter_by(node_id="new").one()
+            self.assertEqual(legacy.fetch_status, "success")
+            self.assertEqual(
+                json.loads(new.raw_json)["_management_system"]["source"],
+                "mcp_pending",
+            )
+        finally:
+            db.close()
+            engine.dispose()
+
     def test_sync_result_contract_uses_new_schema_fields(self):
         client = SimpleNamespace(list_workspaces=lambda: {
             "ok": True,
@@ -275,11 +390,61 @@ class PipelineTests(unittest.TestCase):
             db.close()
             engine.dispose()
 
-    def test_full_pipeline_runs_markdown_before_rechunk(self):
+    def test_full_pipeline_skips_rechunk_and_embed_by_default(self):
         documents = [{"node_id": "node-1", "title": "Demo"}]
         calls = []
 
-        with patch.object(auto_sync, "DingTalkKnowledgeClient"), patch.object(
+        with patch.dict(os.environ, {}, clear=True), patch.object(
+            auto_sync, "DingTalkKnowledgeClient"
+        ), patch.object(
+            auto_sync,
+            "_sync_all_workspaces",
+            return_value={
+                "ok": True,
+                "totalSynced": 1,
+                "totalFailed": 0,
+                "documents": documents,
+                "workspaces": [],
+            },
+        ), patch.object(
+            auto_sync,
+            "download_markdown_documents",
+            side_effect=lambda docs: calls.append("download") or {
+                "ok": True,
+                "downloaded": [{**documents[0], "markdown": "# Demo"}],
+                "failed": [],
+            },
+        ), patch.object(
+            auto_sync,
+            "persist_downloaded_markdown",
+            side_effect=lambda result: calls.append("persist") or {
+                "ok": True,
+                "changedIds": ["node-1"],
+                "changed": 1,
+                "unchanged": 0,
+                "failed": 0,
+            },
+        ), patch.object(auto_sync, "_rechunk_documents") as rechunk, patch.object(
+            auto_sync, "delete_vectors"
+        ) as delete_vectors_mock, patch.object(auto_sync, "embed_chunks") as embed:
+            result = auto_sync.sync_all_and_embed(union_id="union-1")
+
+        self.assertTrue(result["ok"])
+        self.assertFalse(result["autoChunkEmbedEnabled"])
+        self.assertTrue(result["rechunk"]["skipped"])
+        self.assertTrue(result["embed"]["skipped"])
+        self.assertEqual(calls, ["download", "persist"])
+        rechunk.assert_not_called()
+        delete_vectors_mock.assert_not_called()
+        embed.assert_not_called()
+
+    def test_full_pipeline_can_enable_rechunk_and_embed(self):
+        documents = [{"node_id": "node-1", "title": "Demo"}]
+        calls = []
+
+        with patch.dict(
+            os.environ, {"KB_AUTO_CHUNK_EMBED_ENABLED": "true"}, clear=True
+        ), patch.object(auto_sync, "DingTalkKnowledgeClient"), patch.object(
             auto_sync,
             "_sync_all_workspaces",
             return_value={
@@ -331,6 +496,7 @@ class PipelineTests(unittest.TestCase):
             result = auto_sync.sync_all_and_embed(union_id="union-1")
 
         self.assertTrue(result["ok"])
+        self.assertTrue(result["autoChunkEmbedEnabled"])
         self.assertEqual(
             calls,
             ["download", "persist", "rechunk", "delete_vectors", "embed"],

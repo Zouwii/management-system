@@ -183,10 +183,48 @@ def _has_markdown_source(document: KbDocument) -> bool:
         payload = json.loads(document.raw_json or "{}")
     except (TypeError, ValueError):
         return False
-    return isinstance(payload, dict) and (
+    if not isinstance(payload, dict):
+        return False
+    sync_meta = payload.get("_management_system") or {}
+    sync_source = sync_meta.get("source") if isinstance(sync_meta, dict) else ""
+    return (
         isinstance(payload.get("markdown"), str)
         or payload.get("source") == "local_markdown"
+        or sync_source == "mcp_markdown"
     )
+
+
+def _is_markdown_managed(document: KbDocument) -> bool:
+    """Whether weekly sync owns downloads and retries for this document.
+
+    Legacy block-API rows deliberately remain unmanaged until the separately
+    downloaded Markdown is imported.  This prevents one deployment from
+    turning the whole historical corpus into an MCP download queue.
+    """
+    if _has_markdown_source(document):
+        return True
+    try:
+        payload = json.loads(document.raw_json or "{}")
+    except (TypeError, ValueError):
+        return False
+    if not isinstance(payload, dict):
+        return False
+    sync_meta = payload.get("_management_system") or {}
+    return isinstance(sync_meta, dict) and sync_meta.get("source") == "mcp_pending"
+
+
+def _managed_content_remote_time(document: KbDocument):
+    """Return the remote version whose Markdown was downloaded successfully."""
+    try:
+        payload = json.loads(document.raw_json or "{}")
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    sync_meta = payload.get("_management_system") or {}
+    if not isinstance(sync_meta, dict):
+        return None
+    return _parse_dingtalk_time(sync_meta.get("contentRemoteModifiedTime") or "")
 
 
 def _remote_not_newer(previous, current) -> bool:
@@ -219,6 +257,7 @@ def _sync_workspace(client, workspace_id: str, root_id: str, limit: int = 0,
     skipped_workbooks: int = 0
     skipped_cached: int = 0
     skipped_unchanged: int = 0
+    skipped_legacy: int = 0
 
     db = KbSessionLocal()
     now = datetime.now(timezone.utc)
@@ -249,7 +288,7 @@ def _sync_workspace(client, workspace_id: str, root_id: str, limit: int = 0,
     BATCH_SIZE = 100  # 每处理 100 个节点 commit 一次
 
     def _walk(parent_id: str, breadcrumb: str, depth: int):
-        nonlocal skipped_workbooks, skipped_cached, skipped_unchanged, ws_name
+        nonlocal skipped_workbooks, skipped_cached, skipped_unchanged, skipped_legacy, ws_name
 
         if limit and len(synced_doc_ids) >= limit:
             return
@@ -298,17 +337,31 @@ def _sync_workspace(client, workspace_id: str, root_id: str, limit: int = 0,
                     skipped_workbooks += 1
                     continue
 
-                # 增量跳过逻辑
+                cached = cached_docs.get(nid)
+
+                # 旧 blocks 接口留下的记录不由每周 Markdown 小同步批量升级。
+                # 它们后续通过单独的 Markdown 回填流程切换为托管状态。
+                if cached and not _is_markdown_managed(cached["row"]):
+                    if cached["content"] and cached["row"].fetch_status == "failed":
+                        # 2026-08-03 的旧失败处理曾把可用正文误标为 failed。
+                        # 恢复可用状态，但保留来源为 legacy，仍不加入下载队列。
+                        cached["row"].fetch_status = "success"
+                    skipped_legacy += 1
+                    continue
+
+                # 新 Markdown 流程管理的文档才参与缓存、变更和失败重试。
                 if not check_modified:
-                    cached = cached_docs.get(nid)
                     if cached and cached["content"] and cached["ready"]:
                         skipped_cached += 1
                         continue
 
                 if check_modified:
-                    cached = cached_docs.get(nid)
                     if cached and cached["content"] and cached["ready"]:
-                        last_rmt = cached.get("remote_modified_at")
+                        last_rmt = _managed_content_remote_time(cached["row"])
+                        if last_rmt is None:
+                            # 兼容已经通过 fill-markdown 回填、但尚未记录成功
+                            # 远端版本的记录；以回填时的 nodes 快照作为基线。
+                            last_rmt = cached.get("remote_modified_at")
                         cur_rmt = _parse_dingtalk_time(rmt)
                         if _remote_not_newer(last_rmt, cur_rmt):
                             skipped_unchanged += 1
@@ -322,7 +375,9 @@ def _sync_workspace(client, workspace_id: str, root_id: str, limit: int = 0,
                         workspace_id=workspace_id,
                         title=name,
                         content="",
-                        raw_json="",
+                        raw_json=json.dumps({
+                            "_management_system": {"source": "mcp_pending"}
+                        }, ensure_ascii=False),
                         fetch_status="pending",
                         synced_at=now,
                         created_at=now,
@@ -344,6 +399,7 @@ def _sync_workspace(client, workspace_id: str, root_id: str, limit: int = 0,
                     "workspace_id": workspace_id,
                     "title": name,
                     "breadcrumb": bc,
+                    "remote_modified_at": rmt,
                 })
 
     # 写入 root 节点
@@ -369,6 +425,7 @@ def _sync_workspace(client, workspace_id: str, root_id: str, limit: int = 0,
         "skippedWorkbooks": skipped_workbooks,
         "skippedCached": skipped_cached,
         "skippedUnchanged": skipped_unchanged,
+        "skippedLegacy": skipped_legacy,
         "errors": (failed_nodes + failed_docs)[:20],
     }
 
@@ -571,6 +628,7 @@ def register(bp, ok, fail):
             "skippedWorkbooks": result.get("skippedWorkbooks", 0),
             "skippedCached": result.get("skippedCached", 0),
             "skippedUnchanged": result.get("skippedUnchanged", 0),
+            "skippedLegacy": result.get("skippedLegacy", 0),
             "errors": result["errors"],
             "markdown": markdown_result,
             "durationSec": round(finished - started, 1),
@@ -619,6 +677,7 @@ def register(bp, ok, fail):
         total_skipped_wb = 0
         total_skipped_cached = 0
         total_skipped_unchanged = 0
+        total_skipped_legacy = 0
         queued_documents: List[dict] = []
         results: List[dict] = []
 
@@ -639,6 +698,7 @@ def register(bp, ok, fail):
                 "skippedWorkbooks": r.get("skippedWorkbooks", 0),
                 "skippedCached": r.get("skippedCached", 0),
                 "skippedUnchanged": r.get("skippedUnchanged", 0),
+                "skippedLegacy": r.get("skippedLegacy", 0),
                 "errors": r["errors"],
                 "durationSec": ws_elapsed,
             })
@@ -648,6 +708,7 @@ def register(bp, ok, fail):
             total_skipped_wb += r.get("skippedWorkbooks", 0)
             total_skipped_cached += r.get("skippedCached", 0)
             total_skipped_unchanged += r.get("skippedUnchanged", 0)
+            total_skipped_legacy += r.get("skippedLegacy", 0)
 
         from ai.knowledge.markdown_sync import (
             download_markdown_documents,
@@ -671,6 +732,7 @@ def register(bp, ok, fail):
             "skippedWorkbooks": total_skipped_wb,
             "skippedCached": total_skipped_cached,
             "skippedUnchanged": total_skipped_unchanged,
+            "skippedLegacy": total_skipped_legacy,
             "workspaces": results,
             "markdown": markdown_result,
             "durationSec": round(finished - started, 1),
@@ -678,11 +740,14 @@ def register(bp, ok, fail):
 
     @bp.route("/ai/knowledge/sync-and-embedding", methods=["POST"])
     def ai_knowledge_sync_and_embedding():
-        """Full pipeline: metadata -> Markdown -> rechunk -> embed.
+        """Sync metadata and Markdown; rechunk/embed is feature-gated.
 
         Body: { "check_modified"?: true/false, "limit"?: N, "ws_limit"?: N }
         check_modified=false: KB增量（仅拉取新文档）
         check_modified=true:  KB变更（对比 modified_at 重拉变更文档）
+
+        Automatic rechunk/embed is disabled unless
+        KB_AUTO_CHUNK_EMBED_ENABLED=true. Manual endpoints remain available.
         """
         union_id = _current_union_id()
         if not union_id:
@@ -1271,8 +1336,19 @@ def register(bp, ok, fail):
 
                 if row.content != content:
                     row.content = content
+                node = db.query(KbNode).filter(KbNode.node_id == node_id).first()
+                remote_modified_at = ""
+                if node is not None and node.remote_modified_at is not None:
+                    remote_modified_at = node.remote_modified_at.isoformat()
                 row.raw_json = json.dumps(
-                    {"source": "local_markdown"}, ensure_ascii=False
+                    {
+                        "source": "local_markdown",
+                        "_management_system": {
+                            "source": "local_markdown",
+                            "contentRemoteModifiedTime": remote_modified_at,
+                        },
+                    },
+                    ensure_ascii=False,
                 )
                 row.fetch_status = "success"
                 row.fail_reason = ""

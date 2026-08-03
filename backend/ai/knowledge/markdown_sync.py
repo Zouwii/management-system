@@ -152,9 +152,14 @@ def persist_downloaded_markdown(download_result: dict) -> dict:
             else:
                 row.content = markdown
                 changed_ids.append(node_id)
-            row.raw_json = json.dumps(
-                item.get("source_payload") or {}, ensure_ascii=False
-            )
+            source_payload = dict(item.get("source_payload") or {})
+            source_payload["_management_system"] = {
+                "source": "mcp_markdown",
+                "contentRemoteModifiedTime": str(
+                    item.get("remote_modified_at") or ""
+                ),
+            }
+            row.raw_json = json.dumps(source_payload, ensure_ascii=False)
             row.fetch_status = "success"
             row.fail_reason = ""
             row.synced_at = now
