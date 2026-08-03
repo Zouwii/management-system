@@ -1,20 +1,25 @@
-"""Full knowledge-base update pipeline: sync -> rechunk -> embed.
+"""Knowledge-base pipeline: metadata -> Markdown -> rechunk -> embed.
 
 Called by:
   - Daemon thread in app.py on a schedule (default: 04:00 BJT)
-  - HTTP endpoint POST /ai/knowledge/full-update
+  - HTTP endpoint POST /ai/knowledge/sync-and-embedding
 """
 
 from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 from pathlib import Path
 from typing import Any, Dict, List
 
 from ai.knowledge.chunker import chunk_document
-from ai.knowledge.embedder import embed_chunks
+from ai.knowledge.embedder import delete_vectors, embed_chunks
+from ai.knowledge.markdown_sync import (
+    download_markdown_documents,
+    persist_downloaded_markdown,
+)
 from ai.knowledge.models import KbDocument, KbChunk
 from ai.knowledge.routes import _sync_workspace
 from ai.knowledge.service import DingTalkKnowledgeClient, get_known_workspaces
@@ -60,8 +65,10 @@ def _resolve_union_id() -> str:
 
 
 def _sync_all_workspaces(client: DingTalkKnowledgeClient,
-                        check_modified: bool = False) -> dict:
-    """Sync all known workspaces. Returns aggregated results with changedIds."""
+                        check_modified: bool = False,
+                        limit: int = 0,
+                        ws_limit: int = 0) -> dict:
+    """Sync all known workspaces and return documents queued for Markdown."""
     known = get_known_workspaces()
 
     ws_list = client.list_workspaces()
@@ -81,11 +88,12 @@ def _sync_all_workspaces(client: DingTalkKnowledgeClient,
             )
 
     workspaces_to_sync.sort(key=lambda x: known.get(x["workspaceId"], 999))
+    if ws_limit:
+        workspaces_to_sync = workspaces_to_sync[:ws_limit]
 
     total_synced = 0
-    total_changed = 0
     total_failed = 0
-    all_changed_ids: List[str] = []
+    documents: List[dict] = []
     results: List[dict] = []
 
     for ws in workspaces_to_sync:
@@ -97,30 +105,36 @@ def _sync_all_workspaces(client: DingTalkKnowledgeClient,
             continue
 
         ws_started = time.time()
-        r = _sync_workspace(client, ws_id, root_id, check_modified=check_modified)
+        r = _sync_workspace(
+            client,
+            ws_id,
+            root_id,
+            limit=limit,
+            check_modified=check_modified,
+        )
         ws_elapsed = round(time.time() - ws_started, 1)
-        ws_changed = r.get("syncedIds", [])
-        all_changed_ids.extend(ws_changed)
+        ws_documents = r.get("syncedDocIds", [])
+        documents.extend(ws_documents)
         results.append(
             {
                 "workspaceId": ws_id,
                 "name": ws_name,
-                "syncedCount": r["syncedCount"],
-                "changedCount": r.get("changedCount", 0),
-                "failedCount": r["failedCount"],
+                "syncedNodes": r["syncedNodes"],
+                "queuedDocs": len(ws_documents),
+                "failedNodes": r["failedNodes"],
+                "failedDocs": r["failedDocs"],
                 "errors": r["errors"],
                 "durationSec": ws_elapsed,
             }
         )
-        total_synced += r["syncedCount"]
-        total_changed += r.get("changedCount", 0)
-        total_failed += r["failedCount"]
+        total_synced += len(ws_documents)
+        total_failed += r["failedNodes"] + r["failedDocs"]
         skipped_info = ""
         if "skippedWorkbooks" in r:
             skipped_info = f" skippedWb={r['skippedWorkbooks']} skippedCached={r.get('skippedCached',0)} skippedUnchanged={r.get('skippedUnchanged',0)}"
         print(
-            f"[auto_sync] workspace={ws_name} synced={r['syncedCount']} changed={r.get('changedCount', 0)}"
-            f" failed={r['failedCount']}{skipped_info} elapsed={ws_elapsed:.1f}s"
+            f"[auto_sync] workspace={ws_name} queued={len(ws_documents)}"
+            f" failed={r['failedNodes'] + r['failedDocs']}{skipped_info} elapsed={ws_elapsed:.1f}s"
         )
         # Log first few errors for debugging
         ws_errors = r.get("errors", [])
@@ -131,9 +145,8 @@ def _sync_all_workspaces(client: DingTalkKnowledgeClient,
     return {
         "ok": True,
         "totalSynced": total_synced,
-        "totalChanged": total_changed,
         "totalFailed": total_failed,
-        "changedIds": all_changed_ids,
+        "documents": documents,
         "workspaces": results,
     }
 
@@ -155,7 +168,7 @@ def _rechunk_documents(doc_ids: List[str]) -> dict:
     try:
         total_chunks = 0
         docs = db.query(KbDocument).filter(
-            KbDocument.doc_id.in_(doc_ids),
+            KbDocument.node_id.in_(doc_ids),
             KbDocument.content != "",
         ).all()
 
@@ -164,9 +177,16 @@ def _rechunk_documents(doc_ids: List[str]) -> dict:
             "doc_count": len(docs), "doc_ids_count": len(doc_ids),
         })
 
+        removed_chunk_ids: List[int] = []
         for doc in docs:
-            db.query(KbChunk).filter(KbChunk.doc_id == doc.doc_id).delete()
-            chunks = chunk_document(doc.doc_id, doc.title, doc.content, doc.node_type)
+            removed_chunk_ids.extend(
+                row[0]
+                for row in db.query(KbChunk.id).filter(
+                    KbChunk.doc_id == doc.node_id
+                ).all()
+            )
+            db.query(KbChunk).filter(KbChunk.doc_id == doc.node_id).delete()
+            chunks = chunk_document(doc.node_id, doc.title, doc.content, "FILE")
             for c in chunks:
                 db.add(
                     KbChunk(
@@ -185,7 +205,12 @@ def _rechunk_documents(doc_ids: List[str]) -> dict:
             "doc_count": len(docs), "total_chunks": total_chunks,
         })
 
-        return {"ok": True, "chunkedDocs": len(docs), "totalChunks": total_chunks}
+        return {
+            "ok": True,
+            "chunkedDocs": len(docs),
+            "totalChunks": total_chunks,
+            "removedChunkIds": removed_chunk_ids,
+        }
     except Exception as e:
         db.rollback()
         logger.exception("auto_sync: rechunk failed")
@@ -198,8 +223,9 @@ def _rechunk_documents(doc_ids: List[str]) -> dict:
         db.close()
 
 
-def sync_all_and_embed(union_id: str = "", check_modified: bool = False) -> dict:
-    """Run the full pipeline: sync all KBs -> rechunk -> embed.
+def sync_all_and_embed(union_id: str = "", check_modified: bool = False,
+                       limit: int = 0, ws_limit: int = 0) -> dict:
+    """Run the full pipeline: sync metadata -> Markdown -> rechunk -> embed.
 
     check_modified=False: KB增量（仅拉取未缓存的新文档）
     check_modified=True:  KB变更（对比 modified_at，重拉已变更文档）
@@ -229,15 +255,20 @@ def sync_all_and_embed(union_id: str = "", check_modified: bool = False) -> dict
         logger.info(line)
         print(line, flush=True)
 
-    # Phase 1: sync all workspaces
-    _log("phase 1/3 — syncing all knowledge bases...")
+    # Phase 1: sync directory metadata and collect documents requiring refresh.
+    _log("phase 1/4 — syncing knowledge-base metadata...")
     _sync_log({
         "ts": int(time.time()), "phase": "pipeline", "event": "phase1_start",
         "phase": "sync",
     })
     client = DingTalkKnowledgeClient(union_id)
     phase1_start = time.time()
-    sync_result = _sync_all_workspaces(client, check_modified=check_modified)
+    sync_result = _sync_all_workspaces(
+        client,
+        check_modified=check_modified,
+        limit=max(0, int(limit or 0)),
+        ws_limit=max(0, int(ws_limit or 0)),
+    )
     overall["sync"] = sync_result
     phase1_elapsed = round(time.time() - phase1_start, 1)
     if not sync_result.get("ok"):
@@ -251,48 +282,84 @@ def sync_all_and_embed(union_id: str = "", check_modified: bool = False) -> dict
         })
         return overall
 
-    changed_ids = sync_result.get("changedIds", [])
+    documents = sync_result.get("documents", [])
     _log(
         f"phase 1 done ({phase1_elapsed}s) — "
-        f"total={sync_result['totalSynced']} changed={len(changed_ids)} failed={sync_result['totalFailed']}"
+        f"queued={len(documents)} failed={sync_result['totalFailed']}"
     )
     _sync_log({
         "ts": int(time.time()), "phase": "pipeline", "event": "phase1_done",
         "total_synced": sync_result["totalSynced"],
-        "changed_count": len(changed_ids),
+        "queued_count": len(documents),
         "failed": sync_result["totalFailed"],
         "elapsed": phase1_elapsed,
     })
 
-    # Phase 2: rechunk only the documents that actually changed
-    _log(f"phase 2/3 — rechunking {len(changed_ids)} changed documents...")
+    # Phase 2: fetch Markdown and only then replace document content.
+    _log(f"phase 2/4 — downloading {len(documents)} Markdown documents...")
     _sync_log({
         "ts": int(time.time()), "phase": "pipeline", "event": "phase2_start",
-        "phase": "rechunk", "changed_ids_count": len(changed_ids),
+        "phase": "markdown", "document_count": len(documents),
     })
     phase2_start = time.time()
-    rechunk_result = _rechunk_documents(changed_ids)
-    overall["rechunk"] = rechunk_result
+    download_result = download_markdown_documents(documents)
+    markdown_result = persist_downloaded_markdown(download_result)
+    overall["markdown"] = markdown_result
     phase2_elapsed = round(time.time() - phase2_start, 1)
     _log(
         f"phase 2 done ({phase2_elapsed}s) — "
-        f"docs={rechunk_result.get('chunkedDocs', 0)} chunks={rechunk_result.get('totalChunks', 0)}"
+        f"changed={markdown_result['changed']} unchanged={markdown_result['unchanged']} "
+        f"failed={markdown_result['failed']}"
     )
     _sync_log({
         "ts": int(time.time()), "phase": "pipeline", "event": "phase2_done",
-        "docs": rechunk_result.get("chunkedDocs", 0),
-        "chunks": rechunk_result.get("totalChunks", 0),
+        "changed": markdown_result["changed"],
+        "unchanged": markdown_result["unchanged"],
+        "failed": markdown_result["failed"],
         "elapsed": phase2_elapsed,
-        "ok": rechunk_result.get("ok", True),
+        "ok": markdown_result["ok"],
     })
 
-    # Phase 3: embed all chunks (idempotent — skips already-embedded)
-    _log("phase 3/3 — embedding all chunks...")
+    if documents and not download_result.get("downloaded"):
+        overall["ok"] = False
+        overall["error"] = download_result.get("error") or "all Markdown downloads failed"
+        overall["durationSec"] = round(time.time() - started, 1)
+        return overall
+
+    changed_ids = markdown_result["changedIds"]
+
+    # Phase 3: rechunk only documents whose Markdown body changed.
+    _log(f"phase 3/4 — rechunking {len(changed_ids)} changed documents...")
+    phase3_start = time.time()
+    rechunk_result = _rechunk_documents(changed_ids)
+    overall["rechunk"] = rechunk_result
+    phase3_elapsed = round(time.time() - phase3_start, 1)
+    if not rechunk_result.get("ok"):
+        overall["ok"] = False
+        overall["error"] = rechunk_result.get("error", "rechunk failed")
+        overall["durationSec"] = round(time.time() - started, 1)
+        return overall
+    try:
+        removed_vector_count = delete_vectors(rechunk_result.get("removedChunkIds", []))
+    except Exception as exc:
+        logger.exception("auto_sync: deleting stale vectors failed")
+        overall["ok"] = False
+        overall["error"] = f"deleting stale vectors failed: {exc}"
+        overall["durationSec"] = round(time.time() - started, 1)
+        return overall
+    overall["rechunk"]["removedVectors"] = removed_vector_count
+    _log(
+        f"phase 3 done ({phase3_elapsed}s) — "
+        f"docs={rechunk_result.get('chunkedDocs', 0)} chunks={rechunk_result.get('totalChunks', 0)}"
+    )
+
+    # Phase 4: embed all chunks (idempotent — skips already-embedded)
+    _log("phase 4/4 — embedding all chunks...")
     _sync_log({
-        "ts": int(time.time()), "phase": "pipeline", "event": "phase3_start",
+        "ts": int(time.time()), "phase": "pipeline", "event": "phase4_start",
         "phase": "embed",
     })
-    phase3_start = time.time()
+    phase4_start = time.time()
     try:
         embed_result = embed_chunks(limit=0)
         overall["embed"] = {
@@ -302,37 +369,51 @@ def sync_all_and_embed(union_id: str = "", check_modified: bool = False) -> dict
             "skipped": embed_result.get("skipped", 0),
             "errors": embed_result.get("errors", 0),
         }
-        phase3_elapsed = round(time.time() - phase3_start, 1)
+        phase4_elapsed = round(time.time() - phase4_start, 1)
         _log(
-            f"phase 3 done ({phase3_elapsed}s) — "
+            f"phase 4 done ({phase4_elapsed}s) — "
             f"total={embed_result.get('chunk_total', 0)} new={embed_result.get('embedded', 0)} "
             f"skipped={embed_result.get('skipped', 0)} errors={embed_result.get('errors', 0)}"
         )
         _sync_log({
-            "ts": int(time.time()), "phase": "pipeline", "event": "phase3_done",
+            "ts": int(time.time()), "phase": "pipeline", "event": "phase4_done",
             "chunk_total": embed_result.get("chunk_total", 0),
             "embedded": embed_result.get("embedded", 0),
             "skipped": embed_result.get("skipped", 0),
             "errors": embed_result.get("errors", 0),
-            "elapsed": phase3_elapsed,
+            "elapsed": phase4_elapsed,
         })
     except Exception as e:
         logger.exception("auto_sync: embed phase failed")
         overall["embed"] = {"ok": False, "error": str(e)}
+        overall["ok"] = False
+        overall["error"] = f"embedding failed: {e}"
         _sync_log({
-            "ts": int(time.time()), "phase": "pipeline", "event": "phase3_error",
+            "ts": int(time.time()), "phase": "pipeline", "event": "phase4_error",
             "error": str(e),
         })
 
-    overall["ok"] = True
+    if "ok" not in overall:
+        embedding_ok = not bool(overall.get("embed", {}).get("errors"))
+        overall["ok"] = bool(markdown_result["ok"] and embedding_ok)
+        if not overall["ok"]:
+            overall["error"] = (
+                "one or more Markdown downloads failed"
+                if not markdown_result["ok"]
+                else "one or more embedding batches failed"
+            )
     overall["durationSec"] = round(time.time() - started, 1)
-    _log(f"pipeline done — total {overall['durationSec']}s (sync={phase1_elapsed}s rechunk={phase2_elapsed}s)")
+    _log(
+        f"pipeline done — total {overall['durationSec']}s "
+        f"(sync={phase1_elapsed}s markdown={phase2_elapsed}s rechunk={phase3_elapsed}s)"
+    )
 
     _sync_log({
         "ts": int(time.time()), "phase": "pipeline", "event": "done",
         "duration_sec": overall["durationSec"],
         "phase1_elapsed": phase1_elapsed,
         "phase2_elapsed": phase2_elapsed,
+        "phase3_elapsed": phase3_elapsed,
     })
 
     return overall
@@ -340,13 +421,18 @@ def sync_all_and_embed(union_id: str = "", check_modified: bool = False) -> dict
 
 # ---------------------------------------------------------------------------
 # 便捷入口：四个主体函数
-#   kb_incremental_sync  — KB小更新：仅拉取新文档
+#   kb_incremental_sync  — KB小更新：仅拉取新增及 modifiedTime 变更文档
 #   kb_full_sync         — KB大更新：对比 modified_at，重拉已变更文档
 # ---------------------------------------------------------------------------
 
 def kb_incremental_sync() -> dict:
-    """KB小更新：仅拉取未缓存的新文档（check_modified=False）。"""
-    return sync_all_and_embed(check_modified=False)
+    """KB小更新：只下载新增或 modifiedTime 变新的 Markdown。"""
+    if not str(os.getenv("DINGTALK_KB_MCP_URL") or "").strip():
+        return {
+            "ok": False,
+            "error": "missing DINGTALK_KB_MCP_URL; incremental sync aborted before metadata scan",
+        }
+    return sync_all_and_embed(check_modified=True)
 
 
 def kb_full_sync() -> dict:

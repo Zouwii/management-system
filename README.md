@@ -150,6 +150,7 @@ http://localhost:5173/login
 - `DINGTALK_APPKEY` / `DINGTALK_APPSECRET`
 - `DINGTALK_CORP_ID`（可选；也可放在 `backend/config.json` 的 `corpId`）
 - `DINGTALK_REDIRECT_URI`（例如 `http://localhost:5001/api/bt/auth/callback`）
+- `DINGTALK_KB_MCP_URL`（RAG 同步下载 Markdown 所需的钉钉 MCP 地址）
 - `SECRET_KEY`
 - `SESSION_COOKIE_SAMESITE`、`SESSION_COOKIE_SECURE`
 - `SESSION_EXPIRE_SECONDS`

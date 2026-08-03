@@ -54,7 +54,7 @@ def _search_mysql(db, query: str, top_k: int, workspace_id: Optional[str]) -> li
             "SELECT c.id, c.doc_id, d.title, c.chunk_index, c.content, "
             "MATCH(c.content) AGAINST(:kw IN NATURAL LANGUAGE MODE) AS score, "
             "c.token_count, d.workspace_id "
-            "FROM kb_chunks c JOIN kb_documents d ON c.doc_id = d.doc_id "
+            "FROM kb_chunks c JOIN kb_documents d ON c.doc_id = d.node_id "
             "WHERE MATCH(c.content) AGAINST(:kw IN NATURAL LANGUAGE MODE) "
             "AND d.workspace_id = :ws_id "
             "ORDER BY score DESC LIMIT :limit"
@@ -65,7 +65,7 @@ def _search_mysql(db, query: str, top_k: int, workspace_id: Optional[str]) -> li
             "SELECT c.id, c.doc_id, d.title, c.chunk_index, c.content, "
             "MATCH(c.content) AGAINST(:kw IN NATURAL LANGUAGE MODE) AS score, "
             "c.token_count, d.workspace_id "
-            "FROM kb_chunks c JOIN kb_documents d ON c.doc_id = d.doc_id "
+            "FROM kb_chunks c JOIN kb_documents d ON c.doc_id = d.node_id "
             "WHERE MATCH(c.content) AGAINST(:kw IN NATURAL LANGUAGE MODE) "
             "ORDER BY score DESC LIMIT :limit"
         )
@@ -81,7 +81,7 @@ def _search_sqlite(db, query: str, top_k: int, workspace_id: Optional[str]) -> l
             "SELECT c.id, c.doc_id, d.title, c.chunk_index, c.content, "
             "bm25(kb_chunks_fts) AS score, c.token_count, d.workspace_id "
             "FROM kb_chunks c "
-            "JOIN kb_documents d ON c.doc_id = d.doc_id "
+            "JOIN kb_documents d ON c.doc_id = d.node_id "
             "JOIN kb_chunks_fts fts ON c.id = fts.id "
             "WHERE kb_chunks_fts MATCH :kw AND d.workspace_id = :ws_id "
             "ORDER BY score LIMIT :limit"
@@ -92,7 +92,7 @@ def _search_sqlite(db, query: str, top_k: int, workspace_id: Optional[str]) -> l
             "SELECT c.id, c.doc_id, d.title, c.chunk_index, c.content, "
             "bm25(kb_chunks_fts) AS score, c.token_count, d.workspace_id "
             "FROM kb_chunks c "
-            "JOIN kb_documents d ON c.doc_id = d.doc_id "
+            "JOIN kb_documents d ON c.doc_id = d.node_id "
             "JOIN kb_chunks_fts fts ON c.id = fts.id "
             "WHERE kb_chunks_fts MATCH :kw "
             "ORDER BY score LIMIT :limit"
@@ -147,7 +147,7 @@ def search_vector(
             mysql_sql = text(
                 f"SELECT c.id, c.doc_id, d.title, c.chunk_index, c.content, "
                 f"c.token_count, d.workspace_id "
-                f"FROM kb_chunks c JOIN kb_documents d ON c.doc_id = d.doc_id "
+                f"FROM kb_chunks c JOIN kb_documents d ON c.doc_id = d.node_id "
                 f"WHERE c.id IN ({placeholders}) AND d.workspace_id = :ws_id"
             )
             mrows = kb.execute(
@@ -159,7 +159,7 @@ def search_vector(
             mysql_sql = text(
                 f"SELECT c.id, c.doc_id, d.title, c.chunk_index, c.content, "
                 f"c.token_count, d.workspace_id "
-                f"FROM kb_chunks c JOIN kb_documents d ON c.doc_id = d.doc_id "
+                f"FROM kb_chunks c JOIN kb_documents d ON c.doc_id = d.node_id "
                 f"WHERE c.id IN ({placeholders})"
             )
             mrows = kb.execute(

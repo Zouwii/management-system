@@ -6,8 +6,12 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy import and_
 
-from base.db.engine import SessionLocal
+from base.db.engine import AlgoSessionLocal, SessionLocal
 from base.db.orm import (
+    AlgoIssue,
+    AlgoIssueDetail,
+    AlgoTask,
+    AlgoTaskDetail,
     ProgramIssue,
     ProgramIssueDetail,
     ProjectTask,
@@ -29,6 +33,12 @@ WHITELIST_USER_IDS = {
     "011168364322856029",    # 李赫   对接组
     "02013312354020881768",  # 刘力璋 对接组
     "01183307230324910099",  # 戴宇庆 对接组
+    # 算法组
+    "0525436259671512",      # 刘丰
+    "2464543025951000",      # 琚玲
+    "555363695138848564",    # 高尔峰
+    "22665556381168535",     # 邵京
+    "2409506118778941",      # 庞涛
 }
 
 
@@ -55,6 +65,8 @@ def _team_name_static(team_id_value: Any) -> str:
         return "导航组"
     if val == "1":
         return "对接组"
+    if val == "2":
+        return "算法组"
     return "未分组"
 
 
@@ -83,6 +95,7 @@ def _query_workday_costhour_base(
         taskId, content, workdayCosthour }
     """
     session = SessionLocal()
+    algo_session = AlgoSessionLocal()
     try:
         # ── 软件开发：B 表（本季度排期） ──
         b_rows = (
@@ -161,6 +174,57 @@ def _query_workday_costhour_base(
             .all()
         )
 
+        # ── 算法开发：algo_task_details + algo_tasks ──
+        algo_task_rows = (
+            algo_session.query(
+                AlgoTaskDetail.query_user_id,
+                AlgoTaskDetail.workday_costhour,
+                AlgoTaskDetail.need_statistic,
+                AlgoTaskDetail.project_category_1,
+                AlgoTaskDetail.task_id,
+                AlgoTaskDetail.content,
+                AlgoTaskDetail.scenario_field_config_id,
+                AlgoTaskDetail.vehicle_type_2,
+                AlgoTaskDetail.project_name_3,
+            )
+            .join(
+                AlgoTask,
+                and_(
+                    AlgoTask.project_id == AlgoTaskDetail.project_id,
+                    AlgoTask.task_id == AlgoTaskDetail.task_id,
+                ),
+            )
+            .filter(AlgoTask.due_date != None)
+            .filter(AlgoTask.due_date >= start_dt)
+            .filter(AlgoTask.due_date <= end_dt)
+            .all()
+        )
+
+        # ── 算法问题：algo_issue_details + algo_issues ──
+        algo_issue_rows = (
+            algo_session.query(
+                AlgoIssueDetail.query_user_id,
+                AlgoIssueDetail.workday_costhour,
+                AlgoIssueDetail.need_statistic,
+                AlgoIssueDetail.project_category_1,
+                AlgoIssueDetail.vehicle_type_2,
+                AlgoIssueDetail.project_name_3,
+                AlgoIssue.task_id,
+                AlgoIssue.content,
+            )
+            .join(
+                AlgoIssue,
+                and_(
+                    AlgoIssue.project_id == AlgoIssueDetail.project_id,
+                    AlgoIssue.task_id == AlgoIssueDetail.task_id,
+                ),
+            )
+            .filter(AlgoIssue.due_date != None)
+            .filter(AlgoIssue.due_date >= start_dt)
+            .filter(AlgoIssue.due_date <= end_dt)
+            .all()
+        )
+
         # ── 获取所有涉及的 user_id，批量查 team 信息 ──
         all_user_ids = set()
         for uid, *_ in b_rows:
@@ -170,6 +234,12 @@ def _query_workday_costhour_base(
             if uid:
                 all_user_ids.add(str(uid).strip())
         for uid, *_ in issue_rows:
+            if uid:
+                all_user_ids.add(str(uid).strip())
+        for uid, *_ in algo_task_rows:
+            if uid:
+                all_user_ids.add(str(uid).strip())
+        for uid, *_ in algo_issue_rows:
             if uid:
                 all_user_ids.add(str(uid).strip())
 
@@ -293,11 +363,60 @@ def _query_workday_costhour_base(
                 "projectName3": str(pn3 or "").strip() if pn3 else "",
             })
 
+        # ── 算法开发：algo_task_details ──
+        for uid, wdc, need_stat, pc1, tid, content, _scenario, vt, pn3 in algo_task_rows:
+            uid = str(uid or "").strip()
+            if not uid:
+                continue
+            if str(need_stat or "").strip() != "是":
+                continue
+            if wdc is None or not (wdc == wdc and float(wdc) > 0):
+                continue
+            team_id, team_name, user_name = _resolve_team(uid)
+            results.append({
+                "userId": uid,
+                "userName": user_name,
+                "teamId": team_id,
+                "teamName": team_name,
+                "taskType": "软件开发",
+                "projectType": _project_type_label(pc1),
+                "taskId": str(tid or ""),
+                "content": str(content or ""),
+                "workdayCosthour": float(wdc) if wdc is not None and wdc == wdc else 0.0,
+                "vehicleType2": str(vt or "").strip() if vt else "",
+                "projectName3": str(pn3 or "").strip() if pn3 else "",
+            })
+
+        # ── 算法问题：algo_issue_details ──
+        for uid, wdc, need_stat, pc1, vt, pn3, tid, content in algo_issue_rows:
+            uid = str(uid or "").strip()
+            if not uid:
+                continue
+            if str(need_stat or "").strip() != "是":
+                continue
+            if wdc is None or not (wdc == wdc and float(wdc) > 0):
+                continue
+            team_id, team_name, user_name = _resolve_team(uid)
+            results.append({
+                "userId": uid,
+                "userName": user_name,
+                "teamId": team_id,
+                "teamName": team_name,
+                "taskType": "问题处理",
+                "projectType": _project_type_label(pc1),
+                "taskId": str(tid or ""),
+                "content": str(content or ""),
+                "workdayCosthour": float(wdc) if wdc is not None and wdc == wdc else 0.0,
+                "vehicleType2": str(vt or "").strip() if vt else "",
+                "projectName3": str(pn3 or "").strip() if pn3 else "",
+            })
+
         # ── 白名单过滤：只保留指定参与人员 ──
         results = [r for r in results if r["userId"] in WHITELIST_USER_IDS]
 
         return results
     finally:
+        algo_session.close()
         session.close()
 
 

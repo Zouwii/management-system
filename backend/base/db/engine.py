@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 
-from base.db.config import DATABASE_URI, KB_DATABASE_URI, PERF_DATABASE_URI, ONSITE_DATABASE_URI, REQ_POOL_DATABASE_URI, PGVECTOR_DATABASE_URI
+from base.db.config import ALGO_DATABASE_URI, DATABASE_URI, KB_DATABASE_URI, PERF_DATABASE_URI, ONSITE_DATABASE_URI, REQ_POOL_DATABASE_URI, PGVECTOR_DATABASE_URI
 from base.db.orm import Base  # 导入即注册 ProjectTask 等到 Base.metadata
 
 # SQLite 下多线程需 check_same_thread=False（Flask 每请求一线程）
@@ -77,6 +77,20 @@ req_pool_engine = create_engine(
 
 ReqPoolSessionLocal = scoped_session(sessionmaker(bind=req_pool_engine, autoflush=False, autocommit=False, future=True))
 
+# 算法组四张 A/B 表专用库
+_algo_connect_args = {}
+if ALGO_DATABASE_URI.startswith("sqlite"):
+    _algo_connect_args["check_same_thread"] = False
+
+algo_engine = create_engine(
+    ALGO_DATABASE_URI,
+    connect_args=_algo_connect_args,
+    future=True,
+    pool_pre_ping=True,
+)
+
+AlgoSessionLocal = scoped_session(sessionmaker(bind=algo_engine, autoflush=False, autocommit=False, future=True))
+
 # pgvector（PostgreSQL）embedding 专用引擎
 pgvector_engine = create_engine(
     PGVECTOR_DATABASE_URI,
@@ -90,10 +104,14 @@ PgVectorSessionLocal = scoped_session(sessionmaker(bind=pgvector_engine, autoflu
 def _table_registry():
     """
     表注册清单（可视化管理，类似 Go 的 createSQLs/dropSQLs 列表）。
-    返回三个列表：(main_tables, perf_tables, kb_tables)
+    返回六个列表：(main_tables, perf_tables, kb_tables, onsite_tables, req_pool_tables, algo_tables)
     """
     # 延迟导入以避免循环
     from base.db.orm import (
+        AlgoIssue,
+        AlgoIssueDetail,
+        AlgoTask,
+        AlgoTaskDetail,
         ApiCallLog,
         Config as DbConfig,
         MemberAttendance,
@@ -146,7 +164,13 @@ def _table_registry():
         ("req_pool_tasks", ReqPoolTask.__table__),
         ("req_pool_details", ReqPoolDetail.__table__),
     ]
-    return main_tables, perf_tables, kb_tables, onsite_tables, req_pool_tables
+    algo_tables = [
+        ("algo_tasks", AlgoTask.__table__),
+        ("algo_task_details", AlgoTaskDetail.__table__),
+        ("algo_issues", AlgoIssue.__table__),
+        ("algo_issue_details", AlgoIssueDetail.__table__),
+    ]
+    return main_tables, perf_tables, kb_tables, onsite_tables, req_pool_tables, algo_tables
 
 
 def _execute_table_ops(bind, table_entries, action: str) -> None:
@@ -166,6 +190,70 @@ def _execute_table_ops(bind, table_entries, action: str) -> None:
             raise ValueError("drop is disabled in this project init flow")
 
 
+def _ensure_algo_schema_compatible() -> None:
+    """将早期算法表升级为与本体 A/B 表一致的字段结构。"""
+    from sqlalchemy import inspect, text
+
+    migrations = {
+        "algo_tasks": {
+            "add": {},
+            "drop": ("task_list_id", "task_stage_id"),
+        },
+        "algo_task_details": {
+            "add": {
+                "requirement_desc": "TEXT NULL",
+                "task_outputs": "TEXT NULL",
+                "parent_task_id": "VARCHAR(64) NULL",
+                "is_overdue": "BOOLEAN NOT NULL DEFAULT 0",
+                "task_flow_status_id": "INTEGER NULL",
+            },
+            "drop": (
+                "executor_id",
+                "creator_id",
+                "taskflow_status_id",
+                "is_done",
+                "is_archived",
+                "priority",
+                "progress",
+                "note",
+                "visible",
+                "created_at_ding",
+                "updated_at_ding",
+                "ancestor_ids",
+                "involve_members",
+                "tag_ids",
+            ),
+        },
+        "algo_issues": {
+            "add": {"accomplished_at": "DATETIME NULL"},
+            "drop": ("task_list_id", "task_stage_id"),
+        },
+        "algo_issue_details": {
+            "add": {},
+            "drop": ("due_date", "progress", "note"),
+        },
+    }
+
+    inspector = inspect(algo_engine)
+    for table_name, spec in migrations.items():
+        columns = {str(col.get("name") or "") for col in inspector.get_columns(table_name)}
+        statements = []
+        for column_name, ddl in spec["add"].items():
+            if column_name not in columns:
+                statements.append(
+                    f"ALTER TABLE {table_name} ADD COLUMN {column_name} {ddl}"
+                )
+        for column_name in spec["drop"]:
+            if column_name in columns:
+                statements.append(f"ALTER TABLE {table_name} DROP COLUMN {column_name}")
+        if not statements:
+            continue
+        with algo_engine.begin() as conn:
+            for statement in statements:
+                print(f"[init_db] migrate algo schema: {statement}")
+                conn.execute(text(statement))
+
+
 def init_database() -> None:
     """
     数据库初始化入口（仅 init，不做 drop）：
@@ -174,7 +262,7 @@ def init_database() -> None:
 
     设计目标：初始化内容“可视化、可读、可维护”。
     """
-    main_tables, perf_tables, kb_tables, onsite_tables, req_pool_tables = _table_registry()
+    main_tables, perf_tables, kb_tables, onsite_tables, req_pool_tables, algo_tables = _table_registry()
     # seed 阶段会直接使用这两个 ORM 模型
     from base.db.orm import Config as DbConfig, UserCharacter as DbUserCharacter
 
@@ -183,7 +271,12 @@ def init_database() -> None:
     _execute_table_ops(perf_engine, perf_tables, "create")
     _execute_table_ops(kb_engine, kb_tables, "create")
     _execute_table_ops(onsite_engine, onsite_tables, "create")
-    _execute_table_ops(req_pool_engine, req_pool_tables, "create")
+    try:
+        _execute_table_ops(req_pool_engine, req_pool_tables, "create")
+    except Exception as e:
+        print(f"[init_db] skip req_pool tables: {e}")
+    _execute_table_ops(algo_engine, algo_tables, "create")
+    _ensure_algo_schema_compatible()
 
     # 兼容无迁移环境：尝试为 B/C 表补齐新字段/新表（SQLite 场景常见）
     try:

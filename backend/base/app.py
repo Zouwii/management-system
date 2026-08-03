@@ -245,47 +245,32 @@ def create_app() -> Flask:
         from base.api_monitor import monitor as _api_monitor
         _api_monitor._ensure_state()
 
-        # 1) TB团队增量（全用户 DEV + Issue）
+        # 1) TB团队增量（导航组 + 对接组；列表及明细跨成员去重）
         print("[auto_sync] [1/2] TB团队小更新...")
         try:
-            from base.sync.task_sync import normal_incremental_update_service, normal_issue_incremental_update_service, _upsert_config_value
-            from base.db.engine import SessionLocal
-            from base.db.orm import UserCharacter as DbUserCharacter
+            from base.sync.task_sync import benti_team_incremental_update_service
             from base.config.service import get_config_projectids
-            from base.api_monitor import BJ_TZ
 
             projectids = get_config_projectids() or {}
             project_id = str(next(iter(projectids.values())) or "").strip()
             if not project_id:
                 print("[auto_sync] TB团队小更新 skipped: missing projectId")
             else:
-                sess = SessionLocal()
-                try:
-                    rows = sess.query(DbUserCharacter.user_id).all()
-                    user_ids = [str(r[0]).strip() for r in rows if r and str(r[0]).strip()]
-                finally:
-                    sess.close()
-
-                if not user_ids:
-                    print("[auto_sync] TB团队小更新 skipped: no users")
+                result = benti_team_incremental_update_service({"projectId": project_id})
+                if result.get("success"):
+                    data = result.get("data") or {}
+                    written = data.get("written") or {}
+                    print(
+                        "[auto_sync] TB团队小更新 done  users={} unique={} "
+                        "DEV={} Issue={}".format(
+                            data.get("memberCount", 0),
+                            data.get("uniqueTaskCount", 0),
+                            written.get("dev", 0),
+                            written.get("issue", 0),
+                        )
+                    )
                 else:
-                    dev_ok = dev_fail = issue_ok = issue_fail = 0
-                    for uid in user_ids:
-                        shared = {"userId": uid, "projectId": project_id}
-                        dev_out = normal_incremental_update_service(shared, skip_update_time=True)
-                        if dev_out.get("success"):
-                            dev_ok += 1
-                        else:
-                            dev_fail += 1
-                        issue_out = normal_issue_incremental_update_service(shared, skip_update_time=True)
-                        if issue_out.get("success"):
-                            issue_ok += 1
-                        else:
-                            issue_fail += 1
-
-                    now_bj = datetime.now(BJ_TZ)
-                    _upsert_config_value("last_update_time", now_bj.isoformat())
-                    print(f"[auto_sync] TB团队小更新 done  users={len(user_ids)}  DEV: {dev_ok}ok/{dev_fail}fail  Issue: {issue_ok}ok/{issue_fail}fail")
+                    print("[auto_sync] TB团队小更新 failed:", result.get("error", "unknown"))
         except Exception as e:
             print("[auto_sync] TB团队小更新 error:", repr(e))
 

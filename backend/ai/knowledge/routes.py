@@ -4,9 +4,9 @@ Endpoints:
   GET  /ai/knowledge/workspaces                    - List knowledge bases (sorted by priority)
   GET  /ai/knowledge/workspaces/<ws_id>/nodes      - Browse document tree
   GET  /ai/knowledge/documents/<node_id>           - Get parsed document content (blocks -> markdown)
-  POST /ai/knowledge/sync                          - Walk single workspace and cache documents
-  POST /ai/knowledge/sync-all                      - Sync all known workspaces (documents only)
-  POST /ai/knowledge/sync-and-embedding            - Full pipeline: sync -> rechunk -> embed
+  POST /ai/knowledge/sync                          - Sync one workspace metadata + Markdown
+  POST /ai/knowledge/sync-all                      - Sync all workspace metadata + Markdown
+  POST /ai/knowledge/sync-and-embedding            - Metadata -> Markdown -> rechunk -> embed
   POST /ai/knowledge/search                        - Search via DingTalk API
   POST /ai/knowledge/chunks/search                 - Local search on kb_chunks (keyword/vector/hybrid)
   POST /ai/knowledge/rechunk                       - Re-chunk + auto reembed
@@ -177,21 +177,43 @@ def _upsert_document(db, node_id: str, workspace_id: str, title: str,
     return changed
 
 
+def _has_markdown_source(document: KbDocument) -> bool:
+    """Whether a cached row was populated by the Markdown download flow."""
+    try:
+        payload = json.loads(document.raw_json or "{}")
+    except (TypeError, ValueError):
+        return False
+    return isinstance(payload, dict) and (
+        isinstance(payload.get("markdown"), str)
+        or payload.get("source") == "local_markdown"
+    )
+
+
+def _remote_not_newer(previous, current) -> bool:
+    if previous is None or current is None:
+        return False
+    # MySQL commonly returns naive datetimes even for timezone=True columns.
+    if previous.tzinfo is None and current.tzinfo is not None:
+        current = current.replace(tzinfo=None)
+    elif previous.tzinfo is not None and current.tzinfo is None:
+        previous = previous.replace(tzinfo=None)
+    return current <= previous
+
+
 def _sync_workspace(client, workspace_id: str, root_id: str, limit: int = 0,
                     check_modified: bool = False) -> dict:
-    """新 schema 同步: 遍历目录树 → kb_nodes, 下载正文 → kb_documents.
+    """新 schema 同步: 遍历目录树 → kb_nodes → 生成 Markdown 下载队列。
 
     check_modified=False: 跳过已同步的 ALIDOC 文档（不做全量对比）。
     check_modified=True:  对比 remote_modified_at，重拉已变更文档。
 
-    raw_json 置空 —— markdown 正文后续由 MCP 下载脚本 + fill-markdown 接口回填。
+    此函数不拉取正文；调用方使用 syncedDocIds 继续下载 Markdown。
 
     Returns {syncedNodes, syncedDocs, syncedDocIds, changedDocIds, failedNodes,
              failedDocs, skippedWorkbooks, skippedCached, skippedUnchanged}.
     """
     synced_node_ids: List[str] = []
     synced_doc_ids: List[dict] = []
-    changed_doc_ids: List[str] = []
     failed_nodes: List[dict] = []
     failed_docs: List[dict] = []
     skipped_workbooks: int = 0
@@ -201,17 +223,27 @@ def _sync_workspace(client, workspace_id: str, root_id: str, limit: int = 0,
     db = KbSessionLocal()
     now = datetime.now(timezone.utc)
 
-    # 预加载已有文档缓存（用于增量判断）
-    try:
-        cached_docs = {
-            r.node_id: {"content": r.content or "", "remote_modified_at": None}
-            for r in db.query(KbDocument).filter(
-                KbDocument.workspace_id == workspace_id,
-                KbDocument.fetch_status == "success"
-            ).all()
+    # 在刷新 kb_nodes 前保留上次远程修改时间，用于增量判断。
+    cached_rows = db.query(KbDocument).filter(
+        KbDocument.workspace_id == workspace_id
+    ).all()
+    cached_nodes = {
+        r.node_id: r.remote_modified_at
+        for r in db.query(KbNode).filter(KbNode.workspace_id == workspace_id).all()
+    }
+    cached_docs = {
+        r.node_id: {
+            "row": r,
+            "content": r.content or "",
+            "remote_modified_at": cached_nodes.get(r.node_id),
+            # Existing content remains a usable cache even when the latest
+            # refresh attempt failed or it was written by the legacy flow.
+            # The weekly incremental job upgrades it to Markdown only when
+            # DingTalk reports a newer modifiedTime.
+            "ready": bool((r.content or "").strip()),
         }
-    finally:
-        pass  # db is kept open for the walk
+        for r in cached_rows
+    }
 
     ws_name = workspace_id  # will be updated from root node
     BATCH_SIZE = 100  # 每处理 100 个节点 commit 一次
@@ -243,7 +275,7 @@ def _sync_workspace(client, workspace_id: str, root_id: str, limit: int = 0,
             bc = breadcrumb + " / " + name if breadcrumb else name
 
             # ── 写入 kb_nodes（FOLDER + FILE 都写）──
-            node_changed = _upsert_node(
+            _upsert_node(
                 db, nid, workspace_id, parent_id, name, ntype, cat,
                 hc, depth, bc, rmt, now)
             synced_node_ids.append(nid)
@@ -269,43 +301,50 @@ def _sync_workspace(client, workspace_id: str, root_id: str, limit: int = 0,
                 # 增量跳过逻辑
                 if not check_modified:
                     cached = cached_docs.get(nid)
-                    if cached and cached["content"]:
+                    if cached and cached["content"] and cached["ready"]:
                         skipped_cached += 1
                         continue
 
                 if check_modified:
                     cached = cached_docs.get(nid)
-                    if cached and cached["content"]:
+                    if cached and cached["content"] and cached["ready"]:
                         last_rmt = cached.get("remote_modified_at")
                         cur_rmt = _parse_dingtalk_time(rmt)
-                        if last_rmt and cur_rmt and cur_rmt <= last_rmt:
+                        if _remote_not_newer(last_rmt, cur_rmt):
                             skipped_unchanged += 1
                             continue
 
-                # 下载正文
-                try:
-                    blocks_resp = client.get_document_blocks(nid)
-                    if not blocks_resp.get("ok"):
-                        err = blocks_resp.get("error", "")
-                        st = blocks_resp.get("status", "?")
-                        failed_docs.append({"nodeId": nid, "title": name, "error": err, "status": st})
-                        print(f"[sync-error] blocks failed nodeId={nid} title={name} status={st} error={err}")
-                        continue
+                # 此阶段只收集待下载文档。Markdown 正文由主流水线的下一阶段拉取。
+                existing = cached_docs.get(nid, {}).get("row")
+                if existing is None:
+                    existing = KbDocument(
+                        node_id=nid,
+                        workspace_id=workspace_id,
+                        title=name,
+                        content="",
+                        raw_json="",
+                        fetch_status="pending",
+                        synced_at=now,
+                        created_at=now,
+                        updated_at=now,
+                    )
+                    db.add(existing)
+                else:
+                    existing.workspace_id = workspace_id
+                    existing.title = name
+                    # Do not invalidate usable content before the replacement
+                    # Markdown has downloaded successfully.
+                    if not (existing.content or "").strip():
+                        existing.fetch_status = "pending"
+                        existing.fail_reason = ""
+                    existing.updated_at = now
 
-                    parsed = parse_document(blocks_resp["data"], "blocks")
-                    content = parsed["markdown"]
-
-                    doc_changed = _upsert_document(
-                        db, nid, workspace_id, name, content, "", now)
-                    synced_doc_ids.append({
-                        "node_id": nid, "title": name, "breadcrumb": bc,
-                    })
-                    if doc_changed:
-                        changed_doc_ids.append(nid)
-
-                except Exception as e:
-                    failed_docs.append({"nodeId": nid, "title": name, "error": str(e)})
-                    print(f"[sync-error] exception nodeId={nid} title={name} error={str(e)}")
+                synced_doc_ids.append({
+                    "node_id": nid,
+                    "workspace_id": workspace_id,
+                    "title": name,
+                    "breadcrumb": bc,
+                })
 
     # 写入 root 节点
     _upsert_node(db, root_id, workspace_id, "", ws_name, "FOLDER", "", True, 0, ws_name, None, now)
@@ -324,7 +363,7 @@ def _sync_workspace(client, workspace_id: str, root_id: str, limit: int = 0,
         "syncedNodes": len(synced_node_ids),
         "syncedDocs": len(synced_doc_ids),
         "syncedDocIds": synced_doc_ids,
-        "changedDocIds": changed_doc_ids,
+        "changedDocIds": [item["node_id"] for item in synced_doc_ids],
         "failedNodes": len(failed_nodes),
         "failedDocs": len(failed_docs),
         "skippedWorkbooks": skipped_workbooks,
@@ -438,15 +477,23 @@ def register(bp, ok, fail):
             parsed = parse_document(blocks["data"], "blocks")
 
         content = parsed["markdown"]
-        _cache_document(
-            node_id=node_id,
-            workspace_id=ws_id,
-            title=title,
-            content=content,
-            node_type=node_type,
-            category=category,
-            raw_json=json.dumps(meta, ensure_ascii=False),
-        )
+        db = KbSessionLocal()
+        try:
+            _upsert_document(
+                db,
+                node_id,
+                ws_id,
+                title,
+                content,
+                json.dumps(meta, ensure_ascii=False),
+                datetime.now(timezone.utc),
+            )
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
 
         return ok({
             "nodeId": node_id,
@@ -498,7 +545,20 @@ def register(bp, ok, fail):
         started = time.time()
         result = _sync_workspace(client, workspace_id, root_id, limit=limit,
                                  check_modified=check_modified)
+        from ai.knowledge.markdown_sync import (
+            download_markdown_documents,
+            persist_downloaded_markdown,
+        )
+        download_result = download_markdown_documents(result["syncedDocIds"])
+        markdown_result = persist_downloaded_markdown(download_result)
         finished = time.time()
+
+        if result["syncedDocIds"] and not download_result.get("downloaded"):
+            return fail(
+                download_result.get("error") or "all Markdown downloads failed",
+                code=502,
+                data={"sync": result, "markdown": markdown_result},
+            )
 
         return ok({
             "workspaceId": workspace_id,
@@ -512,6 +572,7 @@ def register(bp, ok, fail):
             "skippedCached": result.get("skippedCached", 0),
             "skippedUnchanged": result.get("skippedUnchanged", 0),
             "errors": result["errors"],
+            "markdown": markdown_result,
             "durationSec": round(finished - started, 1),
         })
 
@@ -558,6 +619,7 @@ def register(bp, ok, fail):
         total_skipped_wb = 0
         total_skipped_cached = 0
         total_skipped_unchanged = 0
+        queued_documents: List[dict] = []
         results: List[dict] = []
 
         for ws_id, root_id, ws_name in workspaces_to_sync:
@@ -565,6 +627,7 @@ def register(bp, ok, fail):
             r = _sync_workspace(client, ws_id, root_id, limit=limit,
                                 check_modified=check_modified)
             ws_elapsed = round(time.time() - ws_started, 1)
+            queued_documents.extend(r["syncedDocIds"])
             results.append({
                 "workspaceId": ws_id,
                 "name": ws_name,
@@ -580,16 +643,26 @@ def register(bp, ok, fail):
                 "durationSec": ws_elapsed,
             })
             total_synced += r["syncedDocs"]
-            total_failed += r["failedDocs"]
-            total_skipped_wb += r.get("skippedWorkbooks", 0)
-            total_skipped_cached += r.get("skippedCached", 0)
-            total_skipped_unchanged += r.get("skippedUnchanged", 0)
+            total_failed += r["failedNodes"] + r["failedDocs"]
             total_nodes += r["syncedNodes"]
             total_skipped_wb += r.get("skippedWorkbooks", 0)
             total_skipped_cached += r.get("skippedCached", 0)
             total_skipped_unchanged += r.get("skippedUnchanged", 0)
 
+        from ai.knowledge.markdown_sync import (
+            download_markdown_documents,
+            persist_downloaded_markdown,
+        )
+        download_result = download_markdown_documents(queued_documents)
+        markdown_result = persist_downloaded_markdown(download_result)
         finished = time.time()
+
+        if queued_documents and not download_result.get("downloaded"):
+            return fail(
+                download_result.get("error") or "all Markdown downloads failed",
+                code=502,
+                data={"workspaces": results, "markdown": markdown_result},
+            )
 
         return ok({
             "syncedWorkspaces": len(results),
@@ -599,14 +672,15 @@ def register(bp, ok, fail):
             "skippedCached": total_skipped_cached,
             "skippedUnchanged": total_skipped_unchanged,
             "workspaces": results,
+            "markdown": markdown_result,
             "durationSec": round(finished - started, 1),
         })
 
     @bp.route("/ai/knowledge/sync-and-embedding", methods=["POST"])
     def ai_knowledge_sync_and_embedding():
-        """Full pipeline: sync all KBs -> rechunk -> embed.
+        """Full pipeline: metadata -> Markdown -> rechunk -> embed.
 
-        Body: { "check_modified"?: true/false }
+        Body: { "check_modified"?: true/false, "limit"?: N, "ws_limit"?: N }
         check_modified=false: KB增量（仅拉取新文档）
         check_modified=true:  KB变更（对比 modified_at 重拉变更文档）
         """
@@ -618,9 +692,16 @@ def register(bp, ok, fail):
 
         body = request.get_json(silent=True) or {}
         check_modified = str(body.get("check_modified") or "").lower() in ("1", "true", "yes")
+        limit = max(0, int(body.get("limit") or 0))
+        ws_limit = max(0, int(body.get("ws_limit") or 0))
 
         try:
-            result = sync_all_and_embed(union_id=union_id, check_modified=check_modified)
+            result = sync_all_and_embed(
+                union_id=union_id,
+                check_modified=check_modified,
+                limit=limit,
+                ws_limit=ws_limit,
+            )
             if result.get("ok"):
                 return ok(result)
             else:
@@ -679,12 +760,12 @@ def register(bp, ok, fail):
             if rechunk_all:
                 docs = db.query(KbDocument).filter(KbDocument.content != "").all()
             elif doc_id:
-                docs = [db.query(KbDocument).filter(KbDocument.doc_id == doc_id).first()]
+                docs = [db.query(KbDocument).filter(KbDocument.node_id == doc_id).first()]
                 docs = [d for d in docs if d]
             else:
                 return fail("missing doc_id or all=true", code=400)
 
-            doc_ids = [d.doc_id for d in docs]
+            doc_ids = [d.node_id for d in docs]
             rechunk_result = _rechunk_documents(doc_ids)
             if not rechunk_result.get("ok"):
                 return fail(rechunk_result.get("error", "rechunk failed"), code=500)
@@ -1138,7 +1219,7 @@ def register(bp, ok, fail):
 
     @bp.route("/ai/knowledge/documents/fill-markdown", methods=["POST"])
     def ai_knowledge_fill_markdown():
-        """将 MCP 下载的 markdown 文件回填到 kb_documents.raw_json。
+        """将 MCP 下载的 markdown 文件回填到 kb_documents.content。
 
         Body: { "markdown_dir": "/path/to/markdown" }
         递归扫描目录下所有 {node_id}.md 文件（由 dingtalk-download-by-nodes.py 生成）。
@@ -1146,7 +1227,7 @@ def register(bp, ok, fail):
         行为：
         - 递归扫描目录下所有 .md 文件
         - 按文件名（node_id）匹配 kb_documents 记录
-        - 将 markdown 内容写入 raw_json 字段
+        - 将 markdown 内容写入 content 字段，raw_json 保留为审计字段
         - 跳过非 node_id 格式的 .md 文件（如 _download_summary.md）
         """
         body = request.get_json(silent=True) or {}
@@ -1188,7 +1269,14 @@ def register(bp, ok, fail):
                     skipped += 1
                     continue
 
-                row.raw_json = content
+                if row.content != content:
+                    row.content = content
+                row.raw_json = json.dumps(
+                    {"source": "local_markdown"}, ensure_ascii=False
+                )
+                row.fetch_status = "success"
+                row.fail_reason = ""
+                row.synced_at = now
                 row.updated_at = now
                 filled += 1
 

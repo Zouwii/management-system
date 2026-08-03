@@ -17,6 +17,34 @@ _MODEL_NAME = "BAAI/bge-small-zh-v1.5"
 _model = None
 
 
+def delete_vectors(chunk_ids) -> int:
+    """Delete vectors for chunks that are about to be rebuilt."""
+    ids = [int(chunk_id) for chunk_id in chunk_ids]
+    if not ids:
+        return 0
+
+    from sqlalchemy import text
+
+    deleted = 0
+    pg = PgVectorSessionLocal()
+    try:
+        for start in range(0, len(ids), 500):
+            batch = ids[start:start + 500]
+            placeholders = ",".join(f":id_{i}" for i in range(len(batch)))
+            result = pg.execute(
+                text(f"DELETE FROM chunk_vectors WHERE chunk_id IN ({placeholders})"),
+                {f"id_{i}": chunk_id for i, chunk_id in enumerate(batch)},
+            )
+            deleted += max(0, int(result.rowcount or 0))
+        pg.commit()
+        return deleted
+    except Exception:
+        pg.rollback()
+        raise
+    finally:
+        pg.close()
+
+
 def _load_model():
     """Eagerly load the embedding model. Call once at process start."""
     global _model
@@ -59,7 +87,7 @@ def embed_chunks(
         if workspace_id:
             count_sql = text(
                 "SELECT COUNT(*) FROM kb_chunks c "
-                "JOIN kb_documents d ON c.doc_id = d.doc_id "
+                "JOIN kb_documents d ON c.doc_id = d.node_id "
                 "WHERE d.workspace_id = :ws_id"
             )
             total = kb.execute(count_sql, {"ws_id": workspace_id}).scalar()
@@ -76,7 +104,7 @@ def embed_chunks(
             if workspace_id:
                 sel = text(
                     "SELECT c.id, c.content FROM kb_chunks c "
-                    "JOIN kb_documents d ON c.doc_id = d.doc_id "
+                    "JOIN kb_documents d ON c.doc_id = d.node_id "
                     "WHERE d.workspace_id = :ws_id "
                     "ORDER BY c.id LIMIT :limit OFFSET :offset"
                 )

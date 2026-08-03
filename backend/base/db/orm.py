@@ -644,3 +644,188 @@ class ReqPoolDetail(Base):
     attachments_json: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
 
     fetched_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+# ─────────────────────────────────────────────────────────────
+# 算法组 A/B 表（两个项目共享同一套表结构）
+# ─────────────────────────────────────────────────────────────
+
+
+class AlgoTask(Base):
+    """算法组软件开发 A 表；字段结构与 ProjectTask 一致。"""
+
+    __tablename__ = "algo_tasks"
+    __table_args__ = (UniqueConstraint("project_id", "task_id", name="uq_algo_task"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    task_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    project_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+
+    content: Mapped[str] = mapped_column(Text, default="")
+    scenario_field_config_id: Mapped[str] = mapped_column(String(64), default="")
+    stage_id: Mapped[str] = mapped_column(String(64), default="")
+    taskflow_status_id: Mapped[str] = mapped_column(String(64), default="")
+
+    executor_id: Mapped[str] = mapped_column(String(64), default="")
+    creator_id: Mapped[str] = mapped_column(String(64), default="")
+
+    due_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    ding_created: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    ding_updated: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    note: Mapped[str] = mapped_column(Text, default="")
+    priority: Mapped[int] = mapped_column(Integer, default=0)
+    progress: Mapped[int] = mapped_column(Integer, default=0)
+    visible: Mapped[str] = mapped_column(String(32), default="members")
+
+    is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_done: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    ancestor_ids: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    involve_members: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    tag_ids: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    labels: Mapped[Optional[List[Any]]] = mapped_column(JSON, nullable=True)
+    customfield_ids: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+
+    raw_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    list_synced_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AlgoTaskDetail(Base):
+    """算法组软件开发 B 表；字段结构与 ProjectTaskDetail 一致。"""
+
+    __tablename__ = "algo_task_details"
+    __table_args__ = (
+        UniqueConstraint("task_id", "query_user_id", name="uq_algo_task_detail"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    project_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    task_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    query_user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+
+    scenario_field_config_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    due_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+
+    work_hour_field_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    work_hour: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
+    custom_fields_json: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    raw_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    requirement_desc: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    task_outputs: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    parent_task_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    parent_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    task_list_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    task_stage_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    unique_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    task_nature: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    need_statistic: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)
+    workday_costhour: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
+    is_overdue: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    business_type: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+    task_flow_status_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+
+    project_category_1: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    vehicle_type_2: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    project_name_3: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+
+    fetched_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AlgoIssue(Base):
+    """算法组问题处理 A 表；字段结构与 ProgramIssue 一致。"""
+
+    __tablename__ = "algo_issues"
+    __table_args__ = (UniqueConstraint("project_id", "task_id", name="uq_algo_issue"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    task_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    project_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+
+    content: Mapped[str] = mapped_column(Text, default="")
+    scenario_field_config_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    stage_id: Mapped[str] = mapped_column(String(64), default="")
+    taskflow_status_id: Mapped[str] = mapped_column(String(64), default="")
+
+    executor_id: Mapped[str] = mapped_column(String(64), default="", index=True)
+    creator_id: Mapped[str] = mapped_column(String(64), default="", index=True)
+
+    due_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    accomplished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    ding_created: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    ding_updated: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+
+    note: Mapped[str] = mapped_column(Text, default="")
+    priority: Mapped[int] = mapped_column(Integer, default=0)
+    progress: Mapped[int] = mapped_column(Integer, default=0)
+    visible: Mapped[str] = mapped_column(String(32), default="members")
+
+    is_archived: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_deleted: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_done: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+
+    ancestor_ids: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    involve_members: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    tag_ids: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    labels: Mapped[Optional[List[Any]]] = mapped_column(JSON, nullable=True)
+    customfield_ids: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+
+    raw_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    list_synced_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AlgoIssueDetail(Base):
+    """算法组问题处理 B 表；字段结构与 ProgramIssueDetail 一致。"""
+
+    __tablename__ = "algo_issue_details"
+    __table_args__ = (
+        UniqueConstraint("task_id", "query_user_id", name="uq_algo_issue_detail"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    project_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    task_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    query_user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+
+    scenario_field_config_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    content: Mapped[str] = mapped_column(Text, default="")
+    executor_id: Mapped[str] = mapped_column(String(64), default="")
+    creator_id: Mapped[str] = mapped_column(String(64), default="")
+    task_list_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    task_stage_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    taskflow_status_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    unique_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    parent_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+
+    task_nature: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    need_statistic: Mapped[Optional[str]] = mapped_column(String(8), nullable=True)
+    workday_costhour: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    work_hour_field_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    work_hour: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    business_type: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, index=True)
+
+    is_archived: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_done: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, index=True)
+    priority: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    visible: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+
+    created_at_ding: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    updated_at_ding: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    ancestor_ids: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    involve_members: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+    tag_ids: Mapped[Optional[List[str]]] = mapped_column(JSON, nullable=True)
+
+    custom_fields_json: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
+    raw_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
+    project_category_1: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    vehicle_type_2: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    project_name_3: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+
+    fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.now)

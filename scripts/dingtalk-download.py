@@ -14,7 +14,7 @@ from urllib.parse import urlparse
 sys.stdout.reconfigure(line_buffering=True) if hasattr(sys.stdout, 'reconfigure') else None
 sys.stderr.reconfigure(line_buffering=True) if hasattr(sys.stderr, 'reconfigure') else None
 
-MCP_URL = "https://mcp-gw.dingtalk.com/server/d278fc7e6564857f4ef6adeb204182f00225772bd9b9542cd8351d8e85f820ba?key=8687a5e8add755c924eb14fc625cb07d"
+MCP_URL = os.getenv("DINGTALK_KB_MCP_URL", "").strip()
 DL_DELAY = 0.3  # seconds between list_nodes calls
 
 class DingTalkDownloader:
@@ -270,6 +270,10 @@ class DingTalkDownloader:
 
 
 if __name__ == "__main__":
+    if not MCP_URL:
+        print("缺少环境变量 DINGTALK_KB_MCP_URL")
+        sys.exit(2)
+
     if len(sys.argv) < 2:
         print("用法: python3 dingtalk-download.py <workspaceId> [folderId] [输出目录] [并发数]")
         print("示例: python3 dingtalk-download.py 1oam4Sk7BMLXxn8K")

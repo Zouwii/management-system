@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 import os
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
@@ -186,10 +186,15 @@ def _record_sync_failures(
 
 
 def _load_allowed_executor_ids() -> set:
-    """只允许轮询 user_character 表中存在的 executor，避免离职账号稳定失败。"""
+    """只允许本体两组 executor；算法组不得进入本体同步链路。"""
     sess = SessionLocal()
     try:
-        rows = sess.query(DbUserCharacter.user_id).all()
+        rows = (
+            sess.query(DbUserCharacter.user_id)
+            .filter(DbUserCharacter.team_id.in_(("0", "1")))
+            .order_by(DbUserCharacter.user_id)
+            .all()
+        )
         out = {str((r[0] or "")).strip() for r in rows if r and str((r[0] or "")).strip()}
         return out
     finally:
@@ -1893,6 +1898,297 @@ def normal_issue_incremental_update_service(payload: Dict[str, Any], skip_update
             "issue_incremental_detail": {"count": len(inc_specs), "ok": inc_ok, "fail": inc_fail, "failures": inc_failures[:20]},
         },
     }
+
+
+def benti_team_incremental_update_service(payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """本体团队去重增量更新：20 名本体成员各查一次，任务明细全局只查一次。
+
+    与清表全量更新保持同一数据口径，但这里只做 upsert：
+    - 仅导航组、对接组（team_id 0/1），不查询或写入算法组；
+    - 单次列表查询同时接收 DEV、Issue，跨成员按 taskId 去重；
+    - 所有远端列表和明细成功后才写库并推进 last_update_time；
+    - 明细请求并发执行，失败最多重试三轮。
+    """
+    payload = dict(payload or {})
+    project_id = str(payload.get("projectId") or payload.get("projectid") or "").strip()
+    if not project_id:
+        return {"success": False, "error": "missing projectId", "data": {}}
+
+    owner = "benti_incremental@{}".format(int(time.time()))
+    lock = _acquire_update_lock(DEFAULT_UPDATE_LOCK_KEY, owner, ttl_sec=60 * 60 * 2)
+    if not lock.get("ok"):
+        return {
+            "success": False,
+            "error": lock.get("error", "update is in progress"),
+            "data": {"lock": lock.get("lock") or {}},
+        }
+
+    try:
+        member_ids = sorted(_load_allowed_executor_ids())
+        if not member_ids:
+            return {"success": False, "error": "no benti members found", "data": {}}
+
+        last_dt = _safe_last_update_time()
+        updated_threshold = _format_dt_for_tql_utc(last_dt)
+        token_result = get_valid_access_token(payload)
+        if not token_result.get("ok"):
+            return {
+                "success": False,
+                "error": token_result.get("error", "failed to fetch dingtalk token"),
+                "data": {},
+            }
+        access_token = str(token_result.get("access_token") or "")
+
+        max_results = int(payload.get("maxResults", 500) or 500)
+        max_pages = int(payload.get("maxPages", 200) or 200)
+        allowed_scenarios = {
+            DEFAULT_SCENARIO_FIELD_CONFIG_ID,
+            ISSUE_SCENARIO_FIELD_CONFIG_ID,
+        }
+        tasks_by_id: Dict[str, Dict[str, Any]] = {}
+        list_results: Dict[str, Dict[str, Any]] = {}
+
+        for member_id in member_ids:
+            query_payload = {
+                "userId": member_id,
+                "projectId": project_id,
+                "access_token": access_token,
+                "query": "(updated >= '{}')".format(updated_threshold),
+                "maxResults": max_results,
+                "maxPages": max_pages,
+                "force_refresh": True,
+                "retries": 2,
+            }
+            result: Dict[str, Any] = {}
+            attempts = 0
+            for attempts in range(1, 4):
+                result = query_project_tasks_service(query_payload)
+                if result.get("success"):
+                    break
+            if not result.get("success"):
+                return {
+                    "success": False,
+                    "error": "member list failed user={}: {}".format(
+                        member_id, result.get("error", "unknown")
+                    ),
+                    "data": {
+                        "memberCount": len(member_ids),
+                        "completedMembers": len(list_results),
+                        "listResults": list_results,
+                    },
+                }
+
+            ding = (result.get("data") or {}).get("dingtalk") or {}
+            rows = ding.get("result") if isinstance(ding.get("result"), list) else []
+            accepted = 0
+            for item in rows:
+                if not isinstance(item, dict):
+                    continue
+                scenario_id = str(
+                    item.get("scenarioFieldConfigId")
+                    or item.get("scenariofieldconfigId")
+                    or ""
+                )
+                task_id = str(item.get("taskId") or "").strip()
+                if scenario_id not in allowed_scenarios or not task_id:
+                    continue
+                tasks_by_id.setdefault(task_id, item)
+                accepted += 1
+            list_results[member_id] = {
+                "attempts": attempts,
+                "pages": int((result.get("meta") or {}).get("page_count") or 0),
+                "fetched": len(rows),
+                "accepted": accepted,
+                "uniqueTotal": len(tasks_by_id),
+            }
+
+        allowed_executors = set(member_ids)
+        filtered_tasks: Dict[str, Dict[str, Any]] = {}
+        skipped_executors = {"dev": 0, "issue": 0}
+        detail_specs: List[tuple[str, str, str]] = []
+        for task_id, item in tasks_by_id.items():
+            scenario_id = str(
+                item.get("scenarioFieldConfigId")
+                or item.get("scenariofieldconfigId")
+                or ""
+            )
+            kind = "dev" if scenario_id == DEFAULT_SCENARIO_FIELD_CONFIG_ID else "issue"
+            executor_id = str(item.get("executorId") or "").strip()
+            if not executor_id or executor_id not in allowed_executors:
+                skipped_executors[kind] += 1
+                continue
+            filtered_tasks[task_id] = item
+            detail_specs.append((kind, executor_id, task_id))
+
+        detail_specs = list(dict.fromkeys(detail_specs))
+
+        def _fetch_detail(spec: tuple[str, str, str]) -> Dict[str, Any]:
+            kind, executor_id, task_id = spec
+            result = query_user_tasks_service({
+                "userId": executor_id,
+                "taskId": task_id,
+                "projectId": project_id,
+                "access_token": access_token,
+                "force_refresh": True,
+            })
+            item = _extract_detail_item(result) if result.get("success") else None
+            return {
+                "success": bool(result.get("success") and isinstance(item, dict)),
+                "kind": kind,
+                "executorId": executor_id,
+                "taskId": task_id,
+                "item": item,
+                "error": result.get("error") if not result.get("success") else (
+                    "empty detail" if not item else ""
+                ),
+            }
+
+        pending = list(detail_specs)
+        fetched_details: Dict[tuple[str, str, str], Dict[str, Any]] = {}
+        last_failures: Dict[tuple[str, str, str], Dict[str, Any]] = {}
+        for _round in range(1, 4):
+            if not pending:
+                break
+            next_pending: List[tuple[str, str, str]] = []
+            with ThreadPoolExecutor(max_workers=max(1, min(5, len(pending)))) as pool:
+                futures = {pool.submit(_fetch_detail, spec): spec for spec in pending}
+                for future in as_completed(futures):
+                    spec = futures[future]
+                    try:
+                        result = future.result()
+                    except Exception as exc:
+                        result = {
+                            "success": False,
+                            "kind": spec[0],
+                            "executorId": spec[1],
+                            "taskId": spec[2],
+                            "item": None,
+                            "error": repr(exc),
+                        }
+                    if result.get("success"):
+                        fetched_details[spec] = result
+                        last_failures.pop(spec, None)
+                    else:
+                        next_pending.append(spec)
+                        last_failures[spec] = result
+            pending = next_pending
+
+        if pending:
+            failures = [last_failures[spec] for spec in pending[:20]]
+            _record_sync_failures(
+                sync_type="benti_team_incremental",
+                project_id=project_id,
+                phase="detail_fetch",
+                failures=failures,
+                retry_round=3,
+            )
+            return {
+                "success": False,
+                "error": "{} task details failed after 3 rounds".format(len(pending)),
+                "data": {
+                    "memberCount": len(member_ids),
+                    "uniqueTaskCount": len(tasks_by_id),
+                    "detailCount": len(detail_specs),
+                    "failedDetails": len(pending),
+                    "failures": failures,
+                    "skippedExecutors": skipped_executors,
+                },
+            }
+
+        merged_query_result = {
+            "success": True,
+            "data": {"dingtalk": {"result": list(filtered_tasks.values())}},
+            "meta": {"source": "benti_incremental_deduplicated"},
+        }
+        a_result = sync_project_tasks_to_db(
+            {
+                "projectId": project_id,
+                "scenarioFieldConfigIds": [
+                    DEFAULT_SCENARIO_FIELD_CONFIG_ID,
+                    ISSUE_SCENARIO_FIELD_CONFIG_ID,
+                ],
+            },
+            query_result=merged_query_result,
+        )
+        if not a_result.get("success"):
+            return {
+                "success": False,
+                "error": a_result.get("error", "sync A failed"),
+                "data": a_result.get("data") or {},
+            }
+
+        field_id = str(
+            payload.get("workHourFieldId")
+            or os.getenv("TB_TOOL_BT_WORKHOUR_FIELD_ID")
+            or os.getenv("TB_TOOL_B1_WORKHOUR_FIELD_ID")
+            or DEFAULT_WORKHOUR_FIELD_ID
+        )
+        business_mapping = _get_business_type_tag_mapping()
+        status_mapping = _get_task_flow_status_mapping()
+        session = SessionLocal()
+        written = {"dev": 0, "issue": 0}
+        pending_commit = 0
+        try:
+            for spec in detail_specs:
+                result = fetched_details[spec]
+                if result["kind"] == "dev":
+                    _sync_one_detail_to_b_and_c(
+                        session,
+                        executor_id=result["executorId"],
+                        task_id=result["taskId"],
+                        project_id=project_id,
+                        item=result["item"],
+                        field_id=field_id,
+                        now=datetime.now(timezone.utc),
+                        business_type_mapping=business_mapping,
+                        task_flow_status_mapping=status_mapping,
+                        write_b=True,
+                        write_c=True,
+                    )
+                else:
+                    _sync_one_issue_detail(
+                        session,
+                        executor_id=result["executorId"],
+                        task_id=result["taskId"],
+                        project_id=project_id,
+                        item=result["item"],
+                        field_id=field_id,
+                        now=datetime.now(timezone.utc),
+                        business_type_mapping=business_mapping,
+                    )
+                written[result["kind"]] += 1
+                pending_commit += 1
+                if pending_commit >= DEFAULT_DB_COMMIT_BATCH_SIZE:
+                    session.commit()
+                    pending_commit = 0
+            if pending_commit:
+                session.commit()
+        except Exception as exc:
+            session.rollback()
+            return {"success": False, "error": "detail write failed: {}".format(exc), "data": {}}
+        finally:
+            session.close()
+
+        from base.api_monitor import BJ_TZ
+        completed_at = datetime.now(BJ_TZ).isoformat()
+        _upsert_config_value("last_update_time", completed_at)
+        return {
+            "success": True,
+            "data": {
+                "memberCount": len(member_ids),
+                "updatedGte": updated_threshold,
+                "listResults": list_results,
+                "uniqueTaskCountBeforeExecutorFilter": len(tasks_by_id),
+                "uniqueTaskCount": len(filtered_tasks),
+                "detailCount": len(detail_specs),
+                "written": written,
+                "skippedExecutors": skipped_executors,
+                "lastUpdateTime": completed_at,
+                "aSync": a_result.get("data") or {},
+            },
+        }
+    finally:
+        _release_update_lock(DEFAULT_UPDATE_LOCK_KEY, owner)
 
 
 # ---------------------------------------------------------------------------

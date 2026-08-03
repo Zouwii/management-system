@@ -43,6 +43,20 @@ function generateQuarterOptions() {
 
 const QUARTER_OPTIONS = generateQuarterOptions();
 
+const WORKDAY_TEAMS = [
+  { teamId: '0', teamName: '导航组' },
+  { teamId: '1', teamName: '对接组' },
+  { teamId: '2', teamName: '算法组' },
+];
+
+function mergeWorkdayTeams(teams = []) {
+  const teamMap = new Map(teams.map((team) => [String(team.teamId), team]));
+  return WORKDAY_TEAMS.map((team) => ({
+    ...team,
+    ...(teamMap.get(team.teamId) || {}),
+  }));
+}
+
 // ── 辅助函数 ──
 
 function formatDays(hours) {
@@ -652,6 +666,12 @@ export default function WorkdayCostHourStats() {
     [quarter],
   );
 
+  const teamOptions = useMemo(() => mergeWorkdayTeams(teamData.teams), [teamData.teams]);
+  const memberTeamOptions = useMemo(
+    () => mergeWorkdayTeams(memberData.teams.length ? memberData.teams : teamData.teams),
+    [memberData.teams, teamData.teams],
+  );
+
   const loadAll = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -764,8 +784,8 @@ export default function WorkdayCostHourStats() {
   }, [memberData.members, memberAdjustments, quarterOption]);
 
   const currentTeam = useMemo(
-    () => teamData.teams.find((t) => t.teamId === selectedTeamId) || teamData.teams[0] || {},
-    [teamData.teams, selectedTeamId],
+    () => teamOptions.find((t) => t.teamId === selectedTeamId) || teamOptions[0] || {},
+    [teamOptions, selectedTeamId],
   );
 
   return (
@@ -822,7 +842,7 @@ export default function WorkdayCostHourStats() {
           <>
             {/* ═══════ Effective Hour Management: 个人维度有效工时 ═══════ */}
             <EffectiveHourManageTable
-              teams={memberData.teams.length ? memberData.teams : teamData.teams}
+              teams={memberTeamOptions}
               selectedTeamId={manageTeamId}
               onTeamChange={setManageTeamId}
               members={memberData.members}
@@ -845,7 +865,7 @@ export default function WorkdayCostHourStats() {
                 <h2 className="text-lg font-semibold text-slate-900">小组数据看板</h2>
                 <div className="flex items-center gap-2">
                   <TeamSelector
-                    teams={teamData.teams}
+                    teams={teamOptions}
                     selectedTeamId={selectedTeamId}
                     onSelect={setSelectedTeamId}
                   />
@@ -876,7 +896,7 @@ export default function WorkdayCostHourStats() {
             <Card className="overflow-hidden p-0">
               <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
                 <h2 className="text-lg font-semibold text-slate-900">
-                  部门汇总数据（导航组 + 对接组）· {quarterOption.label.split('(')[0].trim()}
+                  部门汇总数据（导航组 + 对接组 + 算法组）· {quarterOption.label.split('(')[0].trim()}
                   {workdayCount != null ? ` (共计${workdayCount}天)` : ''}
                 </h2>
               </div>

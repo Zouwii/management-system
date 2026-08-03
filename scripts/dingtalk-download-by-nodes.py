@@ -21,7 +21,7 @@ from pathlib import Path
 sys.stdout.reconfigure(line_buffering=True) if hasattr(sys.stdout, 'reconfigure') else None
 sys.stderr.reconfigure(line_buffering=True) if hasattr(sys.stderr, 'reconfigure') else None
 
-MCP_URL = "https://mcp-gw.dingtalk.com/server/d278fc7e6564857f4ef6adeb204182f00225772bd9b9542cd8351d8e85f820ba?key=8687a5e8add755c924eb14fc625cb07d"
+MCP_URL = os.getenv("DINGTALK_KB_MCP_URL", "").strip()
 MCP_DELAY = 0.15  # seconds between MCP calls to avoid rate limiting
 
 
@@ -98,6 +98,10 @@ def download_one(node_id, output_dir):
 
 
 def main():
+    if not MCP_URL:
+        print("❌ 缺少环境变量 DINGTALK_KB_MCP_URL", flush=True)
+        sys.exit(2)
+
     parser = argparse.ArgumentParser(description="钉钉 MCP 按 node_id 批量下载 markdown")
     parser.add_argument("--input", "-i", required=True,
                         help='JSON 文件，支持两种格式:\n'

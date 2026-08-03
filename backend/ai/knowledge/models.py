@@ -52,8 +52,12 @@ class KbDocument(KbBase):
     node_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True, unique=True)
     workspace_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(512), nullable=False)
-    content: Mapped[str] = mapped_column(MEDIUMTEXT, default="")
-    raw_json: Mapped[str] = mapped_column(MEDIUMTEXT, default="")
+    content: Mapped[str] = mapped_column(
+        MEDIUMTEXT().with_variant(Text(), "sqlite"), default=""
+    )
+    raw_json: Mapped[str] = mapped_column(
+        MEDIUMTEXT().with_variant(Text(), "sqlite"), default=""
+    )
     error_code: Mapped[str | None] = mapped_column(String(16), nullable=True, index=True)
     fetch_status: Mapped[str] = mapped_column(String(16), default="pending")  # pending / success / failed
     fail_reason: Mapped[str] = mapped_column(String(500), default="")
