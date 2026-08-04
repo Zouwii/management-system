@@ -12,6 +12,10 @@
     "钉钉文档": {
       "type": "streamable-http",
       "url": "https://mcp-gw.dingtalk.com/server/d278fc7e6564857f4ef6adeb204182f00225772bd9b9542cd8351d8e85f820ba?key=8687a5e8add755c924eb14fc625cb07d"
+    },
+    "钉钉Teambition 项目管理": {
+      "type": "streamable-http",
+      "url": "https://mcp-gw.dingtalk.com/server/d09816d44c356f1de0a2c569fe638246f9e233183a4b061124bac74f7d36801c?key=480c510b1faa5542cb9436105424ac6b"
     }
   }
 }

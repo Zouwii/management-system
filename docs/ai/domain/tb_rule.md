@@ -65,3 +65,55 @@
 | title | ≤ 18 中文字符 | 超长则告警 |
 | startDate / dueDate | 必须是有效 ISO 8601 | 不合法则拒绝 |
 | startDate ≤ dueDate | 开始日期不能晚于截止日期 | 不合法则告警 |
+
+## Teambition Open API v3 — 关联任务
+
+### 查询任务关联的其它任务
+
+```
+GET https://open.teambition.com/api/v3/task/{taskId}/objectlinks
+```
+
+**请求头**:
+
+| Header | 值 | 说明 |
+|--------|-----|------|
+| `Content-Type` | `application/json` | |
+| `X-Operator-Id` | TB 用户 ObjectId（如 `64df1d979c80be1f3c7476cc`） | 必填，通过 TB 代理传入 body headers |
+
+**响应示例**:
+
+```json
+{
+  "result": [
+    {
+      "id": "6900372ab2ffffbf734b4052",
+      "parentId": "69003719f1aefb81c0b17963",
+      "linkedId": "68fb3c3440d118edb8d1cf2e",
+      "linkedType": "task",
+      "parent": {
+        "id": "69003719f1aefb81c0b17963",
+        "content": "交付测试反馈问题处理【10.27-10.31】"
+      },
+      "linked": {
+        "id": "68fb3c3440d118edb8d1cf2e",
+        "content": "【宁波包钢】fdn3030，导航精度不足"
+      },
+      "creatorId": "614a920586f75f5582c18556",
+      "created": "2025-10-28T03:23:22.108Z"
+    }
+  ]
+}
+```
+
+**字段说明**:
+
+| 字段 | 含义 |
+|------|------|
+| `linkedId` | 关联任务的 taskId |
+| `linkedType` | 关联类型，目前已知值 `task` |
+| `linked.content` | 关联任务标题 |
+| `parentId` | 当前任务 ID |
+| `parent.content` | 当前任务标题 |
+
+**注意**: 此接口需要 `X-Operator-Id`，当前仅通过服务器上的 DingTalk 代理（`tb_proxy.py`）调用，尚未在 management-system 中封装为服务。`linkedType` 目前仅观察到 `task`，但接口可能还支持其它对象类型。
