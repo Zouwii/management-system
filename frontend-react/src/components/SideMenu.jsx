@@ -30,8 +30,8 @@ export default function SideMenu({
     ? 'border-slate-200/80 bg-slate-50/90 text-slate-500'
     : 'border-sky-100 bg-[linear-gradient(135deg,rgba(224,242,254,0.9),rgba(236,253,245,0.95))] text-sky-900';
   const containerClass = theme === 'dark'
-    ? 'sticky top-6 border-slate-200/80 bg-white/88'
-    : 'sticky top-6 border-sky-100/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(240,249,255,0.92))]';
+    ? 'border-slate-200/80 bg-white/88 lg:sticky lg:top-6'
+    : 'border-sky-100/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(240,249,255,0.92))] lg:sticky lg:top-6';
   const actionButtonClass = theme === 'dark'
     ? 'mt-4 block rounded-2xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-medium text-slate-700 hover:bg-slate-50'
     : 'mt-4 block rounded-2xl border border-sky-100 bg-white/90 px-4 py-3 text-center text-sm font-medium text-sky-700 shadow-[0_10px_24px_-20px_rgba(14,165,233,0.9)] hover:bg-sky-50';
@@ -42,8 +42,8 @@ export default function SideMenu({
     ? 'inline-flex h-7 min-w-7 items-center justify-center rounded-xl bg-slate-900 px-2 text-xs font-semibold text-white'
     : 'inline-flex h-7 min-w-7 items-center justify-center rounded-xl bg-sky-500 px-2 text-xs font-semibold text-white';
   const chatButtonClass = theme === 'dark'
-    ? 'fixed bottom-24 left-6 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-purple-600 text-white shadow-[0_18px_36px_-18px_rgba(88,28,135,0.8)] transition hover:bg-purple-700 hover:shadow-[0_22px_44px_-18px_rgba(88,28,135,0.9)]'
-    : 'fixed bottom-24 left-6 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-purple-600 text-white shadow-[0_18px_36px_-18px_rgba(88,28,135,0.8)] transition hover:bg-purple-700 hover:shadow-[0_22px_44px_-18px_rgba(88,28,135,0.9)]';
+    ? 'fixed bottom-5 right-5 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-purple-600 text-white shadow-[0_18px_36px_-18px_rgba(88,28,135,0.8)] transition hover:bg-purple-700 hover:shadow-[0_22px_44px_-18px_rgba(88,28,135,0.9)] lg:bottom-24 lg:left-6 lg:right-auto'
+    : 'fixed bottom-5 right-5 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-purple-600 text-white shadow-[0_18px_36px_-18px_rgba(88,28,135,0.8)] transition hover:bg-purple-700 hover:shadow-[0_22px_44px_-18px_rgba(88,28,135,0.9)] lg:bottom-24 lg:left-6 lg:right-auto';
   const collapseStorageKey = `side-menu-collapsed:${theme}:${title}`;
   const [chatOpen, setChatOpen] = useState(false);
 
@@ -103,7 +103,7 @@ export default function SideMenu({
 
   return (
     <>
-      <Card className={`${containerClass} p-5`}>
+      <Card className={`${containerClass} p-4 lg:p-5`}>
         <div className="flex items-start justify-between gap-3 border-b border-slate-200 pb-5">
           <div className="flex items-center gap-3">
             <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl font-semibold ${logoSrc ? 'border border-slate-200 bg-white shadow-none' : logoClass}`}>

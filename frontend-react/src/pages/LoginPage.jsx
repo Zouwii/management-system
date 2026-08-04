@@ -81,17 +81,17 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[radial-gradient(circle_at_top,#eef4fb_0%,#f7f9fc_38%,#eef2f7_100%)] px-6 py-10 text-slate-900">
-      <div className="relative w-[760px] overflow-hidden rounded-[40px] border border-white/70 bg-white/88 p-16 shadow-[0_30px_100px_rgba(15,23,42,0.12)] backdrop-blur">
+    <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,#eef4fb_0%,#f7f9fc_38%,#eef2f7_100%)] px-3 py-6 text-slate-900 sm:px-6 sm:py-10">
+      <div className="relative w-full max-w-[760px] overflow-hidden rounded-[28px] border border-white/70 bg-white/88 p-6 shadow-[0_30px_100px_rgba(15,23,42,0.12)] backdrop-blur sm:rounded-[36px] sm:p-10 lg:p-16">
         <div className="absolute -top-24 -right-16 h-56 w-56 rounded-full bg-sky-100/70 blur-3xl" />
         <div className="absolute -bottom-24 -left-16 h-56 w-56 rounded-full bg-indigo-100/70 blur-3xl" />
 
         <div className="relative text-center">
-          <div className="mt-8 text-[44px] font-bold tracking-[-0.02em] leading-tight text-slate-900">
+          <div className="mt-5 text-3xl font-bold leading-tight tracking-[-0.02em] text-slate-900 sm:mt-8 sm:text-[38px] lg:text-[44px]">
             本体开发部数据管理平台
           </div>
 
-          <div className="mt-5 text-lg text-slate-600">
+          <div className="mt-4 text-base text-slate-600 sm:mt-5 sm:text-lg">
             数据驱动 · AI驱动 · 研发效能提升
           </div>
 
@@ -155,7 +155,7 @@ export default function LoginPage() {
               (showOffline && (!selectedUserId || !password))
             }
             onClick={handleLogin}
-            className="mt-12 h-16 w-full rounded-full bg-gradient-to-r from-slate-900 to-slate-700 text-lg font-semibold text-white shadow-[0_18px_30px_rgba(15,23,42,0.18)] transition hover:translate-y-[-1px] hover:shadow-[0_22px_36px_rgba(15,23,42,0.2)] disabled:cursor-not-allowed disabled:opacity-70"
+            className="mt-8 h-14 w-full rounded-full bg-gradient-to-r from-slate-900 to-slate-700 text-base font-semibold text-white shadow-[0_18px_30px_rgba(15,23,42,0.18)] transition hover:translate-y-[-1px] hover:shadow-[0_22px_36px_rgba(15,23,42,0.2)] disabled:cursor-not-allowed disabled:opacity-70 sm:mt-12 sm:h-16 sm:text-lg"
           >
             {showOffline ? '本地登录' : '使用钉钉登录'}
           </button>

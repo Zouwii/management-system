@@ -298,7 +298,7 @@ export default function DepartmentOverview() {
             <div className="text-lg font-semibold text-slate-900">筛选时间</div>
           </div>
           <div className="flex w-full flex-wrap items-center gap-3 md:w-auto">
-            <label className="flex items-center gap-2 whitespace-nowrap text-sm text-slate-600">
+            <label className="flex w-full items-center gap-2 whitespace-nowrap text-sm text-slate-600 sm:w-auto">
               <span className="shrink-0">开始时间</span>
               <input
                 type="datetime-local"
@@ -306,10 +306,10 @@ export default function DepartmentOverview() {
                 value={dateRange.startDate}
                 onChange={(event) => setDateRange((prev) => ({ ...prev, startDate: event.target.value }))}
                 max={dateRange.endDate || undefined}
-                className="w-[220px] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-400"
+                className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-400 sm:w-[220px] sm:flex-none"
               />
             </label>
-            <label className="flex items-center gap-2 whitespace-nowrap text-sm text-slate-600">
+            <label className="flex w-full items-center gap-2 whitespace-nowrap text-sm text-slate-600 sm:w-auto">
               <span className="shrink-0">结束时间</span>
               <input
                 type="datetime-local"
@@ -317,7 +317,7 @@ export default function DepartmentOverview() {
                 value={dateRange.endDate}
                 onChange={(event) => setDateRange((prev) => ({ ...prev, endDate: event.target.value }))}
                 min={dateRange.startDate || undefined}
-                className="w-[220px] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-400"
+                className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-400 sm:w-[220px] sm:flex-none"
               />
             </label>
             <div className="flex items-center gap-2">

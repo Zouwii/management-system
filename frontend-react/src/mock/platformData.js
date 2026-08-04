@@ -75,43 +75,149 @@ export const personalHoursDashboard = {
   ],
 };
 
+const PERFORMANCE_QUARTERS = [
+  '2024 Q3',
+  '2024 Q4',
+  '2025 Q1',
+  '2025 Q2',
+  '2025 Q3',
+  '2025 Q4',
+  '2026 Q1',
+  '2026 Q2',
+];
+
+function roundPerformance(value) {
+  return Number(value.toFixed(3));
+}
+
+function getMockManagerScore(finalScore) {
+  if (finalScore >= 2) return 2;
+  if (finalScore >= 1.5) return 1.5;
+  if (finalScore >= 1.2) return 1.2;
+  if (finalScore >= 1) return 1;
+  if (finalScore >= 0.8) return 0.8;
+  if (finalScore >= 0.5) return 0.5;
+  return 0;
+}
+
+function buildPerformanceHistory(finalScores, hourScores, carryScores) {
+  return PERFORMANCE_QUARTERS.map((quarter, index) => {
+    const finalScore = finalScores[index];
+    const hourScore = hourScores[index];
+    const managerScore = getMockManagerScore(finalScore);
+    const previousCarry = index > 0 ? carryScores[index - 1] : 0;
+    const overallScore = roundPerformance(hourScore * 0.7 + managerScore * 0.3);
+    const balanceScore = roundPerformance(overallScore + previousCarry);
+    const carryScore = carryScores[index];
+
+    return {
+      quarter,
+      hourScore,
+      managerScore,
+      overallScore,
+      balanceScore,
+      overflowScore: roundPerformance(Math.max(balanceScore - finalScore, 0)),
+      decayScore: roundPerformance(carryScore * 0.25),
+      carryScore,
+      finalScore,
+    };
+  });
+}
+
+function createPerformanceArchive(targetLabel, scenario, finalScores, hourScores, carryScores) {
+  return {
+    targetLabel,
+    sourceLabel: `界面优化样例 · ${scenario}`,
+    desc: `匿名化 ${scenario} 数据，用于验证绩效卡片、档位颜色、季度明细、结余计算和趋势图。`,
+    history: buildPerformanceHistory(finalScores, hourScores, carryScores),
+  };
+}
+
 export const performanceArchives = {
-  李四: {
-    targetLabel: '李四',
-    sourceLabel: '匿名样例 A',
-    desc: '当前页面使用匿名化归档样例展示季度绩效与结余绩效，不映射任何真实人员信息。',
-    history: [
-      { quarter: '2024 Q4', hourScore: 1.05, managerScore: 1, overallScore: 1.035, balanceScore: 1.035, overflowScore: 0.035, decayScore: 0.009, carryScore: 0.035, finalScore: 1.0 },
-      { quarter: '2025 Q1', hourScore: 1.02, managerScore: 1.2, overallScore: 1.074, balanceScore: 1.109, overflowScore: 0.074, decayScore: 0.025, carryScore: 0.100, finalScore: 1.0 },
-      { quarter: '2025 Q2', hourScore: 1.05, managerScore: 1.2, overallScore: 1.095, balanceScore: 1.195, overflowScore: 0.095, decayScore: 0.043, carryScore: 0.170, finalScore: 1.0 },
-      { quarter: '2025 Q3', hourScore: 1.05, managerScore: 1.2, overallScore: 1.095, balanceScore: 1.265, overflowScore: 0.095, decayScore: 0.006, carryScore: 0.022, finalScore: 1.2 },
-      { quarter: '2025 Q4', hourScore: 0.93, managerScore: 1.0, overallScore: 0.951, balanceScore: 0.973, overflowScore: 0.151, decayScore: 0.042, carryScore: 0.168, finalScore: 0.8 },
-    ],
-  },
-  王主管: {
-    targetLabel: '王主管',
-    sourceLabel: '匿名样例 B',
-    desc: '主管账号使用匿名化归档样例数据，保留季度最终绩效和结余绩效口径。',
-    history: [
-      { quarter: '2024 Q4', hourScore: 1.0, managerScore: 1.0, overallScore: 1.041, balanceScore: 1.070, overflowScore: 0.041, decayScore: 0.016, carryScore: 0.063, finalScore: 1.0 },
-      { quarter: '2025 Q1', hourScore: 0.98, managerScore: 1.0, overallScore: 0.976, balanceScore: 1.039, overflowScore: 0.176, decayScore: 0.009, carryScore: 0.023, finalScore: 1.0 },
-      { quarter: '2025 Q2', hourScore: 1.0, managerScore: 1.0, overallScore: 1.0, balanceScore: 1.023, overflowScore: 0.039, decayScore: 0.012, carryScore: 0.017, finalScore: 1.0 },
-      { quarter: '2025 Q3', hourScore: 0.91, managerScore: 1.0, overallScore: 0.897, balanceScore: 0.914, overflowScore: 0.097, decayScore: 0.028, carryScore: 0.110, finalScore: 0.8 },
-      { quarter: '2025 Q4', hourScore: 1.0, managerScore: 1.0, overallScore: 1.0, balanceScore: 1.110, overflowScore: 0.000, decayScore: 0.021, carryScore: 0.083, finalScore: 1.0 },
-    ],
-  },
-  系统管理员: {
-    targetLabel: '系统管理员',
-    sourceLabel: '匿名样例 C',
-    desc: '管理员账号使用匿名化高档位样例，便于验证结余绩效累计和颜色态。',
-    history: [
-      { quarter: '2024 Q4', hourScore: 1.13, managerScore: 1.0, overallScore: 1.091, balanceScore: 1.091, overflowScore: 0.091, decayScore: 0.023, carryScore: 0.091, finalScore: 1.0 },
-      { quarter: '2025 Q1', hourScore: 1.08, managerScore: 1.2, overallScore: 1.116, balanceScore: 1.207, overflowScore: 0.116, decayScore: 0.000, carryScore: 0.000, finalScore: 1.2 },
-      { quarter: '2025 Q2', hourScore: 1.13, managerScore: 1.2, overallScore: 1.151, balanceScore: 1.151, overflowScore: 0.151, decayScore: 0.038, carryScore: 0.151, finalScore: 1.0 },
-      { quarter: '2025 Q3', hourScore: 1.11, managerScore: 1.2, overallScore: 1.137, balanceScore: 1.370, overflowScore: 0.019, decayScore: 0.033, carryScore: 0.132, finalScore: 1.2 },
-      { quarter: '2025 Q4', hourScore: 1.07, managerScore: 1.0, overallScore: 1.049, balanceScore: 1.181, overflowScore: 0.049, decayScore: 0.037, carryScore: 0.148, finalScore: 1.0 },
-    ],
-  },
+  李四: createPerformanceArchive(
+    '李四',
+    '稳定提升',
+    [0.8, 1.0, 1.0, 1.2, 1.0, 1.2, 1.5, 1.2],
+    [0.86, 0.98, 1.03, 1.12, 1.01, 1.15, 1.28, 1.18],
+    [0.01, 0.04, 0.07, 0.12, 0.06, 0.14, 0.18, 0.11],
+  ),
+  王强: createPerformanceArchive(
+    '王强',
+    '低谷恢复',
+    [1.0, 0.8, 0.5, 0.8, 1.0, 0.8, 1.0, 1.0],
+    [1.01, 0.91, 0.68, 0.88, 0.99, 0.92, 1.04, 1.06],
+    [0.05, 0.02, 0, 0.01, 0.05, 0.02, 0.07, 0.08],
+  ),
+  陈晨: createPerformanceArchive(
+    '陈晨',
+    '持续高绩效',
+    [1.0, 1.2, 1.2, 1.5, 1.2, 1.5, 1.5, 1.5],
+    [1.05, 1.14, 1.18, 1.31, 1.21, 1.36, 1.4, 1.43],
+    [0.05, 0.11, 0.14, 0.22, 0.16, 0.25, 0.3, 0.32],
+  ),
+  赵磊: createPerformanceArchive(
+    '赵磊',
+    '需要提高',
+    [1.0, 1.0, 0.8, 1.0, 0.8, 0.8, 1.0, 0.8],
+    [0.99, 1.02, 0.86, 0.97, 0.82, 0.84, 0.96, 0.79],
+    [0.04, 0.06, 0.02, 0.05, 0.01, 0, 0.04, 0],
+  ),
+  孙涛: createPerformanceArchive(
+    '孙涛',
+    '波动上升',
+    [0.8, 1.0, 0.8, 1.0, 1.2, 1.0, 1.2, 1.2],
+    [0.83, 0.97, 0.89, 1.03, 1.14, 1.06, 1.18, 1.22],
+    [0, 0.03, 0.01, 0.05, 0.12, 0.06, 0.13, 0.16],
+  ),
+  周凯: createPerformanceArchive(
+    '周凯',
+    '连续下滑',
+    [1.2, 1.0, 1.0, 0.8, 0.8, 0.5, 0.8, 0.5],
+    [1.16, 1.04, 0.99, 0.9, 0.84, 0.68, 0.8, 0.61],
+    [0.1, 0.07, 0.05, 0.02, 0, 0, 0.01, 0],
+  ),
+  何俊: createPerformanceArchive(
+    '何俊',
+    '杰出突破',
+    [1.0, 1.2, 1.2, 1.5, 1.5, 1.5, 2.0, 2.0],
+    [1.08, 1.18, 1.23, 1.39, 1.45, 1.51, 1.68, 1.76],
+    [0.08, 0.14, 0.19, 0.27, 0.34, 0.4, 0.52, 0.6],
+  ),
+  刘洋: createPerformanceArchive(
+    '刘洋',
+    '风险预警',
+    [1.0, 0.8, 0.8, 0.5, 0.8, 0.5, 0.5, 0.4],
+    [0.96, 0.87, 0.81, 0.63, 0.78, 0.59, 0.55, 0.42],
+    [0.04, 0.01, 0, 0, 0.01, 0, 0, 0],
+  ),
+  吴彬: createPerformanceArchive(
+    '吴彬',
+    '稳定达标',
+    [1.0, 1.0, 1.2, 1.0, 1.0, 1.2, 1.0, 1.0],
+    [1.01, 1.04, 1.14, 1.02, 1.05, 1.16, 1.08, 1.1],
+    [0.04, 0.06, 0.11, 0.07, 0.08, 0.13, 0.09, 0.1],
+  ),
+  导航主管: createPerformanceArchive(
+    '导航主管',
+    '主管高绩效',
+    [1.0, 1.2, 1.2, 1.2, 1.5, 1.2, 1.5, 1.5],
+    [1.08, 1.17, 1.22, 1.25, 1.38, 1.29, 1.44, 1.48],
+    [0.06, 0.12, 0.16, 0.2, 0.28, 0.22, 0.31, 0.35],
+  ),
+  对接主管: createPerformanceArchive(
+    '对接主管',
+    '主管稳健',
+    [1.0, 1.0, 1.2, 1.0, 1.2, 1.2, 1.0, 1.2],
+    [1.02, 1.06, 1.15, 1.08, 1.19, 1.22, 1.11, 1.24],
+    [0.04, 0.07, 0.12, 0.08, 0.14, 0.17, 0.11, 0.18],
+  ),
+  系统管理员: createPerformanceArchive(
+    '系统管理员',
+    '全档位覆盖',
+    [0.4, 0.5, 0.8, 1.0, 1.2, 1.5, 2.0, 2.0],
+    [0.48, 0.62, 0.85, 1.02, 1.18, 1.42, 1.7, 1.82],
+    [0, 0, 0.01, 0.05, 0.13, 0.26, 0.5, 0.68],
+  ),
 };
 
 export const aiInsightList = [

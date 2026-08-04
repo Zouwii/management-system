@@ -6,11 +6,8 @@ import {
   fetchWorkdayCosthourTeamSummary,
   fetchWorkdayCosthourDeptAggregate,
   fetchWorkdayCosthourTaskDetail,
-  fetchWorkdayCosthourMemberSummary,
   fetchWorkdayCosthourProjectNameDetail,
   fetchWorkdays,
-  fetchAttendance,
-  saveAttendance,
 } from '../api/dashboard';
 
 // ── 动态季度选项（基于当前年份） ──
@@ -293,9 +290,9 @@ function DualBarChart({ data = {}, title = '' }) {
   );
 }
 
-// ── 有效工时组别管理表 ──
+// ── 员工出勤表（由独立出勤页面复用） ──
 
-function EffectiveHourManageTable({ teams = [], selectedTeamId, onTeamChange, members = [], standardDays = 0, adjustments = {}, onAdjustmentChange, onSave, saving = false }) {
+export function AttendanceTable({ teams = [], selectedTeamId, onTeamChange, members = [], standardDays = 0, adjustments = {}, onAdjustmentChange, onSave, saving = false }) {
   const selectedMembers = members.filter((m) => !selectedTeamId || m.teamId === selectedTeamId);
   const hasAdjustments = Object.keys(adjustments).length > 0;
 
@@ -338,51 +335,66 @@ function EffectiveHourManageTable({ teams = [], selectedTeamId, onTeamChange, me
         <table className="min-w-full text-sm">
           <thead className="border-b border-slate-200 bg-white text-slate-500">
             <tr>
-              <th className="px-5 py-3 text-left font-medium">姓名</th>
-              <th className="px-5 py-3 text-right font-medium">预期天数</th>
-              <th className="px-5 py-3 text-right font-medium">实际天数</th>
-              <th className="bg-sky-50 px-5 py-3 text-center font-medium text-sky-700">加班</th>
-              <th className="bg-sky-50 px-5 py-3 text-center font-medium text-sky-700">请假</th>
-              <th className="px-5 py-3 text-right font-medium">差额</th>
+              <th className="px-5 py-3 text-center font-medium">姓名</th>
+              <th className="bg-emerald-50 px-5 py-3 text-center font-medium text-emerald-700">加班</th>
+              <th className="bg-rose-50 px-5 py-3 text-center font-medium text-rose-700">请假</th>
+              <th className="bg-amber-50 px-5 py-3 text-center font-medium text-amber-700">法定节假日</th>
+              <th className="px-5 py-3 text-center font-medium">有效工时</th>
+              <th className="px-5 py-3 text-center font-medium">工作日耗时</th>
+              <th className="px-5 py-3 text-center font-medium">已填工作日耗时</th>
+              <th className="px-5 py-3 text-center font-medium">工作日耗时差额</th>
             </tr>
           </thead>
           <tbody>
             {selectedMembers.length === 0 ? (
-              <tr><td className="px-5 py-4 text-slate-400" colSpan={6}>暂无数据</td></tr>
+              <tr><td className="px-5 py-4 text-center text-slate-400" colSpan={8}>暂无数据</td></tr>
             ) : selectedMembers.map((member) => {
-              const workday = Number(member.workdayCosthour || 0);
               const adjustment = adjustments[member.userId] || {};
               const overtime = Number(adjustment.overtimeDays || 0);
               const leave = Number(adjustment.leaveDays || 0);
+              const holiday = Number(adjustment.holidayDays || 0);
               const standard = Number(standardDays || 0);
-              const personalStandard = standard + overtime - leave;
-              const diff = workday - personalStandard;
+              const effectiveWorkdays = Math.max(0, standard - holiday);
+              const workdayCosthourDays = Math.max(0, standard + overtime - leave);
+              const filledCosthourDays = Number(member.workdayCosthour || 0);
+              const diff = workdayCosthourDays - filledCosthourDays;
               return (
                 <tr key={member.userId} className="border-b border-slate-100 last:border-b-0 hover:bg-slate-50">
-                  <td className="px-5 py-3 font-semibold text-slate-900">{member.userName}</td>
-                  <td className="bg-slate-50/60 px-5 py-3 text-right tabular-nums text-slate-600">{formatDays(personalStandard)}</td>
-                  <td className="bg-slate-50/60 px-5 py-3 text-right tabular-nums text-slate-600">{formatDays(workday)}</td>
-                  <td className="bg-sky-50/60 px-5 py-3 text-center">
+                  <td className="px-5 py-3 text-center font-semibold text-slate-900">{member.userName}</td>
+                  <td className="bg-emerald-50/60 px-5 py-3 text-center">
                     <input
                       type="number"
                       value={overtime}
                       step="0.5"
                       min="0"
                       onChange={(e) => onAdjustmentChange(member.userId, 'overtimeDays', e.target.value)}
-                      className="w-24 rounded-xl border border-sky-200 bg-white px-3 py-2 text-center text-sm font-medium text-slate-800 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                      className="w-24 rounded-xl border border-emerald-200 bg-white px-3 py-2 text-center text-sm font-medium text-slate-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
                     />
                   </td>
-                  <td className="bg-sky-50/60 px-5 py-3 text-center">
+                  <td className="bg-rose-50/60 px-5 py-3 text-center">
                     <input
                       type="number"
                       value={leave}
                       step="0.5"
                       min="0"
                       onChange={(e) => onAdjustmentChange(member.userId, 'leaveDays', e.target.value)}
-                      className="w-24 rounded-xl border border-sky-200 bg-white px-3 py-2 text-center text-sm font-medium text-slate-800 outline-none focus:border-sky-400 focus:ring-2 focus:ring-sky-100"
+                      className="w-24 rounded-xl border border-rose-200 bg-white px-3 py-2 text-center text-sm font-medium text-slate-800 outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
                     />
                   </td>
-                  <td className={`px-5 py-3 text-right font-semibold tabular-nums ${diff < 0 ? 'text-rose-700' : 'text-emerald-700'}`}>{formatDays(diff)}</td>
+                  <td className="bg-amber-50/60 px-5 py-3 text-center">
+                    <input
+                      type="number"
+                      value={holiday}
+                      step="0.5"
+                      min="0"
+                      onChange={(e) => onAdjustmentChange(member.userId, 'holidayDays', e.target.value)}
+                      className="w-24 rounded-xl border border-amber-200 bg-white px-3 py-2 text-center text-sm font-medium text-slate-800 outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100"
+                    />
+                  </td>
+                  <td className="px-5 py-3 text-center font-medium tabular-nums text-violet-700">{formatDays(effectiveWorkdays)}</td>
+                  <td className="bg-slate-50/60 px-5 py-3 text-center font-medium tabular-nums text-slate-700">{formatDays(workdayCosthourDays)}</td>
+                  <td className="px-5 py-3 text-center font-medium tabular-nums text-slate-700">{formatDays(filledCosthourDays)}</td>
+                  <td className={`px-5 py-3 text-center font-semibold tabular-nums ${diff > 0 ? 'text-rose-700' : 'text-emerald-700'}`}>{formatDays(diff)}</td>
                 </tr>
               );
             })}
@@ -626,11 +638,8 @@ function ProjectNameDetailTable({ details = [] }) {
 export default function WorkdayCostHourStats() {
   const [quarter, setQuarter] = useState('q1');
   const [selectedTeamId, setSelectedTeamId] = useState(null);
-  const [manageTeamId, setManageTeamId] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const [saveMsg, setSaveMsg] = useState(null);
 
   // 接口1：各小组汇总
   const [teamData, setTeamData] = useState({ timeRange: {}, total: {}, teams: [] });
@@ -638,10 +647,6 @@ export default function WorkdayCostHourStats() {
   const [deptData, setDeptData] = useState({ timeRange: {}, total: {}, byProjectType: {}, byVehicleType: {} });
   // 接口3：任务状态明细
   const [taskData, setTaskData] = useState({ timeRange: {}, total: {}, details: [], summary: {} });
-  // 个人维度统计
-  const [memberData, setMemberData] = useState({ timeRange: {}, total: {}, teams: [], members: [] });
-  // 页面临时录入：加班/请假，不持久化
-  const [memberAdjustments, setMemberAdjustments] = useState({});
   // 工作日数
   const [workdayCount, setWorkdayCount] = useState(null);
   // 项目名称明细
@@ -658,14 +663,12 @@ export default function WorkdayCostHourStats() {
     const payload = { start_time: quarterOption.start, end_time: quarterOption.end };
 
     try {
-      const [tRes, dRes, sRes, mRes, pnRes, wRes, aRes] = await Promise.all([
+      const [tRes, dRes, sRes, pnRes, wRes] = await Promise.all([
         fetchWorkdayCosthourTeamSummary(payload),
         fetchWorkdayCosthourDeptAggregate(payload),
         fetchWorkdayCosthourTaskDetail(payload),
-        fetchWorkdayCosthourMemberSummary(payload),
         fetchWorkdayCosthourProjectNameDetail(payload),
         fetchWorkdays(payload),
-        fetchAttendance(payload),
       ]);
       const t = tRes?.data || {};
       setTeamData({ timeRange: t.timeRange || {}, total: t.total || {}, teams: t.teams || [] });
@@ -682,35 +685,15 @@ export default function WorkdayCostHourStats() {
       const pn = pnRes?.data || {};
       setProjectNameData({ timeRange: pn.timeRange || {}, total: pn.total || {}, details: pn.details || [] });
 
-      const m = mRes?.data || {};
-      const nextMemberData = { timeRange: m.timeRange || {}, total: m.total || {}, teams: m.teams || [], members: m.members || [] };
-      setMemberData(nextMemberData);
-      if (!manageTeamId && nextMemberData.teams?.length) {
-        setManageTeamId(nextMemberData.teams[0].teamId);
-      }
-
       const wd = wRes?.data?.workday_count ?? wRes?.data?.effective_workday_count ?? wRes?.data?.workdays ?? null;
       setWorkdayCount(wd);
-
-      // 回填持久化的出勤数据
-      const attRecords = aRes?.data?.records || [];
-      if (attRecords.length > 0) {
-        const attMap = {};
-        attRecords.forEach((r) => {
-          attMap[r.user_id] = {
-            overtimeDays: r.overtime_days,
-            leaveDays: r.leave_days,
-          };
-        });
-        setMemberAdjustments(attMap);
-      }
     } catch (err) {
       console.error('工作日耗时数据加载失败:', err);
       setError(err?.message || '数据加载失败，请稍后重试');
     } finally {
       setLoading(false);
     }
-  }, [quarterOption, selectedTeamId, manageTeamId]);
+  }, [quarterOption, selectedTeamId]);
 
   // 首次加载
   useEffect(() => {
@@ -721,47 +704,6 @@ export default function WorkdayCostHourStats() {
   const handleQuery = useCallback(() => {
     loadAll();
   }, [loadAll]);
-
-  const handleAdjustmentChange = useCallback((userId, field, value) => {
-    setMemberAdjustments((prev) => ({
-      ...prev,
-      [userId]: {
-        ...(prev[userId] || {}),
-        [field]: value,
-      },
-    }));
-  }, []);
-
-  const handleSaveAttendance = useCallback(async () => {
-    setSaving(true);
-    setSaveMsg(null);
-    const records = memberData.members.map((m) => {
-      const adj = memberAdjustments[m.userId] || {};
-      return {
-        user_id: m.userId,
-        user_name: m.userName,
-        team_id: m.teamId,
-        overtime_days: Number(adj.overtimeDays || 0),
-        leave_days: Number(adj.leaveDays || 0),
-      };
-    });
-    try {
-      const res = await saveAttendance({
-        start_time: quarterOption.start,
-        records,
-      });
-      if (res?.code === 200 || res?.data) {
-        setSaveMsg({ type: 'success', text: `已保存 ${res?.data?.saved_count || records.length} 条记录` });
-      } else {
-        setSaveMsg({ type: 'error', text: res?.error || res?.message || '保存失败' });
-      }
-    } catch (err) {
-      setSaveMsg({ type: 'error', text: err?.message || '保存失败' });
-    } finally {
-      setSaving(false);
-      setTimeout(() => setSaveMsg(null), 3000);
-    }
-  }, [memberData.members, memberAdjustments, quarterOption]);
 
   const currentTeam = useMemo(
     () => teamData.teams.find((t) => t.teamId === selectedTeamId) || teamData.teams[0] || {},
@@ -791,12 +733,12 @@ export default function WorkdayCostHourStats() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="text-lg font-semibold text-slate-900">筛选时间</div>
           <div className="flex w-full flex-wrap items-center gap-3 md:w-auto">
-            <label className="flex items-center gap-2 whitespace-nowrap text-sm text-slate-600">
+            <label className="flex w-full items-center gap-2 whitespace-nowrap text-sm text-slate-600 sm:w-auto">
               <span className="shrink-0">统计季度</span>
               <select
                 value={quarter}
                 onChange={(e) => setQuarter(e.target.value)}
-                className="w-[220px] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-400"
+                className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-400 sm:w-[220px] sm:flex-none"
               >
                 {QUARTER_OPTIONS.map((q) => (
                   <option key={q.value} value={q.value}>{q.label}</option>
@@ -820,26 +762,6 @@ export default function WorkdayCostHourStats() {
           <div className="py-12 text-center text-slate-400">加载中...</div>
         ) : (
           <>
-            {/* ═══════ Effective Hour Management: 个人维度有效工时 ═══════ */}
-            <EffectiveHourManageTable
-              teams={memberData.teams.length ? memberData.teams : teamData.teams}
-              selectedTeamId={manageTeamId}
-              onTeamChange={setManageTeamId}
-              members={memberData.members}
-              standardDays={workdayCount || 0}
-              adjustments={memberAdjustments}
-              onAdjustmentChange={handleAdjustmentChange}
-              onSave={handleSaveAttendance}
-              saving={saving}
-            />
-            {saveMsg && (
-              <div className={`rounded-xl px-4 py-2 text-sm font-medium ${
-                saveMsg.type === 'success' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
-              }`}>
-                {saveMsg.text}
-              </div>
-            )}
-
             <Card className="overflow-hidden p-0">
               <div className="flex flex-col items-start justify-between gap-4 border-b border-slate-200 bg-slate-50 px-5 py-4 md:flex-row md:items-center">
                 <h2 className="text-lg font-semibold text-slate-900">小组数据看板</h2>

@@ -820,7 +820,7 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
         <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
           <div className="flex items-center">
             <div className="flex w-full flex-wrap items-center gap-3">
-              <label className="flex items-center gap-2 whitespace-nowrap text-sm text-slate-600">
+              <label className="flex w-full items-center gap-2 whitespace-nowrap text-sm text-slate-600 sm:w-auto">
                 <span className="shrink-0">开始时间</span>
                 <input
                   type="datetime-local"
@@ -828,10 +828,10 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
                   value={dateRange.startDate}
                   onChange={(event) => handleDateChange('startDate', event.target.value)}
                   max={dateRange.endDate || undefined}
-                  className="w-[220px] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-400"
+                  className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-400 sm:w-[220px] sm:flex-none"
                 />
               </label>
-              <label className="flex items-center gap-2 whitespace-nowrap text-sm text-slate-600">
+              <label className="flex w-full items-center gap-2 whitespace-nowrap text-sm text-slate-600 sm:w-auto">
                 <span className="shrink-0">结束时间</span>
                 <input
                   type="datetime-local"
@@ -839,10 +839,10 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
                   value={dateRange.endDate}
                   onChange={(event) => handleDateChange('endDate', event.target.value)}
                   min={dateRange.startDate || undefined}
-                  className="w-[220px] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-400"
+                  className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-400 sm:w-[220px] sm:flex-none"
                 />
               </label>
-              <div className="flex flex-nowrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
               <button
                 type="button"
                 onClick={() => {
@@ -1310,7 +1310,7 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
                   </div>
                 </div>
               </div>
-              <div className="w-[420px] rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="w-full rounded-2xl border border-slate-200 bg-slate-50 p-4 xl:w-[420px]">
                 <div className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">查看控制</div>
                 <div className="grid grid-cols-[minmax(0,132px)_56px_84px_84px] items-center gap-2">
                   <select
@@ -1346,7 +1346,7 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
             </div>
           </div>
         </div>
-        <div className={`mt-5 rounded-3xl border border-slate-200 ${showAllTasks ? '' : 'max-h-[320px] overflow-auto'}`}>
+        <div className={`mt-5 overflow-x-auto rounded-3xl border border-slate-200 ${showAllTasks ? '' : 'max-h-[320px] overflow-y-auto'}`}>
           <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1.54fr)_108px_108px_148px_108px_108px_108px_108px] gap-4 border-b border-slate-200 bg-slate-50 px-5 py-4 text-sm font-medium text-slate-500">
             <div>任务名称</div>
             <div>业务类型</div>
