@@ -21,18 +21,6 @@ import { mockAccounts, mockUsers } from '../../../mock/auth';
 const ALL_TARGET = 'ALL';
 const BASE_REFERENCE_HOURS = 156;
 
-function getCurrentLocalDateTime() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  const hours = String(now.getHours()).padStart(2, '0');
-  const minutePart = String(now.getMinutes()).padStart(2, '0');
-  const seconds = String(now.getSeconds()).padStart(2, '0');
-
-  return `${year}-${month}-${day}T${hours}:${minutePart}:${seconds}`;
-}
-
 function roundHours(value) {
   return Math.max(Math.round(value), 1);
 }
@@ -120,7 +108,8 @@ function buildPerformancePayload(user, target = user?.name) {
   const memberOptions = buildPerformanceMemberOptions(user);
   const fallbackTarget = user?.name ?? performanceArchives.李四.targetLabel;
   const targetIds = new Set(memberOptions.map((item) => item.id));
-  const resolvedTarget = targetIds.has(target) ? target : fallbackTarget;
+  const hasMockArchive = Object.prototype.hasOwnProperty.call(performanceArchives, target);
+  const resolvedTarget = targetIds.has(target) || hasMockArchive ? target : fallbackTarget;
   const templateEntries = Object.values(performanceArchives);
   const template = performanceArchives[resolvedTarget]
     ?? templateEntries[resolvedTarget.length % templateEntries.length]
@@ -146,10 +135,29 @@ export function mockFetchDepartmentOverview(user) {
   });
 }
 
+function buildMockTeamEffectiveRows(items, teamId, teamName, userIdPrefix) {
+  return items.map((item, index) => {
+    const completedHours = Math.max(0, 45 - index * 2);
+    const overdueCompletedHours = index % 2 === 0 ? 2 : 1;
+    return {
+      ...item,
+      userId: `${userIdPrefix}-${index + 1}`,
+      teamId,
+      teamName,
+      team: teamName,
+      quarterExpectedHours: 52,
+      scheduledHours: Math.max(0, 51 - index),
+      completedHours,
+      overdueEffectiveHours: 3,
+      overdueCompletedHours,
+    };
+  });
+}
+
 export function mockFetchNavTeamDetail(user) {
   return request(() => ({
     rows: filterRowsByDataScope(
-      navTeam.map((item) => ({ ...item, team: '导航组' })),
+      buildMockTeamEffectiveRows(navTeam, '0', '导航组', 'mock-nav'),
       user,
     ),
     lastUpdatedAt: new Date().toISOString(),
@@ -159,7 +167,7 @@ export function mockFetchNavTeamDetail(user) {
 export function mockFetchIntegrationTeamDetail(user) {
   return request(() => ({
     rows: filterRowsByDataScope(
-      integrationTeam.map((item) => ({ ...item, team: '对接组' })),
+      buildMockTeamEffectiveRows(integrationTeam, '1', '对接组', 'mock-integration'),
       user,
     ),
     lastUpdatedAt: new Date().toISOString(),
@@ -371,7 +379,6 @@ async function buildPersonalHoursByQuarterAgg({ user, target, compensatoryDays }
     };
   } catch (e) {
     // 出错时至少保证页面可渲染
-    // eslint-disable-next-line no-console
     console.error('[personal-hours][quarter-agg] failed:', e);
     return fallback;
   }
@@ -542,7 +549,7 @@ export function mockFetchAITtydSession(_user, payload = {}) {
   }));
 }
 
-export function mockInitTbcreateWorkspace(_user, _payload = {}) {
+export function mockInitTbcreateWorkspace() {
   return request(() => ({
     ok: true,
     workspaceDir: '(mock)',
@@ -552,7 +559,7 @@ export function mockInitTbcreateWorkspace(_user, _payload = {}) {
   }));
 }
 
-export function mockFetchTbcreateDraft(_user, _payload = {}) {
+export function mockFetchTbcreateDraft() {
   return request(() => ({
     title: '示例任务标题',
     workType: '指派型',
@@ -564,11 +571,11 @@ export function mockFetchTbcreateDraft(_user, _payload = {}) {
   }));
 }
 
-export function mockSaveTbcreateDraft(_user, _payload = {}) {
+export function mockSaveTbcreateDraft() {
   return request(() => ({ saved: true, savedAt: new Date().toISOString() }));
 }
 
-export function mockFetchTbcreateTasks(_user, _payload = {}) {
+export function mockFetchTbcreateTasks() {
   return request(() => []);
 }
 
@@ -822,7 +829,7 @@ export function mockFetchWorkdayCosthourProjectNameDetail() {
 }
 
 export function mockFetchWorkdays() {
-  return delay({ code: 200, data: { workday_count: 59, workdays: 59 } });
+  return delay({ code: 200, data: { workday_count: 59, workdays: 59, holiday_count: 7 } });
 }
 
 // ── 员工出勤表 Mock ──
@@ -832,8 +839,8 @@ export function mockFetchAttendance() {
     code: 200,
     data: {
       records: [
-        { user_id: 'u1', user_name: '张三', team_id: 'nav', overtime_days: 2, leave_days: 1, year: 2026, quarter: 1 },
-        { user_id: 'u2', user_name: '李四', team_id: 'servo', overtime_days: 0, leave_days: 0.5, year: 2026, quarter: 1 },
+        { user_id: 'u1', user_name: '张三', team_id: 'nav', overtime_days: 2, leave_days: 1, statutory_holiday_days: 7, year: 2026, quarter: 1 },
+        { user_id: 'u2', user_name: '李四', team_id: 'servo', overtime_days: 0, leave_days: 0.5, statutory_holiday_days: 7, year: 2026, quarter: 1 },
       ],
       year: 2026,
       quarter: 1,
@@ -847,14 +854,67 @@ export function mockSaveAttendance() {
 
 // ── 绩效导入 Mock ──
 
-export function mockFetchTeamImportUsers() {
-  const members = [
-    { userId: 'u2', userName: '李四', isTeamLead: false, workHourScore: 1.05, supervisorScore: 1.0, calcStatus: 'filled',
-      prevCarryBalance: 0.25, prevDecayValue: 0.062 },
-    { userId: 'u3', userName: '王五', isTeamLead: true, workHourScore: null, supervisorScore: null, calcStatus: null,
-      prevCarryBalance: 0.0, prevDecayValue: 0.0 },
-  ];
-  return Promise.resolve({ code: 200, error: '', data: { members, count: members.length } });
+const mockPerformanceTeams = {
+  nav: [
+    { userId: 'mock-nav-lead', userName: '导航主管', character: 0, isTeamLead: true },
+    { userId: 'mock-nav-lisi', userName: '李四', character: 1, isTeamLead: false },
+    { userId: 'mock-nav-wangqiang', userName: '王强', character: 4, isTeamLead: false },
+    { userId: 'mock-nav-chenchen', userName: '陈晨', character: 1, isTeamLead: false },
+    { userId: 'mock-nav-zhaolei', userName: '赵磊', character: 4, isTeamLead: false },
+  ],
+  servo: [
+    { userId: 'mock-servo-lead', userName: '对接主管', character: 0, isTeamLead: true },
+    { userId: 'mock-servo-suntao', userName: '孙涛', character: 2, isTeamLead: false },
+    { userId: 'mock-servo-zhoukai', userName: '周凯', character: 2, isTeamLead: false },
+    { userId: 'mock-servo-hejun', userName: '何俊', character: 1, isTeamLead: false },
+    { userId: 'mock-servo-liuyang', userName: '刘洋', character: 1, isTeamLead: false },
+    { userId: 'mock-servo-wubin', userName: '吴彬', character: 2, isTeamLead: false },
+  ],
+};
+
+const mockImportStatuses = {
+  导航主管: 'archived',
+  李四: 'calculated',
+  王强: 'filled',
+  陈晨: 'calculated',
+  赵磊: null,
+  对接主管: 'archived',
+  孙涛: 'calculated',
+  周凯: 'filled',
+  何俊: 'calculated',
+  刘洋: null,
+  吴彬: 'calculated',
+};
+
+function buildMockImportMember(member) {
+  const archive = performanceArchives[member.userName] ?? performanceArchives.李四;
+  const current = archive.history[archive.history.length - 1];
+  const previous = archive.history[archive.history.length - 2];
+  const calcStatus = mockImportStatuses[member.userName];
+  const hasInput = calcStatus !== null;
+  const hasResult = calcStatus === 'calculated' || calcStatus === 'archived';
+
+  return {
+    ...member,
+    workHourScore: hasInput ? current.hourScore : null,
+    supervisorScore: hasInput ? current.managerScore : null,
+    calcStatus,
+    prevCarryBalance: previous?.carryScore ?? 0,
+    prevDecayValue: previous?.decayScore ?? 0,
+    overallScore: hasResult ? current.overallScore : null,
+    compensationValue: hasResult ? Math.max(current.finalScore - current.balanceScore, 0) : null,
+    overflowValue: hasResult ? current.overflowScore : null,
+    finalScore: hasResult ? current.finalScore : null,
+    newCarryBalance: hasResult ? current.carryScore : null,
+    carryDecayValue: hasResult ? current.decayScore : null,
+    companyScore: hasResult ? current.finalScore : null,
+  };
+}
+
+export function mockFetchTeamImportUsers(params = {}) {
+  const teamKey = params.team === 'servo' ? 'servo' : 'nav';
+  const members = mockPerformanceTeams[teamKey].map(buildMockImportMember);
+  return delay({ code: 200, error: '', data: { members, count: members.length } });
 }
 
 export function mockBatchImportScores() {
@@ -866,7 +926,7 @@ export function mockUpdateMemberPerformance() {
 }
 
 export function mockFetchTeams() {
-  return Promise.resolve({
+  return delay({
     code: 200, error: '',
     data: {
       teams: [
@@ -877,21 +937,27 @@ export function mockFetchTeams() {
   });
 }
 
-export function mockFetchMembers() {
-  return Promise.resolve({
+export function mockFetchMembers(teamKey = 'nav') {
+  const resolvedTeam = teamKey === 'servo' ? 'servo' : 'nav';
+  const teamLabel = resolvedTeam === 'nav' ? '导航组' : '对接组';
+  const members = mockPerformanceTeams[resolvedTeam].map((member) => ({
+    ...member,
+    teamKey: resolvedTeam,
+    teamLabel,
+    isNavLead: resolvedTeam === 'nav' && member.isTeamLead,
+    isServoLead: resolvedTeam === 'servo' && member.isTeamLead,
+  }));
+
+  return delay({
     code: 200, error: '',
     data: {
-      members: [
-        { userId: 'u2', userName: '李四', teamKey: 'nav', teamLabel: '导航组', character: 0, isTeamLead: true, isNavLead: true, isServoLead: false },
-        { userId: 'u3', userName: '王五', teamKey: 'servo', teamLabel: '对接组', character: 2, isTeamLead: false, isNavLead: false, isServoLead: false },
-        { userId: 'u4', userName: '赵六', teamKey: 'servo', teamLabel: '对接组', character: 0, isTeamLead: true, isNavLead: false, isServoLead: true },
-      ],
-      count: 3,
+      members,
+      count: members.length,
     },
   });
 }
 
-export function mockRecalcMemberPerformance(_payload = {}) {
+export function mockRecalcMemberPerformance() {
   return Promise.resolve({
     code: 200,
     data: { success: true },
@@ -906,10 +972,30 @@ export function mockIncreaseSync() {
   });
 }
 
-export function mockFetchTeamPerformance(_user, _params = {}) {
-  return Promise.resolve({
+export function mockFetchTeamPerformance(_user, params = {}) {
+  const teamKey = params.teamKey === 'servo' ? 'servo' : 'nav';
+  const requestedYear = Number(params.year);
+  const requestedQuarter = Number(params.quarter);
+  const quarterLabel = `${requestedYear} Q${requestedQuarter}`;
+  const results = mockPerformanceTeams[teamKey].map((member) => {
+    const archive = performanceArchives[member.userName] ?? performanceArchives.李四;
+    const performance = archive.history.find((item) => item.quarter === quarterLabel);
+    if (!performance) return null;
+
+    return {
+      userId: member.userId,
+      userName: member.userName,
+      year: requestedYear,
+      quarter: requestedQuarter,
+      finalScore: performance.finalScore,
+      newCarryBalance: performance.carryScore,
+      calcStatus: mockImportStatuses[member.userName],
+    };
+  }).filter(Boolean);
+
+  return delay({
     code: 200,
     error: '',
-    data: { results: [], count: 0 },
+    data: { results, count: results.length },
   });
 }

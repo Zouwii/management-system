@@ -31,8 +31,8 @@ export default function EmployeeLayout({ children }) {
   const note = '';
 
   return (
-    <div className="grid grid-cols-12 gap-6">
-      <aside className={collapsed ? 'col-span-1' : 'col-span-2'}>
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-6">
+      <aside className={`min-w-0 ${collapsed ? 'lg:col-span-1' : 'lg:col-span-2'}`}>
         <SideMenu
           title={title}
           subtitle={subtitle}
@@ -47,7 +47,7 @@ export default function EmployeeLayout({ children }) {
           onToggleCollapse={() => setCollapsed((prev) => !prev)}
         />
       </aside>
-      <main className={collapsed ? 'col-span-11 space-y-6' : 'col-span-10 space-y-6'}>{children}</main>
+      <main className={`min-w-0 space-y-4 lg:space-y-6 ${collapsed ? 'lg:col-span-11' : 'lg:col-span-10'}`}>{children}</main>
     </div>
   );
 }

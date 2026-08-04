@@ -9,6 +9,143 @@ import { formatDateTime } from '../utils/workHours';
 import { fetchMembers, fetchTeamPerformance } from '../api/dashboard';
 import { shouldHideMemberInSelector } from '../utils/memberVisibility';
 
+const PERFORMANCE_LINE_COLORS = [
+  '#2563eb',
+  '#059669',
+  '#d97706',
+  '#dc2626',
+  '#7c3aed',
+  '#0891b2',
+  '#db2777',
+  '#65a30d',
+  '#ea580c',
+  '#4f46e5',
+  '#0f766e',
+  '#9333ea',
+];
+
+function TeamPerformanceTrendChart({ data, members }) {
+  const width = 960;
+  const height = 400;
+  const padding = { top: 24, right: 28, bottom: 46, left: 52 };
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+  const yMax = 2.1;
+  const yTicks = [0, 0.5, 0.8, 1, 1.2, 1.5, 2];
+  const getX = (index) => (
+    data.length > 1
+      ? padding.left + (index * chartWidth) / (data.length - 1)
+      : padding.left + chartWidth / 2
+  );
+  const getY = (score) => padding.top + ((yMax - score) / yMax) * chartHeight;
+
+  return (
+    <div>
+      <div className="overflow-x-auto">
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          className="block h-[400px] w-full min-w-[760px]"
+          role="img"
+          aria-label="团队成员季度绩效变化趋势图"
+        >
+          {yTicks.map((tick) => {
+            const y = getY(tick);
+            return (
+              <g key={tick}>
+                <line
+                  x1={padding.left}
+                  y1={y}
+                  x2={width - padding.right}
+                  y2={y}
+                  stroke={tick === 1 ? '#16a34a' : '#e2e8f0'}
+                  strokeDasharray={tick === 1 ? '6 4' : '3 3'}
+                />
+                <text x={padding.left - 12} y={y + 4} textAnchor="end" fontSize="12" fill="#64748b">
+                  {tick.toFixed(1)}
+                </text>
+              </g>
+            );
+          })}
+          <line
+            x1={padding.left}
+            y1={padding.top}
+            x2={padding.left}
+            y2={height - padding.bottom}
+            stroke="#cbd5e1"
+          />
+          <line
+            x1={padding.left}
+            y1={height - padding.bottom}
+            x2={width - padding.right}
+            y2={height - padding.bottom}
+            stroke="#cbd5e1"
+          />
+          {data.map((point, index) => (
+            <text
+              key={point.quarter}
+              x={getX(index)}
+              y={height - 18}
+              textAnchor="middle"
+              fontSize="12"
+              fill="#64748b"
+            >
+              {point.quarter}
+            </text>
+          ))}
+          {members.map((member, memberIndex) => {
+            const color = PERFORMANCE_LINE_COLORS[memberIndex % PERFORMANCE_LINE_COLORS.length];
+            const path = data.map((point, index) => {
+              const score = Number(point[member]);
+              if (!Number.isFinite(score)) return null;
+              return { x: getX(index), y: getY(score), score, quarter: point.quarter };
+            });
+            let hasPreviousPoint = false;
+            const pathData = path.map((point) => {
+              if (!point) {
+                hasPreviousPoint = false;
+                return '';
+              }
+              const command = hasPreviousPoint ? 'L' : 'M';
+              hasPreviousPoint = true;
+              return `${command} ${point.x} ${point.y}`;
+            }).join(' ');
+
+            return (
+              <g key={member}>
+                <path d={pathData} fill="none" stroke={color} strokeWidth="2.5" />
+                {path.filter(Boolean).map((point) => (
+                  <circle
+                    key={`${member}-${point.quarter}`}
+                    cx={point.x}
+                    cy={point.y}
+                    r="4"
+                    fill="#fff"
+                    stroke={color}
+                    strokeWidth="2.5"
+                  >
+                    <title>{`${member} · ${point.quarter} · ${point.score.toFixed(2)}`}</title>
+                  </circle>
+                ))}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+      <div className="mt-3 flex flex-wrap justify-center gap-x-5 gap-y-2">
+        {members.map((member, index) => (
+          <div key={member} className="flex items-center gap-2 text-xs text-slate-600">
+            <span
+              className="h-0.5 w-5 rounded-full"
+              style={{ backgroundColor: PERFORMANCE_LINE_COLORS[index % PERFORMANCE_LINE_COLORS.length] }}
+            />
+            <span>{member}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function formatRawDays(value) {
   const n = Number(value || 0);
   return Number.isFinite(n) ? n.toFixed(1) : '0.0';
@@ -72,28 +209,6 @@ function RiskExplanation({ metric }) {
   );
 }
 
-function getPerformanceBand(score) {
-  if (score >= 2) {
-    return '杰出';
-  }
-  if (score >= 1.5) {
-    return '优秀';
-  }
-  if (score >= 1.2) {
-    return '超出期望';
-  }
-  if (score >= 1.0) {
-    return '符合期望';
-  }
-  if (score >= 0.8) {
-    return '需要提高';
-  }
-  if (score >= 0.5) {
-    return '需要改进';
-  }
-  return '不及格';
-}
-
 function normalizeHoursRows(rows) {
   return rows.map((row) => {
     const quarterExpectedHours = Number(row.quarterExpectedHours || 0);
@@ -128,28 +243,6 @@ function normalizeHoursRows(rows) {
       completionRiskLevel: getRiskLevel(completionActualHours, quarterExpectedHours),
     };
   });
-}
-
-function buildPerformanceRows(rows, quarter) {
-  return rows.map((row) => {
-    const finalScore = Number(row.finalScore);
-    const carryScore = Number(row.carryScore);
-    const score = Number.isFinite(finalScore) ? finalScore : 0;
-    return {
-      ...row,
-      quarter: row.quarter || quarter,
-      finalScore: score,
-      carryScore: Number.isFinite(carryScore) ? carryScore : 0,
-      band: Number.isFinite(finalScore) ? getPerformanceBand(score) : '-',
-      performanceRisk: Number.isFinite(finalScore) ? score < 1.0 : false,
-    };
-  });
-}
-
-function getCurrentQuarterLabel() {
-  const now = new Date();
-  const q = Math.floor(now.getMonth() / 3) + 1;
-  return `${now.getFullYear()}Q${q}`;
 }
 
 function generateQuarterOptions() {
@@ -229,11 +322,6 @@ export default function TeamDetailDashboard({
     allocation: '只看分配不足',
     completion: '只看完成不足',
   })[searchParams.get('hoursAbnormal') || ''] ?? '全部成员';
-  const initialPerformanceScore = ({
-    below: '低于1.0',
-    mid: '1.0-1.2',
-    high: '1.2及以上',
-  })[searchParams.get('performanceScore') || ''] ?? '全部绩效';
   const [rows, setRows] = useState(fallbackRows);
   const [memberOptions, setMemberOptions] = useState(['全部', ...fallbackRows.map((row) => row.name)]);
   const [lastUpdatedAt, setLastUpdatedAt] = useState('');
@@ -245,37 +333,52 @@ export default function TeamDetailDashboard({
   const [dateRange, setDateRange] = useState(() => buildExpectedDateRange(initialExpectedView));
 
   const [performanceMemberFilter, setPerformanceMemberFilter] = useState('全部');
-  const [performanceScoreFilter, setPerformanceScoreFilter] = useState(initialPerformanceScore);
   const performanceQuarters = useMemo(() => generateQuarterOptions(), []);
   const defaultQuarter = useMemo(() => getDefaultQuarter(), []);
-  const [selectedQuarter, setSelectedQuarter] = useState(defaultQuarter);
-  const [appliedQuarter, setAppliedQuarter] = useState(defaultQuarter);
-  const [performanceData, setPerformanceData] = useState([]);
-  const [perfLoading, setPerfLoading] = useState(false);
+  const [performanceQueryVersion, setPerformanceQueryVersion] = useState(0);
+  const [performanceTrendData, setPerformanceTrendData] = useState([]);
+  const [perfLoading, setPerfLoading] = useState(true);
 
-  // 切换季度时拉取绩效数据
+  // 默认拉取最新绩效季度及之前最多 8 个季度，用于团队趋势图。
   useEffect(() => {
     let active = true;
-    const parsed = parseQuarterLabel(appliedQuarter);
-    if (!parsed || !teamKey) return;
+    const appliedIndex = performanceQuarters.indexOf(defaultQuarter);
+    const trendQuarters = performanceQuarters
+      .slice(appliedIndex >= 0 ? appliedIndex : 0, (appliedIndex >= 0 ? appliedIndex : 0) + 8)
+      .reverse();
 
-    setPerfLoading(true);
-    fetchTeamPerformance(user, {
-      year: parsed.year,
-      quarter: parsed.quarter,
-      teamKey,
-    }).then((res) => {
+    if (!teamKey || trendQuarters.length === 0) return;
+
+    Promise.all(trendQuarters.map(async (quarterLabel) => {
+      const parsed = parseQuarterLabel(quarterLabel);
+      if (!parsed) return { quarter: quarterLabel, results: [] };
+
+      try {
+        const response = await fetchTeamPerformance(user, {
+          year: parsed.year,
+          quarter: parsed.quarter,
+          teamKey,
+        });
+        return {
+          quarter: quarterLabel,
+          results: response?.data?.results ?? [],
+        };
+      } catch {
+        return { quarter: quarterLabel, results: [] };
+      }
+    })).then((quarterResults) => {
       if (!active) return;
-      setPerformanceData(res?.data?.results ?? []);
-      setPerfLoading(false);
-    }).catch(() => {
-      if (!active) return;
-      setPerformanceData([]);
+      setPerformanceTrendData(quarterResults);
       setPerfLoading(false);
     });
 
     return () => { active = false; };
-  }, [appliedQuarter, teamKey, user]);
+  }, [defaultQuarter, performanceQuarters, performanceQueryVersion, teamKey, user]);
+
+  function handlePerformanceQuery() {
+    setPerfLoading(true);
+    setPerformanceQueryVersion((version) => version + 1);
+  }
 
   // 工时数据加载
   useEffect(() => {
@@ -318,16 +421,11 @@ export default function TeamDetailDashboard({
       allocation: '只看分配不足',
       completion: '只看完成不足',
     })[searchParams.get('hoursAbnormal') || ''] ?? '全部成员';
-    const nextPerformanceScore = ({
-      below: '低于1.0',
-      mid: '1.0-1.2',
-      high: '1.2及以上',
-    })[searchParams.get('performanceScore') || ''] ?? '全部绩效';
-
+    // URL 查询参数是外部状态，需要在路由变化后同步到筛选控件。
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setExpectedView(nextExpectedView);
     setDateRange(buildExpectedDateRange(nextExpectedView));
     setHoursAbnormalFilter(nextHoursAbnormal);
-    setPerformanceScoreFilter(nextPerformanceScore);
   }, [searchParams]);
 
   function applyExpectedView(view) {
@@ -349,11 +447,15 @@ export default function TeamDetailDashboard({
 
   useEffect(() => {
     if (memberOptions.includes(hoursMemberFilter)) return;
+    // 成员列表来自异步接口，切组后需要回退到有效选项。
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setHoursMemberFilter('全部');
   }, [hoursMemberFilter, memberOptions]);
 
   useEffect(() => {
     if (memberOptions.includes(performanceMemberFilter)) return;
+    // 成员列表来自异步接口，切组后需要回退到有效选项。
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPerformanceMemberFilter('全部');
   }, [memberOptions, performanceMemberFilter]);
 
@@ -408,45 +510,49 @@ export default function TeamDetailDashboard({
     return filteredRows;
   }, [allHourRows, allocationSort, completionSort, hoursAbnormalFilter, hoursMemberFilter]);
 
-  const visiblePerformanceRows = useMemo(() => {
-    // 将 API 返回的绩效数据与 rows 做 join（rows 有 userName / role）
-    const rowMap = {};
-    rows.forEach((r) => {
-      rowMap[String(r.userId || '')] = r;
+  const performanceTrendChart = useMemo(() => {
+    const rowNameMap = new Map();
+    rows.forEach((row) => {
+      const userId = String(row.userId || '');
+      if (userId) rowNameMap.set(userId, row.name || row.userName || userId);
     });
 
-    let perfRows = performanceData.map((p) => {
-      const info = rowMap[String(p.userId || '')] || {};
-      const score = Number(p.finalScore);
-      return {
-        userId: p.userId,
-        name: info.name || info.userName || p.userId,
-        role: info.role || '-',
-        quarter: `${p.year}Q${p.quarter}`,
-        finalScore: Number.isFinite(score) ? score : 0,
-        band: Number.isFinite(score) ? getPerformanceBand(score) : '-',
-        carryScore: Number(p.newCarryBalance || 0),
-        performanceRisk: Number.isFinite(score) ? score < 1.0 : false,
-      };
+    const resolveMemberName = (result) => (
+      rowNameMap.get(String(result.userId || ''))
+      || result.userName
+      || result.userId
+    );
+    const memberNames = [];
+    const memberNameSet = new Set();
+
+    performanceTrendData.forEach(({ results }) => {
+      results.forEach((result) => {
+        const name = resolveMemberName(result);
+        if (name && !memberNameSet.has(name)) {
+          memberNameSet.add(name);
+          memberNames.push(name);
+        }
+      });
     });
 
-    // 过滤
-    return perfRows.filter((row) => {
-      if (performanceMemberFilter !== '全部' && row.name !== performanceMemberFilter) {
-        return false;
-      }
-      if (performanceScoreFilter === '低于1.0') {
-        return row.finalScore < 1.0;
-      }
-      if (performanceScoreFilter === '1.0-1.2') {
-        return row.finalScore >= 1.0 && row.finalScore < 1.2;
-      }
-      if (performanceScoreFilter === '1.2及以上') {
-        return row.finalScore >= 1.2;
-      }
-      return true;
+    const visibleMembers = performanceMemberFilter === '全部'
+      ? memberNames
+      : memberNames.filter((name) => name === performanceMemberFilter);
+    const visibleMemberSet = new Set(visibleMembers);
+    const data = performanceTrendData.map(({ quarter, results }) => {
+      const point = { quarter };
+      results.forEach((result) => {
+        const name = resolveMemberName(result);
+        const score = Number(result.finalScore);
+        if (visibleMemberSet.has(name) && Number.isFinite(score)) {
+          point[name] = score;
+        }
+      });
+      return point;
     });
-  }, [performanceData, rows, performanceMemberFilter, performanceScoreFilter]);
+
+    return { data, members: visibleMembers };
+  }, [performanceMemberFilter, performanceTrendData, rows]);
 
   const teamHoursSummary = useMemo(() => ({
     quarterExpectedHours: visibleHourRows.reduce((sum, row) => sum + row.quarterExpectedHours, 0),
@@ -469,9 +575,6 @@ export default function TeamDetailDashboard({
     const first = rows.find((r) => Number.isFinite(Number(r?.workdayCount)));
     return Number(first?.workdayCount || 0);
   }, [rows]);
-  const avgFinalPerformance = visiblePerformanceRows.length
-    ? (visiblePerformanceRows.reduce((sum, row) => sum + row.finalScore, 0) / visiblePerformanceRows.length).toFixed(2)
-    : '0.00';
   const expectedConfig = expectedView === 'custom'
     ? {
         label: '筛选区间预期有效工时',
@@ -521,21 +624,21 @@ export default function TeamDetailDashboard({
           <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
             <div className="flex items-center">
               <div className="flex w-full flex-wrap items-center gap-3">
-                <label className="flex items-center gap-2 whitespace-nowrap text-sm text-slate-600">
+                <label className="flex w-full items-center gap-2 whitespace-nowrap text-sm text-slate-600 sm:w-auto">
                   <span className="shrink-0">开始时间</span>
                   <input type="datetime-local" step="1" value={dateRange.startDate}
                     onChange={(event) => handleDateRangeChange('startDate', event.target.value)}
                     max={dateRange.endDate || undefined}
-                    className="w-[220px] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-400" />
+                    className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-400 sm:w-[220px] sm:flex-none" />
                 </label>
-                <label className="flex items-center gap-2 whitespace-nowrap text-sm text-slate-600">
+                <label className="flex w-full items-center gap-2 whitespace-nowrap text-sm text-slate-600 sm:w-auto">
                   <span className="shrink-0">结束时间</span>
                   <input type="datetime-local" step="1" value={dateRange.endDate}
                     onChange={(event) => handleDateRangeChange('endDate', event.target.value)}
                     min={dateRange.startDate || undefined}
-                    className="w-[220px] rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-400" />
+                    className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none focus:border-slate-400 sm:w-[220px] sm:flex-none" />
                 </label>
-                <div className="flex flex-nowrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                 <button type="button" onClick={() => applyExpectedView('last_quarter')}
                   className={`whitespace-nowrap rounded-full border px-3 py-2 text-sm font-medium ${expectedView === 'last_quarter' ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}>
                   上季度</button>
@@ -714,10 +817,9 @@ export default function TeamDetailDashboard({
       <Card className="overflow-hidden">
         <div className="border-b border-slate-200 bg-slate-50 px-5 py-5">
           <div className="text-lg font-semibold">绩效情况</div>
-          <div className="mt-1 text-sm text-slate-500">按季度查看每个成员的绩效结果，默认展示当前最新季度。</div>
         </div>
         <div className="border-b border-slate-200 bg-white px-5 py-4">
-          <div className="grid gap-3 xl:grid-cols-[220px_180px_180px_max-content_1fr]">
+          <div className="grid gap-3 xl:grid-cols-[220px_max-content]">
             <select
               value={performanceMemberFilter}
               onChange={(event) => setPerformanceMemberFilter(event.target.value)}
@@ -727,65 +829,31 @@ export default function TeamDetailDashboard({
                 <option key={member} value={member}>{member === '全部' ? '全部成员' : member}</option>
               ))}
             </select>
-            <select
-              value={selectedQuarter}
-              onChange={(event) => setSelectedQuarter(event.target.value)}
-              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none"
-            >
-              {performanceQuarters.map((quarter) => (
-                <option key={quarter} value={quarter}>{quarter}</option>
-              ))}
-            </select>
-            <select
-              value={performanceScoreFilter}
-              onChange={(event) => setPerformanceScoreFilter(event.target.value)}
-              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none"
-            >
-              <option value="全部绩效">全部绩效</option>
-              <option value="低于1.0">低于 1.0</option>
-              <option value="1.0-1.2">1.0 - 1.2</option>
-              <option value="1.2及以上">1.2 及以上</option>
-            </select>
             <button
               type="button"
-              onClick={() => setAppliedQuarter(selectedQuarter)}
+              onClick={handlePerformanceQuery}
               disabled={perfLoading}
               className="w-fit justify-self-start rounded-full bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
             >
               {perfLoading ? '查询中...' : '查询'}
             </button>
-            <div className="flex items-center justify-end text-sm text-slate-500">
-              平均最终绩效
-              {' '}
-              <span className="ml-1 font-semibold text-slate-900">{avgFinalPerformance}</span>
-            </div>
           </div>
         </div>
-        <div className="overflow-auto">
-          <table className="w-full text-sm">
-            <thead className="border-b border-slate-200 bg-white text-slate-500">
-              <tr>
-                <th className="px-5 py-4 text-left font-medium">姓名</th>
-                <th className="px-5 py-4 text-left font-medium">岗位</th>
-                <th className="px-5 py-4 text-left font-medium">季度</th>
-                <th className="px-5 py-4 text-left font-medium">最终绩效</th>
-                <th className="px-5 py-4 text-left font-medium">档位</th>
-                <th className="px-5 py-4 text-left font-medium">本季度结余</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visiblePerformanceRows.map((row, index) => (
-                <tr key={`${row.name}-${index}`} className={index !== visiblePerformanceRows.length - 1 ? 'border-b border-slate-100' : ''}>
-                  <td className="px-5 py-4 font-medium text-slate-900">{row.name}</td>
-                  <td className="px-5 py-4 text-slate-600">{row.role}</td>
-                  <td className="px-5 py-4 text-slate-600">{row.quarter}</td>
-                  <td className={`px-5 py-4 font-medium ${row.performanceRisk ? 'text-rose-700' : 'text-emerald-700'}`}>{row.finalScore.toFixed(2)}</td>
-                  <td className="px-5 py-4 text-slate-600">{row.band}</td>
-                  <td className="px-5 py-4 text-slate-600">{row.carryScore.toFixed(3)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="border-b border-slate-200 bg-white px-5 py-5">
+          <div className="h-[450px] min-w-0">
+            {perfLoading ? (
+              <div className="flex h-full items-center justify-center text-sm text-slate-500">正在加载团队趋势...</div>
+            ) : performanceTrendChart.members.length > 0 ? (
+              <TeamPerformanceTrendChart
+                data={performanceTrendChart.data}
+                members={performanceTrendChart.members}
+              />
+            ) : (
+              <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-sm text-slate-500">
+                当前筛选条件下暂无绩效趋势数据
+              </div>
+            )}
+          </div>
         </div>
       </Card>
 

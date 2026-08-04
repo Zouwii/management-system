@@ -626,6 +626,21 @@ def init_database() -> None:
         except Exception:
             # 不阻断服务启动；由上层业务容错或你手工执行迁移
             pass
+
+        # member_attendance 表字段补齐：保存每位成员按季度录入的法定节假日。
+        try:
+            cols_attendance = {c.get("name") for c in inspector.get_columns("member_attendance")}
+            if "statutory_holiday_days" not in cols_attendance:
+                with engine.begin() as conn:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE member_attendance "
+                            "ADD COLUMN statutory_holiday_days FLOAT NOT NULL DEFAULT 0"
+                        )
+                    )
+        except Exception:
+            # 不阻断服务启动；缺列时接口会返回明确错误，便于手工迁移。
+            pass
     except Exception:
         # 不阻断服务启动：字段不存在/表不存在由上层业务容错
         pass

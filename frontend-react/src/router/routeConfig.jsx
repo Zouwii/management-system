@@ -7,6 +7,8 @@ import AIAnalysisPage from '../pages/AIAnalysisPage';
 import LoginPage from '../pages/LoginPage';
 import Prototype from '../pages/Prototype';
 import WorkdayCostHourStats from '../pages/WorkdayCostHourStats';
+import AttendancePage from '../pages/AttendancePage';
+import QuarterlyEffectivePerformancePage from '../pages/QuarterlyEffectivePerformancePage';
 import { PAGE_PERMISSION_CODES } from '../constants/permissionCodes';
 import { ROUTE_PATHS } from '../constants/routes';
 import { ROLES } from '../constants/roles';
@@ -78,6 +80,22 @@ export const appRouteConfig = [
     allowedRoles: [ROLES.MANAGER, ROLES.ADMIN],
     permissionCode: PAGE_PERMISSION_CODES.WORKDAY_COSTHOUR,
     element: <WorkdayCostHourStats />,
+  },
+  {
+    path: ROUTE_PATHS.ATTENDANCE,
+    label: '出勤表',
+    menu: true,
+    allowedRoles: [ROLES.MANAGER, ROLES.ADMIN],
+    permissionCode: PAGE_PERMISSION_CODES.WORKDAY_COSTHOUR,
+    element: <AttendancePage />,
+  },
+  {
+    path: ROUTE_PATHS.QUARTERLY_PERFORMANCE,
+    label: '季度绩效',
+    menu: true,
+    allowedRoles: [ROLES.MANAGER, ROLES.ADMIN],
+    permissionCode: PAGE_PERMISSION_CODES.WORKDAY_COSTHOUR,
+    element: <QuarterlyEffectivePerformancePage />,
   },
 ];
 

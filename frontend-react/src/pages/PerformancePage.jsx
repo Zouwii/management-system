@@ -2,7 +2,6 @@ import { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { fetchPerformanceHistory, fetchMembers, fetchTeams } from '../api/dashboard';
 import Card from '../components/Card';
-import PerfImportModal from '../components/PerfImportModal';
 import SectionTitle from '../components/SectionTitle';
 import { ROLES } from '../constants/roles';
 import EmployeeLayout from '../layouts/EmployeeLayout';
@@ -117,7 +116,6 @@ export default function PerformancePage() {
   const [teams, setTeams] = useState([]);
   const [isQuerying, setIsQuerying] = useState(false);
   const [showMoreColumns, setShowMoreColumns] = useState(false);
-  const [importOpen, setImportOpen] = useState(false);
   const initialLoadDone = useRef(false);
 
   // 加载小组列表
@@ -236,52 +234,47 @@ export default function PerformancePage() {
         title="绩效管理"
       />
 
-      <Card className="p-6">
-            <div className="text-lg font-semibold">绩效查询</div>
-        {canViewAllPeople ? (
-          <div className="mt-5 flex flex-wrap items-end gap-3">
-            <label className="min-w-[140px]">
-              <div className="text-sm font-medium text-slate-700">小组</div>
-              <select
-                className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-slate-300"
-                value={selectedTeam}
-                onChange={(e) => setSelectedTeam(e.target.value)}
+      {canViewAllPeople ? (
+        <Card className="p-5">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="text-lg font-semibold text-slate-900">绩效查询</div>
+            <div className="flex w-full flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center lg:w-auto">
+              <label className="flex w-full items-center gap-2 whitespace-nowrap text-sm text-slate-600 sm:w-auto">
+                <span className="shrink-0">小组</span>
+                <select
+                  className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-slate-400 sm:w-[160px] sm:flex-none"
+                  value={selectedTeam}
+                  onChange={(e) => setSelectedTeam(e.target.value)}
+                >
+                  {teams.map((t) => (
+                    <option key={t.key} value={t.key}>{t.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex w-full items-center gap-2 whitespace-nowrap text-sm text-slate-600 sm:w-auto">
+                <span className="shrink-0">人员</span>
+                <select
+                  className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-slate-400 sm:w-[200px] sm:flex-none"
+                  value={selectedTarget}
+                  onChange={(event) => setSelectedTarget(event.target.value)}
+                >
+                  {memberOptions.map((item) => (
+                    <option key={item.id} value={item.id}>{item.name}</option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={handleQuery}
+                disabled={isQuerying}
               >
-                {teams.map((t) => (
-                  <option key={t.key} value={t.key}>{t.label}</option>
-                ))}
-              </select>
-            </label>
-            <label className="min-w-[200px]">
-              <div className="text-sm font-medium text-slate-700">人员</div>
-              <select
-                className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-slate-300"
-                value={selectedTarget}
-                onChange={(event) => setSelectedTarget(event.target.value)}
-              >
-                {memberOptions.map((item) => (
-                  <option key={item.id} value={item.id}>{item.name}</option>
-                ))}
-              </select>
-            </label>
-            <button
-              type="button"
-              className="rounded-full bg-slate-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-              onClick={handleQuery}
-              disabled={isQuerying}
-            >
-              {isQuerying ? '查询中...' : '查询绩效'}
-            </button>
-            <button
-              type="button"
-              className="rounded-full border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900"
-              onClick={() => setImportOpen(true)}
-            >
-              导入/编辑绩效
-            </button>
+                {isQuerying ? '查询中...' : '查询绩效'}
+              </button>
+            </div>
           </div>
-        ) : null}
-      </Card>
+        </Card>
+      ) : null}
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,0.9fr)]">
         <Card className={`p-6 ${getThresholdClass(currentQuarter?.finalScore ?? 0)}`}>
@@ -503,7 +496,6 @@ export default function PerformancePage() {
         </div>
       </Card>
 
-      <PerfImportModal open={importOpen} onClose={() => setImportOpen(false)} />
 
     </EmployeeLayout>
   );
