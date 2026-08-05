@@ -140,6 +140,10 @@ def exchange_dingtalk_auth_code(auth_code: str, payload: Optional[Dict[str, Any]
         }
 
     try:
+        from base.api_monitor import check_api_allowed
+        if not check_api_allowed():
+            return {"ok": False, "error": "daily API limit reached"}
+
         t0 = time.time()
         resp = requests.post(
             "https://api.dingtalk.com/v1.0/oauth2/userAccessToken",
@@ -170,6 +174,10 @@ def get_dingtalk_user_info(access_token: str) -> Dict[str, Any]:
         return {"ok": False, "error": "missing accessToken"}
 
     try:
+        from base.api_monitor import check_api_allowed
+        if not check_api_allowed():
+            return {"ok": False, "error": "daily API limit reached"}
+
         t0 = time.time()
         resp = requests.get(
             "https://api.dingtalk.com/v1.0/contact/users/me",
@@ -202,6 +210,10 @@ def get_userid_by_unionid(unionid: str) -> Dict[str, Any]:
 
     access_token = token_out.get("access_token")
     try:
+        from base.api_monitor import check_api_allowed
+        if not check_api_allowed():
+            return {"ok": False, "error": "daily API limit reached"}
+
         t0 = time.time()
         resp = requests.get(
             "https://oapi.dingtalk.com/user/getUseridByUnionid",
@@ -308,6 +320,14 @@ def fetch_dingtalk_json(payload: Dict) -> Dict:
     url = "https://oapi.dingtalk.com/gettoken"
     params = {"appkey": app_key, "appsecret": app_secret}
     try:
+        from base.api_monitor import check_api_allowed
+        if not check_api_allowed():
+            return {
+                "source": "dingtalk_oapi_gettoken",
+                "ok": False,
+                "error": "daily API limit reached",
+                "timestamp": now_ts,
+            }
         t0 = time.time()
         resp = requests.get(url, params=params, timeout=30)
         _record("/gettoken", resp.status_code, int((time.time() - t0) * 1000))

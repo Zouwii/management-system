@@ -39,6 +39,8 @@ WORKDAY_DURATION_CUSTOMFIELD_ID = "665ee4b95b46f34b3e04634f"
 WORKDAY_FLAG_CUSTOMFIELD_ID = "667a65e618aebd88f98d4896"
 NEED_STATISTIC_CUSTOMFIELD_ID = "667a65e618aebd88f98d4896"  # 是/否 标记（与 WORKDAY_FLAG 同一字段）
 CASCADING_PROJECT_FIELD_ID = "665ee4b45b46f34b3e045af2"       # 级联：项目分类 / 车型 / 项目名称
+PROGRAM_PROBLEM_TYPE_FIELD_ID = "67c56f477ed2b4b7bbd0cd69"
+PROGRAM_CAUSE_FIELD_ID = "67c571aa5aed540b545e208c"
 DEFAULT_BUSINESS_TYPE_TAG_MAPPING = {
     "65264cfd697b6b909485bcbc": 0,  # 产品
     "65264cf79ed530912c3edf0f": 1,  # 研发
@@ -426,6 +428,43 @@ def _extract_cascading_project_fields(item: Dict[str, Any]) -> Dict[str, Optiona
     return result
 
 
+def _extract_program_issue_label_levels(item: Dict[str, Any]) -> Dict[str, Optional[str]]:
+    """解析问题类型、问题原因的真实层级标签，供 program_issue_detail 直接落列。"""
+    result = {
+        "problem_type_level_1": None,
+        "problem_type_level_2": None,
+        "problem_type_level_3": None,
+        "cause_level_1": None,
+        "cause_level_2": None,
+        "cause_level_3": None,
+    }
+    cfs = item.get("customFields") or item.get("customfields") or []
+    if not isinstance(cfs, list):
+        return result
+
+    field_prefixes = {
+        PROGRAM_PROBLEM_TYPE_FIELD_ID: "problem_type_level_",
+        PROGRAM_CAUSE_FIELD_ID: "cause_level_",
+    }
+    for cf in cfs:
+        if not isinstance(cf, dict):
+            continue
+        prefix = field_prefixes.get(str(cf.get("customFieldId") or cf.get("customfieldId") or "").strip())
+        if not prefix:
+            continue
+        for value in cf.get("value") or []:
+            if not isinstance(value, dict) or not value.get("title"):
+                continue
+            parts = [part.strip() for part in str(value["title"]).split("/") if part.strip()]
+            for index, part in enumerate(parts[:3], 1):
+                key = f"{prefix}{index}"
+                if result[key] is None:
+                    result[key] = part
+                elif part not in result[key].split("; "):
+                    result[key] += f"; {part}"
+    return result
+
+
 def _sync_one_detail_to_b_and_c(
     one_session,
     *,
@@ -473,6 +512,7 @@ def _sync_one_detail_to_b_and_c(
     task_nature = _extract_task_nature(item)
     workday_costhour = _extract_workday_costhour(item)
     cascading = _extract_cascading_project_fields(item)
+    label_levels = _extract_program_issue_label_levels(item)
 
     if write_b:
         if is_overdue:
@@ -677,6 +717,8 @@ def _sync_one_issue_detail(
         row.project_category_1 = cascading["project_category_1"]
         row.vehicle_type_2 = cascading["vehicle_type_2"]
         row.project_name_3 = cascading["project_name_3"]
+        for key, value in label_levels.items():
+            setattr(row, key, value)
         row.fetched_at = now
     else:
         one_session.add(
@@ -713,6 +755,12 @@ def _sync_one_issue_detail(
                 project_category_1=cascading["project_category_1"],
                 vehicle_type_2=cascading["vehicle_type_2"],
                 project_name_3=cascading["project_name_3"],
+                problem_type_level_1=label_levels["problem_type_level_1"],
+                problem_type_level_2=label_levels["problem_type_level_2"],
+                problem_type_level_3=label_levels["problem_type_level_3"],
+                cause_level_1=label_levels["cause_level_1"],
+                cause_level_2=label_levels["cause_level_2"],
+                cause_level_3=label_levels["cause_level_3"],
                 fetched_at=now,
             )
         )

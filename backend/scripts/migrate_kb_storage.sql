@@ -41,6 +41,15 @@ ALTER TABLE kb_storage.kb_chunks
   ADD FULLTEXT INDEX ft_kb_chunks_content (content) WITH PARSER ngram;
 
 -- ============================================================
+-- 6. RAG v3.0: 重命名 raw_json -> outline（分级目录）
+--    执行方式：
+--      mysql -u root -p kb_storage < scripts/migrate_kb_storage.sql
+--    或直接在服务器上执行：
+--      ALTER TABLE kb_documents RENAME COLUMN raw_json TO outline;
+-- ============================================================
+ALTER TABLE kb_storage.kb_documents RENAME COLUMN raw_json TO outline;
+
+-- ============================================================
 -- 迁移完成后，重启 Flask 服务即可使用新库。
 -- 验证通过后，可以手动删除旧表：
 --   DROP TABLE benti_management.kb_documents;

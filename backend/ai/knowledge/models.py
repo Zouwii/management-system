@@ -55,7 +55,7 @@ class KbDocument(KbBase):
     content: Mapped[str] = mapped_column(
         MEDIUMTEXT().with_variant(Text(), "sqlite"), default=""
     )
-    raw_json: Mapped[str] = mapped_column(
+    outline: Mapped[str] = mapped_column(
         MEDIUMTEXT().with_variant(Text(), "sqlite"), default=""
     )
     error_code: Mapped[str | None] = mapped_column(String(16), nullable=True, index=True)

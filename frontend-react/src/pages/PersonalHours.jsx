@@ -633,21 +633,36 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
       const response = await increaseSync(user);
       const d = response?.data || {};
       setLastUpdatedAt(d.beijing_now ?? lastUpdatedAt);
-      const dev = d.dev || {};
-      const issue = d.issue || {};
-      const devOk = dev.ok ?? 0;
-      const devFail = dev.fail ?? 0;
-      const issueOk = issue.ok ?? 0;
-      const issueFail = issue.fail ?? 0;
-      const totalOk = devOk + issueOk;
-      const totalFail = devFail + issueFail;
-      setActionMessage(
-        `已同步 DEV ${devOk}/${d.user_count ?? '?'}人`
-        + (devFail ? `(${devFail}失败)` : '')
-        + `，Issue ${issueOk}/${d.user_count ?? '?'}人`
-        + (issueFail ? `(${issueFail}失败)` : '')
-        + (totalFail ? `，共${totalFail}失败` : '')
-      );
+
+      if (d.benti_optimized) {
+        // 优化版：本体团队去重同步
+        const devW = d.dev_written ?? 0;
+        const issueW = d.issue_written ?? 0;
+        const uniqueTasks = d.unique_task_count ?? 0;
+        const detailCount = d.detail_count ?? 0;
+        setActionMessage(
+          `已同步 ${d.user_count ?? '?'}名本体成员`
+          + `，去重任务 ${uniqueTasks} 条`
+          + (d.detail_count ? `（${detailCount}条明细）` : '')
+          + `，DEV ${devW} + Issue ${issueW}`
+        );
+      } else {
+        const dev = d.dev || {};
+        const issue = d.issue || {};
+        const devOk = dev.ok ?? 0;
+        const devFail = dev.fail ?? 0;
+        const issueOk = issue.ok ?? 0;
+        const issueFail = issue.fail ?? 0;
+        const totalOk = devOk + issueOk;
+        const totalFail = devFail + issueFail;
+        setActionMessage(
+          `已同步 DEV ${devOk}/${d.user_count ?? '?'}人`
+          + (devFail ? `(${devFail}失败)` : '')
+          + `，Issue ${issueOk}/${d.user_count ?? '?'}人`
+          + (issueFail ? `(${issueFail}失败)` : '')
+          + (totalFail ? `，共${totalFail}失败` : '')
+        );
+      }
     } catch (error) {
       if (isUpdateBusyError(error)) {
         showBusyHint();

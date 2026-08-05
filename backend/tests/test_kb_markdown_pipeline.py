@@ -70,7 +70,7 @@ class MarkdownDownloadTests(unittest.TestCase):
     def test_persist_keeps_old_content_when_download_failed(self):
         successful_row = SimpleNamespace(
             content="old-success",
-            raw_json="",
+            outline="",
             fetch_status="success",
             fail_reason="",
             synced_at=None,
@@ -78,7 +78,7 @@ class MarkdownDownloadTests(unittest.TestCase):
         )
         failed_row = SimpleNamespace(
             content="old-must-survive",
-            raw_json="old-raw",
+            outline="old-raw",
             fetch_status="success",
             fail_reason="",
             synced_at=None,
@@ -125,7 +125,7 @@ class MarkdownDownloadTests(unittest.TestCase):
 
         self.assertTrue(session.committed)
         self.assertEqual(successful_row.content, "# New")
-        sync_meta = json.loads(successful_row.raw_json)["_management_system"]
+        sync_meta = json.loads(successful_row.outline)["_management_system"]
         self.assertEqual(sync_meta["source"], "mcp_markdown")
         self.assertEqual(failed_row.content, "old-must-survive")
         self.assertEqual(failed_row.fetch_status, "success")
@@ -135,7 +135,7 @@ class MarkdownDownloadTests(unittest.TestCase):
     def test_persist_marks_failed_only_when_no_cached_content(self):
         row = SimpleNamespace(
             content="",
-            raw_json="",
+            outline="",
             fetch_status="pending",
             fail_reason="",
             synced_at=None,
@@ -196,9 +196,9 @@ class IncrementalSyncTests(unittest.TestCase):
 
 class PipelineTests(unittest.TestCase):
     def test_only_markdown_origin_cache_is_considered_ready(self):
-        legacy = SimpleNamespace(raw_json=json.dumps({"data": {"blocks": []}}))
-        markdown = SimpleNamespace(raw_json=json.dumps({"success": True, "markdown": "# Doc"}))
-        local = SimpleNamespace(raw_json=json.dumps({"source": "local_markdown"}))
+        legacy = SimpleNamespace(outline=json.dumps({"data": {"blocks": []}}))
+        markdown = SimpleNamespace(outline=json.dumps({"success": True, "markdown": "# Doc"}))
+        local = SimpleNamespace(outline=json.dumps({"source": "local_markdown"}))
 
         self.assertFalse(routes._has_markdown_source(legacy))
         self.assertTrue(routes._has_markdown_source(markdown))
@@ -232,14 +232,14 @@ class PipelineTests(unittest.TestCase):
         db.add_all([
             KbDocument(
                 node_id="legacy", workspace_id="ws-1", title="legacy",
-                content="legacy body", raw_json=json.dumps({"ok": True, "data": {}}),
+                content="legacy body", outline=json.dumps({"ok": True, "data": {}}),
                 fetch_status="failed", synced_at=old_time,
                 created_at=old_time, updated_at=old_time,
             ),
             KbDocument(
                 node_id="unchanged", workspace_id="ws-1", title="unchanged",
                 content="# unchanged",
-                raw_json=json.dumps({
+                outline=json.dumps({
                     "markdown": "# unchanged",
                     "_management_system": {
                         "source": "mcp_markdown",
@@ -252,7 +252,7 @@ class PipelineTests(unittest.TestCase):
             KbDocument(
                 node_id="changed", workspace_id="ws-1", title="changed",
                 content="# old",
-                raw_json=json.dumps({
+                outline=json.dumps({
                     "markdown": "# old",
                     "_management_system": {
                         "source": "mcp_markdown",
@@ -265,7 +265,7 @@ class PipelineTests(unittest.TestCase):
             KbDocument(
                 node_id="retry", workspace_id="ws-1", title="retry",
                 content="",
-                raw_json=json.dumps({
+                outline=json.dumps({
                     "_management_system": {"source": "mcp_pending"},
                 }),
                 fetch_status="failed", synced_at=old_time,
@@ -309,7 +309,7 @@ class PipelineTests(unittest.TestCase):
             new = db.query(KbDocument).filter_by(node_id="new").one()
             self.assertEqual(legacy.fetch_status, "success")
             self.assertEqual(
-                json.loads(new.raw_json)["_management_system"]["source"],
+                json.loads(new.outline)["_management_system"]["source"],
                 "mcp_pending",
             )
         finally:
@@ -355,7 +355,7 @@ class PipelineTests(unittest.TestCase):
             workspace_id="ws-1",
             title="Demo",
             content="legacy body",
-            raw_json="",
+            outline="",
             fetch_status="pending",
             synced_at=now,
             created_at=now,

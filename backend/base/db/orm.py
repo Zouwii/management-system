@@ -203,6 +203,14 @@ class ProgramIssueDetail(Base):
     vehicle_type_2: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     project_name_3: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
 
+    # 问题类型/原因标签层级（从问题处理 customFields 回填）
+    problem_type_level_1: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    problem_type_level_2: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    problem_type_level_3: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    cause_level_1: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    cause_level_2: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    cause_level_3: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.now)
 
 
@@ -505,6 +513,8 @@ class OnsiteProblemDetail(Base):
     task_stage_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     due_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     start_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    ding_created: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    ding_updated: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     is_done: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
     is_archived: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)

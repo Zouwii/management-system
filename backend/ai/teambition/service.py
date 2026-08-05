@@ -208,6 +208,10 @@ def create_task(draft: Dict[str, Any], template: Optional[Dict[str, Any]] = None
     # Call DingTalk API
     url = f"https://api.dingtalk.com/v1.0/project/users/{user_id}/tasks"
     try:
+        from base.api_monitor import check_api_allowed
+        if not check_api_allowed():
+            return {"success": False, "error": "daily API limit reached", "data": {}}
+
         _start = time.time()
         resp = requests.post(
             url,

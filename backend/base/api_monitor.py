@@ -39,10 +39,11 @@ class ApiCallMonitor:
         self._last_record_at: float = time.time()
         # 内存计数器：当天调用次数 + 硬限阻断标记，避免等待 DB 写入
         self._today_str: str = _bj_today_str()
-        self._mem_count: int = 0
-        self._hard_blocked: bool = False
-        self._bypass_depth: int = 0   # >0 时绕过限流（全量更新）
+        self._mem_count: int = self._load_today_count()
+        self._hard_blocked: bool = self._mem_count >= self._daily_limit()
         self._count_lock = threading.Lock()
+        if self._hard_blocked:
+            print(f"[api_monitor] STARTUP: {self._mem_count}/{self._daily_limit()} calls already reached, hard block active")
 
     @classmethod
     def get(cls) -> "ApiCallMonitor":
@@ -53,13 +54,8 @@ class ApiCallMonitor:
         return cls._instance
 
     def check_allowed(self) -> bool:
-        """实时检查是否允许发起新的钉钉 API 调用。硬限时返回 False。
-
-        全量更新期间 (_bypass_depth > 0) 总是允许。
-        """
+        """实时检查是否允许发起新的钉钉 API 调用。硬限时返回 False。"""
         with self._count_lock:
-            if self._bypass_depth > 0:
-                return True
             # 日期切换：重置内存计数
             today = _bj_today_str()
             if self._today_str != today:
@@ -76,16 +72,12 @@ class ApiCallMonitor:
             return True
 
     def enter_bypass(self) -> None:
-        """进入全量更新模式，绕过限流。"""
-        with self._count_lock:
-            self._bypass_depth += 1
-            print(f"[api_monitor] bypass enabled (depth={self._bypass_depth})")
+        """（已禁用）绕过限流机制已在 2026-08 关闭。此方法无操作。"""
+        pass
 
     def leave_bypass(self) -> None:
-        """退出全量更新模式。"""
-        with self._count_lock:
-            self._bypass_depth = max(0, self._bypass_depth - 1)
-            print(f"[api_monitor] bypass disabled (depth={self._bypass_depth})")
+        """（已禁用）绕过限流机制已在 2026-08 关闭。此方法无操作。"""
+        pass
 
     def record(self, endpoint: str, status: int, latency_ms: int, error: str = "",
                source: str = ""):
@@ -145,9 +137,29 @@ class ApiCallMonitor:
         # 写入后检查用量，超限自动降级同步
         self._ensure_state()
 
+    def _load_today_count(self) -> int:
+        """从 DB 加载当天已有的 API 调用计数。进程重启后恢复状态。"""
+        try:
+            from base.db.engine import SessionLocal
+            from sqlalchemy import text
+            session = SessionLocal()
+            try:
+                today_str = _bj_now().strftime("%Y-%m-%d")
+                row = session.execute(text(
+                    "SELECT COUNT(*) FROM api_call_logs WHERE DATE(created_at) = :today"
+                ), {"today": today_str}).fetchone()
+                cnt = int(row[0]) if row else 0
+                if cnt > 0:
+                    print(f"[api_monitor] loaded {cnt} existing calls for {today_str} from DB")
+            finally:
+                session.close()
+        except Exception:
+            cnt = 0
+        return cnt
+
     def _daily_limit(self) -> int:
-        """当日硬限额（100%）：临时调高到 2000000"""
-        return 2000000
+        """当日硬限额（100%）"""
+        return 5000
 
     def _soft_limit(self) -> int:
         """当日软限额（80%）：硬限额 × 0.8"""

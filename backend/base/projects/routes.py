@@ -14,16 +14,11 @@ from base.sync.lock import (
     _acquire_update_lock,
     _release_update_lock,
     DEFAULT_UPDATE_LOCK_KEY,
-    SyncBlocked,
-    sync_guard,
-    LOCK_BENTI,
 )
 from base.sync.task_sync import (
     normal_incremental_update_service,
-    normal_issue_incremental_update_service,
     sync_project_details_in_time_range_service,
     sync_project_tasks_to_db,
-    _upsert_config_value,
 )
 from base.config.service import is_sync_enabled
 
@@ -86,72 +81,50 @@ def register(bp, ok, fail):
 
     @bp.route("/increase_sync", methods=["POST"])
     def increase_sync():
-        """增量同步 user_character 表中所有用户，使用同一个 last_update_time 快照。"""
+        """增量同步：委托给 benti_team_incremental_update_service（去重优化版）。
+
+        仅同步本体团队（team_id 0/1）20 人，列表及明细均跨成员去重，
+        相比旧版"逐用户全量拉取"节省 80%+ API 调用量。
+        """
 
         try:
-            with sync_guard(LOCK_BENTI, owner := "increase@{}".format(int(time.time()))):
-                from base.db.orm import UserCharacter as DbUserCharacter
-            from base.db.engine import SessionLocal
+            from base.sync.task_sync import benti_team_incremental_update_service
             from base.config.service import get_config_projectids
-            from base.api_monitor import BJ_TZ
 
-            # 获取 project_id
             projectids = get_config_projectids() or {}
             project_id = str(next(iter(projectids.values())) or "").strip()
             if not project_id:
                 return fail("missing projectId from config", code=400)
 
-            # 获取所有用户
-            sess = SessionLocal()
-            try:
-                rows = sess.query(DbUserCharacter.user_id).all()
-                user_ids = [str(r[0]).strip() for r in rows if r and str(r[0]).strip()]
-            finally:
-                sess.close()
+            result = benti_team_incremental_update_service({"projectId": project_id})
 
-            if not user_ids:
-                return fail("no users found in user_character", code=400)
-
-            # 逐用户同步 DEV + Issue，skip_update_time=True 避免每个用户推进 last_update_time
-            dev_ok = 0
-            dev_fail = 0
-            issue_ok = 0
-            issue_fail = 0
-            errors = []
-            for uid in user_ids:
-                dev_out = normal_incremental_update_service(
-                    {"userId": uid, "projectId": project_id},
-                    skip_update_time=True,
+            if not result.get("success"):
+                return fail(
+                    result.get("error", "benti incremental update failed"),
+                    code=500,
+                    data=result.get("data") or {},
                 )
-                if dev_out.get("success"):
-                    dev_ok += 1
-                else:
-                    dev_fail += 1
-                    errors.append({"userId": uid, "type": "dev", "error": dev_out.get("error")})
 
-                issue_out = normal_issue_incremental_update_service(
-                    {"userId": uid, "projectId": project_id},
-                    skip_update_time=True,
-                )
-                if issue_out.get("success"):
-                    issue_ok += 1
-                else:
-                    issue_fail += 1
-                    errors.append({"userId": uid, "type": "issue", "error": issue_out.get("error")})
-
-            # 所有用户同步完成后，推进 last_update_time 一次
-            now_bj = dt.now(BJ_TZ)
-            _upsert_config_value("last_update_time", now_bj.isoformat())
-
+            data = result.get("data") or {}
+            written = data.get("written") or {}
             return ok({
-                "beijing_now": now_bj.isoformat(),
-                "user_count": len(user_ids),
-                "dev": {"ok": dev_ok, "fail": dev_fail},
-                "issue": {"ok": issue_ok, "fail": issue_fail},
-                "errors": errors[:20],
+                "beijing_now": data.get("lastUpdateTime", ""),
+                "user_count": data.get("memberCount", 0),
+                "dev": {
+                    "ok": data.get("memberCount", 0),
+                    "fail": 0,
+                },
+                "issue": {
+                    "ok": data.get("memberCount", 0),
+                    "fail": 0,
+                },
+                "detail_count": data.get("detailCount", 0),
+                "dev_written": written.get("dev", 0),
+                "issue_written": written.get("issue", 0),
+                "unique_task_count": data.get("uniqueTaskCount", 0),
+                "skipped_executors": data.get("skippedExecutors", {}),
+                "benti_optimized": True,
             })
-        except SyncBlocked as e:
-            return fail(str(e), code=503, data={})
         except Exception as e:
             return fail(str(e), code=500, data={})
 

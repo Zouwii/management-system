@@ -271,6 +271,17 @@ def init_database() -> None:
     _execute_table_ops(perf_engine, perf_tables, "create")
     _execute_table_ops(kb_engine, kb_tables, "create")
     _execute_table_ops(onsite_engine, onsite_tables, "create")
+    # 现场问题 B 表的钉钉任务创建/更新时间；兼容已存在的历史表。
+    try:
+        from sqlalchemy import inspect, text
+        onsite_columns = {c.get("name") for c in inspect(onsite_engine).get_columns("onsite_problem_details")}
+        with onsite_engine.begin() as conn:
+            if "ding_created" not in onsite_columns:
+                conn.execute(text("ALTER TABLE onsite_problem_details ADD COLUMN ding_created DATETIME"))
+            if "ding_updated" not in onsite_columns:
+                conn.execute(text("ALTER TABLE onsite_problem_details ADD COLUMN ding_updated DATETIME"))
+    except Exception as exc:
+        print(f"[init_db] onsite time columns migration skipped: {exc}")
     try:
         _execute_table_ops(req_pool_engine, req_pool_tables, "create")
     except Exception as e:
@@ -603,6 +614,17 @@ def init_database() -> None:
             if "need_statistic" not in cols_b2:
                 with engine.begin() as conn:
                     conn.execute(text("ALTER TABLE program_issue_detail ADD COLUMN need_statistic VARCHAR(8)"))
+            for column, column_type in (
+                ("problem_type_level_1", "VARCHAR(128)"),
+                ("problem_type_level_2", "VARCHAR(128)"),
+                ("problem_type_level_3", "VARCHAR(256)"),
+                ("cause_level_1", "VARCHAR(128)"),
+                ("cause_level_2", "VARCHAR(128)"),
+                ("cause_level_3", "VARCHAR(256)"),
+            ):
+                if column not in cols_b2:
+                    with engine.begin() as conn:
+                        conn.execute(text(f"ALTER TABLE program_issue_detail ADD COLUMN {column} {column_type}"))
 
         # user_character 表字段补齐（无迁移环境下避免缺列导致启动失败）
         try:

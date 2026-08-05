@@ -65,6 +65,10 @@ def _download_one(document: dict, mcp_url: str, timeout: int) -> dict:
         },
     }
     try:
+        from base.api_monitor import check_api_allowed
+        if not check_api_allowed():
+            return {**document, "ok": False, "error": "daily API limit reached"}
+
         response = requests.post(
             mcp_url,
             headers={"Content-Type": "application/json", "Accept": "application/json"},
@@ -159,7 +163,7 @@ def persist_downloaded_markdown(download_result: dict) -> dict:
                     item.get("remote_modified_at") or ""
                 ),
             }
-            row.raw_json = json.dumps(source_payload, ensure_ascii=False)
+            row.outline = json.dumps(source_payload, ensure_ascii=False)
             row.fetch_status = "success"
             row.fail_reason = ""
             row.synced_at = now

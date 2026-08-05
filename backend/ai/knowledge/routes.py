@@ -153,7 +153,7 @@ def _upsert_node(db, node_id: str, workspace_id: str, parent_id: str,
 
 
 def _upsert_document(db, node_id: str, workspace_id: str, title: str,
-                     content: str, raw_json: str, now: datetime) -> bool:
+                     content: str, outline: str, now: datetime) -> bool:
     """Upsert a kb_document. Returns True if content changed."""
     existing = db.query(KbDocument).filter(KbDocument.node_id == node_id).first()
     changed = False
@@ -163,7 +163,7 @@ def _upsert_document(db, node_id: str, workspace_id: str, title: str,
             changed = True
         existing.title = title
         existing.content = content
-        existing.raw_json = raw_json
+        existing.outline = outline
         existing.fetch_status = "success"
         existing.fail_reason = ""
         existing.synced_at = now
@@ -171,7 +171,7 @@ def _upsert_document(db, node_id: str, workspace_id: str, title: str,
     else:
         db.add(KbDocument(
             node_id=node_id, workspace_id=workspace_id, title=title,
-            content=content, raw_json=raw_json, fetch_status="success",
+            content=content, outline=outline, fetch_status="success",
             synced_at=now, created_at=now, updated_at=now))
         changed = True
     return changed
@@ -180,7 +180,7 @@ def _upsert_document(db, node_id: str, workspace_id: str, title: str,
 def _has_markdown_source(document: KbDocument) -> bool:
     """Whether a cached row was populated by the Markdown download flow."""
     try:
-        payload = json.loads(document.raw_json or "{}")
+        payload = json.loads(document.outline or "{}")
     except (TypeError, ValueError):
         return False
     if not isinstance(payload, dict):
@@ -204,7 +204,7 @@ def _is_markdown_managed(document: KbDocument) -> bool:
     if _has_markdown_source(document):
         return True
     try:
-        payload = json.loads(document.raw_json or "{}")
+        payload = json.loads(document.outline or "{}")
     except (TypeError, ValueError):
         return False
     if not isinstance(payload, dict):
@@ -216,7 +216,7 @@ def _is_markdown_managed(document: KbDocument) -> bool:
 def _managed_content_remote_time(document: KbDocument):
     """Return the remote version whose Markdown was downloaded successfully."""
     try:
-        payload = json.loads(document.raw_json or "{}")
+        payload = json.loads(document.outline or "{}")
     except (TypeError, ValueError):
         return None
     if not isinstance(payload, dict):
@@ -375,7 +375,7 @@ def _sync_workspace(client, workspace_id: str, root_id: str, limit: int = 0,
                         workspace_id=workspace_id,
                         title=name,
                         content="",
-                        raw_json=json.dumps({
+                        outline=json.dumps({
                             "_management_system": {"source": "mcp_pending"}
                         }, ensure_ascii=False),
                         fetch_status="pending",
@@ -1292,7 +1292,7 @@ def register(bp, ok, fail):
         行为：
         - 递归扫描目录下所有 .md 文件
         - 按文件名（node_id）匹配 kb_documents 记录
-        - 将 markdown 内容写入 content 字段，raw_json 保留为审计字段
+        - 将 markdown 内容写入 content 字段，outline 保留为分级目录字段
         - 跳过非 node_id 格式的 .md 文件（如 _download_summary.md）
         """
         body = request.get_json(silent=True) or {}
@@ -1340,7 +1340,7 @@ def register(bp, ok, fail):
                 remote_modified_at = ""
                 if node is not None and node.remote_modified_at is not None:
                     remote_modified_at = node.remote_modified_at.isoformat()
-                row.raw_json = json.dumps(
+                row.outline = json.dumps(
                     {
                         "source": "local_markdown",
                         "_management_system": {

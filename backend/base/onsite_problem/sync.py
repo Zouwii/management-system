@@ -297,7 +297,7 @@ def sync_onsite_a_table(payload: Dict[str, Any],
 # ── B 表同步（TB Open API via proxy，含评论+附件）───────────────
 
 def _upsert_detail_row(sess, task: Dict[str, Any], tid: str, user_id: str,
-                       comments_json, attachments_json):
+                       comments_json, attachments_json, source_task: Optional[OnsiteProblemTask] = None):
     """单条 B 表 upsert 逻辑，供单线程和多线程共用."""
     from base.db.orm import OnsiteProblemDetail
 
@@ -324,6 +324,9 @@ def _upsert_detail_row(sess, task: Dict[str, Any], tid: str, user_id: str,
         raw_blob = None
 
     now = datetime.now(timezone.utc)
+    # 创建/更新时间以 A 表列表接口落库的值为准；API 详情作为兼容回退。
+    ding_created = (source_task.ding_created if source_task else None) or _parse_iso_dt(task.get("created"))
+    ding_updated = (source_task.ding_updated if source_task else None) or _parse_iso_dt(task.get("updated"))
     stmt = select(OnsiteProblemDetail).where(OnsiteProblemDetail.task_id == tid)
     row = sess.scalars(stmt).first()
     if row:
@@ -333,6 +336,8 @@ def _upsert_detail_row(sess, task: Dict[str, Any], tid: str, user_id: str,
         row.scenario_field_config_id = str(task.get("scenarioFieldConfigId") or task.get("scenariofieldconfigId") or "")
         row.due_date = _parse_iso_dt(task.get("dueDate"))
         row.start_date = _parse_iso_dt(task.get("startDate"))
+        row.ding_created = ding_created
+        row.ding_updated = ding_updated
         row.is_done = bool(task.get("isDone"))
         row.is_archived = bool(task.get("isArchived"))
         row.priority = int(task.get("priority") or 0)
@@ -370,6 +375,8 @@ def _upsert_detail_row(sess, task: Dict[str, Any], tid: str, user_id: str,
             scenario_field_config_id=str(task.get("scenarioFieldConfigId") or task.get("scenariofieldconfigId") or ""),
             due_date=_parse_iso_dt(task.get("dueDate")),
             start_date=_parse_iso_dt(task.get("startDate")),
+            ding_created=ding_created,
+            ding_updated=ding_updated,
             is_done=bool(task.get("isDone")),
             is_archived=bool(task.get("isArchived")),
             priority=int(task.get("priority") or 0),
@@ -407,8 +414,13 @@ def _b_worker(task_ids: List[str], user_id: str) -> Dict[str, Any]:
     failed = 0
     errors: List[Dict[str, Any]] = []
     sess = OnsiteSessionLocal()
+    a_session = OnsiteSessionLocal()
     pending = 0
     try:
+        source_tasks = {
+            row.task_id: row
+            for row in a_session.query(OnsiteProblemTask).filter(OnsiteProblemTask.task_id.in_(task_ids)).all()
+        }
         for tid in task_ids:
             try:
                 result = fetch_task_with_comments(tid)
@@ -420,6 +432,7 @@ def _b_worker(task_ids: List[str], user_id: str) -> Dict[str, Any]:
             _upsert_detail_row(
                 sess, result["task"], tid, user_id,
                 result["comments_json"], result["attachments_json"],
+                source_task=source_tasks.get(tid),
             )
             pending += 1
             upserted += 1
@@ -433,6 +446,7 @@ def _b_worker(task_ids: List[str], user_id: str) -> Dict[str, Any]:
         errors.append({"error": str(e)})
     finally:
         sess.close()
+        a_session.close()
     return {"upserted": upserted, "failed": failed, "errors": errors}
 
 

@@ -1,6 +1,6 @@
 """Re-parse all kb_documents content using the fixed parser.
 
-Reads raw_json from kb_documents, runs parse_document(), updates content.
+Reads outline from kb_documents, runs parse_document(), updates content.
 No DingTalk API calls — fully offline.
 """
 
@@ -21,10 +21,10 @@ def reparse_all(batch_size: int = 500):
     now = datetime.now(timezone.utc)
 
     total = db.query(KbDocument).filter(
-        KbDocument.raw_json.isnot(None),
-        KbDocument.raw_json != "",
+        KbDocument.outline.isnot(None),
+        KbDocument.outline != "",
     ).count()
-    print(f"Total documents with raw_json: {total}")
+    print(f"Total documents with outline: {total}")
 
     updated = 0
     errors = 0
@@ -33,8 +33,8 @@ def reparse_all(batch_size: int = 500):
 
     while True:
         docs = db.query(KbDocument).filter(
-            KbDocument.raw_json.isnot(None),
-            KbDocument.raw_json != "",
+            KbDocument.outline.isnot(None),
+            KbDocument.outline != "",
         ).limit(batch_size).offset(offset).all()
 
         if not docs:
@@ -42,7 +42,7 @@ def reparse_all(batch_size: int = 500):
 
         for doc in docs:
             try:
-                data = json.loads(doc.raw_json)
+                data = json.loads(doc.outline)
                 blocks = data.get("data", [])
                 if not blocks:
                     skipped += 1
