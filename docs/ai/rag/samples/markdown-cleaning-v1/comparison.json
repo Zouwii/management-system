@@ -1,0 +1,72 @@
+[
+  {
+    "file": "01-can-protocol.md",
+    "input_chars": 9815,
+    "output_chars": 8044,
+    "heading_count": 10,
+    "table_line_count": 140,
+    "code_block_count": 0,
+    "image_count": 0,
+    "deprecated_count": 8,
+    "unknown_html_tag_count": 0,
+    "reduction_chars": 1771,
+    "reduction_percent": 18.04,
+    "warnings": []
+  },
+  {
+    "file": "02-setup-guide.md",
+    "input_chars": 6731,
+    "output_chars": 6196,
+    "heading_count": 20,
+    "table_line_count": 23,
+    "code_block_count": 4,
+    "image_count": 0,
+    "deprecated_count": 5,
+    "unknown_html_tag_count": 0,
+    "reduction_chars": 535,
+    "reduction_percent": 7.95,
+    "warnings": []
+  },
+  {
+    "file": "03-troubleshooting.md",
+    "input_chars": 7189,
+    "output_chars": 5149,
+    "heading_count": 18,
+    "table_line_count": 20,
+    "code_block_count": 0,
+    "image_count": 13,
+    "deprecated_count": 0,
+    "unknown_html_tag_count": 0,
+    "reduction_chars": 2040,
+    "reduction_percent": 28.38,
+    "warnings": []
+  },
+  {
+    "file": "04-project-review.md",
+    "input_chars": 21829,
+    "output_chars": 14741,
+    "heading_count": 9,
+    "table_line_count": 69,
+    "code_block_count": 0,
+    "image_count": 0,
+    "deprecated_count": 0,
+    "unknown_html_tag_count": 0,
+    "reduction_chars": 7088,
+    "reduction_percent": 32.47,
+    "warnings": []
+  },
+  {
+    "file": "05-meeting.md",
+    "input_chars": 499,
+    "output_chars": 461,
+    "heading_count": 0,
+    "table_line_count": 0,
+    "code_block_count": 0,
+    "image_count": 0,
+    "deprecated_count": 0,
+    "unknown_html_tag_count": 0,
+    "reduction_chars": 38,
+    "reduction_percent": 7.62,
+    "warnings": []
+  }
+]

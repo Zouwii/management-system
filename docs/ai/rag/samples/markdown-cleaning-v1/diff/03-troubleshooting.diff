@@ -1,0 +1,176 @@
+--- original/03-troubleshooting.md
++++ cleaned/03-troubleshooting.md
+@@ -1,10 +1,10 @@
+-## **任务流程图**
++## 任务流程图
+ 
+-![image.png](https://alidocs2.oss-cn-zhangjiakou.aliyuncs.com/res/2M9qP5jow6da3O01/img/ffbe80c6-ae7c-4745-a476-b151b97364b8.png?Expires=1785411489&OSSAccessKeyId=LTAI5tKTjg4Kq1HCdBJ8qpSp&Signature=lWrSlpLPMNqkx1IHE8swQv0bANQ%3D "")
++【图片：ffbe80c6-ae7c-4745-a476-b151b97364b8.png】
+ 
+-![image.png](https://alidocs.oss-cn-zhangjiakou.aliyuncs.com/res/8K4nyRXA38zYqLbj/img/b9a2a34f-d703-4e88-b5e4-69dfe45a0b4a.png "")
++【图片：b9a2a34f-d703-4e88-b5e4-69dfe45a0b4a.png】
+ 
+-图一 Web-Service框架图 
++图一 Web-Service框架图
+ 
+ 上图展示了Web-Service主要的框架：
+ 1. WS主要通过TaskService、TaskNaviService、TaskActionService三个服务类
+@@ -22,11 +22,11 @@
+ 
+ 上述仅仅是一个概要的过程，实际交互逻辑会复杂的多，后续章节会详细介绍，总体来说，目前Web-Service作为本体的一个任务接收和处理的逻辑，起到逻辑中间件的作用，是嵌入式以及导航相应接口的桥梁，因此其存在依赖众多，逻辑复杂的情况；由于历史积累的原因，目前Web-Service依赖了100多个ROS接口或者变量，大部分依赖接口的文档缺失，有部分冗余无效的逻辑，需要考虑对其进行梳理和整理的需要。
+ 
+-## **任务处理**
++## 任务处理
+ 
+-### **导航与动作任务下发**
++### 导航与动作任务下发
+ 
+-![image.png](https://alidocs.oss-cn-zhangjiakou.aliyuncs.com/res/8K4nyRXA38zYqLbj/img/61a8b8b1-953b-4e73-9dac-6756b269102e.png "")
++【图片：61a8b8b1-953b-4e73-9dac-6756b269102e.png】
+ 
+ 图二 导航与动作任务下发
+ 
+@@ -42,7 +42,7 @@
+     - 对于导航，则通过子类task\_navi\_service来处理，底层也是和老接口一样，通过MoveAction和NaviClient来实现，其状态则存储在TaskNaviGoal中
+     - 对于动作，则通过子类task\_action\_service来处理，底层也和老接口一样依赖PythonEngine实现动作的解析和运行；运行状态存储在TaskActionGoal中。
+ 
+-#### **接口设计**
++#### 接口设计
+ 
+ 接口名称：/WebService/robotTask，/task/navi，/task/action
+ 
+@@ -53,11 +53,9 @@
+ | cmd | string | 任务类型：start、stop、status、pause、history（Global中存储的历史状态）、delayStop（延时停止某个任务）、result（获得某个任务的状态） |
+ | task\_request | string | JSON格式数据，用于存放任务的详细信息，配置和其他相关属性 |
+ 
+-
+-
+ 输出参数：jzws\_srvs::RobotTask::Response 任务执行结果，另外详细的执行状态通过cmd=status获得
+ 
+-#### **task\_request 参数**
++#### task\_request 参数
+ 
+ 接口名称：/WebService/robotTask
+ 
+@@ -78,14 +76,14 @@
+ | action\_id | string | 动作/任务ID |
+ | poseId | int | 目标位置ID |
+ | action | string | 脚本名称 |
+-| use\_yaw | int | <span style="color: #C10002;">是否使用角度？</span> |
++| use\_yaw | int | 是否使用角度？ |
+ | \_id\_list | array | 路径点位列表 |
+ 
+-#### **时序图**
++#### 时序图
+ 
+-##### **导航时序**
++##### 导航时序
+ 
+-![image.png](https://alidocs.oss-cn-zhangjiakou.aliyuncs.com/res/8K4nyRXA38zYqLbj/img/8ff9747c-cf67-41a7-8142-a5319127d3e5.png "")
++【图片：8ff9747c-cf67-41a7-8142-a5319127d3e5.png】
+ 
+ 图三 老接口导航时序图
+ 1. carly发送导航指令给Webservice
+@@ -103,9 +101,9 @@
+ 13. 在这个过程中carly通过status指令获得任务进展情况
+ 14. 当整个任务执行完毕，carly会得到idle状态
+ 
+-##### **动作时序**
++##### 动作时序
+ 
+-![image.png](https://alidocs.oss-cn-zhangjiakou.aliyuncs.com/res/8K4nyRXA38zYqLbj/img/f0bc6595-d6fe-403d-ab5d-a8ecfa5fd778.png "")
++【图片：f0bc6595-d6fe-403d-ab5d-a8ecfa5fd778.png】
+ 
+ 图四 老接口动作执行
+ 
+@@ -116,9 +114,9 @@
+ 4. ws 封装的函数中会对Global的状态进行判断，并处理Canceling等状态，决定是否中断动作执行
+ 5. Carly通过status获得任务执行的状态，并获得异常信息
+ 
+-##### **抢占时序**
++##### 抢占时序
+ 
+-![image.png](https://alidocs.oss-cn-zhangjiakou.aliyuncs.com/res/8K4nyRXA38zYqLbj/img/b449b683-6825-4f83-a938-c5ceff88c057.png "")
++【图片：b449b683-6825-4f83-a938-c5ceff88c057.png】
+ 
+ 图五 抢占时序
+ 
+@@ -127,62 +125,50 @@
+ 2. 正在执行的导航任务，如果发现该信号量为true，则终止等待，直接结束线程
+ 3. 新的导航任务抢占成功，开始正常发送导航指令给导航模块
+ 
+-# **日志排查**
++# 日志排查
+ 
+-## **普通任务排查**
++## 普通任务排查
+ 
+-### **本机下发任务**
++### 本机下发任务
+ 
+-![image.png](https://alidocs2.oss-cn-zhangjiakou.aliyuncs.com/res/eYVOLw3Y4z0Aqpz2/img/01135a95-5197-46c2-adf1-6cbe36212899.png?Expires=1785411489&OSSAccessKeyId=LTAI5tKTjg4Kq1HCdBJ8qpSp&Signature=tpB0vTbYtQ5rin10tWoPtBgOYdQ%3D "")
++【图片：01135a95-5197-46c2-adf1-6cbe36212899.png】
+ 
+ 上图展示了本机下发的任务，其中关键字为task request。from:carly 表示任务来源为carly
+ 
+-### **执行脚本**
++### 执行脚本
+ 
+-### ![image.png](https://alidocs2.oss-cn-zhangjiakou.aliyuncs.com/res/eYVOLw3Y4z0Aqpz2/img/2fc18049-ab7a-47f7-b3b7-d3abec977058.png?Expires=1785411489&OSSAccessKeyId=LTAI5tKTjg4Kq1HCdBJ8qpSp&Signature=i6YvuM1uh3rSXj4suCkjKqkSI3w%3D "")
++### 【图片：2fc18049-ab7a-47f7-b3b7-d3abec977058.png】
+ 
+ 上图展示了如何查看carly具体执行的脚本，可以通过脚本分析具体运行的block以及调用的函数
+ 
+-### **导航指令**
++### 导航指令
+ 
+-![image.png](https://alidocs2.oss-cn-zhangjiakou.aliyuncs.com/res/eYVOLw3Y4z0Aqpz2/img/ec9b22f1-37d5-412e-ba3f-638c7e75e697.png?Expires=1785411489&OSSAccessKeyId=LTAI5tKTjg4Kq1HCdBJ8qpSp&Signature=N3IqLwUZtDufSYdGQlqP0xppOoc%3D "")
++【图片：ec9b22f1-37d5-412e-ba3f-638c7e75e697.png】
+ 
+ 上图展示了脚本中导航任务的下发，当看到navi client sending goal msg to action server说明任务已经下发导航，此时还要看后面日志中是否有navi action activate如果有，说明导航已经接受指令。
+ 
+-![image.png](https://alidocs2.oss-cn-zhangjiakou.aliyuncs.com/res/eYVOLw3Y4z0Aqpz2/img/62583a44-87dc-4443-a986-0f082e2bb291.png?Expires=1785411489&OSSAccessKeyId=LTAI5tKTjg4Kq1HCdBJ8qpSp&Signature=o84XLzaTRnBeSyfR90DnqEujLFM%3D "")
++【图片：62583a44-87dc-4443-a986-0f082e2bb291.png】
+ 
+ 上图中导航收到了导航指令，并给出了回执。但是后面的日志显示任务被取消，原因是行为树报错。
+ 
+-![image.png](https://alidocs2.oss-cn-zhangjiakou.aliyuncs.com/res/eYVOLw3Y4z0Aqpz2/img/26d419a4-4d04-4b8c-83ae-3b3c014a718c.png?Expires=1785411489&OSSAccessKeyId=LTAI5tKTjg4Kq1HCdBJ8qpSp&Signature=OL0YF21EWZQ4d9YgEtywOeH2zqQ%3D "")
++【图片：26d419a4-4d04-4b8c-83ae-3b3c014a718c.png】
+ 
+ 上面图中是导航正常结束的形式，可以看到action done succed关键字，如果整个任务执行完毕，则会显示task\_list execute successfully关键字
+ 
+-## **调度任务排查**
++## 调度任务排查
+ 
+-### **调度导航任务**
++### 调度导航任务
+ 
+-![image.png](https://alidocs2.oss-cn-zhangjiakou.aliyuncs.com/res/eYVOLw3Y4z0Aqpz2/img/6725e84a-0d6e-4771-9e0b-3ca0ec5c59d0.png?Expires=1785411489&OSSAccessKeyId=LTAI5tKTjg4Kq1HCdBJ8qpSp&Signature=s2dL7zHkva20%2Blh7V2KCTXlcNQ8%3D "")
++【图片：6725e84a-0d6e-4771-9e0b-3ca0ec5c59d0.png】
+ 
+ 上图展示了调度任务的指令关键词req.task\_request以及(start) navi，其中(start) navi表示是一个导航任务，如果是动作任务则为(start) action
+ 
+ 导航任务后续的日志和上面本地的导航任务一致。
+ 
+-### **调度动作任务**
++### 调度动作任务
+ 
+-![image.png](https://alidocs2.oss-cn-zhangjiakou.aliyuncs.com/res/eYVOLw3Y4z0Aqpz2/img/17293b24-de91-4dd3-86bb-70d5eb9bdb04.png?Expires=1785411489&OSSAccessKeyId=LTAI5tKTjg4Kq1HCdBJ8qpSp&Signature=rdxVqYSPv9%2FU1sxc7aguxkoU8nE%3D "")
++【图片：17293b24-de91-4dd3-86bb-70d5eb9bdb04.png】
+ 
+ 上图是调度动作任务关键字，其后续日志参考本地的动作任务执行日志说明
+ 
+-
+-
+-
+-
+-
+-
+-
+-
+-[]该文档24年末维护期间暂不更新（保持原样），以当前更新时间为准。
+-
+-
+-
+-
++该文档24年末维护期间暂不更新（保持原样），以当前更新时间为准。

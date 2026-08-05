@@ -1,0 +1,157 @@
+--- original/02-setup-guide.md
++++ cleaned/02-setup-guide.md
+@@ -1,6 +1,6 @@
+ 文档校验：詹剑波 @ 20240913
+ 
+-# **前言**
++# 前言
+ 
+ 本文档用以说明EMMA本体软件的部署过程。主要概述为以下步骤：
+     - 硬件准备
+@@ -10,9 +10,9 @@
+     - 场景配置
+     - 测试和应用
+ 
+-# **Setup步骤**
++# Setup步骤
+ 
+-## **2.1 硬件准备**
++## 2.1 硬件准备
+ 
+ 硬件准备包括如下内容：
+     - 整车零部件、传感器、核心控制器等硬件设备准备
+@@ -23,14 +23,14 @@
+ 
+ | 编号 | 设备 | 准备工作 |
+ |------|------|------------|
+-| 1 | 工控机 | 硬盘/EMMC预装软件系统<br>参考：<br><ul><li>X86工控机：[再生龙操作系统备份还原方法](https://alidocs.dingtalk.com/api/doc/transit?dentryUuid=3QD5Ea7xAo4VEjrYwdv9JG1YBwgnNKb0&queryString=utm_medium%3Ddingdoc_doc_plugin_card%26utm_source%3Ddingdoc_doc) 或 硬盘对拷方法</li><br><li>KM车板子：[3399+A311D备份还原烧写-机器人系统现场维护指南（KM车）](https://alidocs.dingtalk.com/api/doc/transit?dentryUuid=mdvQnONayjBJKea5Z5rLWPY2MeXzp5o0&queryString=utm_medium%3Ddingdoc_doc_plugin_card%26utm_source%3Ddingdoc_doc)</li><br><li>KM2代板子： [3588系统备份还原烧写-机器人系统现场维护指南（KM2代）](https://alidocs.dingtalk.com/api/doc/transit?dentryUuid=QOG9lyrgJP3grzaPiGYoQ20LVzN67Mw4&queryString=utm_medium%3Ddingdoc_doc_plugin_card%26utm_source%3Ddingdoc_doc)</li></ul> |
++| 1 | 工控机 | 硬盘/EMMC预装软件系统<br>参考：<br>• X86工控机：[再生龙操作系统备份还原方法](https://alidocs.dingtalk.com/api/doc/transit?dentryUuid=3QD5Ea7xAo4VEjrYwdv9JG1YBwgnNKb0&queryString=utm_medium%3Ddingdoc_doc_plugin_card%26utm_source%3Ddingdoc_doc) 或 硬盘对拷方法<br>• KM车板子：[3399+A311D备份还原烧写-机器人系统现场维护指南（KM车）](https://alidocs.dingtalk.com/api/doc/transit?dentryUuid=mdvQnONayjBJKea5Z5rLWPY2MeXzp5o0&queryString=utm_medium%3Ddingdoc_doc_plugin_card%26utm_source%3Ddingdoc_doc)<br>• KM2代板子： [3588系统备份还原烧写-机器人系统现场维护指南（KM2代）](https://alidocs.dingtalk.com/api/doc/transit?dentryUuid=QOG9lyrgJP3grzaPiGYoQ20LVzN67Mw4&queryString=utm_medium%3Ddingdoc_doc_plugin_card%26utm_source%3Ddingdoc_doc) |
+ | 2 | 激光雷达 | 预设基础的配置，比如IP（需遵循IP要求规范，参考对应标准文件） |
+ | 3 | 相机 | 部分相机需要预先标定内参，参考对应标准文件和方法 |
+ |  |  |  |
+ 
+-## **2.2 软件系统准备**
++## 2.2 软件系统准备
+ 
+-在2.1步骤中一般通过镜像的方式，完成工控机的准备工作。对于镜像系统的选择，<span style="color: #FE0300;"><u>**截止到20251213**</u></span>，有如下选项（后续按需更新，资源获取联系管理员）
++在2.1步骤中一般通过镜像的方式，完成工控机的准备工作。对于镜像系统的选择，**截止到20251213**，有如下选项（后续按需更新，资源获取联系管理员）
+ 
+ | 系统架构代号 | 镜像选择 |  | 主控说明 |
+ |------------------|------------|---|------------|
+@@ -48,22 +48,22 @@
+ 
+ 即，系统已经完成目标软件的90%左右内容，后续因为定制/升级等需求再更新软件，一般就是基于jz-total软件包进行一次小升级即可。
+ 
+-## **2.3 迦智自研软件安装和配置**
++## 2.3 迦智自研软件安装和配置
+ 
+ 此部分的目标是完成单车软件构建。包括两部分内容，即嵌入式软件和固件更新，以及本体软件更新。
+ 
+-<u>***远期发展/标准品批量化，将考虑2.3.1和2.3.2全自动化（即用alice工具处理），目前暂时参考如下分步方法。***</u>
++***远期发展/标准品批量化，将考虑2.3.1和2.3.2全自动化（即用alice工具处理），目前暂时参考如下分步方法。***
+ 
+-### **2.3.1 嵌入式软件/固件更新**
++### 2.3.1 嵌入式软件/固件更新
+ 
+ 目前更新有两种方法，任选其一即可。
+ 
+ | 方法 | 方法介绍 |  |
+ |------|------------|---|
+ | 方法一 | 使用嵌入式提供的各项工具软件直接更新，参考对应标准文件和方法 |  |
+-| 方法二 | 使用alice工具直接进行更新，会自动完成特定机型全部的嵌入式软件和固件更新，参考对应标准文件和方法<br><u>*注意：只有标准车才支持alice工具更新。*</u> |  |
++| 方法二 | 使用alice工具直接进行更新，会自动完成特定机型全部的嵌入式软件和固件更新，参考对应标准文件和方法<br>*注意：只有标准车才支持alice工具更新。* |  |
+ 
+-### **2.3.2 本体软件更新**
++### 2.3.2 本体软件更新
+ 
+ 目前更新仅支持手动更新，暂不支持alice更新。步骤如下：
+     1. SSH远程登录小车（或者串口终端登录小车）
+@@ -81,7 +81,7 @@
+ 
+             2. 参考jz-total版本全发布变更：[jz-total changelog](https://alidocs.dingtalk.com/api/doc/transit?dentryUuid=qnYMoO1rWxD4ja5rFZdYN6o0W47Z3je9&queryString=utm_medium%3Ddingdoc_doc_plugin_card%26utm_source%3Ddingdoc_doc)
+ 
+-            3. <u>**一般总是使用，已经发布的最新的LTS版本**</u>
++            3. **一般总是使用，已经发布的最新的LTS版本**
+         2. 安装jz-total
+         3. 按需更新若干定制子包
+ ```shell
+@@ -99,11 +99,11 @@
+ ```
+     4. 重启系统
+ 
+-## **2.4 机型配置**
++## 2.4 机型配置
+ 
+ 此部分的目标是完成单车数据构建。包含三部分内容，即确定机型、配置机型、机型调参。
+ 
+-### **2.4.1 确定机型**
++### 2.4.1 确定机型
+ 
+ 机型数据用于管理单车的所有配置项。机型按照不同类型有不同的确定方式：
+ - 标准车
+@@ -115,7 +115,7 @@
+     - 项目定制车总是基于某一个标准产品改造的，故可参考上文标准车方法找到其标准车原型的机型
+     - 基于得到的标准车机型，按照下文2.4.2的方法直接进行定制化配置
+ 
+-### **2.4.2 配置机型**
++### 2.4.2 配置机型
+ 
+ 确定机型名字后，即可按照下述方法机型配置：
+ - 标准车
+@@ -139,21 +139,21 @@
+ emma_restart
+ ```
+ 
+-### **2.4.3 机型调参**
++### 2.4.3 机型调参
+ 
+ 需要进一步调配单车参数，以满足单车最终运行所需。调配方法有以下汇总：
+ 
+ | 编号 | 调配参数系统 | 调配参数内容 |
+ |------|------------------|------------------|
+-| 1 | adele系统 | <ul><li>jz-total\<=2.2308</li><br><li style="margin-left:1em">使用 adele1 系统进行调配</li><br><li style="margin-left:1em">可配置：</li><br><li style="margin-left:2em">90%左右的硬件参数</li><br><li style="margin-left:2em">标定调配需使用终端工具</li><br><li style="margin-left:2em">其他无法调配的参数使用终端工具</li><br><li>jz-total\>=2.2309</li><br><li style="margin-left:1em">使用 adele3 系统进行调配</li><br><li style="margin-left:1em">可配置：</li><br><li style="margin-left:2em">99%的硬件参数、软件参数</li><br><li style="margin-left:2em">其他无法调配的参数使用终端工具</li><br><li style="margin-left:1em">使用方法文档：[机型setup指南](https://alidocs.dingtalk.com/api/doc/transit?dentryUuid=EpGBa2Lm8azLmGpZC5Y6YwZ1WgN7R35y&queryString=utm_medium%3Ddingdoc_doc_plugin_card%26utm_source%3Ddingdoc_doc)</li></ul> |
+-| 2 | 终端工具 | <ul><li>jz-total\>=2.107</li><br><li style="margin-left:1em">标定终端工具可处理99%的标定 [标定测试文档 108版本](https://alidocs.dingtalk.com/api/doc/transit?dentryUuid=kDnRL6jAJM3vwG2LiNBr6meLWyMoPYe1&queryString=utm_medium%3Ddingdoc_doc_plugin_card%26utm_source%3Ddingdoc_doc)</li></ul> |
++| 1 | adele系统 | • jz-total\<=2.2308<br>　◦ 使用 adele1 系统进行调配<br>　◦ 可配置：<br>　　◦ 90%左右的硬件参数<br>　　◦ 标定调配需使用终端工具<br>　　◦ 其他无法调配的参数使用终端工具<br>• jz-total\>=2.2309<br>　◦ 使用 adele3 系统进行调配<br>　◦ 可配置：<br>　　◦ 99%的硬件参数、软件参数<br>　　◦ 其他无法调配的参数使用终端工具<br>　◦ 使用方法文档：[机型setup指南](https://alidocs.dingtalk.com/api/doc/transit?dentryUuid=EpGBa2Lm8azLmGpZC5Y6YwZ1WgN7R35y&queryString=utm_medium%3Ddingdoc_doc_plugin_card%26utm_source%3Ddingdoc_doc) |
++| 2 | 终端工具 | • jz-total\>=2.107<br>　◦ 标定终端工具可处理99%的标定 [标定测试文档 108版本](https://alidocs.dingtalk.com/api/doc/transit?dentryUuid=kDnRL6jAJM3vwG2LiNBr6meLWyMoPYe1&queryString=utm_medium%3Ddingdoc_doc_plugin_card%26utm_source%3Ddingdoc_doc) |
+ | 3 | 其他 | 其他未尽部分咨询研发 |
+ 
+-## **2.5 场景配置**
++## 2.5 场景配置
+ 
+ 此部分的目标是完成场景数据构建。
+ 
+-核心内容为：<u>新建地图、编辑地图、简单跑图</u>，全部通过工具 Carly 系统交互式完成。
++核心内容为：新建地图、编辑地图、简单跑图，全部通过工具 Carly 系统交互式完成。
+     - 新建地图
+         - 新建地图完成，可验证EMMA核心功能（即感知相关）全量通过。
+     - 编辑地图
+@@ -163,7 +163,7 @@
+ 
+ 可直接参考对应标准文档和方法。
+ 
+-## **2.6 测试和应用**
++## 2.6 测试和应用
+ 
+ 此部分的目标是完成复杂场景/项目场景的应用和测试。
+ 
+@@ -177,18 +177,8 @@
+ 
+ 可直接参考对应标准文档和方法。
+ 
+-# **Q&A**
++# Q&A
+ 
+  TODO
+ 
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-
+-[]该文档24年末维护期间暂不更新（保持原样），以当前更新时间为准。
++该文档24年末维护期间暂不更新（保持原样），以当前更新时间为准。
