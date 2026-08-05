@@ -398,7 +398,7 @@ class ServoPerfQuarterResult(_PerfQuarterResultMixin, Base):
 
 
 class MemberAttendance(Base):
-    """员工出勤调整表：按用户+季度持久化加班、请假和法定节假日天数。
+    """员工出勤调整表：按用户+季度持久化加班、请假和法定带薪假天数。
 
     前端员工出勤表中的个人调整字段持久化存储，
     同一用户+同一季度只保留一条记录，保存时 upsert 覆盖。
@@ -416,6 +416,7 @@ class MemberAttendance(Base):
     overtime_days: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     leave_days: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     statutory_holiday_days: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    effective_work_days: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.now)
 

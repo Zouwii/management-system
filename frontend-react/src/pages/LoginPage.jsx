@@ -36,6 +36,11 @@ const MOCK_LOGIN_OPTIONS = [
   },
 ];
 
+const OFFLINE_LOGIN_USER = {
+  name: '伍浩贤',
+  userId: '6515680920352168',
+};
+
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -60,8 +65,19 @@ export default function LoginPage() {
   useEffect(() => {
     if (isRealMode && showOffline) {
       fetchLocalUsers()
-        .then((res) => setLocalUsers(res?.data?.users || []))
-        .catch(() => setLocalUsers([]));
+        .then((res) => {
+          const users = res?.data?.users || [];
+          const targetUsers = users.filter((user) => (
+            user?.name === OFFLINE_LOGIN_USER.name
+            || String(user?.user_id || '') === OFFLINE_LOGIN_USER.userId
+          ));
+          setLocalUsers(targetUsers);
+          setSelectedUserId(targetUsers[0]?.user_id || '');
+        })
+        .catch(() => {
+          setLocalUsers([]);
+          setSelectedUserId('');
+        });
     }
   }, [isRealMode, showOffline]);
 

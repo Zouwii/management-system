@@ -275,8 +275,11 @@ def init_database() -> None:
         _execute_table_ops(req_pool_engine, req_pool_tables, "create")
     except Exception as e:
         print(f"[init_db] skip req_pool tables: {e}")
-    _execute_table_ops(algo_engine, algo_tables, "create")
-    _ensure_algo_schema_compatible()
+    try:
+        _execute_table_ops(algo_engine, algo_tables, "create")
+        _ensure_algo_schema_compatible()
+    except Exception as e:
+        print(f"[init_db] skip algo tables: {e}")
 
     # 兼容无迁移环境：尝试为 B/C 表补齐新字段/新表（SQLite 场景常见）
     try:
@@ -627,7 +630,7 @@ def init_database() -> None:
             # 不阻断服务启动；由上层业务容错或你手工执行迁移
             pass
 
-        # member_attendance 表字段补齐：保存每位成员按季度录入的法定节假日。
+        # member_attendance 表字段补齐：保存每位成员按季度录入的法定带薪假。
         try:
             cols_attendance = {c.get("name") for c in inspector.get_columns("member_attendance")}
             if "statutory_holiday_days" not in cols_attendance:
@@ -636,6 +639,14 @@ def init_database() -> None:
                         text(
                             "ALTER TABLE member_attendance "
                             "ADD COLUMN statutory_holiday_days FLOAT NOT NULL DEFAULT 0"
+                        )
+                    )
+            if "effective_work_days" not in cols_attendance:
+                with engine.begin() as conn:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE member_attendance "
+                            "ADD COLUMN effective_work_days FLOAT NOT NULL DEFAULT 0"
                         )
                     )
         except Exception:

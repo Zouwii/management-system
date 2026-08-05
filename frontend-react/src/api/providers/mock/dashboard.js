@@ -839,8 +839,8 @@ export function mockFetchAttendance() {
     code: 200,
     data: {
       records: [
-        { user_id: 'u1', user_name: '张三', team_id: 'nav', overtime_days: 2, leave_days: 1, statutory_holiday_days: 7, year: 2026, quarter: 1 },
-        { user_id: 'u2', user_name: '李四', team_id: 'servo', overtime_days: 0, leave_days: 0.5, statutory_holiday_days: 7, year: 2026, quarter: 1 },
+        { user_id: 'u1', user_name: '张三', team_id: 'nav', overtime_days: 2, leave_days: 1, statutory_holiday_days: 7, effective_work_days: 52, year: 2026, quarter: 1 },
+        { user_id: 'u2', user_name: '李四', team_id: 'servo', overtime_days: 0, leave_days: 0.5, statutory_holiday_days: 7, effective_work_days: 52, year: 2026, quarter: 1 },
       ],
       year: 2026,
       quarter: 1,

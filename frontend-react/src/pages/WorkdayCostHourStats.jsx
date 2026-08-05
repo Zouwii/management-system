@@ -352,7 +352,7 @@ export function AttendanceTable({ teams = [], selectedTeamId, onTeamChange, memb
               <th className="px-5 py-3 text-center font-medium">姓名</th>
               <th className="bg-emerald-50 px-5 py-3 text-center font-medium text-emerald-700">加班</th>
               <th className="bg-rose-50 px-5 py-3 text-center font-medium text-rose-700">请假</th>
-              <th className="bg-amber-50 px-5 py-3 text-center font-medium text-amber-700">法定节假日</th>
+              <th className="bg-amber-50 px-5 py-3 text-center font-medium text-amber-700">法定带薪假</th>
               <th className="px-5 py-3 text-center font-medium">有效工时</th>
               <th className="px-5 py-3 text-center font-medium">工作日耗时</th>
               <th className="px-5 py-3 text-center font-medium">已填工作日耗时</th>
@@ -672,10 +672,6 @@ export default function WorkdayCostHourStats() {
   );
 
   const teamOptions = useMemo(() => mergeWorkdayTeams(teamData.teams), [teamData.teams]);
-  const memberTeamOptions = useMemo(
-    () => mergeWorkdayTeams(memberData.teams.length ? memberData.teams : teamData.teams),
-    [memberData.teams, teamData.teams],
-  );
 
   const loadAll = useCallback(async () => {
     setLoading(true);

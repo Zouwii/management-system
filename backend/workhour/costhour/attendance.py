@@ -1,4 +1,4 @@
-"""员工出勤表（加班、请假、法定节假日）持久化存取。"""
+"""员工出勤表（加班、请假、法定带薪假）持久化存取。"""
 
 from datetime import datetime, timezone
 
@@ -34,7 +34,8 @@ def get_attendance_service(payload: dict) -> dict:
 
     Returns:
         { success: bool, data: { records: [{user_id, user_name, team_id,
-           overtime_days, leave_days, statutory_holiday_days, year, quarter}] }, error: str | None }
+           overtime_days, leave_days, statutory_holiday_days, effective_work_days,
+           year, quarter}] }, error: str | None }
     """
     start_time = str(payload.get("start_time", ""))
     year, quarter = _quarter_from_start(start_time)
@@ -57,6 +58,7 @@ def get_attendance_service(payload: dict) -> dict:
                 "overtime_days": r.overtime_days,
                 "leave_days": r.leave_days,
                 "statutory_holiday_days": r.statutory_holiday_days,
+                "effective_work_days": r.effective_work_days,
                 "year": r.year,
                 "quarter": r.quarter,
             }
@@ -76,7 +78,7 @@ def save_attendance_service(payload: dict) -> dict:
         payload: {
             start_time: str,
             records: [{ user_id, user_name, team_id, overtime_days,
-                        leave_days, statutory_holiday_days }]
+                        leave_days, statutory_holiday_days, effective_work_days }]
         }
 
     Returns:
@@ -112,6 +114,7 @@ def save_attendance_service(payload: dict) -> dict:
                 existing.overtime_days = float(record.get("overtime_days", 0) or 0)
                 existing.leave_days = float(record.get("leave_days", 0) or 0)
                 existing.statutory_holiday_days = float(record.get("statutory_holiday_days", 0) or 0)
+                existing.effective_work_days = float(record.get("effective_work_days", 0) or 0)
                 existing.user_name = str(record.get("user_name", existing.user_name))
                 existing.team_id = str(record.get("team_id", "")) if record.get("team_id") is not None else existing.team_id
                 existing.updated_at = now
@@ -126,6 +129,7 @@ def save_attendance_service(payload: dict) -> dict:
                         overtime_days=float(record.get("overtime_days", 0) or 0),
                         leave_days=float(record.get("leave_days", 0) or 0),
                         statutory_holiday_days=float(record.get("statutory_holiday_days", 0) or 0),
+                        effective_work_days=float(record.get("effective_work_days", 0) or 0),
                         created_at=now,
                         updated_at=now,
                     )

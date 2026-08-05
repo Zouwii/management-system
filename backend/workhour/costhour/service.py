@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import and_
+from sqlalchemy.exc import SQLAlchemyError
 
 from base.db.engine import AlgoSessionLocal, SessionLocal
 from base.db.orm import (
@@ -28,8 +29,9 @@ WHITELIST_USER_IDS = {
     "010408241117947540",    # 王睿   导航组
     "250124013220811839",    # 何鸿颉 导航组
     "2739002424650905",      # 何华   导航组
+    "27274739521079424",     # 蒲曲   导航组
+    "396813112226338830",    # 杨沅钋 导航组
     "234765171227529303",    # 沈旭东 对接组
-    "303367406120974289",    # 刁怀锐 对接组
     "011168364322856029",    # 李赫   对接组
     "02013312354020881768",  # 刘力璋 对接组
     "01183307230324910099",  # 戴宇庆 对接组
@@ -39,6 +41,28 @@ WHITELIST_USER_IDS = {
     "555363695138848564",    # 高尔峰
     "22665556381168535",     # 邵京
     "2409506118778941",      # 庞涛
+}
+
+# 出勤表专用分组：不修改 ids.json，也不改变 user_character 的全局 team_id。
+# 这些人员属于当前 ids.json 导航组，但不在导航统计白名单中。
+ATTENDANCE_APPLICATION_USER_IDS = {
+    "2108411066921750",      # 潘铮
+    "265352386036276420",    # 郑世玉
+    "495200335237410081",    # 钟昌郎
+    "312542394537803309",    # 陈文斌
+}
+ATTENDANCE_PARTICIPANT_USER_IDS = WHITELIST_USER_IDS | ATTENDANCE_APPLICATION_USER_IDS
+ATTENDANCE_NAV_USER_IDS = {
+    "01195014075436361289", "010408241117947540", "250124013220811839",
+    "2739002424650905", "27274739521079424", "396813112226338830",
+}
+ATTENDANCE_SERVO_USER_IDS = {
+    "234765171227529303", "011168364322856029",
+    "02013312354020881768", "01183307230324910099",
+}
+ATTENDANCE_ALGO_USER_IDS = {
+    "0525436259671512", "2464543025951000", "555363695138848564",
+    "22665556381168535", "2409506118778941",
 }
 
 
@@ -67,7 +91,25 @@ def _team_name_static(team_id_value: Any) -> str:
         return "对接组"
     if val == "2":
         return "算法组"
+    if val == "3":
+        return "应用组"
     return "未分组"
+
+
+def _attendance_team_id(user_id: str, db_team_id: Any) -> str:
+    """团队数据缺失时按统计名单配置兜底，避免出勤表出现未分组。"""
+    tid = str(db_team_id or "").strip()
+    if user_id in ATTENDANCE_APPLICATION_USER_IDS:
+        return "3"
+    if tid:
+        return tid
+    if user_id in ATTENDANCE_NAV_USER_IDS:
+        return "0"
+    if user_id in ATTENDANCE_SERVO_USER_IDS:
+        return "1"
+    if user_id in ATTENDANCE_ALGO_USER_IDS:
+        return "2"
+    return ""
 
 
 def _resolve_time_range(payload: Dict[str, Any]) -> Tuple[Optional[datetime], Optional[datetime], Optional[str]]:
@@ -174,56 +216,63 @@ def _query_workday_costhour_base(
             .all()
         )
 
-        # ── 算法开发：algo_task_details + algo_tasks ──
-        algo_task_rows = (
-            algo_session.query(
-                AlgoTaskDetail.query_user_id,
-                AlgoTaskDetail.workday_costhour,
-                AlgoTaskDetail.need_statistic,
-                AlgoTaskDetail.project_category_1,
-                AlgoTaskDetail.task_id,
-                AlgoTaskDetail.content,
-                AlgoTaskDetail.scenario_field_config_id,
-                AlgoTaskDetail.vehicle_type_2,
-                AlgoTaskDetail.project_name_3,
+        # 算法库是可选数据源；本地未建库时仍返回导航组/对接组数据。
+        algo_task_rows = []
+        algo_issue_rows = []
+        try:
+            # ── 算法开发：algo_task_details + algo_tasks ──
+            algo_task_rows = (
+                algo_session.query(
+                    AlgoTaskDetail.query_user_id,
+                    AlgoTaskDetail.workday_costhour,
+                    AlgoTaskDetail.need_statistic,
+                    AlgoTaskDetail.project_category_1,
+                    AlgoTaskDetail.task_id,
+                    AlgoTaskDetail.content,
+                    AlgoTaskDetail.scenario_field_config_id,
+                    AlgoTaskDetail.vehicle_type_2,
+                    AlgoTaskDetail.project_name_3,
+                )
+                .join(
+                    AlgoTask,
+                    and_(
+                        AlgoTask.project_id == AlgoTaskDetail.project_id,
+                        AlgoTask.task_id == AlgoTaskDetail.task_id,
+                    ),
+                )
+                .filter(AlgoTask.due_date != None)
+                .filter(AlgoTask.due_date >= start_dt)
+                .filter(AlgoTask.due_date <= end_dt)
+                .all()
             )
-            .join(
-                AlgoTask,
-                and_(
-                    AlgoTask.project_id == AlgoTaskDetail.project_id,
-                    AlgoTask.task_id == AlgoTaskDetail.task_id,
-                ),
-            )
-            .filter(AlgoTask.due_date != None)
-            .filter(AlgoTask.due_date >= start_dt)
-            .filter(AlgoTask.due_date <= end_dt)
-            .all()
-        )
 
-        # ── 算法问题：algo_issue_details + algo_issues ──
-        algo_issue_rows = (
-            algo_session.query(
-                AlgoIssueDetail.query_user_id,
-                AlgoIssueDetail.workday_costhour,
-                AlgoIssueDetail.need_statistic,
-                AlgoIssueDetail.project_category_1,
-                AlgoIssueDetail.vehicle_type_2,
-                AlgoIssueDetail.project_name_3,
-                AlgoIssue.task_id,
-                AlgoIssue.content,
+            # ── 算法问题：algo_issue_details + algo_issues ──
+            algo_issue_rows = (
+                algo_session.query(
+                    AlgoIssueDetail.query_user_id,
+                    AlgoIssueDetail.workday_costhour,
+                    AlgoIssueDetail.need_statistic,
+                    AlgoIssueDetail.project_category_1,
+                    AlgoIssueDetail.vehicle_type_2,
+                    AlgoIssueDetail.project_name_3,
+                    AlgoIssue.task_id,
+                    AlgoIssue.content,
+                )
+                .join(
+                    AlgoIssue,
+                    and_(
+                        AlgoIssue.project_id == AlgoIssueDetail.project_id,
+                        AlgoIssue.task_id == AlgoIssueDetail.task_id,
+                    ),
+                )
+                .filter(AlgoIssue.due_date != None)
+                .filter(AlgoIssue.due_date >= start_dt)
+                .filter(AlgoIssue.due_date <= end_dt)
+                .all()
             )
-            .join(
-                AlgoIssue,
-                and_(
-                    AlgoIssue.project_id == AlgoIssueDetail.project_id,
-                    AlgoIssue.task_id == AlgoIssueDetail.task_id,
-                ),
-            )
-            .filter(AlgoIssue.due_date != None)
-            .filter(AlgoIssue.due_date >= start_dt)
-            .filter(AlgoIssue.due_date <= end_dt)
-            .all()
-        )
+        except SQLAlchemyError as e:
+            algo_session.rollback()
+            print(f"[workday_costhour] skip algo data: {e}")
 
         # ── 获取所有涉及的 user_id，批量查 team 信息 ──
         all_user_ids = set()
@@ -261,7 +310,7 @@ def _query_workday_costhour_base(
 
         def _resolve_team(uid: str):
             m = user_map.get(uid, {})
-            tid = m.get("teamId", "")
+            tid = _attendance_team_id(uid, m.get("teamId", ""))
             return tid, _team_name_static(tid), m.get("name", uid)
 
         # ── 组装统一行 ──
@@ -412,7 +461,7 @@ def _query_workday_costhour_base(
             })
 
         # ── 白名单过滤：只保留指定参与人员 ──
-        results = [r for r in results if r["userId"] in WHITELIST_USER_IDS]
+        results = [r for r in results if r["userId"] in ATTENDANCE_PARTICIPANT_USER_IDS]
 
         return results
     finally:
@@ -638,10 +687,47 @@ def workday_costhour_member_summary_service(payload: Dict[str, Any]) -> Dict[str
     if team_id_filter:
         rows = [r for r in rows if str(r.get("teamId", "") or "").strip() == team_id_filter]
 
+    # 出勤表人员名单是固定参与人员 roster，不能因某季度没有任务数据而缩减。
+    # 先从 user_character 补齐所有人员，再把本季度工时聚合到对应人员。
     member_map: Dict[str, Dict[str, Any]] = {}
+    roster_session = SessionLocal()
+    try:
+        roster_rows = (
+            roster_session.query(DbUserCharacter)
+            .filter(DbUserCharacter.user_id.in_(list(ATTENDANCE_PARTICIPANT_USER_IDS)))
+            .all()
+        )
+        roster_by_id = {
+            str(getattr(item, "user_id", "") or "").strip(): item
+            for item in roster_rows
+        }
+    finally:
+        roster_session.close()
+
+    for uid in sorted(ATTENDANCE_PARTICIPANT_USER_IDS):
+        profile = roster_by_id.get(uid)
+        actual_team_id = str(getattr(profile, "team_id", "") or "") if profile else ""
+        team_id = _attendance_team_id(uid, actual_team_id)
+        team_name = _team_name_static(team_id)
+        user_name = str(getattr(profile, "name", "") or uid) if profile else uid
+        if team_id_filter and team_id != team_id_filter:
+            continue
+        member_map[uid] = {
+            "userId": uid,
+            "userName": user_name,
+            "teamId": team_id,
+            "teamName": team_name,
+            "workdayCosthour": 0.0,
+            "taskCount": 0,
+        }
+
     for r in rows:
         uid = str(r.get("userId", "") or "").strip()
         if not uid:
+            continue
+        if uid not in ATTENDANCE_PARTICIPANT_USER_IDS:
+            continue
+        if team_id_filter and str(r.get("teamId", "") or "").strip() != team_id_filter:
             continue
         bucket = member_map.setdefault(uid, {
             "userId": uid,

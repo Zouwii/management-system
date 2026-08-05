@@ -75,7 +75,6 @@ export default function AttendancePage() {
         ?? workdayResult.workdays
         ?? 0,
       );
-      const defaultHolidayDays = Number(workdayResult.holiday_count ?? 0);
       const savedAttendance = new Map(
         (attendanceResponse?.data?.records || []).map((record) => [String(record.user_id), record]),
       );
@@ -85,7 +84,7 @@ export default function AttendancePage() {
         nextAdjustments[member.userId] = {
           overtimeDays: record?.overtime_days ?? 0,
           leaveDays: record?.leave_days ?? 0,
-          holidayDays: record?.statutory_holiday_days ?? defaultHolidayDays,
+          holidayDays: record?.statutory_holiday_days ?? 0,
         };
       });
       setAdjustments(nextAdjustments);
@@ -100,6 +99,12 @@ export default function AttendancePage() {
   useEffect(() => {
     loadAttendance();
   }, [loadAttendance]);
+
+  useEffect(() => {
+    if (!saveMessage) return undefined;
+    const timer = window.setTimeout(() => setSaveMessage(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [saveMessage]);
 
   const handleAdjustmentChange = useCallback((userId, field, value) => {
     setAdjustments((current) => ({
@@ -123,6 +128,10 @@ export default function AttendancePage() {
         overtime_days: Number(adjustment.overtimeDays || 0),
         leave_days: Number(adjustment.leaveDays || 0),
         statutory_holiday_days: Number(adjustment.holidayDays || 0),
+        effective_work_days: Math.max(
+          0,
+          Number(standardDays || 0) - Number(adjustment.holidayDays || 0),
+        ),
       };
     });
 
@@ -134,7 +143,7 @@ export default function AttendancePage() {
       if (response?.code === 200 || response?.data) {
         setSaveMessage({
           type: 'success',
-          text: `已保存 ${response?.data?.saved_count || records.length} 条记录`,
+          text: `已保存 ${response?.data?.saved_count ?? records.length} 条记录`,
         });
       } else {
         setSaveMessage({ type: 'error', text: response?.error || response?.message || '保存失败' });
@@ -144,7 +153,7 @@ export default function AttendancePage() {
     } finally {
       setSaving(false);
     }
-  }, [adjustments, memberData.members, quarterOption]);
+  }, [adjustments, memberData.members, quarterOption, standardDays]);
 
   return (
     <ManagerLayout>

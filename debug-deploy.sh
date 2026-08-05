@@ -4,14 +4,20 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BACKEND_DIR="${SCRIPT_DIR}/backend"
 FRONTEND_DIR="${SCRIPT_DIR}/frontend-react"
+BACKEND_PID=""
+MCP_PID=""
 
 cleanup() {
   echo ""
   echo "[dev] stopping..."
-  kill $BACKEND_PID 2>/dev/null || true
-  wait $BACKEND_PID 2>/dev/null || true
-  kill $MCP_PID 2>/dev/null || true
-  wait $MCP_PID 2>/dev/null || true
+  if [[ -n "${BACKEND_PID}" ]]; then
+    kill "${BACKEND_PID}" 2>/dev/null || true
+    wait "${BACKEND_PID}" 2>/dev/null || true
+  fi
+  if [[ -n "${MCP_PID}" ]]; then
+    kill "${MCP_PID}" 2>/dev/null || true
+    wait "${MCP_PID}" 2>/dev/null || true
+  fi
   echo "[dev] all stopped."
   exit 0
 }
@@ -21,6 +27,7 @@ trap cleanup SIGINT SIGTERM
 echo "[dev] checking ports..."
 fuser -k 5001/tcp 2>/dev/null || true
 fuser -k 5200/tcp 2>/dev/null || true
+fuser -k 5173/tcp 2>/dev/null || true
 sleep 1
 
 # 后端
@@ -36,6 +43,13 @@ for i in $(seq 1 15); do
   fi
   sleep 1
 done
+
+if ! curl -s http://127.0.0.1:5001/api/bt/health >/dev/null 2>&1; then
+  echo "[dev] backend failed to become ready on port 5001." >&2
+  kill "${BACKEND_PID}" 2>/dev/null || true
+  wait "$BACKEND_PID" 2>/dev/null || true
+  exit 1
+fi
 
 # MCP SSE Server
 cd "${BACKEND_DIR}"

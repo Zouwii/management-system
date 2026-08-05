@@ -101,7 +101,6 @@ export default function QuarterlyEffectivePerformancePage() {
         ?? workdayResult.effective_workday_count
         ?? workdayResult.workdays,
       );
-      const defaultHolidayDays = toNumber(workdayResult.holiday_count);
       const attendanceMap = new Map(
         (attendanceResponse?.data?.records || []).map((record) => [String(record.user_id), record]),
       );
@@ -116,8 +115,8 @@ export default function QuarterlyEffectivePerformancePage() {
         const userId = String(row.userId || row.id || '');
         const name = row.name || row.userName || userId || `成员${index + 1}`;
         const record = attendanceMap.get(userId);
-        const holidayDays = toNumber(record?.statutory_holiday_days ?? defaultHolidayDays);
-        const totalEffectiveHours = Math.max(0, standardDays - holidayDays);
+        const storedEffectiveHours = toNumber(record?.effective_work_days);
+        const totalEffectiveHours = storedEffectiveHours > 0 ? storedEffectiveHours : standardDays;
         const completedCurrentHours = toNumber(row.completedHours ?? row.completedEffectiveHours);
         const completedOverdueHours = toNumber(row.overdueCompletedHours ?? row.completedOverdueEffectiveHours);
         const completedEffectiveHours = completedCurrentHours + completedOverdueHours;
