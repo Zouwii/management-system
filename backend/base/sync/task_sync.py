@@ -40,7 +40,13 @@ WORKDAY_FLAG_CUSTOMFIELD_ID = "667a65e618aebd88f98d4896"
 NEED_STATISTIC_CUSTOMFIELD_ID = "667a65e618aebd88f98d4896"  # 是/否 标记（与 WORKDAY_FLAG 同一字段）
 CASCADING_PROJECT_FIELD_ID = "665ee4b45b46f34b3e045af2"       # 级联：项目分类 / 车型 / 项目名称
 PROGRAM_PROBLEM_TYPE_FIELD_ID = "67c56f477ed2b4b7bbd0cd69"
-PROGRAM_CAUSE_FIELD_ID = "67c571aa5aed540b545e208c"
+PROGRAM_SOFTWARE_VERSION_FIELD_ID = "65a7be8938685843bf1c7d83"
+PROGRAM_CAUSE_FIELD_IDS = {
+    "67c571aa5aed540b545e208c",
+    "67c571c89a5dc6dbb8511d99",
+    "67c5715253aacbf8cf267e81",
+    "67c571d86db6f1be2bf2f88f",
+}
 DEFAULT_BUSINESS_TYPE_TAG_MAPPING = {
     "65264cfd697b6b909485bcbc": 0,  # 产品
     "65264cf79ed530912c3edf0f": 1,  # 研发
@@ -442,15 +448,26 @@ def _extract_program_issue_label_levels(item: Dict[str, Any]) -> Dict[str, Optio
     if not isinstance(cfs, list):
         return result
 
-    field_prefixes = {
-        PROGRAM_PROBLEM_TYPE_FIELD_ID: "problem_type_level_",
-        PROGRAM_CAUSE_FIELD_ID: "cause_level_",
-    }
+    problem_type_ids = {PROGRAM_PROBLEM_TYPE_FIELD_ID}
+    cause_paths = []
     for cf in cfs:
         if not isinstance(cf, dict):
             continue
-        prefix = field_prefixes.get(str(cf.get("customFieldId") or cf.get("customfieldId") or "").strip())
+        cfid = str(cf.get("customFieldId") or cf.get("customfieldId") or "").strip()
+        if cfid in problem_type_ids:
+            prefix = "problem_type_level_"
+        elif cfid in PROGRAM_CAUSE_FIELD_IDS:
+            prefix = "cause_level_"
+        else:
+            prefix = None
         if not prefix:
+            continue
+        if prefix == "cause_level_":
+            for value in cf.get("value") or []:
+                if isinstance(value, dict) and value.get("title"):
+                    parts = [part.strip() for part in str(value["title"]).split("/") if part.strip()]
+                    if parts:
+                        cause_paths.append(parts[:3])
             continue
         for value in cf.get("value") or []:
             if not isinstance(value, dict) or not value.get("title"):
@@ -462,7 +479,30 @@ def _extract_program_issue_label_levels(item: Dict[str, Any]) -> Dict[str, Optio
                     result[key] = part
                 elif part not in result[key].split("; "):
                     result[key] += f"; {part}"
+    if cause_paths:
+        best = max(cause_paths, key=len)
+        for index, part in enumerate(best, 1):
+            result[f"cause_level_{index}"] = part
     return result
+
+
+def _extract_program_issue_software_version(item: Dict[str, Any]) -> Optional[str]:
+    cfs = item.get("customFields") or item.get("customfields") or []
+    if not isinstance(cfs, list):
+        return None
+    titles = []
+    for cf in cfs:
+        if not isinstance(cf, dict):
+            continue
+        cfid = str(cf.get("customFieldId") or cf.get("customfieldId") or "").strip()
+        if cfid != PROGRAM_SOFTWARE_VERSION_FIELD_ID:
+            continue
+        for value in cf.get("value") or []:
+            if isinstance(value, dict) and value.get("title"):
+                title = str(value["title"]).strip()
+                if title and title not in titles:
+                    titles.append(title)
+    return "; ".join(titles) if titles else None
 
 
 def _sync_one_detail_to_b_and_c(
@@ -513,6 +553,7 @@ def _sync_one_detail_to_b_and_c(
     workday_costhour = _extract_workday_costhour(item)
     cascading = _extract_cascading_project_fields(item)
     label_levels = _extract_program_issue_label_levels(item)
+    software_version = _extract_program_issue_software_version(item)
 
     if write_b:
         if is_overdue:
@@ -681,6 +722,7 @@ def _sync_one_issue_detail(
     task_nature = _extract_task_nature(item)
     workday_costhour = _extract_workday_costhour(item)
     cascading = _extract_cascading_project_fields(item)
+    label_levels = _extract_program_issue_label_levels(item)
     stmt = select(ProgramIssueDetail).where(
         ProgramIssueDetail.task_id == task_id,
         ProgramIssueDetail.query_user_id == executor_id,
@@ -719,6 +761,7 @@ def _sync_one_issue_detail(
         row.project_name_3 = cascading["project_name_3"]
         for key, value in label_levels.items():
             setattr(row, key, value)
+        row.software_version = software_version
         row.fetched_at = now
     else:
         one_session.add(
@@ -761,6 +804,7 @@ def _sync_one_issue_detail(
                 cause_level_1=label_levels["cause_level_1"],
                 cause_level_2=label_levels["cause_level_2"],
                 cause_level_3=label_levels["cause_level_3"],
+                software_version=software_version,
                 fetched_at=now,
             )
         )

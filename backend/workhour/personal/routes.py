@@ -48,7 +48,11 @@ def _load_user_character_members():
         for row in rows:
             uid = str(getattr(row, "user_id", "") or "").strip()
             name = str(getattr(row, "name", "") or "").strip()
+            team_id = str(getattr(row, "team_id", "") or "")
             if not uid:
+                continue
+            # 算法组(team_id=2)不出现在工时管理下拉中
+            if team_id == "2":
                 continue
             members.append(
                 {

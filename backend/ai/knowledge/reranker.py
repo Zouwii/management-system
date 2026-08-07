@@ -16,6 +16,12 @@ logger = logging.getLogger(__name__)
 
 _reranker = None
 _reranker_model: str = ""
+_reranker_ready: bool = False
+
+
+def is_reranker_ready() -> bool:
+    """Return True if the reranker model is loaded and ready."""
+    return _reranker_ready
 
 
 def _get_model_dir(model: str) -> Path:
@@ -27,12 +33,8 @@ def _get_model_dir(model: str) -> Path:
 
 
 def get_reranker(model: str | None = None):
-    """懒加载 reranker，全局单例。
-
-    Args:
-        model: "base" 或 "v2-m3"，默认读环境变量 RERANKER_MODEL，兜底 "base"
-    """
-    global _reranker, _reranker_model
+    """懒加载 reranker，全局单例。首次调用阻塞加载（~10s），后续毫秒级。"""
+    global _reranker, _reranker_model, _reranker_ready
 
     if model is None:
         model = os.environ.get("RERANKER_MODEL", "base")
@@ -46,6 +48,7 @@ def get_reranker(model: str | None = None):
     logger.info("Loading reranker [%s] from %s ...", model, model_dir)
     _reranker = FlagReranker(str(model_dir), use_fp16=False, device="cpu")
     _reranker_model = model
+    _reranker_ready = True
     logger.info("Reranker [%s] loaded", model)
     return _reranker
 
@@ -71,6 +74,8 @@ def rerank(
         return candidates
 
     rr = get_reranker(model)
+    if rr is None:
+        return candidates  # reranker not ready yet, return as-is
     pairs = [[query, (c.get("content") or "")[:max_chars]] for c in candidates]
     scores = rr.compute_score(pairs, normalize=True)
 

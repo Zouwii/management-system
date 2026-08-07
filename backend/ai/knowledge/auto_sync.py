@@ -204,17 +204,23 @@ def _rechunk_documents(doc_ids: List[str]) -> dict:
                 ).all()
             )
             db.query(KbChunk).filter(KbChunk.doc_id == doc.node_id).delete()
-            chunks = chunk_document(doc.node_id, doc.title, doc.content, "FILE")
-            for c in chunks:
-                db.add(
-                    KbChunk(
-                        doc_id=c["doc_id"],
-                        chunk_index=c["chunk_index"],
-                        content=c["content"],
-                        token_count=c["token_count"],
+            result = chunk_document(doc.node_id, doc.title, doc.content,
+                                     doc.outline or "", "FILE")
+            for c_list in (result.get("leaf", []), result.get("parent", [])):
+                for c in c_list:
+                    db.add(
+                        KbChunk(
+                            doc_id=c["doc_id"],
+                            chunk_index=c["chunk_index"],
+                            content=c["content"],
+                            token_count=c["token_count"],
+                            parent_id=c.get("parent_id"),
+                            depth=c.get("depth", 1),
+                            chunk_type=c.get("chunk_type", "paragraph"),
+                            section_path=c.get("section_path", ""),
+                        )
                     )
-                )
-            total_chunks += len(chunks)
+            total_chunks += len(result.get("leaf", [])) + len(result.get("parent", []))
         db.commit()
         logger.info("auto_sync: rechunked %d docs -> %d chunks", len(docs), total_chunks)
 

@@ -15,6 +15,12 @@ logger = logging.getLogger(__name__)
 
 _MODEL_NAME = "BAAI/bge-small-zh-v1.5"
 _model = None
+_model_loading = False  # True while model is being loaded (prevents re-entry)
+
+
+def is_model_ready() -> bool:
+    """Return True if the embedding model is loaded and ready to use."""
+    return _model is not None
 
 
 def delete_vectors(chunk_ids) -> int:
@@ -47,14 +53,16 @@ def delete_vectors(chunk_ids) -> int:
 
 def _load_model():
     """Eagerly load the embedding model. Call once at process start."""
-    global _model
-    if _model is not None:
+    global _model, _model_loading
+    if _model is not None or _model_loading:
         return
+    _model_loading = True
     os.environ.setdefault("HF_HUB_OFFLINE", "1")
     import torch
     torch.set_num_threads(1)
     from sentence_transformers import SentenceTransformer
-    _model = SentenceTransformer(_MODEL_NAME, local_files_only=True)
+    _model = SentenceTransformer(_MODEL_NAME, local_files_only=True, device="cpu")
+    _model_loading = False
 
 
 def _get_model():
@@ -67,32 +75,38 @@ def embed_chunks(
     workspace_id: Optional[str] = None,
     limit: int = 0,
     batch_size: int = 32,
+    depth: Optional[int] = None,
 ) -> dict:
     """Embed kb_chunks and store vectors in pgvector chunk_vectors.
 
     Skips chunks that already have a vector entry.
+    If depth is set (e.g. 1), only embed chunks of that depth level.
     Returns counts: {chunk_total, embedded, skipped, errors}.
     """
     model = _get_model()
-    dim = model.get_embedding_dimension()
 
     kb = KbSessionLocal()
     pg = PgVectorSessionLocal()
     stats = {"chunk_total": 0, "embedded": 0, "skipped": 0, "errors": 0}
 
     try:
-        # which chunks need embedding
         from sqlalchemy import text
 
+        # Build WHERE clauses
+        where_clauses = []
+        params: dict = {}
         if workspace_id:
-            count_sql = text(
-                "SELECT COUNT(*) FROM kb_chunks c "
-                "JOIN kb_documents d ON c.doc_id = d.node_id "
-                "WHERE d.workspace_id = :ws_id"
-            )
-            total = kb.execute(count_sql, {"ws_id": workspace_id}).scalar()
-        else:
-            total = kb.execute(text("SELECT COUNT(*) FROM kb_chunks")).scalar()
+            where_clauses.append("d.workspace_id = :ws_id")
+            params["ws_id"] = workspace_id
+        if depth is not None:
+            where_clauses.append("c.depth = :depth")
+            params["depth"] = depth
+        where_str = (" AND " + " AND ".join(where_clauses)) if where_clauses else ""
+
+        join_clause = "JOIN kb_documents d ON c.doc_id = d.node_id" if workspace_id else ""
+
+        count_sql = text(f"SELECT COUNT(*) FROM kb_chunks c {join_clause} WHERE 1=1 {where_str}")
+        total = kb.execute(count_sql, params).scalar()
         stats["chunk_total"] = total
 
         offset = 0
@@ -101,24 +115,13 @@ def embed_chunks(
                 break
             batch_limit = min(batch_size, limit - offset) if limit else batch_size
 
-            if workspace_id:
-                sel = text(
-                    "SELECT c.id, c.content FROM kb_chunks c "
-                    "JOIN kb_documents d ON c.doc_id = d.node_id "
-                    "WHERE d.workspace_id = :ws_id "
-                    "ORDER BY c.id LIMIT :limit OFFSET :offset"
-                )
-                rows = kb.execute(
-                    sel, {"ws_id": workspace_id, "limit": batch_limit, "offset": offset}
-                ).fetchall()
-            else:
-                sel = text(
-                    "SELECT id, content FROM kb_chunks "
-                    "ORDER BY id LIMIT :limit OFFSET :offset"
-                )
-                rows = kb.execute(
-                    sel, {"limit": batch_limit, "offset": offset}
-                ).fetchall()
+            batch_params = {**params, "limit": batch_limit, "offset": offset}
+            sel = text(
+                f"SELECT c.id, c.content FROM kb_chunks c {join_clause} "
+                f"WHERE 1=1 {where_str} "
+                f"ORDER BY c.id LIMIT :limit OFFSET :offset"
+            )
+            rows = kb.execute(sel, batch_params).fetchall()
 
             if not rows:
                 break

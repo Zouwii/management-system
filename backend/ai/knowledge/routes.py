@@ -1,30 +1,50 @@
-"""HTTP routes for knowledge base document browsing, sync, and chat.
+"""HTTP routes for knowledge base document browsing, sync, chat, and RAG v3 pipeline.
 
 Endpoints:
-  GET  /ai/knowledge/workspaces                    - List knowledge bases (sorted by priority)
+  # Workspace & document
+  GET  /ai/knowledge/workspaces                    - List knowledge bases
   GET  /ai/knowledge/workspaces/<ws_id>/nodes      - Browse document tree
-  GET  /ai/knowledge/documents/<node_id>           - Get parsed document content (blocks -> markdown)
+  GET  /ai/knowledge/documents/<node_id>           - Get document content
+
+  # Sync
   POST /ai/knowledge/sync                          - Sync one workspace metadata + Markdown
   POST /ai/knowledge/sync-all                      - Sync all workspace metadata + Markdown
-  POST /ai/knowledge/sync-and-embedding            - Metadata -> Markdown -> rechunk -> embed
+  POST /ai/knowledge/sync-and-embedding            - Metadata → Markdown → rechunk → embed
+
+  # Search & chat
   POST /ai/knowledge/search                        - Search via DingTalk API
-  POST /ai/knowledge/chunks/search                 - Local search on kb_chunks (keyword/vector/hybrid)
-  POST /ai/knowledge/rechunk                       - Re-chunk + auto reembed
-  POST /ai/knowledge/reembed                       - Embed chunks into pgvector
+  POST /ai/knowledge/chunks/search                 - Local search (keyword/vector/hybrid)
   POST /ai/knowledge/chat/session                  - Create chat session
-  GET  /ai/knowledge/chat                          - SSE knowledge-base chat
+  GET  /ai/knowledge/chat                          - SSE chat
+  POST /ai/knowledge/rechunk                       - Re-chunk + auto reembed (legacy)
+  POST /ai/knowledge/reembed                       - Embed chunks (legacy)
+  POST /ai/knowledge/documents/fill-markdown       - Fill markdown from local files (legacy)
+
+  # RAG v3 pipeline
+  GET  /ai/knowledge/v3/status                     - Pipeline status overview
+  POST /ai/knowledge/v3/import                     - Clean markdown → content + outline
+  POST /ai/knowledge/v3/chunk                      - Chunk documents (v3 chunker)
+  POST /ai/knowledge/v3/embed                      - Embed leaf chunks → pgvector
+
+  # Analysis
+  POST /ai/knowledge/analyze/task                  - Analyze task
+  POST /ai/knowledge/analyze/task/report           - Task report
+  POST /ai/knowledge/analyze/dashboard             - Dashboard analysis
 """
 
 from __future__ import annotations
 
 import json
+import re
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import List
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from flask import request, session
 
-from ai.knowledge.models import KbNode, KbDocument
+from ai.knowledge.models import KbNode, KbDocument, KbChunk
 from ai.knowledge.parser import parse_document
 from ai.knowledge.service import DingTalkKnowledgeClient
 from base.db.engine import KbSessionLocal, SessionLocal
@@ -428,6 +448,91 @@ def _sync_workspace(client, workspace_id: str, root_id: str, limit: int = 0,
         "skippedLegacy": skipped_legacy,
         "errors": (failed_nodes + failed_docs)[:20],
     }
+
+
+# ── shared outline extractor (used by v3 import + reoutline) ─────
+
+_HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)(?:\s*#+\s*)?$", re.MULTILINE)
+_CNS = r"[一二三四五六七八九十]+"
+_CN_HEADING_RE = re.compile(rf"^({_CNS})[、，,.．。.]\s*(.+)$")
+_DIGIT_HEADING_RE = re.compile(r"^(\d+(?:\.\d+)*)[\.、，,．。)]?(?!\d)\s+(.+)$")
+_LETTER_HEADING_RE = re.compile(r"^([A-Za-z])[)\.]\s*(.+)$")
+_BOLD_LINE_RE = re.compile(r"^\*\*(.+?)\*\*\s*$")
+_TABLE_LINE_RE = re.compile(r"^\|.+\|")
+
+
+def _clean_title_v3(t: str) -> str:
+    t = t.strip()
+    while t.startswith("**") and t.endswith("**") and len(t) > 4:
+        t = t[2:-2].strip()
+    t = re.sub(r"\*\*", "", t).strip()
+    t = re.sub(r"(\D)\d{1,4}$", r"\1", t).strip()
+    return t
+
+
+def _extract_outline_v2(markdown: str) -> list:
+    entries = []
+    stack = []
+    lines = markdown.split("\n")
+    for lineno, line in enumerate(lines, 1):
+        s = line.strip()
+        if not s:
+            continue
+        m = _HEADING_RE.match(s)
+        if m:
+            level = len(m.group(1))
+            title = _clean_title_v3(m.group(2))
+            while stack and stack[-1]["level"] >= level:
+                stack.pop()
+            parts = [h["title"] for h in stack] + [title]
+            entries.append({"level": level, "title": title, "line": lineno,
+                            "path": " > ".join(parts), "source": "markdown"})
+            stack.append({"level": level, "title": title})
+            continue
+        m = _CN_HEADING_RE.match(s)
+        if m:
+            title = _clean_title_v3(m.group(2))
+            entries.append({"level": 1, "title": title, "line": lineno,
+                            "path": title, "source": "implicit"})
+            continue
+        m = _DIGIT_HEADING_RE.match(s)
+        if m:
+            level = m.group(1).count(".") + 1
+            title = _clean_title_v3(m.group(2))
+            while stack and stack[-1]["level"] >= level:
+                stack.pop()
+            parts = [h["title"] for h in stack] + [title]
+            entries.append({"level": level, "title": title, "line": lineno,
+                            "path": " > ".join(parts), "source": "implicit_digit"})
+            stack.append({"level": level, "title": title})
+            continue
+        m = _LETTER_HEADING_RE.match(s)
+        if m:
+            title = _clean_title_v3(m.group(2))
+            level = 2
+            while stack and stack[-1]["level"] >= level:
+                stack.pop()
+            parts = [h["title"] for h in stack] + [title]
+            entries.append({"level": level, "title": title, "line": lineno,
+                            "path": " > ".join(parts), "source": "implicit_letter"})
+            stack.append({"level": level, "title": title})
+            continue
+        if not entries and _BOLD_LINE_RE.match(s):
+            title = _clean_title_v3(s)
+            entries.append({"level": 1, "title": title, "line": lineno,
+                            "path": title, "source": "implicit_bold"})
+            continue
+    if not entries:
+        for lineno, line in enumerate(lines, 1):
+            s = line.strip()
+            if not s or _TABLE_LINE_RE.match(s):
+                continue
+            title = _clean_title_v3(s)
+            if title and len(title) > 1:
+                entries.append({"level": 1, "title": title[:120], "line": lineno,
+                                "path": title[:120], "source": "implicit_fallback"})
+                break
+    return entries
 
 
 # ── route registration ─────────────────────────────────────────
@@ -1370,3 +1475,6 @@ def register(bp, ok, fail):
             "total_files": len(md_files),
             "markdown_dir": md_dir,
         })
+
+    from ai.knowledge.routes_v3 import register_v3
+    register_v3(bp, ok, fail)

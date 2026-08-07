@@ -621,6 +621,7 @@ def init_database() -> None:
                 ("cause_level_1", "VARCHAR(128)"),
                 ("cause_level_2", "VARCHAR(128)"),
                 ("cause_level_3", "VARCHAR(256)"),
+                ("software_version", "VARCHAR(128)"),
             ):
                 if column not in cols_b2:
                     with engine.begin() as conn:

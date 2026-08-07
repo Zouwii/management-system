@@ -27,7 +27,14 @@ from base.db.orm import ProgramIssueDetail  # noqa: E402
 
 
 PROBLEM_TYPE_FIELD_ID = "67c56f477ed2b4b7bbd0cd69"
-CAUSE_FIELD_ID = "67c571aa5aed540b545e208c"
+SOFTWARE_VERSION_FIELD_ID = "65a7be8938685843bf1c7d83"
+# 原因字段曾按场景/版本拆成多个 customField；它们的 value 结构相同，都要解析。
+CAUSE_FIELD_IDS = {
+    "67c571aa5aed540b545e208c",
+    "67c571c89a5dc6dbb8511d99",
+    "67c5715253aacbf8cf267e81",
+    "67c571d86db6f1be2bf2f88f",
+}
 
 
 def _as_fields(value: Any) -> List[Dict[str, Any]]:
@@ -59,15 +66,19 @@ def _titles(field: Dict[str, Any]) -> Iterable[str]:
             yield str(value["title"]).strip()
 
 
-def _levels(fields: List[Dict[str, Any]], target_id: str) -> List[Optional[str]]:
+def _levels(fields: List[Dict[str, Any]], target_ids) -> List[Optional[str]]:
     paths = []
     for field in fields:
-        if _field_id(field) != target_id:
+        if _field_id(field) not in target_ids:
             continue
         for title in _titles(field):
             parts = [part.strip() for part in title.split("/") if part.strip()]
             if parts:
                 paths.append(parts[:3])
+
+    # 同一任务可能同时保留旧版和新版原因字段，优先使用层级更完整的路径。
+    if paths:
+        paths = [max(paths, key=len)]
 
     result: List[Optional[str]] = []
     for index in range(3):
@@ -79,6 +90,17 @@ def _levels(fields: List[Dict[str, Any]], target_id: str) -> List[Optional[str]]
     return result
 
 
+def _value_titles(fields: List[Dict[str, Any]], target_id: str) -> Optional[str]:
+    titles = []
+    for field in fields:
+        if _field_id(field) != target_id:
+            continue
+        for title in _titles(field):
+            if title not in titles:
+                titles.append(title)
+    return "; ".join(titles) if titles else None
+
+
 def ensure_columns() -> None:
     columns = {column["name"] for column in inspect(engine).get_columns("program_issue_detail")}
     definitions = {
@@ -88,6 +110,7 @@ def ensure_columns() -> None:
         "cause_level_1": "VARCHAR(128)",
         "cause_level_2": "VARCHAR(128)",
         "cause_level_3": "VARCHAR(256)",
+        "software_version": "VARCHAR(128)",
     }
     with engine.begin() as connection:
         for name, column_type in definitions.items():
@@ -110,17 +133,20 @@ def backfill(limit: Optional[int], dry_run: bool, batch_size: int = 500) -> None
             scanned += 1
             fields = _load_fields(row.custom_fields_json, row.raw_json)
             problem = _levels(fields, PROBLEM_TYPE_FIELD_ID)
-            cause = _levels(fields, CAUSE_FIELD_ID)
+            cause = _levels(fields, CAUSE_FIELD_IDS)
+            software_version = _value_titles(fields, SOFTWARE_VERSION_FIELD_ID)
             if any(problem) or any(cause):
                 with_labels += 1
 
             changed = (
                 [row.problem_type_level_1, row.problem_type_level_2, row.problem_type_level_3] != problem
                 or [row.cause_level_1, row.cause_level_2, row.cause_level_3] != cause
+                or row.software_version != software_version
             )
             if changed:
                 row.problem_type_level_1, row.problem_type_level_2, row.problem_type_level_3 = problem
                 row.cause_level_1, row.cause_level_2, row.cause_level_3 = cause
+                row.software_version = software_version
                 updated += 1
             if not dry_run and scanned % batch_size == 0:
                 session.commit()

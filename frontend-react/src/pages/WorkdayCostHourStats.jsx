@@ -43,7 +43,6 @@ const QUARTER_OPTIONS = generateQuarterOptions();
 const WORKDAY_TEAMS = [
   { teamId: '0', teamName: '导航组' },
   { teamId: '1', teamName: '对接组' },
-  { teamId: '2', teamName: '算法组' },
 ];
 
 function mergeWorkdayTeams(teams = []) {
@@ -814,7 +813,7 @@ export default function WorkdayCostHourStats() {
             <Card className="overflow-hidden p-0">
               <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
                 <h2 className="text-lg font-semibold text-slate-900">
-                  部门汇总数据（导航组 + 对接组 + 算法组）· {quarterOption.label.split('(')[0].trim()}
+                  部门汇总数据（导航组 + 对接组）· {quarterOption.label.split('(')[0].trim()}
                   {workdayCount != null ? ` (共计${workdayCount}天)` : ''}
                 </h2>
               </div>

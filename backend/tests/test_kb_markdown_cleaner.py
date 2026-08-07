@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import unittest
 
-from ai.knowledge.v2.cleaner import clean_markdown
+from ai.knowledge.cleaner import clean_markdown
 
 
 class MarkdownCleanerTests(unittest.TestCase):

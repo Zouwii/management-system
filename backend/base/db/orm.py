@@ -210,6 +210,7 @@ class ProgramIssueDetail(Base):
     cause_level_1: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     cause_level_2: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     cause_level_3: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    software_version: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
 
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.now)
 

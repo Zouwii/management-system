@@ -133,16 +133,21 @@ def run_rechunk(doc_id: str = "") -> dict:
                 KbChunk.doc_id == doc.doc_id
             ).delete()
             # 生成新分块
-            chunks = chunk_document(doc.doc_id, doc.title,
-                                    doc.content, doc.node_type)
-            for c in chunks:
-                db.add(KbChunk(
-                    doc_id=c["doc_id"],
-                    chunk_index=c["chunk_index"],
-                    content=c["content"],
-                    token_count=c["token_count"],
-                ))
-            total_chunks += len(chunks)
+            result = chunk_document(doc.doc_id, doc.title,
+                                    doc.content, doc.outline or "", doc.node_type)
+            for c_list in (result.get("leaf", []), result.get("parent", [])):
+                for c in c_list:
+                    db.add(KbChunk(
+                        doc_id=c["doc_id"],
+                        chunk_index=c["chunk_index"],
+                        content=c["content"],
+                        token_count=c["token_count"],
+                        parent_id=c.get("parent_id"),
+                        depth=c.get("depth", 1),
+                        chunk_type=c.get("chunk_type", "paragraph"),
+                        section_path=c.get("section_path", ""),
+                    ))
+            total_chunks += len(result.get("leaf", [])) + len(result.get("parent", []))
 
             if (i + 1) % 50 == 0:
                 db.commit()

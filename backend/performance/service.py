@@ -620,7 +620,7 @@ def _normalize_team_key(team_id_raw) -> str:
 
 
 def list_teams_service() -> Dict[str, Any]:
-    """获取所有团队列表（从 user_character.team_id 去重）。"""
+    """获取所有团队列表（从 user_character.team_id 去重）。排除算法组(team_id=2)。"""
     uc_sess = SessionLocal()
     try:
         rows = uc_sess.query(UserCharacter.team_id).distinct().all()
@@ -628,7 +628,8 @@ def list_teams_service() -> Dict[str, Any]:
         teams = []
         for (tid,) in rows:
             key = str(tid).strip() if tid else ""
-            if not key or key in seen:
+            # 算法组不出现在绩效管理下拉中
+            if not key or key in seen or key == "2":
                 continue
             label = _TEAM_LABELS.get(key, key)
             tk = _normalize_team_key(key)
@@ -649,7 +650,10 @@ def list_members_service(payload: Dict[str, Any] = None) -> Dict[str, Any]:
 
     uc_sess = SessionLocal()
     try:
-        query = uc_sess.query(UserCharacter).filter(UserCharacter.character != "9").order_by(UserCharacter.user_id.asc())
+        query = uc_sess.query(UserCharacter).filter(
+            UserCharacter.character != "9",
+            UserCharacter.team_id != "2",  # 排除算法组
+        ).order_by(UserCharacter.user_id.asc())
         if team_filter:
             allowed_ids = _TEAM_ID_MAP.get(team_filter)
             if not allowed_ids:

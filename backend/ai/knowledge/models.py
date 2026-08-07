@@ -85,6 +85,11 @@ class KbChunk(KbBase):
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
     )
+    # RAG v3: parent-child hierarchy + section path
+    parent_id: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
+    depth: Mapped[int] = mapped_column(Integer, default=0)          # 0=父块, 1=叶子
+    chunk_type: Mapped[str] = mapped_column(String(20), default="paragraph")
+    section_path: Mapped[str] = mapped_column(String(1024), default="")
 
 
 # ── FTS index creation (database-aware) ──────────────────────────

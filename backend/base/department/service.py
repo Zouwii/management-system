@@ -139,6 +139,9 @@ def _fetch_members() -> List[Dict[str, Any]]:
             if not uid:
                 continue
             tid = str(getattr(r, "team_id", "") or "").strip()
+            # 算法组(team_id=2)不出现在部门总览中
+            if tid == "2":
+                continue
             char_val = int(getattr(r, "character", 0) or 0)
 
             # 排除双组管理员：character=9 或 (character=0 且同时 nav+servo 组长)
