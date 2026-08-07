@@ -1,6 +1,6 @@
 # RAG v2：文档清洗与层级切分工作记录
 
-> 状态：全量完成 | 更新：2026-08-05
+> 状态：v3 链路可用，已知问题待修 | 更新：2026-08-07
 > 样本目录：服务器 `/home/jz/zhr/markdown/`  
 > 关联设计：[RAG v2：Markdown 与图片多模态检索设计](./RAG-v2-markdown-multimodal-design.md)
 
@@ -214,7 +214,10 @@ content + outline
 - [x] 路径链路修复（ws_id → 中文名映射，命中率 0% → 65%）
 - [x] search_v3 集成 reranker（代码就绪，等 CPU 不降频启用）
 - [x] `/v3/sync` 全链路打通
-- [ ] 3 篇超大文档单独处理（chunk content 超 TEXT 限制）
+- [ ] 3 篇超大文档（ALTER TABLE kb_chunks.content → MEDIUMTEXT）
+- [ ] 302 篇 chunk 覆盖率 <20%（chunker 表格处理待修）
+- [ ] 2252 篇 pending 需 MCP 下载
+- [ ] 998 磁盘孤儿文件无 kb_node 匹配
 
 ## 6. v3 Chunker 实测记录（2026-08-05）
 
@@ -317,14 +320,14 @@ content + outline
 
 | 脚本 | 路径 | 用途 |
 |------|------|------|
-| 清洗+导入 | `backend/scripts/import_cleaned_markdown.py` | 批量清洗 markdown → kb_documents |
-| outline 重提取 | `backend/scripts/fix_outline.py` | 从 content 重新提取 outline → kb_documents |
 | cleaner 库 | `backend/ai/knowledge/cleaner.py` | `clean_markdown()` 清洗函数 |
 | chunker v3 | `backend/ai/knowledge/chunker.py` | outline 驱动父子块切分（497 行） |
 | embedder | `backend/ai/knowledge/embedder.py` | SentenceTransformer → pgvector |
 | retriever | `backend/ai/knowledge/retriever.py` | keyword/vector/hybrid/rerank 检索 |
+| reranker | `backend/ai/knowledge/reranker.py` | bge-reranker-base 交叉编码 |
 | routes v3 | `backend/ai/knowledge/routes_v3.py` | /v3/sync, /v3/download, /v3/import, /v3/index, /v3/status |
-| 样本生成 | `docs/ai/rag/samples/markdown-cleaning-v1/build_samples.py` | 生成清洗前后对照 |
+| models | `backend/ai/knowledge/models.py` | KbDocument / KbNode / KbChunk ORM |
+| schema | `backend/scripts/migrate_kb_storage.sql` | kb_chunks 扩展 + pgvector 迁移 |
 
 ---
 
@@ -360,7 +363,17 @@ content + outline
 | `/v3/search` | POST | ✅ keyword+vector RRF，reranker 待启用 |
 | `/v3/status` | GET | ✅ |
 
-### 10.4 3 篇失败文档
+### 10.4 已知问题
+
+#### 10.4.1 Chunk 覆盖率不足（302 篇文档）
+
+137 篇覆盖率为 0-5%，165 篇为 5-20%。共同特征：大篇幅 adoc/markdown 混合表格文档，cleaner 保留原始表格标记后 chunker 无法正确处理，造成 99% 内容丢失。
+
+典型案例：60K 字符文档仅产出 600 token 的 chunk。
+
+> 根因：outline 过度细粒度 + `_chunk_section_leaf` 原子表格块过大时 `_fixed_window` 分句失败。待修。
+
+#### 10.4.2 Chunk 超 TEXT 限制（3 篇）
 
 | 文档 | 原因 |
 |------|------|
@@ -368,4 +381,16 @@ content + outline
 | `人形机器人OMNI300协议文档-V1.1.adoc` | 同上 |
 | `（某超大 JSON 文档）` | 28K token 代码块未切开 |
 
-需单独处理：增大 `kb_chunks.content` 为 MEDIUMTEXT，或优化 chunker 对超大代码块的处理。
+> 修复：`ALTER TABLE kb_chunks MODIFY content MEDIUMTEXT`（16MB）。
+
+#### 10.4.3 2252 篇 pending 需 MCP 下载
+
+MCP 服务未运行，磁盘无对应 .md 文件。含产品信息门户（OQ0xySKEGYKEG48B）556 篇。
+
+#### 10.4.4 998 磁盘孤儿文件无 kb_node
+
+磁盘有文件但 kb_nodes 无匹配条目。多为 MCP 下载 .adoc 拆分为子目录/子 .md 的场景（如 `PRD.adoc → PRD/子章节.md`）。当前策略：暂不处理。
+
+#### 10.4.5 Reranker 待启用
+
+bge-reranker-base (3.2GB) 模型已部署，但服务器 CPU 限频至 54%，模型加载过慢。待 CPU 频率恢复后启用。
