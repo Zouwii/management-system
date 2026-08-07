@@ -1,6 +1,6 @@
 # Markdown 链路整治
 
-> 状态：已完成 | 更新：2026-08-05
+> 状态：已完成 | 更新：2026-08-07
 
 ## 1. 问题
 
@@ -49,19 +49,21 @@ DB: 6722 篇 kb_documents
 
 ## 3. 待办
 
-### 3.1 MCP 下载 ~910 篇（外部依赖）
+### 3.1 MCP 下载 产品信息门户 556 篇（已完成 ✅）
+已通过 MCP 批量下载 310 篇 .adoc 文档，v3 import+index 入库。246 篇非文本格式（.axls/.able/.amind）无法下载。
 
-磁盘确实没有文件，需要 DingTalk MCP 下载。确认 MCP 可访问后跑 `/v3/download`。
+### 3.2 MCP 下载其余工作区 ~1696 篇（MCP 可用，待执行）
+其余 8 个工作区共 1696 篇 pending 可随时下载。
 
-### 3.2 全量 index（P1）
+### 3.3 全量 index（P1）
 
 import 完成后跑 `/v3/index` 切块+embed。
 
-### 3.3 旧 import_cleaned_markdown.py 退役（P3）
+### 3.4 旧 import_cleaned_markdown.py 退役（已完成 ✅）
 
-v3 import 稳定后废弃。
+已删除，v3 import 现已替代。
 
-### 3.4 磁盘整理（可选）
+### 3.5 磁盘整理（可选）
 
 磁盘文件路径现在和 `_build_md_path()` 一致（workspace_name 开头）。新下载的文件自动对齐。旧文件暂不需要迁移。
 
@@ -71,9 +73,10 @@ v3 import 稳定后废弃。
 |------|------|------|
 | breadcrumb 末尾去重 | ✅ 已修复 | `_build_md_path()` |
 | `parent_dir` 参数 | ✅ 已加 | download/import/sync 都支持 |
-| import fallback 搜索 | ✅ 已实现 | 文件名 fallback 搜索，命中率 0% → 65% |
+| import fallback 搜索 | ✅ 已实现 | 命中率 0% → 65% |
 | 批量 import pending | ✅ 已完成 | 增量导入 +57 新建 +413 更新 |
-| 全量 index | ✅ 已完成 | 32915 leaf + 9169 parent → 31310 vectors |
+| 全量 index | ✅ 已完成 | 46853 chunks, ~35000 vectors |
+| 产品信息门户 MCP | ✅ 已完成 | 310 篇 adoc 下载+入库 |
+| MCP 其余工作区 | ❌ 待做 | ~1696 篇 pending 可随时下载 |
 | 磁盘整理脚本 | ❌ 待做 | 统一目录结构 |
-| MCP 下载 | ❌ 待做 | 服务未运行 |
-| 旧脚本退役 | ❌ 待做 | 等 v3 稳定 |
+| 旧脚本退役 | ✅ 已完成 | 4 个旧脚本 + v2 模块已删除 |

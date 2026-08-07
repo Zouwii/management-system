@@ -337,9 +337,9 @@ content + outline
 
 | 表 | 记录数 | 说明 |
 |-----|--------|------|
-| kb_documents | 6779 | 4527 success + 2252 pending |
-| kb_chunks | 42084 | 32915 leaf + 9169 parent |
-| chunk_vectors | 31310 | 全量嵌入 |
+| kb_documents | 6779 | 4836 success + 1943 pending（含产品信息门户 246 篇非文本格式） |
+| kb_chunks | 46853 | 35698 leaf + 11155 parent |
+| chunk_vectors | ~35000 | 本次新增产品信息门户 ~3600 条（embed 进行中） |
 
 ### 10.2 链路修复记录
 
@@ -347,21 +347,25 @@ content + outline
 |------|------|------|
 | breadcrumb 路径 0% 命中 | `_build_md_path()` 查 `kb_workspaces.json` 做 ws_id→中文名映射 | 命中率 → 65% |
 | 磁盘有文件但 DB 无记录 | 文件名 fallback 搜索 + 补建 kb_documents | +57 新建 +413 导入 |
-| 超大单行 JSON (28K token) | `_force_split_long()` 兜底 | 仍有 3 篇失败（需进一步处理） |
+| 超大单行 JSON (28K token) | `_force_split_long()` 兜底 | 仍有 3 篇失败 |
 | outline 过度切分 | `_merge_tiny_leaves()` 合并 | 135→11 chunk |
 | CPU 模型加载 3-5min | embedder 加 `device="cpu"` | 加载 4.6s |
 | reranker 后台加载卡死 | 恢复同步加载 | 待 CPU 不降频后启用 |
+| 产品信息门户 556 篇未下载 | MCP 批量下载 + v3 import/index | 310 篇入库，246 篇非文本跳过 |
+| 冗余脚本 | 删除 4 个旧脚本 + v2 模块 | 保留 routes_v3/chunker/cleaner/embedder/retriever/reranker |
 
 ### 10.3 接口状态
 
 | 端点 | 方法 | 状态 |
 |------|------|------|
-| `/v3/sync` | POST | ✅ 全步骤 |
-| `/v3/download` | POST | ✅ 支持 `parent_dir` |
-| `/v3/import` | POST | ✅ 支持 `parent_dir` |
+| `/v3/sync` | POST | ✅ 全步骤（meta/download/import/index） |
+| `/v3/download` | POST | ✅ MCP 网关正常，支持 `parent_dir` |
+| `/v3/import` | POST | ✅ clean + outline → kb_documents |
 | `/v3/index` | POST | ✅ chunk + embed |
 | `/v3/search` | POST | ✅ keyword+vector RRF，reranker 待启用 |
 | `/v3/status` | GET | ✅ |
+
+> ⚠️ 周一自动 sync（`kb_incremental_sync`）使用旧流程：MCP 下载原始 markdown → 直接标记 success，跳过 v3 的 clean + outline。因此 auto sync 产出的文档需手动跑 v3 import+index。`KB_AUTO_CHUNK_EMBED_ENABLED` 默认关闭。
 
 ### 10.4 已知问题
 
