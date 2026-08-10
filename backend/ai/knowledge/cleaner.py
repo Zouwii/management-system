@@ -36,7 +36,6 @@ def _normalize_basic(text: str) -> str:
         text.lstrip("\ufeff")
         .replace("\r\n", "\n")
         .replace("\r", "\n")
-        .replace("\u00a0", " ")
     )
 
 
@@ -79,7 +78,9 @@ def _protect_fenced_code(text: str) -> Tuple[str, List[str], List[str]]:
         # Keep malformed input losslessly. A warning lets the ingestion layer
         # decide whether this document is safe to overwrite.
         warnings.append("UNCLOSED_CODE_FENCE")
-        output.extend(current)
+        index = len(blocks)
+        blocks.append("".join(current).rstrip("\n"))
+        output.append(_CODE_PLACEHOLDER.format(index) + "\n")
 
     return "".join(output), blocks, warnings
 
@@ -147,16 +148,89 @@ def _image_name(alt: str, url: str) -> str:
     return alt.strip()
 
 
-def _replace_images(text: str) -> Tuple[str, List[str]]:
+def _meaningful_alt(alt: str) -> str:
+    value = alt.strip()
+    if not value or value.lower() in {"image", "image.png", "图片", "【图片】"}:
+        return ""
+    if re.fullmatch(r"[0-9a-f]{8,}(?:-[0-9a-f-]+)?(?:\.[A-Za-z0-9]+)?", value, re.I):
+        return ""
+    return value
+
+
+def _is_dingtalk_node_url(url: str) -> bool:
+    parsed = urlparse(url)
+    hostname = (parsed.hostname or "").lower()
+    return (hostname == "dingtalk.com" or hostname.endswith(".dingtalk.com")) and "/i/nodes/" in parsed.path
+
+
+def _is_image_url(url: str) -> bool:
+    path = unquote(urlparse(url).path).lower()
+    return bool(re.search(r"\.(?:png|jpe?g|gif|webp|svg|bmp|avif)(?:$|/)", path))
+
+
+def _is_teambition_doc_url(url: str) -> bool:
+    parsed = urlparse(url)
+    hostname = (parsed.hostname or "").lower()
+    if not (hostname == "teambition.com" or hostname.endswith(".teambition.com")):
+        return False
+    return "/workspaces/" in parsed.path and "/docs/" in parsed.path
+
+
+def _replace_images(text: str) -> Tuple[str, List[str], List[str], List[str], int, int]:
     urls: List[str] = []
+    document_links: List[str] = []
+    warnings: List[str] = []
+    image_count = 0
+    unknown_count = 0
 
     def replace(match: re.Match[str]) -> str:
+        nonlocal image_count, unknown_count
         url = (match.group(2) or match.group(3) or "").strip()
+        alt = match.group(1).strip()
+        if _is_dingtalk_node_url(url):
+            document_links.append(url)
+            return f"[{alt or '文档链接'}]({url})"
+        if _is_teambition_doc_url(url):
+            document_links.append(url)
+            return f"[{alt or '文档链接'}]({url})"
+        if not _is_image_url(url):
+            unknown_count += 1
+            warnings.append("UNKNOWN_MEDIA_URL")
+            return match.group(0)
+        image_count += 1
         urls.append(url)
-        name = _image_name(match.group(1), url)
-        return f"【图片：{name}】" if name else "【图片】"
+        name = _meaningful_alt(alt) or _image_name(alt, url) or "【图片】"
+        return f"【图片：{name}】" if name != "【图片】" else name
 
-    return _IMAGE_RE.sub(replace, text), urls
+    return _IMAGE_RE.sub(replace, text), urls, document_links, warnings, unknown_count, image_count
+
+
+def _restore_structural_escapes(text: str) -> Tuple[str, int, int, bool]:
+    lines = text.split("\n")
+    normal_headings = sum(bool(re.match(r"^\s*#{1,6}\s+", line)) for line in lines)
+    escaped_headings = [i for i, line in enumerate(lines) if re.match(r"^\s*\\#{1,6}\s+", line)]
+    restored_headings = 0
+    if normal_headings == 0 and len(escaped_headings) >= 2:
+        for i in escaped_headings:
+            lines[i] = re.sub(r"^(\s*)\\(#)", r"\1\2", lines[i])
+            restored_headings += 1
+
+    escaped_table = [i for i, line in enumerate(lines) if re.match(r"^\s*\\\|", line)]
+    restored_tables = 0
+    runs: List[List[int]] = []
+    for index in escaped_table:
+        if not runs or index != runs[-1][-1] + 1:
+            runs.append([index])
+        else:
+            runs[-1].append(index)
+    for run in runs:
+        if len(run) >= 2 and not any(line.lstrip().startswith("|") for line in lines):
+            for i in run:
+                lines[i] = lines[i].replace("\\|", "|")
+                restored_tables += 1
+    detected = bool(escaped_headings or escaped_table)
+    ambiguous = detected and not (restored_headings or restored_tables)
+    return "\n".join(lines), restored_headings, restored_tables, ambiguous
 
 
 def _normalize_adjacent_emphasis(text: str) -> str:
@@ -186,11 +260,30 @@ def _normalize_adjacent_emphasis(text: str) -> str:
     return text
 
 
-def _clean_inline_html(line: str, *, in_table: bool) -> str:
+def _clean_inline_html(line: str, *, in_table: bool) -> Tuple[str, int, int]:
+    """Clean inline HTML from a single line, returning (cleaned_line, join_count, space_count)."""
+    join_count = 0
+    space_count = 0
+
     # Keep an explicit boundary between adjacent styled runs. Without it,
     # values such as "上高压" + "Bit2" become an incorrect single token.
+    def span_boundary(match: re.Match[str]) -> str:
+        nonlocal join_count, space_count
+        gap = match.group(1)
+        if gap:
+            space_count += 1
+            return gap
+        left = match.string[:match.start()].rstrip()[-1:] or ""
+        right = match.string[match.end():].lstrip()[:1] or ""
+        is_joinable = lambda value: bool(re.fullmatch(r"[A-Za-z0-9_.:]", value))
+        if is_joinable(left) and is_joinable(right):
+            join_count += 1
+            return ""
+        space_count += 1
+        return " "
+
     line = re.sub(
-        r"</span>\s*<span\b[^>]*>", " ", line, flags=re.IGNORECASE
+        r"</span>(\s*)<span\b[^>]*>", span_boundary, line, flags=re.IGNORECASE
     )
     line = re.sub(r"</?span\b[^>]*>", "", line, flags=re.IGNORECASE)
     line = re.sub(r"</?u\b[^>]*>", "", line, flags=re.IGNORECASE)
@@ -233,7 +326,7 @@ def _clean_inline_html(line: str, *, in_table: bool) -> str:
     else:
         line = re.sub(r"<br\s*/?>", "\n", line, flags=re.IGNORECASE)
         line = re.sub(r"\n{2,}", "\n", line)
-    return line
+    return line, join_count, space_count
 
 
 def _script_text(content: str, marker: str) -> str:
@@ -250,8 +343,10 @@ def _normalize_heading(line: str) -> str:
     return line
 
 
-def _clean_lines(text: str) -> str:
+def _clean_lines(text: str) -> Tuple[str, int, int]:
     output: List[str] = []
+    total_join = 0
+    total_space = 0
     for raw_line in text.split("\n"):
         line = raw_line.rstrip()
         stripped = line.strip()
@@ -265,7 +360,9 @@ def _clean_lines(text: str) -> str:
         line = re.sub(r"^\s*\[\](?=\S)", "", line)
 
         in_table = line.lstrip().startswith("|")
-        line = _clean_inline_html(line, in_table=in_table)
+        line, join_count, space_count = _clean_inline_html(line, in_table=in_table)
+        total_join += join_count
+        total_space += space_count
         line = _normalize_adjacent_emphasis(line)
         line = _normalize_heading(line)
         output.extend(part.rstrip() for part in line.split("\n"))
@@ -280,7 +377,7 @@ def _clean_lines(text: str) -> str:
             continue
         compact.append(line)
         previous_empty = empty
-    return "\n".join(compact).strip()
+    return "\n".join(compact).strip(), total_join, total_space
 
 
 def _unknown_html_tags(text: str) -> List[str]:
@@ -331,9 +428,14 @@ def clean_markdown(raw_md: str, doc_title: str = "") -> CleanResult:
 
     normalized = _normalize_basic(raw_md or "")
     protected, code_blocks, warnings = _protect_fenced_code(normalized)
+    protected = protected.replace("\u00a0", " ")
+    protected, restored_heading_count, restored_table_count, ambiguous_escape = _restore_structural_escapes(protected)
+    if ambiguous_escape:
+        warnings.append("AMBIGUOUS_ESCAPED_MARKDOWN")
     protected = _convert_html_lists(protected)
-    protected, image_urls = _replace_images(protected)
-    cleaned = _clean_lines(protected)
+    protected, image_urls, document_links, media_warnings, unknown_media_count, image_count = _replace_images(protected)
+    warnings.extend(media_warnings)
+    cleaned, span_join_count, span_space_count = _clean_lines(protected)
     unknown_tags = _unknown_html_tags(cleaned)
     cleaned = _restore_fenced_code(cleaned, code_blocks).strip()
 
@@ -348,9 +450,16 @@ def clean_markdown(raw_md: str, doc_title: str = "") -> CleanResult:
             [line for line in cleaned.splitlines() if line.lstrip().startswith("|")]
         ),
         "code_block_count": len(code_blocks),
-        "image_count": len(image_urls),
+        "image_count": image_count,
+        "document_link_count": len(document_links),
+        "unknown_media_count": unknown_media_count,
+        "escaped_heading_restored_count": restored_heading_count,
+        "escaped_table_restored_count": restored_table_count,
+        "span_join_count": span_join_count,
+        "span_space_count": span_space_count,
         "deprecated_count": len(deprecated),
         "unknown_html_tag_count": len(unknown_tags),
+        "warning_count": len(warnings),
     }
 
     return CleanResult(
