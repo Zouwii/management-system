@@ -158,8 +158,8 @@ class ApiCallMonitor:
         return cnt
 
     def _daily_limit(self) -> int:
-        """当日硬限额（100%）"""
-        return 5000
+        """当日硬限额（北京时间：周一 10000，其余日期 5000）。"""
+        return 10000 if _bj_now().weekday() == 0 else 5000
 
     def _soft_limit(self) -> int:
         """当日软限额（80%）：硬限额 × 0.8"""
@@ -333,8 +333,14 @@ def record_api_call(endpoint: str, status: int, latency_ms: int, error: str = ""
     monitor.record(endpoint, status, latency_ms, error, source)
 
 
-def check_api_allowed() -> bool:
-    """检查是否允许发起新的钉钉 API 调用。硬限时返回 False。"""
+def check_api_allowed(ignore_hard_limit: bool = False) -> bool:
+    """检查钉钉 API 调用权限。
+
+    ``ignore_hard_limit`` 仅供登录 OAuth 流程使用；普通同步、查询和更新
+    调用必须使用默认值，达到当日硬限额后继续被拦截。
+    """
+    if ignore_hard_limit:
+        return True
     return monitor.check_allowed()
 
 

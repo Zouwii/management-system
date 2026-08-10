@@ -236,10 +236,6 @@ def create_app() -> Flask:
 
     def _do_weekly_sync():
         """每周一 04:00：TB小更新 + KB小更新。"""
-        if datetime.now(ZoneInfo("Asia/Shanghai")).day == 1:
-            print("[auto_sync] 周一但为1号，由月度大同步负责，跳过周同步")
-            return
-
         print("[auto_sync] === 周一：TB团队增量 + KB小更新 ===")
 
         from base.api_monitor import monitor as _api_monitor
@@ -254,25 +250,31 @@ def create_app() -> Flask:
             projectids = get_config_projectids() or {}
             project_id = str(next(iter(projectids.values())) or "").strip()
             if not project_id:
-                print("[auto_sync] TB团队小更新 skipped: missing projectId")
-            else:
-                result = benti_team_incremental_update_service({"projectId": project_id})
-                if result.get("success"):
-                    data = result.get("data") or {}
-                    written = data.get("written") or {}
-                    print(
-                        "[auto_sync] TB团队小更新 done  users={} unique={} "
-                        "DEV={} Issue={}".format(
-                            data.get("memberCount", 0),
-                            data.get("uniqueTaskCount", 0),
-                            written.get("dev", 0),
-                            written.get("issue", 0),
-                        )
-                    )
-                else:
-                    print("[auto_sync] TB团队小更新 failed:", result.get("error", "unknown"))
+                print("[auto_sync] TB团队小更新 aborted: missing projectId; KB小更新不会启动")
+                return
+
+            result = benti_team_incremental_update_service({"projectId": project_id})
+            if not result.get("success"):
+                print(
+                    "[auto_sync] TB团队小更新 failed; KB小更新不会启动:",
+                    result.get("error", "unknown"),
+                )
+                return
+
+            data = result.get("data") or {}
+            written = data.get("written") or {}
+            print(
+                "[auto_sync] TB团队小更新 done  users={} unique={} "
+                "DEV={} Issue={}".format(
+                    data.get("memberCount", 0),
+                    data.get("uniqueTaskCount", 0),
+                    written.get("dev", 0),
+                    written.get("issue", 0),
+                )
+            )
         except Exception as e:
-            print("[auto_sync] TB团队小更新 error:", repr(e))
+            print("[auto_sync] TB团队小更新 error; KB小更新不会启动:", repr(e))
+            return
 
         # 2) KB小更新
         print("[auto_sync] [2/2] KB小更新...")

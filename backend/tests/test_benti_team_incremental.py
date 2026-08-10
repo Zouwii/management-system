@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import unittest
+from datetime import datetime, timezone
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from base.sync import task_sync
@@ -25,7 +27,46 @@ class _FakeSession:
         pass
 
 
+class _ExistingRowSession:
+    def __init__(self, row):
+        self.row = row
+
+    def scalars(self, _statement):
+        return self
+
+    def first(self):
+        return self.row
+
+
 class BentiTeamIncrementalTests(unittest.TestCase):
+    def test_issue_detail_writes_software_version_without_name_error(self):
+        row = SimpleNamespace()
+        session = _ExistingRowSession(row)
+        item = {
+            "taskId": "issue-1",
+            "executorId": "u1",
+            "customFields": [
+                {
+                    "customFieldId": task_sync.PROGRAM_SOFTWARE_VERSION_FIELD_ID,
+                    "value": [{"title": "v1.2.3"}],
+                }
+            ],
+        }
+
+        result = task_sync._sync_one_issue_detail(
+            session,
+            executor_id="u1",
+            task_id="issue-1",
+            project_id="project-1",
+            item=item,
+            field_id="work-hour",
+            now=datetime.now(timezone.utc),
+            business_type_mapping={},
+        )
+
+        self.assertIsNone(result["work_hour"])
+        self.assertEqual(row.software_version, "v1.2.3")
+
     def _common_patches(self):
         return (
             patch.object(task_sync, "_acquire_update_lock", return_value={"ok": True}),

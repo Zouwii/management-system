@@ -723,6 +723,7 @@ def _sync_one_issue_detail(
     workday_costhour = _extract_workday_costhour(item)
     cascading = _extract_cascading_project_fields(item)
     label_levels = _extract_program_issue_label_levels(item)
+    software_version = _extract_program_issue_software_version(item)
     stmt = select(ProgramIssueDetail).where(
         ProgramIssueDetail.task_id == task_id,
         ProgramIssueDetail.query_user_id == executor_id,

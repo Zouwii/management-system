@@ -141,7 +141,7 @@ def exchange_dingtalk_auth_code(auth_code: str, payload: Optional[Dict[str, Any]
 
     try:
         from base.api_monitor import check_api_allowed
-        if not check_api_allowed():
+        if not check_api_allowed(ignore_hard_limit=True):
             return {"ok": False, "error": "daily API limit reached"}
 
         t0 = time.time()
@@ -175,7 +175,7 @@ def get_dingtalk_user_info(access_token: str) -> Dict[str, Any]:
 
     try:
         from base.api_monitor import check_api_allowed
-        if not check_api_allowed():
+        if not check_api_allowed(ignore_hard_limit=True):
             return {"ok": False, "error": "daily API limit reached"}
 
         t0 = time.time()
@@ -204,14 +204,14 @@ def get_userid_by_unionid(unionid: str) -> Dict[str, Any]:
     if not uid:
         return {"ok": False, "error": "missing unionid"}
 
-    token_out = get_valid_access_token({})
+    token_out = get_valid_access_token({}, ignore_hard_limit=True)
     if not token_out.get("ok"):
         return {"ok": False, "error": token_out.get("error", "failed to get corp access_token")}
 
     access_token = token_out.get("access_token")
     try:
         from base.api_monitor import check_api_allowed
-        if not check_api_allowed():
+        if not check_api_allowed(ignore_hard_limit=True):
             return {"ok": False, "error": "daily API limit reached"}
 
         t0 = time.time()
@@ -261,7 +261,7 @@ def _get_cached_token_if_valid(cfg: Dict[str, Any], now_ts: int) -> str:
     return ""
 
 
-def fetch_dingtalk_json(payload: Dict) -> Dict:
+def fetch_dingtalk_json(payload: Dict, ignore_hard_limit: bool = False) -> Dict:
     """
     钉钉 token 获取（按你给的 curl 形式）：
 
@@ -321,7 +321,7 @@ def fetch_dingtalk_json(payload: Dict) -> Dict:
     params = {"appkey": app_key, "appsecret": app_secret}
     try:
         from base.api_monitor import check_api_allowed
-        if not check_api_allowed():
+        if not check_api_allowed(ignore_hard_limit=ignore_hard_limit):
             return {
                 "source": "dingtalk_oapi_gettoken",
                 "ok": False,
@@ -359,13 +359,13 @@ def fetch_dingtalk_json(payload: Dict) -> Dict:
         }
 
 
-def get_valid_access_token(payload: Dict[str, Any]) -> Dict[str, Any]:
+def get_valid_access_token(payload: Dict[str, Any], ignore_hard_limit: bool = False) -> Dict[str, Any]:
     """
     获取有效 access_token：
     - 先走本地缓存校验
     - 缓存失效时自动请求钉钉 gettoken
     """
-    token_result = fetch_dingtalk_json(payload or {})
+    token_result = fetch_dingtalk_json(payload or {}, ignore_hard_limit=ignore_hard_limit)
     if not token_result.get("ok"):
         return {
             "ok": False,
@@ -585,4 +585,3 @@ def get_config_projectids() -> Dict[str, str]:
 # 兼容你提到的 “ftech” 名字（如果外部代码就是这么调用的）
 def ftech(payload: Dict) -> Dict:
     return fetch_dingtalk_json(payload)
-
