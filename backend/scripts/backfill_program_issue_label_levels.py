@@ -2,7 +2,7 @@
 """从 program_issue_detail 的 customFields/raw_json 回填问题标签层级。
 
 只解析接口返回的实际标签，不做关键词推断：
-  问题类型字段 -> problem_type_level_1/2/3
+  问题类型字段 -> problem_type_1/2
   原因字段     -> cause_level_1/2/3
 
 用法：
@@ -104,9 +104,8 @@ def _value_titles(fields: List[Dict[str, Any]], target_id: str) -> Optional[str]
 def ensure_columns() -> None:
     columns = {column["name"] for column in inspect(engine).get_columns("program_issue_detail")}
     definitions = {
-        "problem_type_level_1": "VARCHAR(128)",
-        "problem_type_level_2": "VARCHAR(128)",
-        "problem_type_level_3": "VARCHAR(256)",
+        "problem_type_1": "VARCHAR(128)",
+        "problem_type_2": "VARCHAR(128)",
         "cause_level_1": "VARCHAR(128)",
         "cause_level_2": "VARCHAR(128)",
         "cause_level_3": "VARCHAR(256)",
@@ -139,12 +138,12 @@ def backfill(limit: Optional[int], dry_run: bool, batch_size: int = 500) -> None
                 with_labels += 1
 
             changed = (
-                [row.problem_type_level_1, row.problem_type_level_2, row.problem_type_level_3] != problem
+                [row.problem_type_1, row.problem_type_2] != problem[:2]
                 or [row.cause_level_1, row.cause_level_2, row.cause_level_3] != cause
                 or row.software_version != software_version
             )
             if changed:
-                row.problem_type_level_1, row.problem_type_level_2, row.problem_type_level_3 = problem
+                row.problem_type_1, row.problem_type_2 = problem[0], problem[1]
                 row.cause_level_1, row.cause_level_2, row.cause_level_3 = cause
                 row.software_version = software_version
                 updated += 1

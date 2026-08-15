@@ -602,22 +602,26 @@ def init_database() -> None:
             if "workday_costhour" in cols_b2:
                 _ensure_workday_costhour_float("program_issue_detail")
             # B2 表 (program_issue_detail)：级联自定义字段
-            if "project_category_1" not in cols_b2:
+            if "project_catagory_1" not in cols_b2:
                 with engine.begin() as conn:
-                    conn.execute(text("ALTER TABLE program_issue_detail ADD COLUMN project_category_1 VARCHAR(128)"))
-            if "vehicle_type_2" not in cols_b2:
+                    conn.execute(text("ALTER TABLE program_issue_detail ADD COLUMN project_catagory_1 VARCHAR(128)"))
+            if "project_catagory_2" not in cols_b2:
                 with engine.begin() as conn:
-                    conn.execute(text("ALTER TABLE program_issue_detail ADD COLUMN vehicle_type_2 VARCHAR(128)"))
-            if "project_name_3" not in cols_b2:
+                    conn.execute(text("ALTER TABLE program_issue_detail ADD COLUMN project_catagory_2 VARCHAR(128)"))
+            if "project_catagory_3" not in cols_b2:
                 with engine.begin() as conn:
-                    conn.execute(text("ALTER TABLE program_issue_detail ADD COLUMN project_name_3 VARCHAR(256)"))
+                    conn.execute(text("ALTER TABLE program_issue_detail ADD COLUMN project_catagory_3 VARCHAR(256)"))
             if "need_statistic" not in cols_b2:
                 with engine.begin() as conn:
                     conn.execute(text("ALTER TABLE program_issue_detail ADD COLUMN need_statistic VARCHAR(8)"))
             for column, column_type in (
-                ("problem_type_level_1", "VARCHAR(128)"),
-                ("problem_type_level_2", "VARCHAR(128)"),
-                ("problem_type_level_3", "VARCHAR(256)"),
+                ("problem_type_1", "VARCHAR(128)"),
+                ("problem_type_2", "VARCHAR(128)"),
+                ("vehicle_1", "VARCHAR(128)"),
+                ("vehicle_2", "VARCHAR(128)"),
+                ("problem_note_info_1", "VARCHAR(128)"),
+                ("problem_note_info_2", "VARCHAR(128)"),
+                ("problem_note_info_3", "VARCHAR(256)"),
                 ("cause_level_1", "VARCHAR(128)"),
                 ("cause_level_2", "VARCHAR(128)"),
                 ("cause_level_3", "VARCHAR(256)"),

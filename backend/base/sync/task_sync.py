@@ -47,6 +47,8 @@ PROGRAM_CAUSE_FIELD_IDS = {
     "67c5715253aacbf8cf267e81",
     "67c571d86db6f1be2bf2f88f",
 }
+PROGRAM_VEHICLE_FIELD_ID = "668e05afbe23298626d61027"        # 级联：车型
+PROGRAM_NOTE_INFO_FIELD_ID = "67c572129590cd29ac9c5137"      # 级联：问题提示信息
 DEFAULT_BUSINESS_TYPE_TAG_MAPPING = {
     "65264cfd697b6b909485bcbc": 0,  # 产品
     "65264cf79ed530912c3edf0f": 1,  # 研发
@@ -371,8 +373,7 @@ def _extract_workday_costhour(item: Dict[str, Any]) -> Optional[float]:
 def _extract_cascading_project_fields(item: Dict[str, Any]) -> Dict[str, Optional[str]]:
     """
     从 customFields 中一次遍历同时解析：
-      - CASCADING_PROJECT_FIELD_ID → project_category_1 / vehicle_type_2 / project_name_3
-      - NEED_STATISTIC_CUSTOMFIELD_ID → need_statistic（"是"/"否"）
+      - CASCADING_PROJECT_FIELD_ID → project_catagory_1/2/3（新名）+ 旧名兼容
 
     Teambition 数据格式:
       {
@@ -384,16 +385,20 @@ def _extract_cascading_project_fields(item: Dict[str, Any]) -> Dict[str, Optiona
       }
 
     返回: {
-        project_category_1: str|None,
-        vehicle_type_2: str|None,
-        project_name_3: str|None,
-        need_statistic: str|None,   # "是" / "否" / None
+        project_catagory_1: str|None,    project_catagory_2: str|None,    project_catagory_3: str|None,
+        project_category_1: str|None,     vehicle_type_2: str|None,        project_name_3: str|None,   (兼容)
+        need_statistic: str|None,
     }
     """
     result = {
+        "project_catagory_1": None,
+        "project_catagory_2": None,
+        "project_catagory_3": None,
+        # ── 兼容旧名 ──
         "project_category_1": None,
         "vehicle_type_2": None,
         "project_name_3": None,
+        # ── 其他 ──
         "need_statistic": None,
     }
     cfs = item.get("customFields") or item.get("customfields") or []
@@ -405,7 +410,7 @@ def _extract_cascading_project_fields(item: Dict[str, Any]) -> Dict[str, Optiona
             continue
         cfid = str(cf.get("customFieldId") or cf.get("customfieldId") or "").strip()
 
-        # ── 级联字段：项目分类 / 车型 / 项目名称 ──
+        # ── 级联字段：项目分类 ──
         if cfid == CASCADING_PROJECT_FIELD_ID:
             values = cf.get("value") or []
             if isinstance(values, list) and values:
@@ -415,11 +420,14 @@ def _extract_cascading_project_fields(item: Dict[str, Any]) -> Dict[str, Optiona
                     if title:
                         parts = [p.strip() for p in title.split("/")]
                         if len(parts) >= 1 and parts[0]:
-                            result["project_category_1"] = parts[0]
+                            result["project_catagory_1"] = parts[0]
+                            result["project_category_1"] = parts[0]   # 兼容旧名
                         if len(parts) >= 2 and parts[1]:
-                            result["vehicle_type_2"] = parts[1]
+                            result["project_catagory_2"] = parts[1]
+                            result["vehicle_type_2"] = parts[1]       # 兼容旧名
                         if len(parts) >= 3 and parts[2]:
-                            result["project_name_3"] = parts[2]
+                            result["project_catagory_3"] = parts[2]
+                            result["project_name_3"] = parts[2]       # 兼容旧名
 
         # ── 是否计入统计（与 WORKDAY_FLAG 同一字段）──
         elif cfid == NEED_STATISTIC_CUSTOMFIELD_ID:
@@ -435,14 +443,18 @@ def _extract_cascading_project_fields(item: Dict[str, Any]) -> Dict[str, Optiona
 
 
 def _extract_program_issue_label_levels(item: Dict[str, Any]) -> Dict[str, Optional[str]]:
-    """解析问题类型、问题原因的真实层级标签，供 program_issue_detail 直接落列。"""
+    """解析问题类型、问题原因、车型、问题提示信息的层级标签。"""
     result = {
-        "problem_type_level_1": None,
-        "problem_type_level_2": None,
-        "problem_type_level_3": None,
+        "problem_type_1": None,
+        "problem_type_2": None,
         "cause_level_1": None,
         "cause_level_2": None,
         "cause_level_3": None,
+        "vehicle_1": None,
+        "vehicle_2": None,
+        "problem_note_info_1": None,
+        "problem_note_info_2": None,
+        "problem_note_info_3": None,
     }
     cfs = item.get("customFields") or item.get("customfields") or []
     if not isinstance(cfs, list):
@@ -454,31 +466,52 @@ def _extract_program_issue_label_levels(item: Dict[str, Any]) -> Dict[str, Optio
         if not isinstance(cf, dict):
             continue
         cfid = str(cf.get("customFieldId") or cf.get("customfieldId") or "").strip()
+
+        # ── 问题类型 ──
         if cfid in problem_type_ids:
-            prefix = "problem_type_level_"
-        elif cfid in PROGRAM_CAUSE_FIELD_IDS:
-            prefix = "cause_level_"
-        else:
-            prefix = None
-        if not prefix:
+            for value in cf.get("value") or []:
+                if not isinstance(value, dict) or not value.get("title"):
+                    continue
+                parts = [part.strip() for part in str(value["title"]).split("/") if part.strip()]
+                for index, part in enumerate(parts[:2], 1):
+                    key = f"problem_type_{index}"
+                    if result[key] is None:
+                        result[key] = part
+                    elif part not in result[key].split("; "):
+                        result[key] += f"; {part}"
             continue
-        if prefix == "cause_level_":
+
+        # ── 问题原因 ──
+        if cfid in PROGRAM_CAUSE_FIELD_IDS:
             for value in cf.get("value") or []:
                 if isinstance(value, dict) and value.get("title"):
                     parts = [part.strip() for part in str(value["title"]).split("/") if part.strip()]
                     if parts:
                         cause_paths.append(parts[:3])
             continue
-        for value in cf.get("value") or []:
-            if not isinstance(value, dict) or not value.get("title"):
-                continue
-            parts = [part.strip() for part in str(value["title"]).split("/") if part.strip()]
-            for index, part in enumerate(parts[:3], 1):
-                key = f"{prefix}{index}"
-                if result[key] is None:
+
+        # ── 车型 ──
+        if cfid == PROGRAM_VEHICLE_FIELD_ID:
+            for value in cf.get("value") or []:
+                if not isinstance(value, dict) or not value.get("title"):
+                    continue
+                parts = [part.strip() for part in str(value["title"]).split("/") if part.strip()]
+                for index, part in enumerate(parts[:2], 1):
+                    key = f"vehicle_{index}"
                     result[key] = part
-                elif part not in result[key].split("; "):
-                    result[key] += f"; {part}"
+            continue
+
+        # ── 问题提示信息 ──
+        if cfid == PROGRAM_NOTE_INFO_FIELD_ID:
+            for value in cf.get("value") or []:
+                if not isinstance(value, dict) or not value.get("title"):
+                    continue
+                parts = [part.strip() for part in str(value["title"]).split("/") if part.strip()]
+                for index, part in enumerate(parts[:3], 1):
+                    key = f"problem_note_info_{index}"
+                    result[key] = part
+            continue
+
     if cause_paths:
         best = max(cause_paths, key=len)
         for index, part in enumerate(best, 1):
@@ -757,9 +790,9 @@ def _sync_one_issue_detail(
         row.tag_ids = [str(x) for x in tag_ids] if isinstance(tag_ids, list) else None
         row.custom_fields_json = cfs if cfs is not None else None
         row.raw_json = raw_blob
-        row.project_category_1 = cascading["project_category_1"]
-        row.vehicle_type_2 = cascading["vehicle_type_2"]
-        row.project_name_3 = cascading["project_name_3"]
+        row.project_catagory_1 = cascading["project_catagory_1"]
+        row.project_catagory_2 = cascading["project_catagory_2"]
+        row.project_catagory_3 = cascading["project_catagory_3"]
         for key, value in label_levels.items():
             setattr(row, key, value)
         row.software_version = software_version
@@ -796,12 +829,16 @@ def _sync_one_issue_detail(
                 tag_ids=[str(x) for x in tag_ids] if isinstance(tag_ids, list) else None,
                 custom_fields_json=cfs if cfs is not None else None,
                 raw_json=raw_blob,
-                project_category_1=cascading["project_category_1"],
-                vehicle_type_2=cascading["vehicle_type_2"],
-                project_name_3=cascading["project_name_3"],
-                problem_type_level_1=label_levels["problem_type_level_1"],
-                problem_type_level_2=label_levels["problem_type_level_2"],
-                problem_type_level_3=label_levels["problem_type_level_3"],
+                project_catagory_1=cascading["project_catagory_1"],
+                project_catagory_2=cascading["project_catagory_2"],
+                project_catagory_3=cascading["project_catagory_3"],
+                problem_type_1=label_levels["problem_type_1"],
+                problem_type_2=label_levels["problem_type_2"],
+                vehicle_1=label_levels["vehicle_1"],
+                vehicle_2=label_levels["vehicle_2"],
+                problem_note_info_1=label_levels["problem_note_info_1"],
+                problem_note_info_2=label_levels["problem_note_info_2"],
+                problem_note_info_3=label_levels["problem_note_info_3"],
                 cause_level_1=label_levels["cause_level_1"],
                 cause_level_2=label_levels["cause_level_2"],
                 cause_level_3=label_levels["cause_level_3"],

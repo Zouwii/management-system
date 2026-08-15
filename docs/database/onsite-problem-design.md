@@ -12,7 +12,8 @@
 
 | cfId | type | 业务含义 | 示例值 |
 |------|------|----------|--------|
-| `659369d32ae435dd0b3c803e` | cascading | **车型** | `EMMA标车 / K系列 / 1000K` |
+| `659369d32ae435dd0b3c803e` | cascading | **车型第1级** | `FOLA` / `EMMA标车` |
+| 同上 | cascading | **车型第2级** | `堆高型 DN1416、1430、2030` / `EMMA K系列（举升、旋转举升）` |
 | `637c2e2ffbb56c003fdd74e9` | dropDown | **载具配置** | `不带载具` |
 | `62c51d82d7ab965fbdebd686` | dropDown | **复现概率** | `单车偶现` / `单车必现` |
 | `6645bd4d22e1f70dadb953f6` | dropDown | **JZTOTAL包版本** | `2.2311` / `＜2.2309` |
@@ -153,7 +154,8 @@ TB Open API via proxy 单次调用可拿到：
 
 | 列名 | 类型 | 来源 cfId | 含义 |
 |------|------|-----------|------|
-| `vehicle_model` | VARCHAR(128) | `659369d3...` | **车型** |
+| `vehicle_model_1` | VARCHAR(128) | `659369d3...` | **车型第1级** |
+| `vehicle_model_2` | VARCHAR(128) | `659369d3...` | **车型第2级** |
 | `carrier_type` | VARCHAR(32) | `637c2e2f...` | **载具配置** |
 | `occurrence_frequency` | VARCHAR(32) | `62c51d82...` | **复现概率** |
 | `software_version` | VARCHAR(32) | `6645bd4d...` | **JZTOTAL包版本** |
@@ -276,3 +278,4 @@ B 表同步（改用 TB Open API via proxy）
 |------|------|
 | 2026-07-22 | 初稿：customField 16个全部确认，A/B 表设计 |
 | 2026-07-24 | B 表新增 `comments_json` + `attachments_json`；同步方法从钉钉项目 API 切换到 TB Open API via proxy |
+| 2026-08-12 | `vehicle_model` 拆分为 `vehicle_model_1` + `vehicle_model_2`（按 / 拆分前两级） |

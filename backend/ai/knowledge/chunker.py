@@ -146,7 +146,13 @@ def _fixed_window(
 
     if buf:
         windows.append("\n\n".join(buf))
-    return windows
+    bounded: List[str] = []
+    for window in windows:
+        if count_tokens(window) <= max_tokens:
+            bounded.append(window)
+        else:
+            bounded.extend(_force_split_long(window, max_tokens))
+    return bounded
 
 
 def _parse_row(line: str) -> List[str]:
@@ -158,12 +164,23 @@ def _force_split_long(text: str, max_tokens: int) -> List[str]:
     """Force-split a single long string by approximate token boundaries.
     Used as last resort when paragraph/sentence/line splitting all fail.
     """
-    chunks = []
-    # Rough: 1 token ≈ 2 chars for Chinese, 4 chars for English
-    # Use conservative 1.5 chars/token to stay under limit
-    chunk_size = int(max_tokens * 1.5)
-    for start in range(0, len(text), chunk_size):
-        chunks.append(text[start:start + chunk_size])
+    chunks: List[str] = []
+    start = 0
+    while start < len(text):
+        remaining = text[start:]
+        if count_tokens(remaining) <= max_tokens:
+            chunks.append(remaining)
+            break
+        low, high, best = 1, len(remaining), 1
+        while low <= high:
+            mid = (low + high) // 2
+            if count_tokens(remaining[:mid]) <= max_tokens:
+                best = mid
+                low = mid + 1
+            else:
+                high = mid - 1
+        chunks.append(remaining[:best])
+        start += best
     return chunks
 
 
@@ -240,6 +257,13 @@ def _build_sections(
     if not outline:
         return [({"level": 0, "title": "", "line": 1, "path": "", "source": "none"}, 0, len(lines))]
     sections: List[Tuple[dict, int, int]] = []
+    first_start = min(max(0, outline[0]["line"] - 1), len(lines))
+    if first_start > 0:
+        sections.append((
+            {"level": 0, "title": "", "line": 1, "path": "",
+             "source": "synthetic_preamble"},
+            0, first_start,
+        ))
     for i, entry in enumerate(outline):
         start = min(max(0, entry["line"] - 1), len(lines))
         end = min(outline[i + 1]["line"] - 1, len(lines)) if i + 1 < len(outline) else len(lines)
@@ -407,57 +431,18 @@ def _chunk_structured_v3(content: str, title: str, outline: List[dict]) -> List[
     all_chunks: List[dict] = []
     for entry, start, end in sections:
         heading = entry.get("title", "")
-        sp = entry.get("path", title)
+        # Synthetic preamble entries deliberately have an empty path; keep
+        # their content associated with the document instead of "".
+        sp = entry.get("path") or title
         all_chunks.extend(_chunk_section_leaf(lines[start:end], heading, sp))
     return all_chunks or _chunk_text_v3(content, title, outline)
 
 
 def _chunk_table_v3(content: str, title: str, outline: Optional[List[dict]]) -> List[dict]:
-    lines = content.strip().split("\n")
-    header_idx = sep_idx = -1
-    for i, line in enumerate(lines):
-        s = line.strip()
-        if s.startswith("|") and not re.match(r'^\|\s*:?---', s):
-            if header_idx < 0:
-                header_idx = i
-        elif re.match(r'^\|\s*:?---', s):
-            sep_idx = i
-    if header_idx < 0:
-        return _plain_leaf(content, title, outline)
-    headers = _parse_row(lines[header_idx])
-    rows: List[List[str]] = []
-    for i in range(max(sep_idx, header_idx) + 1, len(lines)):
-        s = lines[i].strip()
-        if not s.startswith("|"):
-            continue
-        cells = _parse_row(s)
-        if any(c.strip() for c in cells):
-            rows.append(cells)
-    if not rows:
-        return _plain_leaf(content, title, outline)
-    compact = []
-    for cells in rows:
-        parts = []
-        for j, c in enumerate(cells):
-            c = c.strip()
-            if not c:
-                continue
-            parts.append(f"{headers[j].strip()}: {c}" if j < len(headers) and headers[j].strip() else c)
-        if parts:
-            compact.append(" | ".join(parts))
-    sp = _resolve_path(title, outline)
-    chunks: List[dict] = []
-    buf, bt = [], 0
-    for row in compact:
-        rt = count_tokens(row)
-        if bt + rt > LEAF_TARGET and bt >= LEAF_MIN:
-            chunks.append(_make_leaf(buf, title, sp))
-            buf, bt = [], 0
-        buf.append(row)
-        bt += rt
-    if buf:
-        chunks.append(_make_leaf(buf, title, sp))
-    return chunks
+    # Preserve the original representation: the old key/value conversion
+    # dropped surrounding prose, headers, separators, and sometimes rows.
+    return _chunk_section_leaf(content.split("\n"), title,
+                               _resolve_path(title, outline))
 
 
 def _chunk_meeting_v3(content: str, title: str, outline: Optional[List[dict]]) -> List[dict]:
@@ -569,12 +554,10 @@ def chunk_document(
     outline = _parse_outline(outline_json)
     doc_type = classify_document(title, node_type, content)
 
-    # Short document → single chunk
-    if len(content) < SHORT_DOC_CHARS:
-        return {"leaf": _plain_leaf(content, title, outline), "parent": []}
-
     # Choose strategy
-    if doc_type == "structured" and outline:
+    if len(content) < SHORT_DOC_CHARS:
+        leaf = _plain_leaf(content, title, outline)
+    elif doc_type == "structured" and outline:
         leaf = _chunk_structured_v3(content, title, outline)
     elif doc_type == "meeting":
         leaf = _chunk_meeting_v3(content, title, outline)
@@ -585,6 +568,21 @@ def chunk_document(
 
     # Merge adjacent tiny leaves (handles fine-grained outlines like table-rows-as-headings)
     leaf = _merge_tiny_leaves(leaf)
+
+    # Enforce the real hard limit after every strategy and after merging.
+    bounded_leaf: List[dict] = []
+    for chunk in leaf:
+        text = chunk.get("content", "")
+        if count_tokens(text) <= LEAF_MAX:
+            chunk["token_count"] = count_tokens(text)
+            bounded_leaf.append(chunk)
+        else:
+            for window in _force_split_long(text, LEAF_MAX):
+                bounded_leaf.append(_make_leaf(
+                    [window], chunk.get("heading", ""),
+                    chunk.get("section_path", title),
+                ))
+    leaf = bounded_leaf or _chunk_text_v3(content, title, outline)
 
     # Build parent chunks for long docs
     parent: List[dict] = []

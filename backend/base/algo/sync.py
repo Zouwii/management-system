@@ -126,9 +126,15 @@ def _extract_algo_cascading_fields(item: Dict[str, Any]) -> Dict[str, Optional[s
     )
     if cascading_title:
         parts = [part.strip() for part in cascading_title.split("/")]
-        result["project_category_1"] = parts[0] if len(parts) >= 1 and parts[0] else None
-        result["vehicle_type_2"] = parts[1] if len(parts) >= 2 and parts[1] else None
-        result["project_name_3"] = parts[2] if len(parts) >= 3 and parts[2] else None
+        values = [
+            parts[0] if len(parts) >= 1 and parts[0] else None,
+            parts[1] if len(parts) >= 2 and parts[1] else None,
+            parts[2] if len(parts) >= 3 and parts[2] else None,
+        ]
+        # 算法开发仍使用旧的三列字段，算法问题与本体问题表保持新结构一致。
+        result["project_category_1"], result["project_catagory_1"] = values[0], values[0]
+        result["vehicle_type_2"], result["project_catagory_2"] = values[1], values[1]
+        result["project_name_3"], result["project_catagory_3"] = values[2], values[2]
 
     need_statistic = (
         _custom_field_first_title(item, GROUPMAP_NEED_STATISTIC_FIELD_ID)
@@ -361,9 +367,9 @@ def _apply_issue_detail(
     row.tag_ids = tag_ids or None
     row.custom_fields_json = cfs if cfs is not None else None
     row.raw_json = _safe_json(item)
-    row.project_category_1 = cascading["project_category_1"]
-    row.vehicle_type_2 = cascading["vehicle_type_2"]
-    row.project_name_3 = cascading["project_name_3"]
+    row.project_catagory_1 = cascading["project_catagory_1"]
+    row.project_catagory_2 = cascading["project_catagory_2"]
+    row.project_catagory_3 = cascading["project_catagory_3"]
     row.fetched_at = now
 
 

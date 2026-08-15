@@ -1,0 +1,9 @@
+{
+  "source": "172.19.3.79 kb_storage read-only audit",
+  "generated_at": "2026-08-10",
+  "sample_count": 20,
+  "category_counts": {"short": 4, "structured_preamble": 4, "table": 6, "oversize": 3, "healthy_control": 3},
+  "database_checks": {"blank_doc_id_leaf": 2663, "content_without_leaf": 1048, "oversize_leaf_count": 564, "oversize_leaf_docs": 298, "max_leaf_tokens": 12048},
+  "sample_selection": {"workspace_count": 4, "documents_with_zero_existing_leaf": 4},
+  "notes": ["This is a read-only baseline from the server's current chunker/database state.", "Per-document lexical recall and deterministic reruns were not executed in this first server audit; the manifest stores markers for the follow-up candidate comparison."]
+}

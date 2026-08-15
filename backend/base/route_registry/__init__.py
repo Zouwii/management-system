@@ -28,6 +28,9 @@ from base.department.routes import register as register_department
 # 现场问题跟踪
 from base.onsite_problem.routes import register as register_onsite
 
+# DiagKit 诊断终端
+from base.diagkit.routes import register as register_diagkit
+
 # 需求池
 from base.req_pool.routes import register as register_req_pool
 
@@ -50,5 +53,6 @@ def register_all_routes(bp, ok, fail):
     register_stats(bp, ok, fail)
     register_costhour(bp, ok, fail)
     register_department(bp, ok, fail)
+    register_diagkit(bp, ok, fail)
     register_onsite(bp, ok, fail)
     register_req_pool(bp, ok, fail)

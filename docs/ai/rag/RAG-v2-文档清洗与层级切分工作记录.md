@@ -3,6 +3,7 @@
 > 状态：v3 链路可用，已知问题待修 | 更新：2026-08-07
 > 样本目录：服务器 `/home/jz/zhr/markdown/`  
 > 关联设计：[RAG v2：Markdown 与图片多模态检索设计](./RAG-v2-markdown-multimodal-design.md)
+> Cleaner 专项审计：[RAG v2：Cleaner 数据驱动迭代](./RAG-v2-cleaner数据驱动迭代.md)
 
 ## 1. 概要
 
@@ -398,3 +399,163 @@ MCP 服务未运行，磁盘无对应 .md 文件。含产品信息门户（OQ0xy
 #### 10.4.5 Reranker 待启用
 
 bge-reranker-base (3.2GB) 模型已部署，但服务器 CPU 限频至 54%，模型加载过慢。待 CPU 频率恢复后启用。
+
+---
+
+## 11. Outline 现状与暂不重建决策（2026-08-10）
+
+### 11.1 当前判断
+
+现有 `extract_outline_v2()` 已覆盖大部分普通文档类型：标准 Markdown 标题、中文编号、数字编号、字母编号、首个粗体标题和无结构文档首行回退。历史统计中，4056 篇有内容文档有 3971 篇生成 outline，覆盖率约 97.9%；其中 3451 篇具有明确的结构化层级，占 85.1%。
+
+本轮 Cleaner 修复对 outline 的直接影响集中在少量整篇转义文档、标题内相邻 span，以及无标题文档首行的图片/文档链接。影响面不足以支持立即全量重建。
+
+**决策：当前不重建存量 outline。** 保留现有 outline，不单独更新数据库，也不触发 chunks 或 vectors 重建。新导入文档继续按现有 `clean → outline` 链路生成。
+
+### 11.2 已知但暂缓的问题
+
+| 问题 | 当前影响 | 后续处理 |
+|------|----------|----------|
+| fenced code 内的 `#` 或数字行可能被识别成标题 | 少量代码密集文档产生伪目录 | 优先补“跳过代码块”规则 |
+| `_clean_title_v3()` 删除标题末尾数字 | `Bit2`、年份、版本号等可能失真 | 优先取消无上下文的末尾数字删除 |
+| 操作步骤可能被当成数字标题 | 部分教程类文档 outline 偏细 | 出现检索 Bad Case 后增加上下文约束 |
+| 纯表格文档 outline 为空 | 85 篇空 outline 中包含纯表格或空文档 | 必要时生成单一文档根节点 |
+| 后续粗体独立行不会继续成为标题 | 混合 Markdown/粗体结构可能漏章节 | 按样本验证后再扩展 |
+| Roadmap 等文档 outline 过度切分 | 极端案例可产生上百个 entry | 继续由 chunker 合并兜底，后续增加标题密度降级 |
+
+短期只考虑两个高收益修复：跳过 fenced code 内伪标题、保留标题末尾数字。其余问题按真实检索 Bad Case 数据驱动迭代，不重写 outline 提取器。
+
+### 11.3 原 100 篇样本带来的经验
+
+原 100 篇主要用于 Cleaner 审计，不是严格的 outline 评测集。样本中过短文档较多，长结构、整篇转义和真实相邻 span 覆盖不足，因此不能用来证明 outline 精度。
+
+仍可保留以下经验：
+
+- 样本分类必须校验文档确实包含目标结构，不能只依赖人工标签；
+- 代码、表格、编号列表、整篇转义和无标题 fallback 应分别评价；
+- 不能只统计 outline 是否非空，还要检查 entry 数量、来源、层级、标题密度和标题文本保真；
+- 整篇转义会造成标题缺失，文档链接误判可能影响无标题文档的 fallback 标题；
+- 普通文档覆盖已经足够，后续应优先收集失败样本，而不是重复扩大随机样本数量。
+
+### 11.4 重新评估与重建触发条件
+
+满足以下任一条件时再启动 outline 专项修复和存量重建评估：
+
+1. 出现一批可复现的目录错误或检索 Bad Case；
+2. 完成代码块伪标题和末尾数字修复；
+3. 决定对存量文档重新执行 Cleaner；
+4. outline 只读 old/new diff 表明变化范围足够大。
+
+届时先对存量 content 只读计算新 outline 并比较差异，只更新实际变化的文档；若变化面很大，再考虑全量重建。单独更新 outline 不会同步改变已有 chunk 的章节路径，因此任何面向检索效果的重建需另行评估 chunk 一致性。
+
+---
+
+## 12. Chunker 快速可用优化范围（2026-08-10）
+
+详细执行与抽样设计见：[RAG v2 Chunker 快速可用 TODO](./RAG-v2-chunker-TODO.md)。
+
+### 12.1 目标与边界
+
+本轮不追求通用 Markdown AST、语义切分、最优 chunk 参数或复杂表格理解，只修复会导致文档无法关联、正文静默丢失和单个 leaf 明显超限的问题。保持现有 `LEAF_TARGET=320`、`LEAF_MAX=512`、父子块结构和 document classification 基本不变。
+
+### 12.2 已确认的硬问题
+
+| 问题 | 代码位置 | 本地最小复现结果 | 影响 |
+|------|----------|------------------|------|
+| 短文档提前返回，没有填充 `doc_id` | `chunk_document()` 的 `<500 chars` 分支 | 499 个中文字符生成 1 个 leaf，`doc_id=""` | chunk 无法与原文档关联；现有 SQLite 流水线测试因此失败 |
+| 短文档绕过 token 上限 | 同一提前返回分支 | 499 个中文字符生成 898-token leaf | embedding 可能截断，违反 512-token 硬上限 |
+| 首个 outline 前的正文被丢弃 | `_build_sections()` | 标题前“前言内容”没有进入任何 leaf | 结构化文档前言、摘要或说明静默丢失 |
+| 表格策略只提取表格行 | `_chunk_table_v3()` | 1696 字符表格文档的“表前说明”和“表后说明”均丢失 | 与已记录的低 chunk 覆盖率问题一致 |
+| 部分策略仍能输出超长 leaf | meeting/table/超长句分支 | 4000 个无标点 ASCII 字符生成 1200-token leaf | 超过 leaf 上限，可能触发截断或字段风险 |
+
+当前没有独立的 chunker 单元测试。`tests.test_kb_markdown_pipeline` 中已有一条短文档持久化测试会失败：rechunk 后按原 `node_id` 查不到 chunk，直接证明空 `doc_id` 是现存故障。
+
+### 12.3 最小修复清单
+
+#### P0-1：统一完成 leaf 元数据和硬上限检查
+
+- 取消短文档在公共收尾逻辑之前直接返回；
+- 所有策略生成 leaf 后统一填写 `doc_id`、`chunk_index`；
+- 增加最终 leaf 校验：任何 `token_count > LEAF_MAX` 的 leaf 必须继续拆分；
+- 拆分后使用真实 `count_tokens()` 复核，不能只依赖固定字符数估算；
+- 保证任何非空文档至少生成一个 leaf。
+
+这一处统一兜底即可覆盖短文档、无标点会议段落、超长表格行和超长 JSON，不为每种文档分别增加复杂规则。
+
+#### P0-2：保证结构化文档前言不丢失
+
+当第一个 outline entry 不在第 1 行时，`_build_sections()` 增加一个从第 1 行到首标题前的 synthetic preamble section。其 `section_path` 使用文档标题，后续真实章节逻辑保持不变。
+
+#### P0-3：表格先采用保真切分
+
+当前 `_chunk_table_v3()` 会把整篇内容压缩成首张表格的键值行，并跳过所有非表格正文。快速可用版本不继续扩展复杂表格解析，改为：
+
+- 保留表格前后正文、标题和多个表格的原始可见文本；
+- 使用现有行/窗口切分能力按 512-token 上限分组；
+- 不拆断单个正常表格行；超长单行仍交给统一硬上限兜底；
+- 暂不实现合并单元格、父级单元格向下填充和多层表头语义。
+
+优先保证“内容不丢且可检索”，表头重复注入等精细优化等真实检索 Bad Case 出现后再做。
+
+#### P0-4：补最小回归测试
+
+新增独立 chunker 测试，至少覆盖：
+
+1. 短文档 leaf 的 `doc_id` 和 `chunk_index` 正确；
+2. 499 个中文字符不会产生超过 512 token 的 leaf；
+3. 结构化文档首标题前正文被保留；
+4. 表格前说明、表格行和表格后说明全部被保留；
+5. 无标点超长段落的每个 leaf 均不超过 512 token；
+6. 空文档仍返回空 leaf；
+7. 现有 `test_kb_markdown_pipeline` 全部通过。
+
+### 12.4 暂不处理
+
+- 不调整 320/512/800/1200 token 参数；
+- 不重写 document classification；
+- 不做 Markdown AST 或 LLM 语义切分；
+- 不优化父块聚合和 parent-child 关系；
+- 不处理 outline 的伪标题和过度切分；
+- 不实现复杂表格表头、合并单元格和单元格继承；
+- 不修改 embedding、retriever 或 reranker；
+- 不立即全量重建 chunks/vectors。
+
+### 12.5 验收与存量处理
+
+代码验收只看四项硬指标：
+
+- 非空文档生成 leaf，且 leaf 能关联到正确 `doc_id`；
+- 所有 leaf `token_count <= 512`；
+- 标题前正文和表格前后正文不再静默丢失；
+- 新增 chunker 测试及现有 Markdown pipeline 测试全部通过。
+
+修复完成后先只读统计存量中的无关联 chunk、无 chunk 文档、`token_count > 512` 文档和 chunk 覆盖率低于 20% 的文档。首轮仅对这些受影响文档定向 rechunk；只有受影响范围接近全量时，才重新评估全量 chunks/vectors 重建。
+
+### 12.6 本次直接执行结果（2026-08-10）
+
+- 修改文件：`backend/ai/knowledge/chunker.py`、`backend/tests/test_kb_chunker.py`。
+- 根因修复：取消短文档提前返回；统一在策略、tiny-leaf 合并之后按真实 `count_tokens()` 执行 512-token 硬上限；outline 首标题前增加 synthetic preamble；表格改为保留原始整篇行内容。
+- 测试结果：`python3 -m unittest tests/test_kb_chunker.py`（4/4 通过）；`python3 -m unittest tests/test_kb_markdown_pipeline.py`（14/14 通过）；`python3 -m py_compile ai/knowledge/chunker.py` 和 `git diff --check` 通过。
+- 本地 C-01～C-04 均确认：非空文档有 leaf、`doc_id` 正确、索引连续、leaf 不超过 512 token，前言/表格首尾/无标点正文保留。
+- 已通过 `172.19.3.79` 只读连接固定 20 篇 canary（4 short、4 structured_preamble、6 table、3 oversize、3 healthy_control），覆盖 4 个 workspace，4 篇当前无 leaf。元数据见 `docs/ai/rag/samples/chunker-mvp/manifest.json`。
+- 服务器 baseline：空 `doc_id` leaf 2663；有正文但无 leaf 文档 1048；超 512 token leaf 564，涉及 298 篇文档；最大 leaf 12048 token。详情见 `baseline-report.json`。
+- candidate 已通过 SSH 只读管道读取同一 20 篇正文，并在本地候选代码上逐篇比较：20/20 有 leaf，blank `doc_id` 0，empty leaf 0，最大 512 token，首尾/表格 marker 20/20 保留，deterministic 20/20，最低 lexical recall 0.993405。详情见 `docs/ai/rag/samples/chunker-mvp/candidate-report.json`。
+- 本次没有复制代码、修改服务器文件、数据库写入、rechunk 或 embedding；baseline 中暴露的存量问题仍需另建任务定向处理。
+
+### 12.7 服务器存量修复 dry-run（2026-08-11）
+
+- 服务器实际只读清单：A 类 1048 篇、B 类 297 篇、C 类 canary 20 篇，去重并集 1360 篇；空 `doc_id` leaf 2663 个单独保留为孤儿清单，不猜测归属。
+- 服务器没有 git commit；候选 Chunker 仅临时放在 `/tmp`，SHA-256：`2bdc73257d74dadd86dd07b955729fe99a7484af59ff2a1185c6f48a0f516418`。
+- 使用服务器真实 `content` 和 `outline` 对 1360 篇执行只读 dry-run：1360/1360 有 leaf，错误 0，错误 `doc_id` 0，断序索引 0，超 512 token leaf 0，最大新 leaf 512 token。
+- 现有服务器 `rechunk_and_embed.py` 会全局处理、每 50 篇提交；`auto_sync._rechunk_documents()` 虽支持 doc_id 列表，但 20 篇共用一个事务，且服务器当前仍是旧 Chunker。因此未直接调用写库入口。
+- 下一步必须先备份数据库、正式部署候选 Chunker，并补齐/确认按文档单独事务和定向 vector 删除/重建；在获得人工确认前不执行任何写库操作。
+
+### 12.8 服务器定向存量修复结果（2026-08-12）
+
+- 已备份：`/home/jz/zhr/backups/rag-v2-chunker-20260811-173510/kb_storage.sql`（149M，SHA-256 `83ebdd73ad364af6014db34b17a9feb556980c3e2a9664c095db92121796330b`）；`kb_vectors.dump`（92M，SHA-256 `ca77d0ac57e307bcffecf8d528410259c929d8ffedf6bda1a73b08a848a50f90`）。
+- 已部署候选 Chunker，SHA-256 `2bdc73257d74dadd86dd07b955729fe99a7484af59ff2a1185c6f48a0f516418`；旧版本已保存为同一备份目录下的 `chunker.py.before`。
+- 20 篇 canary 首批修复 20/20 成功；随后按单篇事务、每批最多 100 篇完成 A/B/C 并集定向修复。每篇均先删除其旧 vectors，再替换 chunks，提交后为新 chunks 生成 vectors；单篇失败会回滚且未出现失败项。
+- 最终全库只读验收：4749 篇非空文档全部有 leaf；有正文无 leaf 为 0；有效 `doc_id` 的超限 leaf 文档为 0；有效文档对应 chunks 覆盖 4749 篇；非空 `doc_id` 孤儿为 0。
+- 仍保留 2663 个空 `doc_id` 孤儿 chunk，未猜测归属、未删除；其中 103 个仍超过 512 token，均属于这些孤儿。孤儿处理需另行确认删除及检索引用影响。
+- 最终数据库统计：`kb_chunks` 48137，`chunk_vectors` 39356。vectors 少于 chunks 的差异包含未纳入本次清单的历史块/父块状态，后续如需全量 vector 一致性需另建任务，不在本次定向范围内。
+- 未修改 `kb_documents.content` 或 `outline`，未重建 outline，未执行全量 rechunk。

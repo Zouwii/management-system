@@ -6,7 +6,7 @@ unset ANTHROPIC_AUTH_TOKEN || true
 unset OPENAI_API_KEY OPENAI_API_BASE OPENAI_BASE_URL OPENAI_MODEL || true
 
 # ====================== 兜底 PATH ======================
-REAL_HOME="${HOME:-}"
+REAL_HOME="${AI_RUNTIME_HOME:-${HOME:-}}"
 if [ -n "${REAL_HOME}" ]; then
   for p in \
     "${REAL_HOME}/.nvm/versions/node/v20.20.2/bin" \
@@ -22,8 +22,14 @@ fi
 export PATH
 
 # ====================== 用户隔离 ======================
-OWNER_KEY="${AI_OWNER_KEY:-anonymous}"
+: "${AI_OWNER_KEY:?missing AI_OWNER_KEY}"
+: "${AI_SAFE_OWNER:?missing AI_SAFE_OWNER}"
+OWNER_KEY="${AI_OWNER_KEY}"
 SAFE_OWNER="$(printf '%s' "${OWNER_KEY}" | sha256sum | awk '{print $1}' | cut -c1-24)"
+if [ "${SAFE_OWNER}" != "${AI_SAFE_OWNER}" ]; then
+  echo "[terminal] owner identity validation failed" >&2
+  exit 1
+fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # backend/ 路径（从 ai/terminal/ 向上两级）
@@ -82,7 +88,8 @@ pick_and_apply_account
 # ====================== 共享 skills ======================
 # Source: ai/prompts/ → installed to runtime/shared/.claude/skills/ by install_prompts.sh
 SHARED_SKILLS="${BACKEND_DIR}/runtime/shared/.claude/skills"
-CLAUDE_SKILLS_DIR="${HOME}/.claude/skills"
+CLAUDE_USER_CONFIG="${CLAUDE_CONFIG_DIR:?missing CLAUDE_CONFIG_DIR}"
+CLAUDE_SKILLS_DIR="${CLAUDE_USER_CONFIG}/skills"
 if [ -d "${SHARED_SKILLS}" ]; then
   mkdir -p "${CLAUDE_SKILLS_DIR}"
   for skill_dir in "${SHARED_SKILLS}"/*/; do
@@ -96,8 +103,8 @@ if [ -d "${SHARED_SKILLS}" ]; then
 fi
 
 # ====================== 默认权限：避免每次询问 ======================
-mkdir -p "${HOME}/.claude"
-cat > "${HOME}/.claude/settings.json" << 'SETEOF'
+mkdir -p "${CLAUDE_USER_CONFIG}"
+cat > "${CLAUDE_USER_CONFIG}/settings.json" << 'SETEOF'
 {
   "permissions": {
     "allow": [

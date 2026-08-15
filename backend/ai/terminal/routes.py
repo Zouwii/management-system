@@ -46,7 +46,12 @@ def register(bp, ok, fail):
         """
         payload = request.get_json(silent=True) or {}
         auth_user = session.get("auth_user") or {}
-        owner_key = resolve_owner_key(payload, auth_user)
+        if not isinstance(auth_user, dict) or not auth_user:
+            return fail("authentication required", code=401, data={})
+        try:
+            owner_key = resolve_owner_key(payload, auth_user)
+        except ValueError as exc:
+            return fail(str(exc), code=401, data={})
         owner_name = resolve_owner_name(auth_user)
         cfg = load_ai_config()
         model = str(payload.get("model") or cfg.get("model") or "glm-5.1").strip() or "glm-5.1"

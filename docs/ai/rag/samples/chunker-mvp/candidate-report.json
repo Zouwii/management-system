@@ -1,0 +1,21 @@
+{
+  "status": "completed",
+  "source": "same 20 server documents streamed read-only over SSH; candidate executed from local checkout",
+  "sample_count": 20,
+  "category_counts": {"short": 4, "structured_preamble": 4, "table": 6, "oversize": 3, "healthy_control": 3},
+  "all_nonempty_have_leaf": true,
+  "blank_doc_id_count": 0,
+  "empty_leaf_count": 0,
+  "max_leaf_tokens": 512,
+  "all_leaf_tokens_le_512": true,
+  "structured_preamble_markers_preserved": "4/4",
+  "table_markers_preserved": "6/6",
+  "oversize_markers_preserved": "3/3",
+  "healthy_control_markers_preserved": "3/3",
+  "all_markers_preserved": true,
+  "all_deterministic": true,
+  "min_source_lexical_recall": 0.993405,
+  "lexical_recall_below_1_explanation": "The metric uses source character bigrams and is conservative around Markdown escaping/normalization; all expected first/last and table markers were preserved.",
+  "local_regression": {"chunker_tests": "4/4 passed", "markdown_pipeline_tests": "14/14 passed", "py_compile": "passed", "git_diff_check": "passed"},
+  "server_safety": "No server code, database rows, chunks, vectors, or embeddings were modified."
+}

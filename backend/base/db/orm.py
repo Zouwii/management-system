@@ -198,18 +198,30 @@ class ProgramIssueDetail(Base):
     custom_fields_json: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
     raw_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    # 级联自定义字段解析（customFieldId=665ee4b45b46f34b3e045af2）
-    project_category_1: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
-    vehicle_type_2: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
-    project_name_3: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    # 项目分类三级（customFieldId=665ee4b45b46f34b3e045af2）
+    project_catagory_1: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    project_catagory_2: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    project_catagory_3: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
 
-    # 问题类型/原因标签层级（从问题处理 customFields 回填）
-    problem_type_level_1: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
-    problem_type_level_2: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
-    problem_type_level_3: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    # 车型两级（customFieldId=668e05afbe23298626d61027）
+    vehicle_1: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    vehicle_2: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+
+    # 问题类型两级（customFieldId=67c56f477ed2b4b7bbd0cd69）
+    problem_type_1: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    problem_type_2: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+
+    # 问题提示信息三级（customFieldId=67c572129590cd29ac9c5137）
+    problem_note_info_1: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    problem_note_info_2: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    problem_note_info_3: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+
+    # 问题原因三级
     cause_level_1: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     cause_level_2: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
     cause_level_3: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+
+    # 软件版本（customFieldId=65a7be8938685843bf1c7d83）
     software_version: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
 
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.now)
@@ -837,8 +849,30 @@ class AlgoIssueDetail(Base):
     custom_fields_json: Mapped[Optional[Any]] = mapped_column(JSON, nullable=True)
     raw_json: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    project_category_1: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
-    vehicle_type_2: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
-    project_name_3: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+    # 项目分类三级（customFieldId=665ee4b45b46f34b3e045af2）
+    project_catagory_1: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    project_catagory_2: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    project_catagory_3: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+
+    # 车型两级（customFieldId=668e05afbe23298626d61027）
+    vehicle_1: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    vehicle_2: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+
+    # 问题类型两级（customFieldId=67c56f477ed2b4b7bbd0cd69）
+    problem_type_1: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    problem_type_2: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+
+    # 问题提示信息三级（customFieldId=67c572129590cd29ac9c5137）
+    problem_note_info_1: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    problem_note_info_2: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    problem_note_info_3: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+
+    # 问题原因三级
+    cause_level_1: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    cause_level_2: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    cause_level_3: Mapped[Optional[str]] = mapped_column(String(256), nullable=True)
+
+    # 软件版本
+    software_version: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
 
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=datetime.now)

@@ -22,10 +22,14 @@ _RUNTIME_DIR = Path(__file__).resolve().parent.parent.parent / "runtime"
 _SHARED_CLAUDE_DIR = _RUNTIME_DIR / "shared" / ".claude"
 _USERS_ROOT = _RUNTIME_DIR / "users"
 _LOG_FILE = _RUNTIME_DIR / "logs" / "ai_debug_subprocess.log"
-_DEFAULT_OWNER_KEY = "anonymous"
 _DEFAULT_TTYD_PORT_BASE = 8800
 _DEFAULT_TTYD_PORT_SPAN = 400
 _DEFAULT_TTYD_TTL_SECONDS = 2 * 60 * 60
+_DEFAULT_MAX_SESSIONS = 8
+_DEFAULT_MAX_SESSIONS_PER_USER = 2
+_DEFAULT_USER_MEMORY_MB = 1536
+_DEFAULT_TOTAL_MEMORY_MB = 6144
+_DEFAULT_JANITOR_INTERVAL_SECONDS = 15
 
 _TTYD_SESSIONS: dict = {}
 _TTYD_LOCK = threading.Lock()
@@ -68,27 +72,39 @@ def load_ai_config() -> dict:
         return {}
 
 
+def _env_int(name: str, default: int, minimum: int = 1) -> int:
+    try:
+        return max(int(str(os.getenv(name, default)).strip()), minimum)
+    except (TypeError, ValueError):
+        return default
+
+
 def safe_owner_key(owner_key: str) -> str:
     """Hash an owner_key into a filesystem-safe 24-char hex string."""
-    raw = str(owner_key or "").strip() or _DEFAULT_OWNER_KEY
+    raw = str(owner_key or "").strip()
+    if not raw:
+        raise ValueError("authenticated user has no stable user_id")
     return hashlib.sha256(raw.encode("utf-8", errors="ignore")).hexdigest()[:24]
 
 
 def resolve_owner_key(payload: dict, session_auth: dict = None) -> str:
     """Resolve the effective owner_key from a request payload or session.
 
-    Priority: explicit ownerKey in payload > auth_user.user_id > auth_user.name > 'anonymous'.
+    Authenticated identity always wins over request data. Explicit ownerKey is
+    retained only for trusted internal calls that do not carry a Flask cookie.
     """
-    direct = str((payload or {}).get("ownerKey") or "").strip()
-    if direct:
-        return direct
     auth_user = session_auth or {}
     if isinstance(auth_user, dict):
-        for k in ("user_id", "userid", "name"):
+        for k in ("user_id", "userid"):
             val = str(auth_user.get(k) or "").strip()
             if val:
                 return val
-    return _DEFAULT_OWNER_KEY
+        if auth_user:
+            raise ValueError("authenticated session has no stable user_id")
+    direct = str((payload or {}).get("ownerKey") or "").strip()
+    if direct:
+        return direct
+    raise ValueError("missing authenticated user identity")
 
 
 def resolve_owner_name(session_auth: dict = None) -> str:
@@ -110,11 +126,13 @@ def user_workspace(owner_key: str) -> dict:
     safe = safe_owner_key(owner_key)
     user_root = _USERS_ROOT / safe
     claude_dir = user_root / ".claude"
+    home_dir = user_root / "home"
     workspace_dir = user_root / "workspaces" / "default"
     return {
         "owner_safe": safe,
         "user_root": str(user_root),
         "claude_dir": str(claude_dir),
+        "home_dir": str(home_dir),
         "workspace_dir": str(workspace_dir),
         "shared_claude_dir": str(_SHARED_CLAUDE_DIR),
     }
@@ -158,6 +176,10 @@ def make_env(owner_key: str, owner_name: str, model: str) -> dict:
 
     env = os.environ.copy()
     real_home = str(os.environ.get("HOME") or "").strip()
+    ws = user_workspace(owner_key)
+    for key in ("user_root", "home_dir", "claude_dir", "workspace_dir"):
+        Path(ws[key]).mkdir(parents=True, exist_ok=True, mode=0o700)
+        Path(ws[key]).chmod(0o700)
     # Claude Code should use the Anthropic-compatible gateway settings below.
     # Some shells export OpenAI vars globally, and the CLI may prefer them.
     for key in ("OPENAI_API_KEY", "OPENAI_API_BASE", "OPENAI_BASE_URL", "OPENAI_MODEL"):
@@ -183,6 +205,9 @@ def make_env(owner_key: str, owner_name: str, model: str) -> dict:
     env["AI_USERS_ROOT"] = str(_USERS_ROOT)
     env["AI_SHARED_CLAUDE_DIR"] = str(_SHARED_CLAUDE_DIR)
     env["AI_SAFE_OWNER"] = safe_owner_key(owner_key)
+    env["AI_RUNTIME_HOME"] = real_home
+    env["HOME"] = ws["home_dir"]
+    env["CLAUDE_CONFIG_DIR"] = ws["claude_dir"]
     # Flask backend URL for internal curl (e.g. /draft/notify)
     # 优先使用外部显式设置的 AI_FLASK_BASE_URL，再尝试从 FLASK_RUN_PORT 推导
     ai_flask_base_url = str(os.getenv("AI_FLASK_BASE_URL") or "").strip()
@@ -292,6 +317,82 @@ def _terminate_ttyd_locked(state: dict, reason: str = "") -> None:
     )
 
 
+def _process_table() -> dict[int, tuple[int, int]]:
+    """Return pid -> (ppid, RSS KiB) from Linux /proc."""
+    table = {}
+    proc_root = Path("/proc")
+    if not proc_root.is_dir():
+        return table
+    for entry in proc_root.iterdir():
+        if not entry.name.isdigit():
+            continue
+        try:
+            lines = (entry / "status").read_text(
+                encoding="utf-8", errors="replace"
+            ).splitlines()
+            ppid = 0
+            rss_kb = 0
+            for line in lines:
+                if line.startswith("PPid:"):
+                    ppid = int(line.split()[1])
+                elif line.startswith("VmRSS:"):
+                    rss_kb = int(line.split()[1])
+            table[int(entry.name)] = (ppid, rss_kb)
+        except (OSError, ValueError, IndexError):
+            continue
+    return table
+
+
+def process_tree_rss_kb(root_pid: int, table: dict = None) -> int:
+    table = table if table is not None else _process_table()
+    children = {}
+    for pid, (ppid, _rss) in table.items():
+        children.setdefault(ppid, []).append(pid)
+    total = 0
+    stack = [int(root_pid)]
+    visited = set()
+    while stack:
+        pid = stack.pop()
+        if pid in visited:
+            continue
+        visited.add(pid)
+        total += table.get(pid, (0, 0))[1]
+        stack.extend(children.get(pid, []))
+    return total
+
+
+def _enforce_resource_limits_locked() -> None:
+    """Enforce per-user and total RSS budgets for ttyd process trees."""
+    table = _process_table()
+    user_limit_kb = _env_int(
+        "AI_TTYD_USER_MEMORY_MB", _DEFAULT_USER_MEMORY_MB, 128
+    ) * 1024
+    total_limit_kb = _env_int(
+        "AI_TTYD_TOTAL_MEMORY_MB", _DEFAULT_TOTAL_MEMORY_MB, 128
+    ) * 1024
+    by_owner = {}
+    for sk, state in list(_TTYD_SESSIONS.items()):
+        proc = state.get("proc")
+        if proc is None or proc.poll() is not None:
+            continue
+        state["rss_kb"] = process_tree_rss_kb(proc.pid, table)
+        by_owner.setdefault(state.get("owner_key", ""), []).append((sk, state))
+
+    for owner_key, entries in by_owner.items():
+        while sum(item[1].get("rss_kb", 0) for item in entries) > user_limit_kb:
+            sk, target = max(entries, key=lambda item: item[1].get("rss_kb", 0))
+            _terminate_ttyd_locked(target, reason="user_memory_limit")
+            _TTYD_SESSIONS.pop(sk, None)
+            entries.remove((sk, target))
+
+    while sum(state.get("rss_kb", 0) for state in _TTYD_SESSIONS.values()) > total_limit_kb:
+        sk, target = max(
+            _TTYD_SESSIONS.items(), key=lambda item: item[1].get("rss_kb", 0)
+        )
+        _terminate_ttyd_locked(target, reason="total_memory_limit")
+        _TTYD_SESSIONS.pop(sk, None)
+
+
 def _cleanup_ttyd_sessions_locked(now: int = None) -> None:
     """Remove dead or expired ttyd sessions. Must be called under _TTYD_LOCK."""
     current = int(now or time.time())
@@ -323,6 +424,7 @@ def _cleanup_ttyd_sessions_locked(now: int = None) -> None:
                 }
             )
         _TTYD_SESSIONS.pop(sk, None)
+    _enforce_resource_limits_locked()
 
 
 def start_ttyd_janitor() -> None:
@@ -335,7 +437,12 @@ def start_ttyd_janitor() -> None:
 
     def _run() -> None:
         while True:
-            time.sleep(min(300, max(30, ttyd_ttl_seconds() // 6)))
+            interval = _env_int(
+                "AI_TTYD_JANITOR_INTERVAL_SECONDS",
+                _DEFAULT_JANITOR_INTERVAL_SECONDS,
+                5,
+            )
+            time.sleep(interval)
             with _TTYD_LOCK:
                 _cleanup_ttyd_sessions_locked()
 
@@ -405,6 +512,29 @@ def ensure_ttyd_session(
             else:
                 _terminate_ttyd_locked(existing, reason="stale")
             _TTYD_SESSIONS.pop(sk, None)
+
+        max_sessions = _env_int(
+            "AI_TTYD_MAX_SESSIONS", _DEFAULT_MAX_SESSIONS
+        )
+        max_per_user = _env_int(
+            "AI_TTYD_MAX_SESSIONS_PER_USER", _DEFAULT_MAX_SESSIONS_PER_USER
+        )
+        owner_sessions = [
+            state for state in _TTYD_SESSIONS.values()
+            if state.get("owner_key") == owner_key
+        ]
+        if len(owner_sessions) >= max_per_user:
+            raise RuntimeError("current user ttyd session limit reached")
+        if len(_TTYD_SESSIONS) >= max_sessions:
+            raise RuntimeError("global ttyd session limit reached")
+        current_total_kb = sum(
+            state.get("rss_kb", 0) for state in _TTYD_SESSIONS.values()
+        )
+        total_limit_kb = _env_int(
+            "AI_TTYD_TOTAL_MEMORY_MB", _DEFAULT_TOTAL_MEMORY_MB, 128
+        ) * 1024
+        if current_total_kb >= total_limit_kb:
+            raise RuntimeError("global ttyd memory capacity reached")
 
         resolved_env = make_env(owner_key=owner_key, owner_name=owner_name, model=model)
         write_workspace_context(owner_key, auth_user or {}, workspace_init=workspace_init)

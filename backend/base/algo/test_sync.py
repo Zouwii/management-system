@@ -134,9 +134,9 @@ class AlgoSyncMappingTest(unittest.TestCase):
         self.assertEqual(row.need_statistic, "是")
         self.assertEqual(row.workday_costhour, 1.0)
         self.assertIsNone(row.work_hour)
-        self.assertEqual(row.project_category_1, "产品项目")
-        self.assertEqual(row.vehicle_type_2, "叉车")
-        self.assertEqual(row.project_name_3, "立体导航")
+        self.assertEqual(row.project_catagory_1, "产品项目")
+        self.assertEqual(row.project_catagory_2, "叉车")
+        self.assertEqual(row.project_catagory_3, "立体导航")
 
     def test_groupmap_detail_uses_algorithm_custom_field_ids(self):
         row = AlgoTaskDetail(

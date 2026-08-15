@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""回填 program_issue_detail 表的级联三列（project_category_1 / vehicle_type_2 / project_name_3）。"""
+"""回填 program_issue_detail 表的级联三列（project_catagory_1 / project_catagory_2 / project_catagory_3）。"""
 
 import json
 import sys
@@ -58,9 +58,9 @@ def main():
             .filter(ProgramIssueDetail.raw_json != "")
             .filter(ProgramIssueDetail.raw_json != "null")
             .filter(
-                (ProgramIssueDetail.project_category_1 == None)  # noqa: E711
-                | (ProgramIssueDetail.vehicle_type_2 == None)  # noqa: E711
-                | (ProgramIssueDetail.project_name_3 == None)  # noqa: E711
+                (ProgramIssueDetail.project_catagory_1 == None)  # noqa: E711
+                | (ProgramIssueDetail.project_catagory_2 == None)  # noqa: E711
+                | (ProgramIssueDetail.project_catagory_3 == None)  # noqa: E711
             )
             .all()
         )
@@ -72,9 +72,9 @@ def main():
         for row in rows:
             cat, vehicle, name = parse_cascading(row.raw_json)
             if cat is not None or vehicle is not None or name is not None:
-                row.project_category_1 = cat
-                row.vehicle_type_2 = vehicle
-                row.project_name_3 = name
+                row.project_catagory_1 = cat
+                row.project_catagory_2 = vehicle
+                row.project_catagory_3 = name
                 updated += 1
             else:
                 skipped += 1

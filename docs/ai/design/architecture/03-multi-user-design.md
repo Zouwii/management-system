@@ -178,6 +178,17 @@ stateDiagram-v2
 ### 7.2 回收策略（当前实现）
 
 - `ttl_seconds`: 默认 7200 秒，可通过 `AI_TTYD_TTL_SECONDS` 配置，最小 60 秒
+- 登录 session 的 `user_id` 是 ttyd 用户归属的唯一可信来源；请求体不能覆盖已登录身份。
+- 每个用户使用独立的 `runtime/users/<safe_owner>/home`、`.claude` 和 workspace。
+- `AI_TTYD_MAX_SESSIONS` 默认 8，`AI_TTYD_MAX_SESSIONS_PER_USER` 默认 2。
+- `AI_TTYD_USER_MEMORY_MB` 默认 1536，按同一用户全部 ttyd 进程树 RSS 汇总控制。
+- `AI_TTYD_TOTAL_MEMORY_MB` 默认 6144，作为全部 ttyd 进程树 RSS 硬上限。
+- `AI_TTYD_JANITOR_INTERVAL_SECONDS` 默认 15 秒，最小 5 秒。
+
+当前动态 ttyd 端口仍由浏览器直接访问。上述机制提供身份、进程、HOME、Claude 配置和
+工作区隔离，但动态端口尚未复用 Flask session 做逐连接授权。若部署网络允许用户直接
+访问 ttyd 端口，下一阶段应增加 management-system WebSocket 认证反向代理，并将 ttyd
+改为仅监听回环地址；在此之前不能把它描述为容器级或零信任网络隔离。
 - `sweep_interval`: `min(300, max(30, ttl_seconds / 6))`
 - `max_sessions_per_user`: 当前按 `ownerKey + purpose` 保留一个活跃会话
 - `_TTYD_SESSIONS`: 仅保存本后端进程创建的 ttyd
