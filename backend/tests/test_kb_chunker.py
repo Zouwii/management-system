@@ -47,6 +47,31 @@ class ChunkerMvpTests(unittest.TestCase):
         self.assertIn("结尾标记", joined)
         self.assertEqual(joined, content)
 
+    def test_parent_declares_exact_child_leaf_indexes(self):
+        content = "\n\n".join(
+            f"第{i}段：" + ("这是用于验证父子块精确映射的正文。" * 30)
+            for i in range(40)
+        )
+        result = chunk_document("doc-parent", "长文档", content)
+        leaves = result["leaf"]
+        parents = result["parent"]
+
+        self.assertGreater(len(parents), 1)
+        declared_indexes = []
+        for parent in parents:
+            child_indexes = parent["child_chunk_indexes"]
+            self.assertTrue(child_indexes)
+            self.assertEqual(child_indexes, sorted(child_indexes))
+            self.assertTrue(all(0 <= index < len(leaves) for index in child_indexes))
+            expected_content = "\n\n".join(
+                leaves[index]["content"] for index in child_indexes
+            ).strip()
+            self.assertEqual(parent["content"], expected_content)
+            self.assertEqual(parent["token_count"], count_tokens(expected_content))
+            declared_indexes.extend(child_indexes)
+
+        self.assertEqual(declared_indexes, list(range(len(leaves))))
+
 
 if __name__ == "__main__":
     unittest.main()

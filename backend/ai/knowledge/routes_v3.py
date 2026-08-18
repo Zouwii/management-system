@@ -215,6 +215,7 @@ def register_v3(bp, ok, fail):
         6. Embed leaf chunks (depth=1 only)
         """
         from ai.knowledge.chunker import chunk_document
+        from ai.knowledge.chunk_storage import persist_chunk_result
         from ai.knowledge.embedder import embed_chunks, delete_vectors
 
         db = KbSessionLocal()
@@ -254,50 +255,11 @@ def register_v3(bp, ok, fail):
                     doc.node_id, doc.title, doc.content,
                     doc.outline or "", "FILE"
                 )
-                all_leaf = result.get("leaf", [])
-                all_parent = result.get("parent", [])
-
-                # Insert leaf chunks, collect IDs by section_path
-                leaf_ids_by_path: dict = {}
-                for c in all_leaf:
-                    ch = KbChunk(
-                        doc_id=c["doc_id"],
-                        chunk_index=c["chunk_index"],
-                        content=c["content"],
-                        token_count=c["token_count"],
-                        depth=c.get("depth", 1),
-                        chunk_type=c.get("chunk_type", "paragraph"),
-                        section_path=c.get("section_path", ""),
-                    )
-                    db.add(ch)
-                    db.flush()  # get ID
-                    sp = c.get("section_path", "") or ""
-                    leaf_ids_by_path.setdefault(sp, []).append(ch.id)
-
-                # Insert parent chunks, link leaf children
-                for c in all_parent:
-                    sp = c.get("section_path", "") or ""
-                    child_ids = leaf_ids_by_path.get(sp, [])
-                    ch = KbChunk(
-                        doc_id=c["doc_id"],
-                        chunk_index=c["chunk_index"],
-                        content=c["content"],
-                        token_count=c["token_count"],
-                        depth=c.get("depth", 0),
-                        chunk_type=c.get("chunk_type", "parent"),
-                        section_path=sp,
-                    )
-                    db.add(ch)
-                    db.flush()
-                    # Link leaf chunks to this parent
-                    if child_ids:
-                        db.query(KbChunk).filter(KbChunk.id.in_(child_ids)).update(
-                            {KbChunk.parent_id: ch.id}, synchronize_session=False
-                        )
+                persisted = persist_chunk_result(db, result)
 
                 db.commit()
-                stats["leaf_chunks"] += len(all_leaf)
-                stats["parent_chunks"] += len(all_parent)
+                stats["leaf_chunks"] += persisted["leaf_count"]
+                stats["parent_chunks"] += persisted["parent_count"]
 
             except Exception:
                 db.rollback()

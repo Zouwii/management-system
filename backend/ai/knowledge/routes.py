@@ -959,7 +959,9 @@ def register(bp, ok, fail):
                 # Step 1: get all valid chunk IDs from KB database
                 valid_ids = [
                     r[0] for r in
-                    db.execute(sa_text("SELECT id FROM kb_chunks")).fetchall()
+                    db.execute(sa_text(
+                        "SELECT id FROM kb_chunks WHERE depth = 1"
+                    )).fetchall()
                 ]
 
                 # Step 2: clean orphan vectors in pgvector
@@ -988,7 +990,7 @@ def register(bp, ok, fail):
                     pg.close()
 
                 from ai.knowledge.embedder import embed_chunks
-                emb_stats = embed_chunks(limit=0)
+                emb_stats = embed_chunks(limit=0, depth=1)
                 result["embed"] = emb_stats
 
             return ok(result)
@@ -1371,7 +1373,7 @@ def register(bp, ok, fail):
 
     @bp.route("/ai/knowledge/reembed", methods=["POST"])
     def ai_knowledge_reembed():
-        """Embed kb_chunks into pgvector chunk_vectors for semantic search.
+        """Embed leaf kb_chunks into pgvector chunk_vectors for semantic search.
 
         Body: { "workspace_id"?: "...", "limit"?: N }
         """
@@ -1382,7 +1384,7 @@ def register(bp, ok, fail):
         from ai.knowledge.embedder import embed_chunks
 
         try:
-            stats = embed_chunks(workspace_id=ws_id, limit=limit)
+            stats = embed_chunks(workspace_id=ws_id, limit=limit, depth=1)
             return ok(stats)
         except Exception as e:
             return fail(str(e), code=500)

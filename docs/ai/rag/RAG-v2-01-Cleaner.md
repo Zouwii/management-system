@@ -1,13 +1,15 @@
-# RAG v2：Cleaner 数据驱动迭代
+# RAG v2：Cleaner 工作记录
 
-> 状态：100 篇审计完成，改造方案待实施
-> 更新：2026-08-10
+> 状态：已完成并冻结；等待真实检索 Bad Case 再评估
+> 更新：2026-08-18
 > 范围：服务器 Markdown 原文 → `clean_markdown()` → `kb_documents.content`
 > 不包含：outline 提取、chunk 切分、embedding 和检索排序
 
-## 1. 结论
+> 当前结论：既有 100 篇审计达到 100/100 幂等和 100/100 表格行保留，现有 22 个 Cleaner 专项测试通过。以下正文保留 2026-08-10 的问题发现和迭代过程，最终状态以本文顶部及 [RAG v2 文档索引](./RAG-v2-00-文档索引.md) 为准。
 
-Cleaner 已经具备可用的保守清洗基线，但还不能被视为完成。
+## 1. 2026-08-10 阶段结论
+
+在 2026-08-10 阶段，Cleaner 已经具备可用的保守清洗基线，但还不能被视为完成。
 
 100 篇去重文档审计表明：
 
@@ -33,9 +35,9 @@ Cleaner 已经具备可用的保守清洗基线，但还不能被视为完成。
 
 Cleaner 不是没有设计。已有资料包括：
 
-- [Markdown 与图片多模态检索设计](./RAG-v2-markdown-multimodal-design.md)：定义原始层、AST block、HTML 白名单和图片资产；
-- [研发项目与模块知识助手设计](./RAG-v2-研发项目知识助手设计.md)：规定保留标题、列表、表格、链接和人员上下文；
-- [文档清洗与层级切分工作记录](./RAG-v2-文档清洗与层级切分工作记录.md)：记录 cleaner v1、样本验证和全量导入过程；
+- [Markdown 与图片多模态检索设计](./RAG-v2-04-多模态扩展.md)：定义原始层、AST block、HTML 白名单和图片资产；
+- [研发项目与模块知识助手设计](./RAG-v2-03-知识助手设计.md)：规定保留标题、列表、表格、链接和人员上下文；
+- [Chunker 与 Leaf 工作记录](./RAG-v2-02-Chunker.md)：记录 cleaner v1、样本验证、全量导入和后续切分演进；
 - [Markdown 清洗 v1 样本](./samples/markdown-cleaning-v1/README.md)：5 类原文、清洗稿和逐行 diff；
 - `backend/tests/test_kb_markdown_cleaner.py`：现有 10 个规则级回归测试。
 
@@ -318,3 +320,20 @@ Cleaner 后续按固定闭环演进：
 10. 至少抽查 10 篇 candidate diff 后再批量重建。
 
 Cleaner 验收后再重新生成 outline 和 chunk。否则 documents 层的格式错误会继续被误判为 chunker 问题。
+
+---
+
+## 9. 当前冻结结论（2026-08-18）
+
+经过规则修复、专项测试和服务器样本复核，当前结论更新为：
+
+- 100 篇固定样本达到 100/100 幂等；
+- 100 篇固定样本达到 100/100 Markdown 表格行保留；
+- 标准 pipe table 的表头、分隔行、列管道、行顺序和 `<br>` 能够保留；
+- 整篇被转义的 Markdown 表格能够恢复；
+- 原生 HTML `<table>` 保留为 HTML 并产生 warning，不负责转换成 pipe table；
+- 22 个 Cleaner 专项单元测试全部通过。
+
+因此 Cleaner 当前冻结。第 5～8 节作为审计方法、历史风险和未来变更门槛继续保留，但不代表需要立即继续改造。只有真实检索 Bad Case 经定位确认来自 Cleaner，才重新进入“固定样本 → 最小测试 → 单规则修改 → 全量审计”的闭环。
+
+Chunker 跨 leaf 后的表头缺失、代码缩进变化和 BGE token 超限不属于 Cleaner 问题，统一记录在 [Chunker 与 Leaf 工作记录](./RAG-v2-02-Chunker.md)。

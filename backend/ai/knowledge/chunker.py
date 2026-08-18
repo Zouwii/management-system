@@ -367,14 +367,18 @@ def _chunk_section_leaf(
 
 # ── parent chunk builder ────────────────────────────────────────────
 
-def _make_parent(parts: List[str], tokens: int, section_path: str) -> dict:
+def _make_parent(
+    children: List[dict], section_path: str,
+) -> dict:
+    content = "\n\n".join(child["content"] for child in children).strip()
     return {
-        "content": "\n\n".join(parts).strip(),
-        "token_count": tokens,
+        "content": content,
+        "token_count": count_tokens(content),
         "heading": "",
         "section_path": _safe_path(section_path),
         "depth": 0,
         "chunk_type": "parent",
+        "child_chunk_indexes": [child["chunk_index"] for child in children],
         "doc_id": "",       # filled later
         "chunk_index": 0,   # filled later
     }
@@ -394,20 +398,20 @@ def _build_parent_chunks(leaf_chunks: List[dict]) -> List[dict]:
         total_tokens = sum(c["token_count"] for c in children)
         if total_tokens < PARENT_MIN_SECTION_TOKENS:
             continue
-        buf: List[str] = []
+        buf: List[dict] = []
         buf_tokens: int = 0
         for child in children:
             ct = child["token_count"]
             if buf_tokens + ct <= PARENT_TARGET:
-                buf.append(child["content"])
+                buf.append(child)
                 buf_tokens += ct
             else:
                 if buf:
-                    parents.append(_make_parent(buf, buf_tokens, sp))
-                buf = [child["content"]]
+                    parents.append(_make_parent(buf, sp))
+                buf = [child]
                 buf_tokens = ct
         if buf:
-            parents.append(_make_parent(buf, buf_tokens, sp))
+            parents.append(_make_parent(buf, sp))
     return parents
 
 
@@ -546,7 +550,8 @@ def chunk_document(
     """Chunk a single document with v3 parent-child hierarchy.
 
     Returns {"leaf": [...], "parent": [...]} where each chunk has:
-      content, token_count, heading, section_path, depth (0|1), chunk_type
+      content, token_count, heading, section_path, depth (0|1), chunk_type.
+    Parent chunks additionally contain exact child_chunk_indexes.
     """
     if not content or not content.strip():
         return {"leaf": [], "parent": []}
@@ -584,15 +589,18 @@ def chunk_document(
                 ))
     leaf = bounded_leaf or _chunk_text_v3(content, title, outline)
 
+    # Assign stable leaf indexes before building parents. Parent-child links use
+    # these indexes as an explicit persistence contract; section_path alone is
+    # ambiguous when a section produces more than one parent.
+    for i, c in enumerate(leaf):
+        c["doc_id"] = doc_id
+        c["chunk_index"] = i
+
     # Build parent chunks for long docs
     parent: List[dict] = []
     if len(content) >= LONG_DOC_CHARS:
         parent = _build_parent_chunks(leaf)
 
-    # Assign doc_id + index
-    for i, c in enumerate(leaf):
-        c["doc_id"] = doc_id
-        c["chunk_index"] = i
     for i, c in enumerate(parent):
         c["doc_id"] = doc_id
         c["chunk_index"] = i + 100000  # temp offset, fixed after parent_ids assigned

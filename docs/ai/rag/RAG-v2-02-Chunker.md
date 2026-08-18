@@ -1,9 +1,10 @@
-# RAG v2：文档清洗与层级切分工作记录
+# RAG v2：Chunker 与 Leaf 工作记录
 
-> 状态：v3 链路可用，已知问题待修 | 更新：2026-08-07
+> 状态：Parent 链路代码已修复但未启用，Chunker 优化暂停 | 更新：2026-08-18
 > 样本目录：服务器 `/home/jz/zhr/markdown/`  
-> 关联设计：[RAG v2：Markdown 与图片多模态检索设计](./RAG-v2-markdown-multimodal-design.md)
-> Cleaner 专项审计：[RAG v2：Cleaner 数据驱动迭代](./RAG-v2-cleaner数据驱动迭代.md)
+> 文档索引：[RAG v2 文档索引](./RAG-v2-00-文档索引.md)
+> 关联设计：[RAG v2：Markdown 与图片多模态检索设计](./RAG-v2-04-多模态扩展.md)
+> Cleaner 专项审计：[RAG v2：Cleaner 数据驱动迭代](./RAG-v2-01-Cleaner.md)
 
 ## 1. 概要
 
@@ -452,7 +453,7 @@ bge-reranker-base (3.2GB) 模型已部署，但服务器 CPU 限频至 54%，模
 
 ## 12. Chunker 快速可用优化范围（2026-08-10）
 
-详细执行与抽样设计见：[RAG v2 Chunker 快速可用 TODO](./RAG-v2-chunker-TODO.md)。
+本节保留当时的快速修复范围；执行方案和最终结果已归档在 12.6～12.8，原临时 TODO 文档于 2026-08-18 完成清理。
 
 ### 12.1 目标与边界
 
@@ -559,3 +560,207 @@ bge-reranker-base (3.2GB) 模型已部署，但服务器 CPU 限频至 54%，模
 - 仍保留 2663 个空 `doc_id` 孤儿 chunk，未猜测归属、未删除；其中 103 个仍超过 512 token，均属于这些孤儿。孤儿处理需另行确认删除及检索引用影响。
 - 最终数据库统计：`kb_chunks` 48137，`chunk_vectors` 39356。vectors 少于 chunks 的差异包含未纳入本次清单的历史块/父块状态，后续如需全量 vector 一致性需另建任务，不在本次定向范围内。
 - 未修改 `kb_documents.content` 或 `outline`，未重建 outline，未执行全量 rechunk。
+
+---
+
+## 13. Leaf-only 清理与 Chunker 现状复核（2026-08-18）
+
+### 13.1 本轮确定的设计口径
+
+- 自动同步链路暂不作为当前重点，允许知识库暂时不更新；
+- `kb_documents.content` 继续作为 Cleaner 处理后的 Markdown 正文源；
+- Cleaner 暂时冻结，除非后续真实检索 Bad Case 能证明问题来自 Cleaner；
+- 初始召回和向量索引采用 leaf-only；parent 不建向量、不参与初始召回，只作为 leaf 命中后的可选上下文扩展；
+- 旧方案只保留实验记录和可恢复备份，历史 chunk 数据可以清理；
+- 后续坚持单变量、分步骤调整，先验证内容和结构保真，再评价检索效果。
+
+### 13.2 旧 chunk 清理结果
+
+执行前服务器状态：
+
+| 项目 | 数量 |
+|------|-----:|
+| `kb_chunks` 总数 | 48,137 |
+| 有效 leaf | 35,076 |
+| parent chunk | 10,398 |
+| 空 `doc_id` 历史 chunk | 2,663 |
+| `chunk_vectors` | 39,356 |
+| 空 `doc_id` chunk 对应 vector | 980 |
+| parent 对应 vector | 3,300 |
+| leaf → parent 关联 | 12,294 |
+
+本次完成：
+
+- 删除 10,398 个 parent chunk；
+- 删除 2,663 个空 `doc_id` 历史 chunk；
+- 删除上述 chunk 对应的 4,280 条 vector；
+- 清空 12,294 个 leaf 的 `parent_id`；
+- 未修改 `kb_documents`、Cleaner 后的 Markdown、有效 leaf 正文或 outline。
+
+最终只读验收：
+
+| 检查项 | 结果 |
+|--------|------|
+| `kb_chunks` | 35,076，全部为有效 depth-1 leaf |
+| `chunk_vectors` | 35,076 |
+| parent chunk | 0 |
+| 空 `doc_id` chunk | 0 |
+| 非空 `parent_id` | 0 |
+| vector 无对应 chunk | 0 |
+| chunk 无对应 vector | 0 |
+| 有正文但无 leaf 的文档 | 0 |
+
+当前数据库已经满足 leaf-only 和 chunk/vector 一一对应。此处是清理完成时的阶段记录；随后已修复 parent 精确映射与写库契约，最终口径见 13.8。生产库仍未生成 parent。
+
+### 13.3 删除前备份与临时文件清理
+
+删除前备份保留在服务器：
+
+`/home/jz/zhr/backups/rag-leaf-only-20260818-104834`
+
+| 文件 | 行数 | SHA-256 |
+|------|-----:|---------|
+| `deleted_chunks.jsonl.gz` | 13,061 | `813b8db0f9bb9f3d5044f6ade6454969835e1332b1294e3d56d1a0423dc7f248` |
+| `deleted_vectors.jsonl.gz` | 4,280 | `cd3e348bd716a41b0ac2fc726cb0b463ecfdf03b92294f65c063d09805c216ce` |
+| `deleted_chunk_ids.txt` | - | `d72ea8eafa4d4c0bbc1a80477ff3eace22e23f256217ae5c9d00358d4d32cf4e` |
+| `leaf_parent_links.jsonl` | 12,294 | `9e73468c1f12536ff48beb39d45a175efe6dd0db125e558e79ad5538d9553aa8` |
+
+备份校验和已独立复核。该目录是本次删除操作的恢复依据，属于有意保留文件，不作为残留清理。
+
+服务器临时文件已删除并确认不存在：
+
+- `/tmp/rag_v2_candidate_chunker.py`
+- `/tmp/rag_v2_repair_dryrun.json`
+- `/tmp/test_chunker.py`
+
+本地本轮生成的 `/tmp` 审计脚本也已清理。
+
+### 13.4 Cleaner 结论
+
+- 标准 Markdown pipe table 的表头、分隔行、列管道、行顺序和单元格内容能够保留；
+- 整篇被转义的 Markdown 表格能够恢复；
+- 原生 HTML `<table>` 仍保留为 HTML，不会被规范化成 Markdown pipe table；
+- 既有 100 篇服务器审计为 100/100 幂等、100/100 表格行保留；
+- 2026-08-18 本地复核：22 个 Cleaner 专项测试全部通过。
+
+因此 Cleaner 当前不是主要矛盾，保持冻结。后续发现表格结构问题时，应先区分问题发生在 Cleaner 输出阶段还是 Chunker 跨 leaf 切分阶段。
+
+### 13.5 Chunker 已确认问题
+
+#### 1. Chunker 与 embedding tokenizer 不一致
+
+当前 `chunker.py` 使用 `cl100k_base` 计数并以 512 为上限，实际 embedding 模型是 `BAAI/bge-small-zh-v1.5`。对当前 35,076 个 leaf 使用真实 BGE tokenizer 全量只读审计：
+
+| 指标 | 结果 |
+|------|-----:|
+| BGE token 超过 512 的 leaf | 1,158（3.30%） |
+| 受影响文档 | 481 |
+| 最大 BGE token | 1,711 |
+| 超限 leaf 中包含 pipe table | 469 |
+| 表格内容占主导 | 398 |
+| 包含 fenced code | 151 |
+| 包含超过 1,000 字符的单行 | 92 |
+| ASCII 内容占主导 | 1,071 |
+
+数据库保存的正文没有因此删除，但 embedding 可能截断 leaf 尾部。数据库中 `token_count > 512` 为 0 只能证明 `cl100k_base` 计数未超限，不能证明 BGE 不截断。
+
+#### 2. Parent 定位和写库契约不准确
+
+`chunk_document()` 对超过 3,000 字符的文档生成 parent 是预期行为：leaf 用于初始召回和 embedding，parent 用于命中后的上下文扩展。问题不在“生成 parent”，而在原结果只提供 `section_path`，没有声明每个 parent 对应的具体 leaf；多个写库入口因此会错误关联或完全不设置 `parent_id`。该口径在 13.8 中修正并完成代码修复。
+
+#### 3. 超长表格和代码块的结构可能被破坏
+
+当前超长原子块最终仍会进入通用 `_fixed_window()`。2026-08-18 本地最小复现结果：
+
+- 120 行长表格的表头、分隔行和 120 个数据行内容都还在，但表头只存在于第一个 leaf，后续 leaf 单独看不是完整 Markdown 表格；
+- chunk 拼接结果与原始表格不是严格字符级一致；
+- 长 fenced code 的可见正文仍在，但段落 `.strip()` 会破坏缩进，中间 leaf 也没有独立的围栏；
+- 因此当前能证明“主要可见内容未静默丢失”，不能证明“Markdown/代码结构完全保真”。
+
+该问题属于 Chunker，不推翻 Cleaner 对标准 Markdown 表格的保真结论。
+
+#### 4. 当前测试覆盖不足
+
+- Chunker 只有 4 个专项测试；2026-08-18 本地执行全部通过；
+- 其 token 上限断言调用 Chunker 自己的 `count_tokens()`，无法发现 BGE tokenizer 超限；
+- 现有表格测试只检查 marker 是否存在，没有检查跨 leaf 表头、行结构和字符级内容保真；
+- 尚缺 leaf-only、不破坏代码缩进、真实 BGE token 上限和确定性切分测试。
+
+#### 5. 小块合并可能模糊章节元数据
+
+`_merge_tiny_leaves()` 可以跨相邻 section 合并内容，并以较长的 `section_path` 作为合并结果路径。正文仍在，但章节归属可能不准确。该项优先级低于 tokenizer、leaf-only 和表格/代码结构问题。
+
+### 13.6 下一步执行顺序
+
+为避免多变量同时变化，按以下顺序推进：
+
+1. **修复 Parent 链路代码**：建立精确 child 映射、统一写库、leaf-only embedding 和初始召回；结果见 13.8，不重建数据库。
+2. **真实 BGE 计数候选**：使用与 embedding 相同的 tokenizer，先以 480 BGE token 作为安全上限；只做 dry-run。
+3. **结构感知切分**：表格按行分组并为后续 leaf 重复表头；代码按行分组并保持缩进、补齐围栏；超长单行使用明确兜底。
+4. **定向验证 481 篇**：要求所有新 leaf 不超过安全上限、内容覆盖完整、表格行 100% 保留、首尾 marker 保留、输出确定且 leaf 数量无异常膨胀。
+5. **人工确认后定向写库**：重建受影响 leaf、对应 parent 和 leaf vectors；parent 不建 vector。
+6. **最后再评估检索效果**：建立当前版本评测集，对比 parent expansion 与 sibling expansion。
+
+截至 13.6 只记录 2026-08-18 已完成事实和当前决策；除已授权的旧 chunk 清理外，没有执行新的 rechunk、embedding 或正文修改。
+
+### 13.7 未启用的 v2 空表清理（2026-08-18）
+
+多模态扩展设计曾预建 `kb_documents_v2`、`kb_blocks`、`kb_assets`、`kb_chunks_v2`。当前代码没有这些表的读写入口，四张表均为 0 行，且外键引用只存在于这四张表内部。
+
+删除前已备份完整建表 DDL 和外键清单：
+
+`/home/jz/zhr/backups/rag-v2-empty-schema-20260818-113452`
+
+| 文件 | SHA-256 |
+|------|---------|
+| `schema.sql` | `d5c5ce6062894bb29527f52b5ee57dedcce3689d884cd0b945cf11eeb1eb37fe` |
+| `manifest.json` | `586e2a845fc5a3f1480995af0854f16ebe490cb484a0dfc3f94a508e4f05f801` |
+
+按外键依赖顺序删除：
+
+1. `kb_assets`
+2. `kb_chunks_v2`
+3. `kb_blocks`
+4. `kb_documents_v2`
+
+独立复核结果：四张目标表均已不存在；核心 RAG 数据删除前后保持一致：
+
+| 核心表 | 删除前 | 删除后 |
+|--------|-------:|-------:|
+| `kb_documents` | 6,817 | 6,817 |
+| `kb_chunks` | 35,076 | 35,076 |
+| `chunk_vectors` | 35,076 | 35,076 |
+
+本次只删除未使用的空表，没有修改正文、leaf、vector、Cleaner、Chunker 代码或检索链路。需要恢复空表结构时可使用上述 `schema.sql`。
+
+### 13.8 Parent 链路代码修复（2026-08-18）
+
+本次修正“leaf-only”的准确含义：只允许 leaf 参与初始召回和 embedding；parent 可以生成并写入 `kb_chunks`，但只作为 leaf 命中后的支持上下文，不建立 vector。当前 Chunker 暂停继续调整，因此该能力保持代码就绪、生产未启用。
+
+已完成四类修复：
+
+1. `chunker.py` 为每个 parent 输出准确的 `child_chunk_indexes`，不再让写库层根据 `section_path` 猜测关系；
+2. 新增 `chunk_storage.py` 作为共享持久化入口，`routes_v3.py`、`auto_sync.py` 和手动 rechunk 脚本统一按明确 child indexes 设置 leaf 的 `parent_id`；
+3. `embedder.py` 默认只处理 `depth=1`，所有生产调用均显式传入 `depth=1`，手动 reembed 的孤儿清理也只把 leaf ID 视为有效 vector；
+4. MySQL FULLTEXT、SQLite FTS 和向量结果回查均在初始召回阶段过滤 `depth=1`，避免 parent 挤占 leaf 候选。
+
+同时修复手动 `rechunk_and_embed.py` 中使用不存在的 `KbDocument.doc_id/node_type` 字段，以及 rechunk 后未删除旧 vector 的问题。
+
+新增回归覆盖：
+
+- 同一章节产生多个 parent 时，每个 parent 声明准确且不重叠的 child leaf；
+- parent 内容严格等于声明的 child leaf 组合；
+- 共享写库后每个 leaf 只指向正确 parent；
+- 一个 leaf 被多个 parent 声明时拒绝写入；
+- embedding 默认深度为 1；
+- MySQL/SQLite 关键词召回 SQL 包含 leaf 深度过滤；
+- 向量候选回查 MySQL 元数据时再次过滤 leaf 深度。
+
+验证结果：
+
+- `python3 -m unittest discover -s tests -p 'test_*.py'`：51/51 通过；
+- 相关 Python 文件 `py_compile` 通过；
+- `git diff --check` 通过；
+- 全部 `embed_chunks()` 生产调用已静态复核为 `depth=1`。
+
+本次没有连接或修改生产数据库，没有 rechunk、没有生成 parent、没有重建 vector，也没有部署。当前数据库仍保持 35,076 个 leaf 和 35,076 个 leaf vector；待 BGE tokenizer 与结构感知切分稳定后，再按人工确认的范围重建 leaf、parent 和关联。

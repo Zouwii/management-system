@@ -100,7 +100,9 @@ def check_state() -> dict:
 
 def run_rechunk(doc_id: str = "") -> dict:
     """对所有有内容的文档（或指定文档）执行分块。"""
+    from ai.knowledge.chunk_storage import persist_chunk_result
     from ai.knowledge.chunker import chunk_document
+    from ai.knowledge.embedder import delete_vectors
     from ai.knowledge.models import KbDocument, KbChunk
     from ai.knowledge.models import create_kb_fts, drop_kb_fts
     from base.db.engine import KbSessionLocal, kb_engine
@@ -109,7 +111,7 @@ def run_rechunk(doc_id: str = "") -> dict:
     try:
         if doc_id:
             docs = db.query(KbDocument).filter(
-                KbDocument.doc_id == doc_id,
+                KbDocument.node_id == doc_id,
                 KbDocument.content != "",
             ).all()
         else:
@@ -126,34 +128,32 @@ def run_rechunk(doc_id: str = "") -> dict:
              "msg": f"开始分块 {len(docs)} 个文档"})
 
         total_chunks = 0
+        removed_chunk_ids = []
         t0 = time.time()
         for i, doc in enumerate(docs):
             # 删除旧分块
-            deleted = db.query(KbChunk).filter(
-                KbChunk.doc_id == doc.doc_id
+            removed_chunk_ids.extend(
+                row[0]
+                for row in db.query(KbChunk.id).filter(
+                    KbChunk.doc_id == doc.node_id
+                ).all()
+            )
+            db.query(KbChunk).filter(
+                KbChunk.doc_id == doc.node_id
             ).delete()
             # 生成新分块
-            result = chunk_document(doc.doc_id, doc.title,
-                                    doc.content, doc.outline or "", doc.node_type)
-            for c_list in (result.get("leaf", []), result.get("parent", [])):
-                for c in c_list:
-                    db.add(KbChunk(
-                        doc_id=c["doc_id"],
-                        chunk_index=c["chunk_index"],
-                        content=c["content"],
-                        token_count=c["token_count"],
-                        parent_id=c.get("parent_id"),
-                        depth=c.get("depth", 1),
-                        chunk_type=c.get("chunk_type", "paragraph"),
-                        section_path=c.get("section_path", ""),
-                    ))
-            total_chunks += len(result.get("leaf", [])) + len(result.get("parent", []))
+            result = chunk_document(
+                doc.node_id, doc.title, doc.content, doc.outline or "", "FILE"
+            )
+            persisted = persist_chunk_result(db, result)
+            total_chunks += persisted["total_count"]
 
             if (i + 1) % 50 == 0:
                 db.commit()
                 print(f"    进度: {i+1}/{len(docs)} 文档, {total_chunks} 个分块")
 
         db.commit()
+        removed_vectors = delete_vectors(removed_chunk_ids)
         elapsed = round(time.time() - t0, 1)
 
         # 重建 FTS 索引
@@ -170,7 +170,7 @@ def run_rechunk(doc_id: str = "") -> dict:
              "elapsed_sec": elapsed})
 
         return {"chunkedDocs": len(docs), "totalChunks": total_chunks,
-                "elapsedSec": elapsed}
+                "removedVectors": removed_vectors, "elapsedSec": elapsed}
 
     except Exception as e:
         db.rollback()
@@ -184,14 +184,14 @@ def run_rechunk(doc_id: str = "") -> dict:
 # ── Phase 3: Embed ────────────────────────────────────────────────
 
 def run_embed() -> dict:
-    """对所有未嵌入向量的分块执行 embedding。"""
+    """对所有未嵌入向量的 leaf 分块执行 embedding。"""
     from ai.knowledge.embedder import embed_chunks
 
     log({"phase": "embed", "event": "start",
          "msg": "开始 embedding（跳过已有向量的 chunk）"})
 
     t0 = time.time()
-    stats = embed_chunks(limit=0)  # limit=0 表示不限制
+    stats = embed_chunks(limit=0, depth=1)  # limit=0 表示不限制
     elapsed = round(time.time() - t0, 1)
 
     log({"phase": "embed", "event": "done",

@@ -14,6 +14,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List
 
+from ai.knowledge.chunk_storage import persist_chunk_result
 from ai.knowledge.chunker import chunk_document
 from ai.knowledge.embedder import delete_vectors, embed_chunks
 from ai.knowledge.markdown_sync import (
@@ -206,21 +207,8 @@ def _rechunk_documents(doc_ids: List[str]) -> dict:
             db.query(KbChunk).filter(KbChunk.doc_id == doc.node_id).delete()
             result = chunk_document(doc.node_id, doc.title, doc.content,
                                      doc.outline or "", "FILE")
-            for c_list in (result.get("leaf", []), result.get("parent", [])):
-                for c in c_list:
-                    db.add(
-                        KbChunk(
-                            doc_id=c["doc_id"],
-                            chunk_index=c["chunk_index"],
-                            content=c["content"],
-                            token_count=c["token_count"],
-                            parent_id=c.get("parent_id"),
-                            depth=c.get("depth", 1),
-                            chunk_type=c.get("chunk_type", "paragraph"),
-                            section_path=c.get("section_path", ""),
-                        )
-                    )
-            total_chunks += len(result.get("leaf", [])) + len(result.get("parent", []))
+            persisted = persist_chunk_result(db, result)
+            total_chunks += persisted["total_count"]
         db.commit()
         logger.info("auto_sync: rechunked %d docs -> %d chunks", len(docs), total_chunks)
 
@@ -425,15 +413,15 @@ def sync_all_and_embed(union_id: str = "", check_modified: bool = False,
         f"docs={rechunk_result.get('chunkedDocs', 0)} chunks={rechunk_result.get('totalChunks', 0)}"
     )
 
-    # Phase 4: embed all chunks (idempotent — skips already-embedded)
-    _log("phase 4/4 — embedding all chunks...")
+    # Phase 4: embed leaf chunks (idempotent — skips already-embedded)
+    _log("phase 4/4 — embedding leaf chunks...")
     _sync_log({
         "ts": int(time.time()), "phase": "pipeline", "event": "phase4_start",
         "phase": "embed",
     })
     phase4_start = time.time()
     try:
-        embed_result = embed_chunks(limit=0)
+        embed_result = embed_chunks(limit=0, depth=1)
         overall["embed"] = {
             "ok": True,
             "chunkTotal": embed_result.get("chunk_total", 0),

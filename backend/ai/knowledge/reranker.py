@@ -46,7 +46,7 @@ def get_reranker(model: str | None = None):
 
     model_dir = _get_model_dir(model)
     logger.info("Loading reranker [%s] from %s ...", model, model_dir)
-    _reranker = FlagReranker(str(model_dir), use_fp16=False, device="cpu")
+    _reranker = FlagReranker(str(model_dir), use_fp16=False, devices="cpu")
     _reranker_model = model
     _reranker_ready = True
     logger.info("Reranker [%s] loaded", model)

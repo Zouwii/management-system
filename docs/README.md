@@ -50,6 +50,7 @@
 | [ai/rag/RAG-设计.md](ai/rag/RAG-设计.md) | 系统设计：架构、DB、检索策略、API |
 | [ai/rag/RAG-对照试验.md](ai/rag/RAG-对照试验.md) | 对照试验：检索基准、保真度、测试集 |
 | [ai/rag/RAG-优化方案.md](ai/rag/RAG-优化方案.md) | 优化路线：Phase 1-3、模型选型、待办 |
+| [ai/rag/RAG-v2-00-文档索引.md](ai/rag/RAG-v2-00-文档索引.md) | RAG v2 文档顺序、当前状态和下一步入口 |
 
 **其他设计**
 | 文档 | 说明 |
@@ -91,4 +92,3 @@
 | 文档 | 说明 |
 |------|------|
 | [ops/server-connection.md](ops/server-connection.md) | 服务器连接：SSH、日志、数据库、重启、同步控制、离线模式 |
-

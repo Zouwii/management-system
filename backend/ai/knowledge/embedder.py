@@ -75,12 +75,13 @@ def embed_chunks(
     workspace_id: Optional[str] = None,
     limit: int = 0,
     batch_size: int = 32,
-    depth: Optional[int] = None,
+    depth: Optional[int] = 1,
 ) -> dict:
     """Embed kb_chunks and store vectors in pgvector chunk_vectors.
 
     Skips chunks that already have a vector entry.
-    If depth is set (e.g. 1), only embed chunks of that depth level.
+    Embeds leaf chunks (depth=1) by default. Pass depth=None only for an
+    explicit all-depth maintenance operation.
     Returns counts: {chunk_total, embedded, skipped, errors}.
     """
     model = _get_model()

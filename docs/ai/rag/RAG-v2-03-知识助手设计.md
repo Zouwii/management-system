@@ -4,6 +4,7 @@
 > 日期：2026-07-31  
 > 适用范围：Management-System 的 RAG v2  
 > 当前口径：文本与表格优先，不做全量多模态和源码级理解
+> 当前实施顺序：[RAG v2 文档索引](./RAG-v2-00-文档索引.md)
 
 ## 1. 结论先行
 
@@ -498,3 +499,40 @@ V1 完成需要同时满足：
 8. 已记录成功、失败、无答案和冲突 Case。
 
 这八项未完成前，统一描述为“设计与 canary 验证中”，不描述为全量上线。
+
+## 16. 在线检索与问答链路验收（2026-08-18）
+
+本轮不修改 Cleaner、Chunker、leaf 正文或存量 vector，只启用和修复查询链路。
+
+### 16.1 已完成
+
+- 服务器设置 `AI_PRELOAD_EMBEDDING=1`，查询侧加载 `BAAI/bge-small-zh-v1.5`；
+- 35,076 个存量 leaf vector 不重建，关键词、向量和 Hybrid 接口均返回有效 chunk；
+- 定位 Reranker 超时根因：生产代码传入 `device="cpu"`，但 FlagEmbedding 1.4.0 接收 `devices="cpu"`；
+- 错误参数导致 `devices=None`，进而在 CUDA 版 PyTorch 的 `torch.cuda.is_available()` 探测阶段卡住；
+- 生产 Reranker 和历史对照实验脚本均改为 `devices`，新增参数与回退测试；
+- 本地后端测试 55/55 通过，语法检查和 `git diff --check` 通过；
+- 仅定向部署两个 Reranker 文件，未发布工作区中暂停的 Parent/Chunker 改动；
+- 完整 SSE 问答返回 status、citation、text 和 done，HTTP 200；模型常驻后真实聊天请求可正常完成。
+
+### 16.2 实测耗时
+
+| 阶段 | 耗时 |
+| --- | ---: |
+| 关键词检索 Top 20 | 0.046 秒 |
+| 向量检索 Top 20 | 0.311 秒 |
+| Hybrid Top 20 | 0.364 秒 |
+| 查询 Embedding 模型首次加载 | 6.4 秒 |
+| 正确指定 CPU 后的 Reranker 导入与加载 | 7.6 秒 |
+| LLM 响应头 | 0.46 秒 |
+| LLM 首 token | 0.81 秒 |
+
+### 16.3 当前边界
+
+- 数据库仍为 35,076 个 leaf 与 35,076 个 vector，parent 为 0；
+- Parent/Chunker 修复仍保留在本地，未随本次定向部署发布；
+- 首次完整问答包含模型冷启动，耗时高于常驻后的请求；
+- SSE 子窗口不再注入终端 Agent Skill，自动化验收未出现 curl、tool_call、invoke、内部地址或重复自我介绍；
+- SSE 使用独立的 answer-only Prompt；终端与 MCP 使用的知识库 Skill 保持不变；
+- 当前模型仍会把 `<think>` 思考标签作为正文流式输出，需作为独立展示问题处理；
+- 下一阶段先用真实问题建立基线，不恢复 rechunk、re-embedding 或自动同步。

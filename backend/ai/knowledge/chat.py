@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-from pathlib import Path
 from typing import Dict, Generator, List
 
 import requests
@@ -14,40 +13,28 @@ from ai.knowledge.chat_session import add_turn, get_history
 
 logger = logging.getLogger(__name__)
 
-_SKILL_PROMPT_PATH = Path(__file__).resolve().parent.parent / "skills" / "3_kb_qa" / "SKILL.md"
 _SYSTEM_PROMPT = (
     "你是企业内部知识助手，基于以下资料回答问题。\n"
+    "后端已经完成资料检索，你只能根据给定资料直接回答，不能调用或模拟任何工具。\n"
     "回答要求：\n"
     "1. 如果提供了 TB 任务数据，优先用它回答关于人员工作、工时、进度的问题\n"
     "2. 如果提供了知识库文档，提取具体数值，不要模糊带过\n"
     "3. 区分不同数据来源，不要混为一谈\n"
     "4. 分点组织，便于阅读\n"
     "5. 资料不足时明确告知，不编造\n"
-    "6. 末尾标注来源"
+    "6. 末尾标注来源\n"
+    "7. 不要输出命令、代码块、XML 或特殊调用标记\n"
+    "8. 不要重复介绍身份，也不要描述检索过程"
 )
 
 _RETRIEVAL_TOP_K = 20
 _MAX_CONTEXT_TOKENS = 8000
 _MAX_TB_TASKS = 30
-_SKILL_PROMPT_CACHE: str | None = None
 
 
 def _sse_message(payload: dict) -> str:
     data = json.dumps(payload, ensure_ascii=False)
     return f"event: message\ndata: {data}\n\n"
-
-
-def _load_skill_prompt() -> str:
-    """Load local knowledge Q&A skill instructions for SSE chat."""
-    global _SKILL_PROMPT_CACHE
-    if _SKILL_PROMPT_CACHE is not None:
-        return _SKILL_PROMPT_CACHE
-    try:
-        _SKILL_PROMPT_CACHE = _SKILL_PROMPT_PATH.read_text(encoding="utf-8")
-    except Exception:
-        logger.exception("failed to load knowledge skill prompt")
-        _SKILL_PROMPT_CACHE = ""
-    return _SKILL_PROMPT_CACHE
 
 
 def _load_config() -> dict:
@@ -180,6 +167,19 @@ def _llm_model() -> str:
     return str(cfg.get("model") or "glm-5.1").strip() or "glm-5.1"
 
 
+def _build_system_content(kb_context: str = "", tb_context: str = "") -> str:
+    """Build the answer-only prompt used by the SSE chat endpoint."""
+    context_parts: list[str] = []
+    if tb_context:
+        context_parts.append(tb_context)
+    if kb_context:
+        context_parts.append("知识库资料：\n---\n" + kb_context + "\n---")
+
+    if not context_parts:
+        return _SYSTEM_PROMPT
+    return _SYSTEM_PROMPT + "\n\n" + "\n\n".join(context_parts)
+
+
 def chat_stream(
     query: str,
     session_id: str = "",
@@ -192,9 +192,6 @@ def chat_stream(
       event: message  data: {"type": "citation", "sources": [...]}
       event: done     data: {"type": "done"}
     """
-    yield _sse_message({"type": "status", "content": "加载本地知识库 skill 规则"})
-    skill_prompt = _load_skill_prompt()
-
     # 1. Retrieve context from knowledge base + TB database
     yield _sse_message({"type": "status", "content": "检索本地向量知识库"})
     kb_context, citations = _build_context(query, workspace_id)
@@ -208,24 +205,7 @@ def chat_stream(
 
     # 2. Build messages
     history = get_history(session_id) if session_id else []
-    system_content = _SYSTEM_PROMPT
-    if skill_prompt:
-        system_content += (
-            "\n\n运行环境说明：当前是 SSE 问答模式，后端已经代你调用本地"
-            "向量/混合检索并把结果放入下方“知识库资料”。不要声称自己正在执行 curl。"
-            "\n\n以下是本地知识库问答 skill 规则，请严格遵循：\n"
-            + skill_prompt
-        )
-
-    # Merge TB data and KB context
-    context_parts = []
-    if tb_context:
-        context_parts.append(tb_context)
-    if kb_context:
-        context_parts.append("知识库资料：\n---\n" + kb_context + "\n---")
-
-    if context_parts:
-        system_content += "\n\n" + "\n\n".join(context_parts)
+    system_content = _build_system_content(kb_context, tb_context)
 
     messages: List[Dict[str, str]] = [{"role": "system", "content": system_content}]
     messages.extend(history)

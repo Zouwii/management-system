@@ -41,7 +41,7 @@ def _get_reranker(model: str = "base"):
     fp16, dev = False, "cpu"
 
     print(f"[reranker:{model}] loading from {model_dir} ({dev}) ...", end=" ", flush=True)
-    _reranker = FlagReranker(str(model_dir), use_fp16=fp16, device=dev)
+    _reranker = FlagReranker(str(model_dir), use_fp16=fp16, devices=dev)
     _reranker_model = model
     print("done")
     return _reranker
