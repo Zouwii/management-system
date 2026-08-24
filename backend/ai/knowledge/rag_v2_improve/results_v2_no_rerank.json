@@ -1,0 +1,3014 @@
+{
+  "experiment": {
+    "name": "rag_v2_hybrid_rrf_no_rerank",
+    "run_at": "2026-08-21T16:15:49+08:00",
+    "input": "/tmp/test_queries_v2.json",
+    "retrieval": "search_hybrid (keyword FULLTEXT + vector cosine + RRF)",
+    "rerank": false,
+    "top_k": 10,
+    "embedding_model_ready": true,
+    "embedding_model_load_ms": 6534.4
+  },
+  "summary": {
+    "question_count": 26,
+    "recall_at_5": 0.0929,
+    "recall_at_10": 0.2138,
+    "hit_at_5": 0.1538,
+    "hit_at_10": 0.3462,
+    "mrr_at_10": 0.1171,
+    "ndcg_at_5": 0.0776,
+    "ndcg_at_10": 0.1199,
+    "latency_ms": {
+      "mean": 402.07,
+      "p50": 401.5,
+      "p95": 439.19
+    }
+  },
+  "by_difficulty": {
+    "easy": {
+      "question_count": 9,
+      "recall_at_5": 0.1204,
+      "recall_at_10": 0.3981,
+      "hit_at_5": 0.2222,
+      "hit_at_10": 0.5556,
+      "mrr_at_10": 0.142,
+      "ndcg_at_5": 0.0889,
+      "ndcg_at_10": 0.1796,
+      "latency_ms": {
+        "mean": 408.19,
+        "p50": 409.32,
+        "p95": 437.21
+      }
+    },
+    "hard": {
+      "question_count": 3,
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0476,
+      "hit_at_5": 0.0,
+      "hit_at_10": 0.3333,
+      "mrr_at_10": 0.0476,
+      "ndcg_at_5": 0.0,
+      "ndcg_at_10": 0.0305,
+      "latency_ms": {
+        "mean": 429.76,
+        "p50": 403.69,
+        "p95": 474.88
+      }
+    },
+    "medium": {
+      "question_count": 14,
+      "recall_at_5": 0.0952,
+      "recall_at_10": 0.131,
+      "hit_at_5": 0.1429,
+      "hit_at_10": 0.2143,
+      "mrr_at_10": 0.1161,
+      "ndcg_at_5": 0.0868,
+      "ndcg_at_10": 0.1007,
+      "latency_ms": {
+        "mean": 392.21,
+        "p50": 387.7,
+        "p95": 424.64
+      }
+    }
+  },
+  "by_type": {
+    "会议纪要": {
+      "question_count": 3,
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.3333,
+      "hit_at_5": 0.0,
+      "hit_at_10": 0.3333,
+      "mrr_at_10": 0.037,
+      "ndcg_at_5": 0.0,
+      "ndcg_at_10": 0.1003,
+      "latency_ms": {
+        "mean": 411.32,
+        "p50": 384.27,
+        "p95": 472.94
+      }
+    },
+    "技术文档": {
+      "question_count": 11,
+      "recall_at_5": 0.0985,
+      "recall_at_10": 0.2348,
+      "hit_at_5": 0.1818,
+      "hit_at_10": 0.3636,
+      "mrr_at_10": 0.1477,
+      "ndcg_at_5": 0.099,
+      "ndcg_at_10": 0.1436,
+      "latency_ms": {
+        "mean": 394.93,
+        "p50": 391.06,
+        "p95": 419.42
+      }
+    },
+    "操作指南": {
+      "question_count": 3,
+      "recall_at_5": 0.1111,
+      "recall_at_10": 0.2778,
+      "hit_at_5": 0.3333,
+      "hit_at_10": 0.6667,
+      "mrr_at_10": 0.2222,
+      "ndcg_at_5": 0.0987,
+      "ndcg_at_10": 0.1715,
+      "latency_ms": {
+        "mean": 411.89,
+        "p50": 409.32,
+        "p95": 436.63
+      }
+    },
+    "故障处理": {
+      "question_count": 2,
+      "recall_at_5": 0.5,
+      "recall_at_10": 0.5,
+      "hit_at_5": 0.5,
+      "hit_at_10": 0.5,
+      "mrr_at_10": 0.25,
+      "ndcg_at_5": 0.3155,
+      "ndcg_at_10": 0.3155,
+      "latency_ms": {
+        "mean": 418.5,
+        "p50": 418.5,
+        "p95": 434.57
+      }
+    },
+    "测试文档": {
+      "question_count": 1,
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "hit_at_5": 0.0,
+      "hit_at_10": 0.0,
+      "mrr_at_10": 0.0,
+      "ndcg_at_5": 0.0,
+      "ndcg_at_10": 0.0,
+      "latency_ms": {
+        "mean": 402.37,
+        "p50": 402.37,
+        "p95": 402.37
+      }
+    },
+    "表格": {
+      "question_count": 1,
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "hit_at_5": 0.0,
+      "hit_at_10": 0.0,
+      "mrr_at_10": 0.0,
+      "ndcg_at_5": 0.0,
+      "ndcg_at_10": 0.0,
+      "latency_ms": {
+        "mean": 437.78,
+        "p50": 437.78,
+        "p95": 437.78
+      }
+    },
+    "跨文档": {
+      "question_count": 5,
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0286,
+      "hit_at_5": 0.0,
+      "hit_at_10": 0.2,
+      "mrr_at_10": 0.0286,
+      "ndcg_at_5": 0.0,
+      "ndcg_at_10": 0.0183,
+      "latency_ms": {
+        "mean": 392.58,
+        "p50": 402.8,
+        "p95": 407.99
+      }
+    }
+  },
+  "per_question": [
+    {
+      "id": 1,
+      "type": "技术文档",
+      "difficulty": "easy",
+      "query": "导航控制器的参数有哪些如何梳理",
+      "gold_leaf_ids": [
+        57703,
+        57704,
+        57705,
+        57707,
+        57708,
+        57709,
+        57711,
+        57712,
+        57713,
+        57714,
+        57716,
+        57718
+      ],
+      "predicted_leaf_ids": [
+        61140,
+        35299,
+        57718,
+        56259,
+        11165,
+        34816,
+        18642,
+        35006,
+        11345,
+        3806
+      ],
+      "hit_leaf_ids_at_5": [
+        57718
+      ],
+      "hit_leaf_ids_at_10": [
+        57718
+      ],
+      "recall_at_5": 0.08333333333333333,
+      "recall_at_10": 0.08333333333333333,
+      "hit_at_5": 1,
+      "hit_at_10": 1,
+      "mrr_at_10": 0.3333333333333333,
+      "ndcg_at_5": 0.16958010263680806,
+      "ndcg_at_10": 0.11004588314904008,
+      "latency_ms": 422.28,
+      "keyword_candidates": 20,
+      "vector_candidates": 20,
+      "results": [
+        {
+          "rank": 1,
+          "leaf_id": 61140,
+          "title": "规控算法迭代一期验收报告.adoc",
+          "chunk_index": 12,
+          "score": 0.0313
+        },
+        {
+          "rank": 2,
+          "leaf_id": 35299,
+          "title": "规控算法迭代专项二期需求分解.adoc",
+          "chunk_index": 9,
+          "score": 0.0309
+        },
+        {
+          "rank": 3,
+          "leaf_id": 57718,
+          "title": "控制器参数梳理.adoc",
+          "chunk_index": 15,
+          "score": 0.0164
+        },
+        {
+          "rank": 4,
+          "leaf_id": 56259,
+          "title": "B项目复盘.adoc",
+          "chunk_index": 8,
+          "score": 0.0161
+        },
+        {
+          "rank": 5,
+          "leaf_id": 11165,
+          "title": "导航软件模块设计书.adoc",
+          "chunk_index": 0,
+          "score": 0.0161
+        },
+        {
+          "rank": 6,
+          "leaf_id": 34816,
+          "title": "故障诊断【二期】技术方案.adoc",
+          "chunk_index": 22,
+          "score": 0.0159
+        },
+        {
+          "rank": 7,
+          "leaf_id": 18642,
+          "title": "导航相关配置文件修改说明.adoc",
+          "chunk_index": 3,
+          "score": 0.0156
+        },
+        {
+          "rank": 8,
+          "leaf_id": 35006,
+          "title": "LTS软件升级工具链III期测试报告.adoc",
+          "chunk_index": 10,
+          "score": 0.0156
+        },
+        {
+          "rank": 9,
+          "leaf_id": 11345,
+          "title": "比利旋转撞车事故说明.adoc",
+          "chunk_index": 1,
+          "score": 0.0154
+        },
+        {
+          "rank": 10,
+          "leaf_id": 3806,
+          "title": "纹理技术会议记录.adoc",
+          "chunk_index": 3,
+          "score": 0.0152
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "技术文档",
+      "difficulty": "medium",
+      "query": "机器人原地旋转的精度指标是多少",
+      "gold_leaf_ids": [
+        3705,
+        43004
+      ],
+      "predicted_leaf_ids": [
+        18685,
+        57412,
+        18756,
+        59058,
+        51160,
+        59087,
+        26759,
+        65540,
+        3748,
+        7205
+      ],
+      "hit_leaf_ids_at_5": [],
+      "hit_leaf_ids_at_10": [],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "hit_at_5": 0,
+      "hit_at_10": 0,
+      "mrr_at_10": 0.0,
+      "ndcg_at_5": 0.0,
+      "ndcg_at_10": 0.0,
+      "latency_ms": 374.14,
+      "keyword_candidates": 20,
+      "vector_candidates": 20,
+      "results": [
+        {
+          "rank": 1,
+          "leaf_id": 18685,
+          "title": "盲走精度测试工具使用说明.adoc",
+          "chunk_index": 0,
+          "score": 0.0282
+        },
+        {
+          "rank": 2,
+          "leaf_id": 57412,
+          "title": "FAQ常见问题.adoc",
+          "chunk_index": 0,
+          "score": 0.0263
+        },
+        {
+          "rank": 3,
+          "leaf_id": 18756,
+          "title": "二维码伺服选型指南.adoc",
+          "chunk_index": 3,
+          "score": 0.0262
+        },
+        {
+          "rank": 4,
+          "leaf_id": 59058,
+          "title": "FAQ常见问题.adoc",
+          "chunk_index": 0,
+          "score": 0.026
+        },
+        {
+          "rank": 5,
+          "leaf_id": 51160,
+          "title": "货架对接相关性能优化专题.adoc",
+          "chunk_index": 7,
+          "score": 0.0164
+        },
+        {
+          "rank": 6,
+          "leaf_id": 59087,
+          "title": "高速小车软件功能需求PRD-三期.adoc",
+          "chunk_index": 27,
+          "score": 0.0164
+        },
+        {
+          "rank": 7,
+          "leaf_id": 26759,
+          "title": "叉车导航功能优化一期需求分解.adoc",
+          "chunk_index": 7,
+          "score": 0.0161
+        },
+        {
+          "rank": 8,
+          "leaf_id": 65540,
+          "title": "高速AMR 产品软件需求PRD-4.adoc",
+          "chunk_index": 22,
+          "score": 0.0161
+        },
+        {
+          "rank": 9,
+          "leaf_id": 3748,
+          "title": "叉车优化二期导航部分设计文档.adoc",
+          "chunk_index": 0,
+          "score": 0.0159
+        },
+        {
+          "rank": 10,
+          "leaf_id": 7205,
+          "title": "原地旋转曲线调试文档.adoc",
+          "chunk_index": 0,
+          "score": 0.0159
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "技术文档",
+      "difficulty": "easy",
+      "query": "ROS中如何录制、查看和回放话题数据",
+      "gold_leaf_ids": [
+        6552
+      ],
+      "predicted_leaf_ids": [
+        16593,
+        16294,
+        38348,
+        6551,
+        37096,
+        6552,
+        60040,
+        32920,
+        16595,
+        16238
+      ],
+      "hit_leaf_ids_at_5": [],
+      "hit_leaf_ids_at_10": [
+        6552
+      ],
+      "recall_at_5": 0.0,
+      "recall_at_10": 1.0,
+      "hit_at_5": 0,
+      "hit_at_10": 1,
+      "mrr_at_10": 0.16666666666666666,
+      "ndcg_at_5": 0.0,
+      "ndcg_at_10": 0.3562071871080222,
+      "latency_ms": 413.95,
+      "keyword_candidates": 20,
+      "vector_candidates": 20,
+      "results": [
+        {
+          "rank": 1,
+          "leaf_id": 16593,
+          "title": "ROS使用基本概念指南.adoc",
+          "chunk_index": 45,
+          "score": 0.0311
+        },
+        {
+          "rank": 2,
+          "leaf_id": 16294,
+          "title": "基础入门学习.adoc",
+          "chunk_index": 16,
+          "score": 0.0299
+        },
+        {
+          "rank": 3,
+          "leaf_id": 38348,
+          "title": "603017 第一帧获取失败.adoc",
+          "chunk_index": 5,
+          "score": 0.0272
+        },
+        {
+          "rank": 4,
+          "leaf_id": 6551,
+          "title": "ROS基础教程.adoc",
+          "chunk_index": 4,
+          "score": 0.0262
+        },
+        {
+          "rank": 5,
+          "leaf_id": 37096,
+          "title": "与基线对接内容.adoc",
+          "chunk_index": 0,
+          "score": 0.0164
+        },
+        {
+          "rank": 6,
+          "leaf_id": 6552,
+          "title": "ROS基础教程.adoc",
+          "chunk_index": 5,
+          "score": 0.0164
+        },
+        {
+          "rank": 7,
+          "leaf_id": 60040,
+          "title": "本体软件编程基础知识训练学习总结.adoc",
+          "chunk_index": 13,
+          "score": 0.0161
+        },
+        {
+          "rank": 8,
+          "leaf_id": 32920,
+          "title": "调度新部署框架测试报告.adoc",
+          "chunk_index": 61,
+          "score": 0.0159
+        },
+        {
+          "rank": 9,
+          "leaf_id": 16595,
+          "title": "ROS使用基本概念指南.adoc",
+          "chunk_index": 47,
+          "score": 0.0159
+        },
+        {
+          "rank": 10,
+          "leaf_id": 16238,
+          "title": "ROS学习.adoc",
+          "chunk_index": 33,
+          "score": 0.0156
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "技术文档",
+      "difficulty": "easy",
+      "query": "本体和调度之间的接口协议是什么",
+      "gold_leaf_ids": [
+        8771,
+        8818
+      ],
+      "predicted_leaf_ids": [
+        3337,
+        33803,
+        6387,
+        8852,
+        37568,
+        3362,
+        30817,
+        36915,
+        60226,
+        33520
+      ],
+      "hit_leaf_ids_at_5": [],
+      "hit_leaf_ids_at_10": [],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "hit_at_5": 0,
+      "hit_at_10": 0,
+      "mrr_at_10": 0.0,
+      "ndcg_at_5": 0.0,
+      "ndcg_at_10": 0.0,
+      "latency_ms": 384.14,
+      "keyword_candidates": 20,
+      "vector_candidates": 20,
+      "results": [
+        {
+          "rank": 1,
+          "leaf_id": 3337,
+          "title": "本体导航&调度指令协议文档.adoc",
+          "chunk_index": 0,
+          "score": 0.0303
+        },
+        {
+          "rank": 2,
+          "leaf_id": 33803,
+          "title": "【三期需求分解】本体&调度协作.adoc",
+          "chunk_index": 23,
+          "score": 0.0289
+        },
+        {
+          "rank": 3,
+          "leaf_id": 6387,
+          "title": "负载下的速度曲线.adoc",
+          "chunk_index": 6,
+          "score": 0.0164
+        },
+        {
+          "rank": 4,
+          "leaf_id": 8852,
+          "title": "飞箱 X 轴与 Y 轴的示教方案设计.adoc",
+          "chunk_index": 3,
+          "score": 0.0164
+        },
+        {
+          "rank": 5,
+          "leaf_id": 37568,
+          "title": "通用运动控制相关公共库接口文档.adoc",
+          "chunk_index": 0,
+          "score": 0.0161
+        },
+        {
+          "rank": 6,
+          "leaf_id": 3362,
+          "title": "本体导航&调度指令协议文档.adoc",
+          "chunk_index": 25,
+          "score": 0.0161
+        },
+        {
+          "rank": 7,
+          "leaf_id": 30817,
+          "title": "优聚思-苏州警察物证处复合机器人需求分解.adoc",
+          "chunk_index": 13,
+          "score": 0.0159
+        },
+        {
+          "rank": 8,
+          "leaf_id": 36915,
+          "title": "导航平均加减速度标定.adoc",
+          "chunk_index": 0,
+          "score": 0.0156
+        },
+        {
+          "rank": 9,
+          "leaf_id": 60226,
+          "title": "接口需求.adoc",
+          "chunk_index": 15,
+          "score": 0.0156
+        },
+        {
+          "rank": 10,
+          "leaf_id": 33520,
+          "title": "【五期】本体调度协作需求分解.adoc",
+          "chunk_index": 15,
+          "score": 0.0154
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "技术文档",
+      "difficulty": "medium",
+      "query": "伺服驱动器测试工具的功能设计有哪些",
+      "gold_leaf_ids": [
+        5021,
+        5023,
+        5025,
+        5027,
+        5032
+      ],
+      "predicted_leaf_ids": [
+        55678,
+        11225,
+        63296,
+        62784,
+        4880,
+        35192,
+        3610,
+        16537,
+        4826,
+        10434
+      ],
+      "hit_leaf_ids_at_5": [],
+      "hit_leaf_ids_at_10": [],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "hit_at_5": 0,
+      "hit_at_10": 0,
+      "mrr_at_10": 0.0,
+      "ndcg_at_5": 0.0,
+      "ndcg_at_10": 0.0,
+      "latency_ms": 414.93,
+      "keyword_candidates": 20,
+      "vector_candidates": 20,
+      "results": [
+        {
+          "rank": 1,
+          "leaf_id": 55678,
+          "title": "STU 飞箱部分需求拆解.dlink",
+          "chunk_index": 25,
+          "score": 0.0164
+        },
+        {
+          "rank": 2,
+          "leaf_id": 11225,
+          "title": "驱动器性能测试产品化.adoc",
+          "chunk_index": 0,
+          "score": 0.0164
+        },
+        {
+          "rank": 3,
+          "leaf_id": 63296,
+          "title": "标车性能点检标准流程.adoc",
+          "chunk_index": 8,
+          "score": 0.0161
+        },
+        {
+          "rank": 4,
+          "leaf_id": 62784,
+          "title": "伺服日志说明.adoc",
+          "chunk_index": 3,
+          "score": 0.0161
+        },
+        {
+          "rank": 5,
+          "leaf_id": 4880,
+          "title": "工作总结报告.adoc",
+          "chunk_index": 0,
+          "score": 0.0159
+        },
+        {
+          "rank": 6,
+          "leaf_id": 35192,
+          "title": "自动化测试二期需求.adoc",
+          "chunk_index": 4,
+          "score": 0.0159
+        },
+        {
+          "rank": 7,
+          "leaf_id": 3610,
+          "title": "标车性能调优标准流程.adoc",
+          "chunk_index": 10,
+          "score": 0.0156
+        },
+        {
+          "rank": 8,
+          "leaf_id": 16537,
+          "title": "伺服控制器.adoc",
+          "chunk_index": 0,
+          "score": 0.0156
+        },
+        {
+          "rank": 9,
+          "leaf_id": 4826,
+          "title": "李建威工作交接清单.adoc",
+          "chunk_index": 0,
+          "score": 0.0154
+        },
+        {
+          "rank": 10,
+          "leaf_id": 10434,
+          "title": "伺服目标点与反馈2D平面映射测试报告.adoc",
+          "chunk_index": 0,
+          "score": 0.0154
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "技术文档",
+      "difficulty": "medium",
+      "query": "盲走精度测试包含哪些测试项，验收标准是什么",
+      "gold_leaf_ids": [
+        3704,
+        3705,
+        43003,
+        43004
+      ],
+      "predicted_leaf_ids": [
+        14213,
+        60578,
+        3614,
+        14212,
+        63299,
+        11724,
+        21855,
+        7968,
+        15811,
+        63290
+      ],
+      "hit_leaf_ids_at_5": [],
+      "hit_leaf_ids_at_10": [],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "hit_at_5": 0,
+      "hit_at_10": 0,
+      "mrr_at_10": 0.0,
+      "ndcg_at_5": 0.0,
+      "ndcg_at_10": 0.0,
+      "latency_ms": 388.71,
+      "keyword_candidates": 20,
+      "vector_candidates": 20,
+      "results": [
+        {
+          "rank": 1,
+          "leaf_id": 14213,
+          "title": "2025年终工作总结汇报.adoc",
+          "chunk_index": 13,
+          "score": 0.0325
+        },
+        {
+          "rank": 2,
+          "leaf_id": 60578,
+          "title": "出厂工具链【六期】.adoc",
+          "chunk_index": 27,
+          "score": 0.0325
+        },
+        {
+          "rank": 3,
+          "leaf_id": 3614,
+          "title": "标车性能调优标准流程.adoc",
+          "chunk_index": 14,
+          "score": 0.031
+        },
+        {
+          "rank": 4,
+          "leaf_id": 14212,
+          "title": "2025年终工作总结汇报.adoc",
+          "chunk_index": 12,
+          "score": 0.03
+        },
+        {
+          "rank": 5,
+          "leaf_id": 63299,
+          "title": "标车性能点检标准流程.adoc",
+          "chunk_index": 11,
+          "score": 0.0286
+        },
+        {
+          "rank": 6,
+          "leaf_id": 11724,
+          "title": "Seminar - 标车运动性能点检流程分享.adoc",
+          "chunk_index": 2,
+          "score": 0.0278
+        },
+        {
+          "rank": 7,
+          "leaf_id": 21855,
+          "title": "二期【差分CE】1000x行走驱动器测试报告.adoc",
+          "chunk_index": 12,
+          "score": 0.0159
+        },
+        {
+          "rank": 8,
+          "leaf_id": 7968,
+          "title": "故障诊断工具客户端后端软件架构与前后端交互说明.adoc",
+          "chunk_index": 5,
+          "score": 0.0156
+        },
+        {
+          "rank": 9,
+          "leaf_id": 15811,
+          "title": "marker当前测试结论（2025.1.20）.adoc",
+          "chunk_index": 6,
+          "score": 0.0154
+        },
+        {
+          "rank": 10,
+          "leaf_id": 63290,
+          "title": "标车性能点检标准流程.adoc",
+          "chunk_index": 2,
+          "score": 0.0152
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "操作指南",
+      "difficulty": "easy",
+      "query": "Carly中机器狗有哪些运行状态，各状态分别表示什么",
+      "gold_leaf_ids": [
+        6415,
+        6416
+      ],
+      "predicted_leaf_ids": [
+        36321,
+        22722,
+        36322,
+        25799,
+        60960,
+        6415,
+        65674,
+        55752,
+        59387,
+        60319
+      ],
+      "hit_leaf_ids_at_5": [],
+      "hit_leaf_ids_at_10": [
+        6415
+      ],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.5,
+      "hit_at_5": 0,
+      "hit_at_10": 1,
+      "mrr_at_10": 0.16666666666666666,
+      "ndcg_at_5": 0.0,
+      "ndcg_at_10": 0.21840743681816419,
+      "latency_ms": 409.32,
+      "keyword_candidates": 20,
+      "vector_candidates": 20,
+      "results": [
+        {
+          "rank": 1,
+          "leaf_id": 36321,
+          "title": "IPLUSunitree测试报告.adoc",
+          "chunk_index": 7,
+          "score": 0.0295
+        },
+        {
+          "rank": 2,
+          "leaf_id": 22722,
+          "title": "需求收集.adoc",
+          "chunk_index": 0,
+          "score": 0.0293
+        },
+        {
+          "rank": 3,
+          "leaf_id": 36322,
+          "title": "IPLUSunitree测试报告.adoc",
+          "chunk_index": 8,
+          "score": 0.0292
+        },
+        {
+          "rank": 4,
+          "leaf_id": 25799,
+          "title": "三期需求导入.adoc",
+          "chunk_index": 8,
+          "score": 0.029
+        },
+        {
+          "rank": 5,
+          "leaf_id": 60960,
+          "title": "轮式移动机器人过弯能力增强技术技术交底书.adoc",
+          "chunk_index": 26,
+          "score": 0.0164
+        },
+        {
+          "rank": 6,
+          "leaf_id": 6415,
+          "title": "Carly使用手册.adoc",
+          "chunk_index": 2,
+          "score": 0.0164
+        },
+        {
+          "rank": 7,
+          "leaf_id": 65674,
+          "title": "轮式移动机器人过弯能力增强技术技术交底书.adoc",
+          "chunk_index": 26,
+          "score": 0.0161
+        },
+        {
+          "rank": 8,
+          "leaf_id": 55752,
+          "title": "Carly3说明书-2506.adoc",
+          "chunk_index": 8,
+          "score": 0.0161
+        },
+        {
+          "rank": 9,
+          "leaf_id": 59387,
+          "title": "Carly3说明书-2506.adoc",
+          "chunk_index": 8,
+          "score": 0.0159
+        },
+        {
+          "rank": 10,
+          "leaf_id": 60319,
+          "title": "Carly3说明书-2503.adoc",
+          "chunk_index": 8,
+          "score": 0.0156
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "技术文档",
+      "difficulty": "medium",
+      "query": "嵌入式驱动器的性能指标设计有哪些",
+      "gold_leaf_ids": [
+        4369,
+        4370,
+        4371,
+        39333,
+        39334,
+        39335
+      ],
+      "predicted_leaf_ids": [
+        55032,
+        61731,
+        63980,
+        4368,
+        13911,
+        39332,
+        41298,
+        31030,
+        19226,
+        11228
+      ],
+      "hit_leaf_ids_at_5": [],
+      "hit_leaf_ids_at_10": [],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "hit_at_5": 0,
+      "hit_at_10": 0,
+      "mrr_at_10": 0.0,
+      "ndcg_at_5": 0.0,
+      "ndcg_at_10": 0.0,
+      "latency_ms": 365.39,
+      "keyword_candidates": 20,
+      "vector_candidates": 20,
+      "results": [
+        {
+          "rank": 1,
+          "leaf_id": 55032,
+          "title": "驱动器测试总结.adoc",
+          "chunk_index": 11,
+          "score": 0.0289
+        },
+        {
+          "rank": 2,
+          "leaf_id": 61731,
+          "title": "驱动器测试总结.dlink",
+          "chunk_index": 11,
+          "score": 0.0284
+        },
+        {
+          "rank": 3,
+          "leaf_id": 63980,
+          "title": "Q2结项项目复盘.adoc",
+          "chunk_index": 29,
+          "score": 0.0164
+        },
+        {
+          "rank": 4,
+          "leaf_id": 4368,
+          "title": "嵌入式驱动器性能指标设计.adoc",
+          "chunk_index": 0,
+          "score": 0.0164
+        },
+        {
+          "rank": 5,
+          "leaf_id": 13911,
+          "title": "驱动器测试工具使用说明.adoc",
+          "chunk_index": 0,
+          "score": 0.0161
+        },
+        {
+          "rank": 6,
+          "leaf_id": 39332,
+          "title": "嵌入式驱动器性能指标设计.adoc",
+          "chunk_index": 0,
+          "score": 0.0161
+        },
+        {
+          "rank": 7,
+          "leaf_id": 41298,
+          "title": "驱动器测试工具使用说明.adoc",
+          "chunk_index": 0,
+          "score": 0.0159
+        },
+        {
+          "rank": 8,
+          "leaf_id": 31030,
+          "title": "宜昌邦普功能分解.adoc",
+          "chunk_index": 0,
+          "score": 0.0159
+        },
+        {
+          "rank": 9,
+          "leaf_id": 19226,
+          "title": "标车.adoc",
+          "chunk_index": 0,
+          "score": 0.0156
+        },
+        {
+          "rank": 10,
+          "leaf_id": 11228,
+          "title": "驱动器性能测试产品化.adoc",
+          "chunk_index": 3,
+          "score": 0.0156
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "测试文档",
+      "difficulty": "easy",
+      "query": "零类急停异常处理的测试流程和通过标准是什么",
+      "gold_leaf_ids": [
+        14670
+      ],
+      "predicted_leaf_ids": [
+        42240,
+        26808,
+        54918,
+        61689,
+        24597,
+        57119,
+        18944,
+        44535,
+        10997,
+        51314
+      ],
+      "hit_leaf_ids_at_5": [],
+      "hit_leaf_ids_at_10": [],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "hit_at_5": 0,
+      "hit_at_10": 0,
+      "mrr_at_10": 0.0,
+      "ndcg_at_5": 0.0,
+      "ndcg_at_10": 0.0,
+      "latency_ms": 402.37,
+      "keyword_candidates": 20,
+      "vector_candidates": 20,
+      "results": [
+        {
+          "rank": 1,
+          "leaf_id": 42240,
+          "title": "出厂检测/标定【5期】需求方案.adoc",
+          "chunk_index": 39,
+          "score": 0.032
+        },
+        {
+          "rank": 2,
+          "leaf_id": 26808,
+          "title": "叉车导航功能优化二期需求分解.adoc",
+          "chunk_index": 15,
+          "score": 0.0267
+        },
+        {
+          "rank": 3,
+          "leaf_id": 54918,
+          "title": "2024年终述职-王睿.adoc",
+          "chunk_index": 12,
+          "score": 0.0164
+        },
+        {
+          "rank": 4,
+          "leaf_id": 61689,
+          "title": "急停过程定位数据处理PRD.adoc",
+          "chunk_index": 0,
+          "score": 0.0161
+        },
+        {
+          "rank": 5,
+          "leaf_id": 24597,
+          "title": "出厂五期测试报告.adoc",
+          "chunk_index": 44,
+          "score": 0.0161
+        },
+        {
+          "rank": 6,
+          "leaf_id": 57119,
+          "title": "Carly用户手册.adoc",
+          "chunk_index": 167,
+          "score": 0.0159
+        },
+        {
+          "rank": 7,
+          "leaf_id": 18944,
+          "title": "603014 举升报错.adoc",
+          "chunk_index": 8,
+          "score": 0.0159
+        },
+        {
+          "rank": 8,
+          "leaf_id": 44535,
+          "title": "3-STU III FSD.dlink",
+          "chunk_index": 34,
+          "score": 0.0156
+        },
+        {
+          "rank": 9,
+          "leaf_id": 10997,
+          "title": "部门会议稿【2025.07.02】.adoc",
+          "chunk_index": 1,
+          "score": 0.0154
+        },
+        {
+          "rank": 10,
+          "leaf_id": 51314,
+          "title": "AMR安全功能专项需求.adoc",
+          "chunk_index": 5,
+          "score": 0.0154
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "操作指南",
+      "difficulty": "medium",
+      "query": "反光板伺服适用于哪些场景，部署反光板时有哪些尺寸要求",
+      "gold_leaf_ids": [
+        18715,
+        18716
+      ],
+      "predicted_leaf_ids": [
+        19961,
+        52661,
+        35134,
+        27931,
+        52399,
+        59686,
+        52662,
+        52663,
+        52658,
+        59690
+      ],
+      "hit_leaf_ids_at_5": [],
+      "hit_leaf_ids_at_10": [],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "hit_at_5": 0,
+      "hit_at_10": 0,
+      "mrr_at_10": 0.0,
+      "ndcg_at_5": 0.0,
+      "ndcg_at_10": 0.0,
+      "latency_ms": 386.7,
+      "keyword_candidates": 20,
+      "vector_candidates": 20,
+      "results": [
+        {
+          "rank": 1,
+          "leaf_id": 19961,
+          "title": "新激光伺服使用指南.adoc",
+          "chunk_index": 1,
+          "score": 0.0313
+        },
+        {
+          "rank": 2,
+          "leaf_id": 52661,
+          "title": "反光板/柱部署要求.adoc",
+          "chunk_index": 5,
+          "score": 0.031
+        },
+        {
+          "rank": 3,
+          "leaf_id": 35134,
+          "title": "【三期需求分解】效能提升专项三期.adoc",
+          "chunk_index": 6,
+          "score": 0.0297
+        },
+        {
+          "rank": 4,
+          "leaf_id": 27931,
+          "title": "反光板测试需求文档.adoc",
+          "chunk_index": 1,
+          "score": 0.029
+        },
+        {
+          "rank": 5,
+          "leaf_id": 52399,
+          "title": "AMR对接标准实施方案.adoc",
+          "chunk_index": 45,
+          "score": 0.0164
+        },
+        {
+          "rank": 6,
+          "leaf_id": 59686,
+          "title": "软件优化项目二期(终版)测试报告.adoc",
+          "chunk_index": 29,
+          "score": 0.0161
+        },
+        {
+          "rank": 7,
+          "leaf_id": 52662,
+          "title": "反光板/柱部署要求.adoc",
+          "chunk_index": 6,
+          "score": 0.0159
+        },
+        {
+          "rank": 8,
+          "leaf_id": 52663,
+          "title": "反光板/柱部署要求.adoc",
+          "chunk_index": 7,
+          "score": 0.0156
+        },
+        {
+          "rank": 9,
+          "leaf_id": 52658,
+          "title": "反光板/柱部署要求.adoc",
+          "chunk_index": 2,
+          "score": 0.0154
+        },
+        {
+          "rank": 10,
+          "leaf_id": 59690,
+          "title": "软件优化项目二期(终版)测试报告.adoc",
+          "chunk_index": 33,
+          "score": 0.0154
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "会议纪要",
+      "difficulty": "medium",
+      "query": "OKR复盘会议上导航组和对接组分别讨论了什么",
+      "gold_leaf_ids": [
+        62854,
+        62855
+      ],
+      "predicted_leaf_ids": [
+        62853,
+        11092,
+        3227,
+        52270,
+        11025,
+        13743,
+        4702,
+        62526,
+        39701,
+        55302
+      ],
+      "hit_leaf_ids_at_5": [],
+      "hit_leaf_ids_at_10": [],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "hit_at_5": 0,
+      "hit_at_10": 0,
+      "mrr_at_10": 0.0,
+      "ndcg_at_5": 0.0,
+      "ndcg_at_10": 0.0,
+      "latency_ms": 384.27,
+      "keyword_candidates": 20,
+      "vector_candidates": 20,
+      "results": [
+        {
+          "rank": 1,
+          "leaf_id": 62853,
+          "title": "OKR阶段性复盘会议记录【2023.09.22】.adoc",
+          "chunk_index": 0,
+          "score": 0.0323
+        },
+        {
+          "rank": 2,
+          "leaf_id": 11092,
+          "title": "软件开发流程review.adoc",
+          "chunk_index": 13,
+          "score": 0.0308
+        },
+        {
+          "rank": 3,
+          "leaf_id": 3227,
+          "title": "Q4 OKR工作汇报【2023.12.11】.adoc",
+          "chunk_index": 1,
+          "score": 0.0164
+        },
+        {
+          "rank": 4,
+          "leaf_id": 52270,
+          "title": "会议纪要202050428-软件接口对接.adoc",
+          "chunk_index": 0,
+          "score": 0.0161
+        },
+        {
+          "rank": 5,
+          "leaf_id": 11025,
+          "title": "部门例会【0418】.adoc",
+          "chunk_index": 1,
+          "score": 0.0161
+        },
+        {
+          "rank": 6,
+          "leaf_id": 13743,
+          "title": "国唐呼叫盒流程梳理.adoc",
+          "chunk_index": 5,
+          "score": 0.0159
+        },
+        {
+          "rank": 7,
+          "leaf_id": 4702,
+          "title": "ctj2023年度汇总.adoc",
+          "chunk_index": 22,
+          "score": 0.0156
+        },
+        {
+          "rank": 8,
+          "leaf_id": 62526,
+          "title": "会议纪要20250304_底盘首台样机需求及设计方案确认.adoc",
+          "chunk_index": 4,
+          "score": 0.0154
+        },
+        {
+          "rank": 9,
+          "leaf_id": 39701,
+          "title": "ctj2023年度汇总.adoc",
+          "chunk_index": 22,
+          "score": 0.0154
+        },
+        {
+          "rank": 10,
+          "leaf_id": 55302,
+          "title": "Q3项目绩效复盘.adoc",
+          "chunk_index": 3,
+          "score": 0.0152
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "技术文档",
+      "difficulty": "medium",
+      "query": "差分车左右轮速度与质心速度、角速度之间是什么关系",
+      "gold_leaf_ids": [
+        39657,
+        39658
+      ],
+      "predicted_leaf_ids": [
+        19645,
+        60956,
+        65670,
+        13917,
+        4811,
+        14679,
+        60958,
+        60945,
+        65672,
+        65659
+      ],
+      "hit_leaf_ids_at_5": [],
+      "hit_leaf_ids_at_10": [],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "hit_at_5": 0,
+      "hit_at_10": 0,
+      "mrr_at_10": 0.0,
+      "ndcg_at_5": 0.0,
+      "ndcg_at_10": 0.0,
+      "latency_ms": 391.06,
+      "keyword_candidates": 20,
+      "vector_candidates": 20,
+      "results": [
+        {
+          "rank": 1,
+          "leaf_id": 19645,
+          "title": "导航类问题初步排查.adoc",
+          "chunk_index": 16,
+          "score": 0.0325
+        },
+        {
+          "rank": 2,
+          "leaf_id": 60956,
+          "title": "轮式移动机器人过弯能力增强技术技术交底书.adoc",
+          "chunk_index": 22,
+          "score": 0.0296
+        },
+        {
+          "rank": 3,
+          "leaf_id": 65670,
+          "title": "轮式移动机器人过弯能力增强技术技术交底书.adoc",
+          "chunk_index": 22,
+          "score": 0.0292
+        },
+        {
+          "rank": 4,
+          "leaf_id": 13917,
+          "title": "驱动器测试工具使用说明.adoc",
+          "chunk_index": 6,
+          "score": 0.0257
+        },
+        {
+          "rank": 5,
+          "leaf_id": 4811,
+          "title": "基于速度方向角的控制器.adoc",
+          "chunk_index": 2,
+          "score": 0.0164
+        },
+        {
+          "rank": 6,
+          "leaf_id": 14679,
+          "title": "差分舵轮车内外轮速度补偿.adoc",
+          "chunk_index": 6,
+          "score": 0.0161
+        },
+        {
+          "rank": 7,
+          "leaf_id": 60958,
+          "title": "轮式移动机器人过弯能力增强技术技术交底书.adoc",
+          "chunk_index": 24,
+          "score": 0.0159
+        },
+        {
+          "rank": 8,
+          "leaf_id": 60945,
+          "title": "轮式移动机器人过弯能力增强技术技术交底书.adoc",
+          "chunk_index": 11,
+          "score": 0.0159
+        },
+        {
+          "rank": 9,
+          "leaf_id": 65672,
+          "title": "轮式移动机器人过弯能力增强技术技术交底书.adoc",
+          "chunk_index": 24,
+          "score": 0.0156
+        },
+        {
+          "rank": 10,
+          "leaf_id": 65659,
+          "title": "轮式移动机器人过弯能力增强技术技术交底书.adoc",
+          "chunk_index": 11,
+          "score": 0.0156
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "type": "会议纪要",
+      "difficulty": "easy",
+      "query": "主管评分的参考标准是什么",
+      "gold_leaf_ids": [
+        3024
+      ],
+      "predicted_leaf_ids": [
+        10981,
+        10987,
+        40133,
+        10995,
+        65356,
+        10990,
+        14995,
+        56859,
+        3024,
+        32679
+      ],
+      "hit_leaf_ids_at_5": [],
+      "hit_leaf_ids_at_10": [
+        3024
+      ],
+      "recall_at_5": 0.0,
+      "recall_at_10": 1.0,
+      "hit_at_5": 0,
+      "hit_at_10": 1,
+      "mrr_at_10": 0.1111111111111111,
+      "ndcg_at_5": 0.0,
+      "ndcg_at_10": 0.3010299956639812,
+      "latency_ms": 366.89,
+      "keyword_candidates": 20,
+      "vector_candidates": 20,
+      "results": [
+        {
+          "rank": 1,
+          "leaf_id": 10981,
+          "title": "Q4考核数据统计.adoc",
+          "chunk_index": 3,
+          "score": 0.0328
+        },
+        {
+          "rank": 2,
+          "leaf_id": 10987,
+          "title": "Q3考核数据统计.adoc",
+          "chunk_index": 3,
+          "score": 0.0323
+        },
+        {
+          "rank": 3,
+          "leaf_id": 40133,
+          "title": "Q1考核数据统计方式.adoc",
+          "chunk_index": 3,
+          "score": 0.0317
+        },
+        {
+          "rank": 4,
+          "leaf_id": 10995,
+          "title": "有效工时优化会议【2026.3.27】.adoc",
+          "chunk_index": 7,
+          "score": 0.0262
+        },
+        {
+          "rank": 5,
+          "leaf_id": 65356,
+          "title": "4-高速小车 III FSD.dlink",
+          "chunk_index": 41,
+          "score": 0.0156
+        },
+        {
+          "rank": 6,
+          "leaf_id": 10990,
+          "title": "有效工时优化会议【2026.3.27】.adoc",
+          "chunk_index": 2,
+          "score": 0.0156
+        },
+        {
+          "rank": 7,
+          "leaf_id": 14995,
+          "title": "绩效部分.adoc",
+          "chunk_index": 3,
+          "score": 0.0154
+        },
+        {
+          "rank": 8,
+          "leaf_id": 56859,
+          "title": "2025年Q3季度新技术项目复盘报告.adoc",
+          "chunk_index": 7,
+          "score": 0.0154
+        },
+        {
+          "rank": 9,
+          "leaf_id": 3024,
+          "title": "0. 本体开发部制度规范.adoc",
+          "chunk_index": 1,
+          "score": 0.0152
+        },
+        {
+          "rank": 10,
+          "leaf_id": 32679,
+          "title": "模块节点性能优化（六期）需求拆解.adoc",
+          "chunk_index": 5,
+          "score": 0.0152
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "type": "技术文档",
+      "difficulty": "medium",
+      "query": "速度仲裁模块如何从多个速度来源中选择并发布最终速度",
+      "gold_leaf_ids": [
+        14604,
+        14606
+      ],
+      "predicted_leaf_ids": [
+        14604,
+        65337,
+        14606,
+        65344,
+        9438,
+        3583,
+        41320,
+        12217,
+        12221,
+        54958
+      ],
+      "hit_leaf_ids_at_5": [
+        14604,
+        14606
+      ],
+      "hit_leaf_ids_at_10": [
+        14604,
+        14606
+      ],
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "hit_at_5": 1,
+      "hit_at_10": 1,
+      "mrr_at_10": 1.0,
+      "ndcg_at_5": 0.9197207891481876,
+      "ndcg_at_10": 0.9197207891481876,
+      "latency_ms": 391.81,
+      "keyword_candidates": 20,
+      "vector_candidates": 20,
+      "results": [
+        {
+          "rank": 1,
+          "leaf_id": 14604,
+          "title": "速度仲裁.adoc",
+          "chunk_index": 0,
+          "score": 0.0325
+        },
+        {
+          "rank": 2,
+          "leaf_id": 65337,
+          "title": "4-高速小车 III FSD.dlink",
+          "chunk_index": 22,
+          "score": 0.0315
+        },
+        {
+          "rank": 3,
+          "leaf_id": 14606,
+          "title": "速度仲裁.adoc",
+          "chunk_index": 2,
+          "score": 0.0307
+        },
+        {
+          "rank": 4,
+          "leaf_id": 65344,
+          "title": "4-高速小车 III FSD.dlink",
+          "chunk_index": 29,
+          "score": 0.0304
+        },
+        {
+          "rank": 5,
+          "leaf_id": 9438,
+          "title": "speed manager配置说明.adoc",
+          "chunk_index": 0,
+          "score": 0.0303
+        },
+        {
+          "rank": 6,
+          "leaf_id": 3583,
+          "title": "11月工作总结【刁怀锐】.adoc",
+          "chunk_index": 2,
+          "score": 0.0301
+        },
+        {
+          "rank": 7,
+          "leaf_id": 41320,
+          "title": "speed manager配置说明.adoc",
+          "chunk_index": 0,
+          "score": 0.0299
+        },
+        {
+          "rank": 8,
+          "leaf_id": 12217,
+          "title": "速度仲裁与里程计算详细设计.adoc",
+          "chunk_index": 2,
+          "score": 0.0274
+        },
+        {
+          "rank": 9,
+          "leaf_id": 12221,
+          "title": "速度仲裁与里程计算详细设计.adoc",
+          "chunk_index": 6,
+          "score": 0.0159
+        },
+        {
+          "rank": 10,
+          "leaf_id": 54958,
+          "title": "11.《代码整洁之道》第十二&十三章 - 迭进&并发编程.adoc",
+          "chunk_index": 5,
+          "score": 0.0154
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "type": "故障处理",
+      "difficulty": "easy",
+      "query": "运动学功能初始化失败时，三代机型的执行器数量和底盘类型参数应如何填写",
+      "gold_leaf_ids": [
+        19105
+      ],
+      "predicted_leaf_ids": [
+        37576,
+        3603,
+        31553,
+        13719,
+        22486,
+        13720,
+        57439,
+        13721,
+        37571,
+        13722
+      ],
+      "hit_leaf_ids_at_5": [],
+      "hit_leaf_ids_at_10": [],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "hit_at_5": 0,
+      "hit_at_10": 0,
+      "mrr_at_10": 0.0,
+      "ndcg_at_5": 0.0,
+      "ndcg_at_10": 0.0,
+      "latency_ms": 436.36,
+      "keyword_candidates": 20,
+      "vector_candidates": 20,
+      "results": [
+        {
+          "rank": 1,
+          "leaf_id": 37576,
+          "title": "2412车型底盘运动学库的接口.adoc",
+          "chunk_index": 6,
+          "score": 0.0296
+        },
+        {
+          "rank": 2,
+          "leaf_id": 3603,
+          "title": "标车性能调优标准流程.adoc",
+          "chunk_index": 3,
+          "score": 0.0292
+        },
+        {
+          "rank": 3,
+          "leaf_id": 31553,
+          "title": "3588测试需求.adoc",
+          "chunk_index": 0,
+          "score": 0.0164
+        },
+        {
+          "rank": 4,
+          "leaf_id": 13719,
+          "title": "行为树内部自定义字段整理说明.adoc",
+          "chunk_index": 0,
+          "score": 0.0161
+        },
+        {
+          "rank": 5,
+          "leaf_id": 22486,
+          "title": "机械臂运动库SDK-python.adoc",
+          "chunk_index": 11,
+          "score": 0.0161
+        },
+        {
+          "rank": 6,
+          "leaf_id": 13720,
+          "title": "行为树内部自定义字段整理说明.adoc",
+          "chunk_index": 1,
+          "score": 0.0159
+        },
+        {
+          "rank": 7,
+          "leaf_id": 57439,
+          "title": "机械臂运动库SDK-C++.adoc",
+          "chunk_index": 9,
+          "score": 0.0159
+        },
+        {
+          "rank": 8,
+          "leaf_id": 13721,
+          "title": "行为树内部自定义字段整理说明.adoc",
+          "chunk_index": 2,
+          "score": 0.0156
+        },
+        {
+          "rank": 9,
+          "leaf_id": 37571,
+          "title": "2412车型底盘运动学库的接口.adoc",
+          "chunk_index": 1,
+          "score": 0.0156
+        },
+        {
+          "rank": 10,
+          "leaf_id": 13722,
+          "title": "行为树内部自定义字段整理说明.adoc",
+          "chunk_index": 3,
+          "score": 0.0154
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "type": "故障处理",
+      "difficulty": "easy",
+      "query": "执行伺服行为树时不伺服或失败应检查哪些项目",
+      "gold_leaf_ids": [
+        41703
+      ],
+      "predicted_leaf_ids": [
+        8625,
+        41703,
+        64523,
+        38337,
+        36921,
+        30050,
+        23413,
+        57781,
+        64524,
+        8624
+      ],
+      "hit_leaf_ids_at_5": [
+        41703
+      ],
+      "hit_leaf_ids_at_10": [
+        41703
+      ],
+      "recall_at_5": 1.0,
+      "recall_at_10": 1.0,
+      "hit_at_5": 1,
+      "hit_at_10": 1,
+      "mrr_at_10": 0.5,
+      "ndcg_at_5": 0.6309297535714575,
+      "ndcg_at_10": 0.6309297535714575,
+      "latency_ms": 400.63,
+      "keyword_candidates": 20,
+      "vector_candidates": 20,
+      "results": [
+        {
+          "rank": 1,
+          "leaf_id": 8625,
+          "title": "低代码常见问题排查.adoc",
+          "chunk_index": 6,
+          "score": 0.0328
+        },
+        {
+          "rank": 2,
+          "leaf_id": 41703,
+          "title": "低代码常见问题排查.adoc",
+          "chunk_index": 6,
+          "score": 0.0323
+        },
+        {
+          "rank": 3,
+          "leaf_id": 64523,
+          "title": "9-低代码 IX FSD.dlink",
+          "chunk_index": 18,
+          "score": 0.0159
+        },
+        {
+          "rank": 4,
+          "leaf_id": 38337,
+          "title": "603018 伺服期间报错.adoc",
+          "chunk_index": 1,
+          "score": 0.0159
+        },
+        {
+          "rank": 5,
+          "leaf_id": 36921,
+          "title": "行为树DEMO设计.adoc",
+          "chunk_index": 2,
+          "score": 0.0156
+        },
+        {
+          "rank": 6,
+          "leaf_id": 30050,
+          "title": "项目3&6需求分解.adoc",
+          "chunk_index": 42,
+          "score": 0.0156
+        },
+        {
+          "rank": 7,
+          "leaf_id": 23413,
+          "title": "低代码9期R1回归测试报告.adoc",
+          "chunk_index": 12,
+          "score": 0.0154
+        },
+        {
+          "rank": 8,
+          "leaf_id": 57781,
+          "title": "行为树新增栈板伺服对象类型可选.adoc",
+          "chunk_index": 0,
+          "score": 0.0154
+        },
+        {
+          "rank": 9,
+          "leaf_id": 64524,
+          "title": "9-低代码 IX FSD.dlink",
+          "chunk_index": 19,
+          "score": 0.0152
+        },
+        {
+          "rank": 10,
+          "leaf_id": 8624,
+          "title": "低代码常见问题排查.adoc",
+          "chunk_index": 5,
+          "score": 0.0152
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "type": "技术文档",
+      "difficulty": "medium",
+      "query": "机械臂安全保护的区域检测如何实现，检测到障碍物后如何处理",
+      "gold_leaf_ids": [
+        10782,
+        10783
+      ],
+      "predicted_leaf_ids": [
+        22774,
+        56091,
+        55712,
+        56104,
+        37352,
+        56090,
+        62895,
+        10782,
+        37353,
+        22111
+      ],
+      "hit_leaf_ids_at_5": [],
+      "hit_leaf_ids_at_10": [
+        10782
+      ],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.5,
+      "hit_at_5": 0,
+      "hit_at_10": 1,
+      "mrr_at_10": 0.125,
+      "ndcg_at_5": 0.0,
+      "ndcg_at_10": 0.19342640361727081,
+      "latency_ms": 416.56,
+      "keyword_candidates": 20,
+      "vector_candidates": 20,
+      "results": [
+        {
+          "rank": 1,
+          "leaf_id": 22774,
+          "title": "轮臂机器人一期测试报告.adoc",
+          "chunk_index": 10,
+          "score": 0.0275
+        },
+        {
+          "rank": 2,
+          "leaf_id": 56091,
+          "title": "基于二维码检测的复合机器人运动控制方法.adoc",
+          "chunk_index": 17,
+          "score": 0.027
+        },
+        {
+          "rank": 3,
+          "leaf_id": 55712,
+          "title": "台州展厅（E级）项目需求确认文档.adoc",
+          "chunk_index": 3,
+          "score": 0.0164
+        },
+        {
+          "rank": 4,
+          "leaf_id": 56104,
+          "title": "基于二维码检测的复合机器人运动控制方法.adoc",
+          "chunk_index": 30,
+          "score": 0.0164
+        },
+        {
+          "rank": 5,
+          "leaf_id": 37352,
+          "title": "【BLOCK】复合机械臂.adoc",
+          "chunk_index": 32,
+          "score": 0.0161
+        },
+        {
+          "rank": 6,
+          "leaf_id": 56090,
+          "title": "基于二维码检测的复合机器人运动控制方法.adoc",
+          "chunk_index": 16,
+          "score": 0.0161
+        },
+        {
+          "rank": 7,
+          "leaf_id": 62895,
+          "title": "CE全向车软件功能需求.adoc",
+          "chunk_index": 17,
+          "score": 0.0159
+        },
+        {
+          "rank": 8,
+          "leaf_id": 10782,
+          "title": "机械臂安全保护功能.adoc",
+          "chunk_index": 0,
+          "score": 0.0159
+        },
+        {
+          "rank": 9,
+          "leaf_id": 37353,
+          "title": "【BLOCK】复合机械臂.adoc",
+          "chunk_index": 33,
+          "score": 0.0156
+        },
+        {
+          "rank": 10,
+          "leaf_id": 22111,
+          "title": "轮臂机器人二期需求分解.adoc",
+          "chunk_index": 20,
+          "score": 0.0156
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "type": "表格",
+      "difficulty": "easy",
+      "query": "导航组2025年的Roadmap包含哪些目标",
+      "gold_leaf_ids": [
+        3031,
+        3032,
+        3033,
+        3034,
+        3035,
+        3036,
+        3037,
+        3038,
+        3039,
+        3040
+      ],
+      "predicted_leaf_ids": [
+        61765,
+        3324,
+        11001,
+        3027,
+        7968,
+        4702,
+        58923,
+        39701,
+        12072,
+        57782
+      ],
+      "hit_leaf_ids_at_5": [],
+      "hit_leaf_ids_at_10": [],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "hit_at_5": 0,
+      "hit_at_10": 0,
+      "mrr_at_10": 0.0,
+      "ndcg_at_5": 0.0,
+      "ndcg_at_10": 0.0,
+      "latency_ms": 437.78,
+      "keyword_candidates": 20,
+      "vector_candidates": 20,
+      "results": [
+        {
+          "rank": 1,
+          "leaf_id": 61765,
+          "title": "2023年工作规划.adoc",
+          "chunk_index": 0,
+          "score": 0.0315
+        },
+        {
+          "rank": 2,
+          "leaf_id": 3324,
+          "title": "本体开发部协议文档索引目录.adoc",
+          "chunk_index": 0,
+          "score": 0.0296
+        },
+        {
+          "rank": 3,
+          "leaf_id": 11001,
+          "title": "导航组例会【2025.1.13】.adoc",
+          "chunk_index": 0,
+          "score": 0.029
+        },
+        {
+          "rank": 4,
+          "leaf_id": 3027,
+          "title": "2025年Q2 Roadmap会议【2025.4.24】.adoc",
+          "chunk_index": 0,
+          "score": 0.0282
+        },
+        {
+          "rank": 5,
+          "leaf_id": 7968,
+          "title": "故障诊断工具客户端后端软件架构与前后端交互说明.adoc",
+          "chunk_index": 5,
+          "score": 0.0164
+        },
+        {
+          "rank": 6,
+          "leaf_id": 4702,
+          "title": "ctj2023年度汇总.adoc",
+          "chunk_index": 22,
+          "score": 0.0161
+        },
+        {
+          "rank": 7,
+          "leaf_id": 58923,
+          "title": "💡 26年Q1-问题处理效率提升.adoc",
+          "chunk_index": 0,
+          "score": 0.0159
+        },
+        {
+          "rank": 8,
+          "leaf_id": 39701,
+          "title": "ctj2023年度汇总.adoc",
+          "chunk_index": 22,
+          "score": 0.0159
+        },
+        {
+          "rank": 9,
+          "leaf_id": 12072,
+          "title": "8.《代码整洁之道》第八章 - 边界.adoc",
+          "chunk_index": 8,
+          "score": 0.0156
+        },
+        {
+          "rank": 10,
+          "leaf_id": 57782,
+          "title": "GroupDock Roadmap 2025.adoc",
+          "chunk_index": 0,
+          "score": 0.0156
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "type": "跨文档",
+      "difficulty": "medium",
+      "query": "小车性能测试的方法和指标有哪些",
+      "gold_leaf_ids": [
+        13975,
+        13979,
+        13988,
+        13991,
+        3704,
+        3705,
+        43003,
+        43004
+      ],
+      "predicted_leaf_ids": [
+        57732,
+        5123,
+        19783,
+        5128,
+        27024,
+        13914,
+        27001,
+        41301,
+        24052,
+        8405
+      ],
+      "hit_leaf_ids_at_5": [],
+      "hit_leaf_ids_at_10": [],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "hit_at_5": 0,
+      "hit_at_10": 0,
+      "mrr_at_10": 0.0,
+      "ndcg_at_5": 0.0,
+      "ndcg_at_10": 0.0,
+      "latency_ms": 377.79,
+      "keyword_candidates": 20,
+      "vector_candidates": 20,
+      "results": [
+        {
+          "rank": 1,
+          "leaf_id": 57732,
+          "title": "测试效能提升专项一期需求导入.adoc",
+          "chunk_index": 2,
+          "score": 0.0164
+        },
+        {
+          "rank": 2,
+          "leaf_id": 5123,
+          "title": "性能分析方法.adoc",
+          "chunk_index": 0,
+          "score": 0.0164
+        },
+        {
+          "rank": 3,
+          "leaf_id": 19783,
+          "title": "导航问题排查指南.adoc",
+          "chunk_index": 12,
+          "score": 0.0161
+        },
+        {
+          "rank": 4,
+          "leaf_id": 5128,
+          "title": "性能分析方法.adoc",
+          "chunk_index": 5,
+          "score": 0.0161
+        },
+        {
+          "rank": 5,
+          "leaf_id": 27024,
+          "title": "5月14日会议纪要.adoc",
+          "chunk_index": 4,
+          "score": 0.0159
+        },
+        {
+          "rank": 6,
+          "leaf_id": 13914,
+          "title": "驱动器测试工具使用说明.adoc",
+          "chunk_index": 3,
+          "score": 0.0159
+        },
+        {
+          "rank": 7,
+          "leaf_id": 27001,
+          "title": "单叉臂二期项目时间线.adoc",
+          "chunk_index": 0,
+          "score": 0.0156
+        },
+        {
+          "rank": 8,
+          "leaf_id": 41301,
+          "title": "驱动器测试工具使用说明.adoc",
+          "chunk_index": 3,
+          "score": 0.0156
+        },
+        {
+          "rank": 9,
+          "leaf_id": 24052,
+          "title": "BN1501自研搬运叉车测试项.adoc",
+          "chunk_index": 3,
+          "score": 0.0154
+        },
+        {
+          "rank": 10,
+          "leaf_id": 8405,
+          "title": "多车伺服激光标定对外精度测试方案.adoc",
+          "chunk_index": 1,
+          "score": 0.0154
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "type": "跨文档",
+      "difficulty": "hard",
+      "query": "移动机器人导航栈的性能瓶颈在哪里，如何系统性地分析和优化",
+      "gold_leaf_ids": [
+        14046,
+        14063,
+        14075,
+        14077,
+        54897
+      ],
+      "predicted_leaf_ids": [
+        9898,
+        13556,
+        61970,
+        3585,
+        6923,
+        18498,
+        55666,
+        42150,
+        5132,
+        3037
+      ],
+      "hit_leaf_ids_at_5": [],
+      "hit_leaf_ids_at_10": [],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "hit_at_5": 0,
+      "hit_at_10": 0,
+      "mrr_at_10": 0.0,
+      "ndcg_at_5": 0.0,
+      "ndcg_at_10": 0.0,
+      "latency_ms": 403.69,
+      "keyword_candidates": 20,
+      "vector_candidates": 20,
+      "results": [
+        {
+          "rank": 1,
+          "leaf_id": 9898,
+          "title": "7-tb缓存系统方案设计.adoc",
+          "chunk_index": 0,
+          "score": 0.0164
+        },
+        {
+          "rank": 2,
+          "leaf_id": 13556,
+          "title": "非标安全功能整理.adoc",
+          "chunk_index": 42,
+          "score": 0.0164
+        },
+        {
+          "rank": 3,
+          "leaf_id": 61970,
+          "title": "【2509】最新 nav-manager CPU占用分析报告.adoc",
+          "chunk_index": 10,
+          "score": 0.0161
+        },
+        {
+          "rank": 4,
+          "leaf_id": 3585,
+          "title": "基于导航场景用例自动化测试.adoc",
+          "chunk_index": 0,
+          "score": 0.0161
+        },
+        {
+          "rank": 5,
+          "leaf_id": 6923,
+          "title": " UML语言介绍以在钉钉上的使用方法.adoc",
+          "chunk_index": 21,
+          "score": 0.0159
+        },
+        {
+          "rank": 6,
+          "leaf_id": 18498,
+          "title": "VDA5050支持计划.adoc",
+          "chunk_index": 20,
+          "score": 0.0159
+        },
+        {
+          "rank": 7,
+          "leaf_id": 55666,
+          "title": "STU 飞箱部分需求拆解.dlink",
+          "chunk_index": 13,
+          "score": 0.0156
+        },
+        {
+          "rank": 8,
+          "leaf_id": 42150,
+          "title": "VDA5050支持计划.adoc",
+          "chunk_index": 20,
+          "score": 0.0156
+        },
+        {
+          "rank": 9,
+          "leaf_id": 5132,
+          "title": "性能分析方法.adoc",
+          "chunk_index": 9,
+          "score": 0.0154
+        },
+        {
+          "rank": 10,
+          "leaf_id": 3037,
+          "title": "2025年导航组Roadmap.adoc",
+          "chunk_index": 6,
+          "score": 0.0154
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "type": "跨文档",
+      "difficulty": "medium",
+      "query": "二维码导航的功能包括哪些有什么版本迭代",
+      "gold_leaf_ids": [
+        40077,
+        40083,
+        40098,
+        40099,
+        61252,
+        61264,
+        61306,
+        61309
+      ],
+      "predicted_leaf_ids": [
+        38096,
+        59252,
+        3309,
+        64129,
+        54750,
+        65547,
+        64255,
+        35128,
+        64767,
+        35217
+      ],
+      "hit_leaf_ids_at_5": [],
+      "hit_leaf_ids_at_10": [],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "hit_at_5": 0,
+      "hit_at_10": 0,
+      "mrr_at_10": 0.0,
+      "ndcg_at_5": 0.0,
+      "ndcg_at_10": 0.0,
+      "latency_ms": 409.06,
+      "keyword_candidates": 20,
+      "vector_candidates": 20,
+      "results": [
+        {
+          "rank": 1,
+          "leaf_id": 38096,
+          "title": "23年全年专项成果汇总.adoc",
+          "chunk_index": 16,
+          "score": 0.0291
+        },
+        {
+          "rank": 2,
+          "leaf_id": 59252,
+          "title": "二维码导航测试用例.adoc",
+          "chunk_index": 0,
+          "score": 0.0164
+        },
+        {
+          "rank": 3,
+          "leaf_id": 3309,
+          "title": "新carly二维码格式.adoc",
+          "chunk_index": 0,
+          "score": 0.0164
+        },
+        {
+          "rank": 4,
+          "leaf_id": 64129,
+          "title": "二维码导航测试用例.adoc",
+          "chunk_index": 0,
+          "score": 0.0161
+        },
+        {
+          "rank": 5,
+          "leaf_id": 54750,
+          "title": "600K迭代（V3）_项目任务书.adoc",
+          "chunk_index": 1,
+          "score": 0.0159
+        },
+        {
+          "rank": 6,
+          "leaf_id": 65547,
+          "title": "高速AMR 产品软件需求PRD-4.adoc",
+          "chunk_index": 29,
+          "score": 0.0159
+        },
+        {
+          "rank": 7,
+          "leaf_id": 64255,
+          "title": "ros.adoc",
+          "chunk_index": 0,
+          "score": 0.0156
+        },
+        {
+          "rank": 8,
+          "leaf_id": 35128,
+          "title": "【三期需求分解】效能提升专项三期.adoc",
+          "chunk_index": 0,
+          "score": 0.0156
+        },
+        {
+          "rank": 9,
+          "leaf_id": 64767,
+          "title": "GroupDock Roadmap 2026.adoc",
+          "chunk_index": 1,
+          "score": 0.0154
+        },
+        {
+          "rank": 10,
+          "leaf_id": 35217,
+          "title": "效能提升二期测试报告.adoc",
+          "chunk_index": 21,
+          "score": 0.0154
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "type": "跨文档",
+      "difficulty": "hard",
+      "query": "导航模块的CPU占用情况如何有哪些优化措施",
+      "gold_leaf_ids": [
+        14046,
+        14051,
+        14058,
+        14063,
+        14069,
+        14077,
+        54897
+      ],
+      "predicted_leaf_ids": [
+        14021,
+        5068,
+        24064,
+        24123,
+        15784,
+        9109,
+        54897,
+        14301,
+        32730,
+        14274
+      ],
+      "hit_leaf_ids_at_5": [],
+      "hit_leaf_ids_at_10": [
+        54897
+      ],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.14285714285714285,
+      "hit_at_5": 0,
+      "hit_at_10": 1,
+      "mrr_at_10": 0.14285714285714285,
+      "ndcg_at_5": 0.0,
+      "ndcg_at_10": 0.09162544430476362,
+      "latency_ms": 402.8,
+      "keyword_candidates": 20,
+      "vector_candidates": 20,
+      "results": [
+        {
+          "rank": 1,
+          "leaf_id": 14021,
+          "title": "nav-net性能测试规划.adoc",
+          "chunk_index": 5,
+          "score": 0.0284
+        },
+        {
+          "rank": 2,
+          "leaf_id": 5068,
+          "title": "宇树机械狗imu双向融合进行速度估计.adoc",
+          "chunk_index": 3,
+          "score": 0.0279
+        },
+        {
+          "rank": 3,
+          "leaf_id": 24064,
+          "title": "安全功能【五期】合入2603主干版本测试报告.adoc",
+          "chunk_index": 11,
+          "score": 0.0268
+        },
+        {
+          "rank": 4,
+          "leaf_id": 24123,
+          "title": "安全功能【五期】测试报告.adoc",
+          "chunk_index": 11,
+          "score": 0.0265
+        },
+        {
+          "rank": 5,
+          "leaf_id": 15784,
+          "title": "伺服性能占用分析.adoc",
+          "chunk_index": 1,
+          "score": 0.0164
+        },
+        {
+          "rank": 6,
+          "leaf_id": 9109,
+          "title": "高速小车性能分析.adoc",
+          "chunk_index": 4,
+          "score": 0.0164
+        },
+        {
+          "rank": 7,
+          "leaf_id": 54897,
+          "title": "nav-base空闲状态cpu占用分析.adoc",
+          "chunk_index": 7,
+          "score": 0.0161
+        },
+        {
+          "rank": 8,
+          "leaf_id": 14301,
+          "title": "nav-base导航状态cpu分析.adoc",
+          "chunk_index": 51,
+          "score": 0.0161
+        },
+        {
+          "rank": 9,
+          "leaf_id": 32730,
+          "title": "3588_2403-1.adoc",
+          "chunk_index": 2,
+          "score": 0.0159
+        },
+        {
+          "rank": 10,
+          "leaf_id": 14274,
+          "title": "nav-base导航状态cpu分析.adoc",
+          "chunk_index": 24,
+          "score": 0.0159
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "type": "跨文档",
+      "difficulty": "medium",
+      "query": "行为树在移动机器人中有哪些应用实例",
+      "gold_leaf_ids": [
+        9707,
+        9732,
+        9733,
+        55243,
+        55244
+      ],
+      "predicted_leaf_ids": [
+        61643,
+        64525,
+        64074,
+        61631,
+        64062,
+        64524,
+        9698,
+        9697,
+        64523,
+        21286
+      ],
+      "hit_leaf_ids_at_5": [],
+      "hit_leaf_ids_at_10": [],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "hit_at_5": 0,
+      "hit_at_10": 0,
+      "mrr_at_10": 0.0,
+      "ndcg_at_5": 0.0,
+      "ndcg_at_10": 0.0,
+      "latency_ms": 369.54,
+      "keyword_candidates": 20,
+      "vector_candidates": 20,
+      "results": [
+        {
+          "rank": 1,
+          "leaf_id": 61643,
+          "title": "行为树叉车部署文档.adoc",
+          "chunk_index": 19,
+          "score": 0.0309
+        },
+        {
+          "rank": 2,
+          "leaf_id": 64525,
+          "title": "9-低代码 IX FSD.dlink",
+          "chunk_index": 20,
+          "score": 0.0306
+        },
+        {
+          "rank": 3,
+          "leaf_id": 64074,
+          "title": "行为树叉车部署文档.adoc",
+          "chunk_index": 19,
+          "score": 0.0304
+        },
+        {
+          "rank": 4,
+          "leaf_id": 61631,
+          "title": "行为树叉车部署文档.adoc",
+          "chunk_index": 7,
+          "score": 0.0294
+        },
+        {
+          "rank": 5,
+          "leaf_id": 64062,
+          "title": "行为树叉车部署文档.adoc",
+          "chunk_index": 7,
+          "score": 0.029
+        },
+        {
+          "rank": 6,
+          "leaf_id": 64524,
+          "title": "9-低代码 IX FSD.dlink",
+          "chunk_index": 19,
+          "score": 0.0286
+        },
+        {
+          "rank": 7,
+          "leaf_id": 9698,
+          "title": "行为树基础概念及其在移动机器人中的应用实例.adoc",
+          "chunk_index": 1,
+          "score": 0.0164
+        },
+        {
+          "rank": 8,
+          "leaf_id": 9697,
+          "title": "行为树基础概念及其在移动机器人中的应用实例.adoc",
+          "chunk_index": 0,
+          "score": 0.0161
+        },
+        {
+          "rank": 9,
+          "leaf_id": 64523,
+          "title": "9-低代码 IX FSD.dlink",
+          "chunk_index": 18,
+          "score": 0.0159
+        },
+        {
+          "rank": 10,
+          "leaf_id": 21286,
+          "title": "Total稳定版本新功能概要.adoc",
+          "chunk_index": 72,
+          "score": 0.0156
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "type": "操作指南",
+      "difficulty": "medium",
+      "query": "什么情况下需要进行载具外参标定，标定需要哪些参数，如何确认成功",
+      "gold_leaf_ids": [
+        38509,
+        38510,
+        38511
+      ],
+      "predicted_leaf_ids": [
+        58922,
+        38509,
+        51073,
+        24470,
+        31120,
+        56948,
+        18607,
+        24366,
+        24421,
+        18548
+      ],
+      "hit_leaf_ids_at_5": [
+        38509
+      ],
+      "hit_leaf_ids_at_10": [
+        38509
+      ],
+      "recall_at_5": 0.3333333333333333,
+      "recall_at_10": 0.3333333333333333,
+      "hit_at_5": 1,
+      "hit_at_10": 1,
+      "mrr_at_10": 0.5,
+      "ndcg_at_5": 0.2960819109658652,
+      "ndcg_at_10": 0.2960819109658652,
+      "latency_ms": 439.66,
+      "keyword_candidates": 20,
+      "vector_candidates": 20,
+      "results": [
+        {
+          "rank": 1,
+          "leaf_id": 58922,
+          "title": "6. 天马-载具外参标定.adoc",
+          "chunk_index": 0,
+          "score": 0.031
+        },
+        {
+          "rank": 2,
+          "leaf_id": 38509,
+          "title": "22. 载具外参标定指南.adoc",
+          "chunk_index": 0,
+          "score": 0.0309
+        },
+        {
+          "rank": 3,
+          "leaf_id": 51073,
+          "title": "3D激光潜伏车软件需求.adoc",
+          "chunk_index": 17,
+          "score": 0.03
+        },
+        {
+          "rank": 4,
+          "leaf_id": 24470,
+          "title": "出厂标定四期方案设计.adoc",
+          "chunk_index": 21,
+          "score": 0.0164
+        },
+        {
+          "rank": 5,
+          "leaf_id": 31120,
+          "title": "00.多车一致性问题-0815验证.adoc",
+          "chunk_index": 0,
+          "score": 0.0161
+        },
+        {
+          "rank": 6,
+          "leaf_id": 56948,
+          "title": "AMR产品标定专项需求.adoc",
+          "chunk_index": 7,
+          "score": 0.0159
+        },
+        {
+          "rank": 7,
+          "leaf_id": 18607,
+          "title": "16. 深度相机标定.adoc",
+          "chunk_index": 0,
+          "score": 0.0156
+        },
+        {
+          "rank": 8,
+          "leaf_id": 24366,
+          "title": "AMR出厂标定优化方案设计.adoc",
+          "chunk_index": 26,
+          "score": 0.0156
+        },
+        {
+          "rank": 9,
+          "leaf_id": 24421,
+          "title": "AMR出厂标定测试报告.adoc",
+          "chunk_index": 11,
+          "score": 0.0154
+        },
+        {
+          "rank": 10,
+          "leaf_id": 18548,
+          "title": "1. 激光外参标定.adoc",
+          "chunk_index": 0,
+          "score": 0.0154
+        }
+      ]
+    },
+    {
+      "id": 25,
+      "type": "会议纪要",
+      "difficulty": "hard",
+      "query": "2025年CodeReview总结中有哪些改进措施",
+      "gold_leaf_ids": [
+        11158,
+        11159
+      ],
+      "predicted_leaf_ids": [
+        5424,
+        5453,
+        11076,
+        6291,
+        58923,
+        6612,
+        40190,
+        40191,
+        6274,
+        38622
+      ],
+      "hit_leaf_ids_at_5": [],
+      "hit_leaf_ids_at_10": [],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "hit_at_5": 0,
+      "hit_at_10": 0,
+      "mrr_at_10": 0.0,
+      "ndcg_at_5": 0.0,
+      "ndcg_at_10": 0.0,
+      "latency_ms": 482.79,
+      "keyword_candidates": 20,
+      "vector_candidates": 20,
+      "results": [
+        {
+          "rank": 1,
+          "leaf_id": 5424,
+          "title": "2025年终工作述职.adoc",
+          "chunk_index": 1,
+          "score": 0.032
+        },
+        {
+          "rank": 2,
+          "leaf_id": 5453,
+          "title": "2025年终工作述职.adoc",
+          "chunk_index": 30,
+          "score": 0.0164
+        },
+        {
+          "rank": 3,
+          "leaf_id": 11076,
+          "title": "CodeReview开展【简洁版】.adoc",
+          "chunk_index": 0,
+          "score": 0.0161
+        },
+        {
+          "rank": 4,
+          "leaf_id": 6291,
+          "title": "2025 年总结规划.adoc",
+          "chunk_index": 0,
+          "score": 0.0161
+        },
+        {
+          "rank": 5,
+          "leaf_id": 58923,
+          "title": "💡 26年Q1-问题处理效率提升.adoc",
+          "chunk_index": 0,
+          "score": 0.0159
+        },
+        {
+          "rank": 6,
+          "leaf_id": 6612,
+          "title": "2025年终述职报告-zsy.adoc",
+          "chunk_index": 0,
+          "score": 0.0159
+        },
+        {
+          "rank": 7,
+          "leaf_id": 40190,
+          "title": "route_processor.cpp|20250312评审记录.adoc",
+          "chunk_index": 0,
+          "score": 0.0156
+        },
+        {
+          "rank": 8,
+          "leaf_id": 40191,
+          "title": "route_processor.cpp|20250312评审记录.adoc",
+          "chunk_index": 1,
+          "score": 0.0154
+        },
+        {
+          "rank": 9,
+          "leaf_id": 6274,
+          "title": "新提单流程数据分析.adoc",
+          "chunk_index": 0,
+          "score": 0.0154
+        },
+        {
+          "rank": 10,
+          "leaf_id": 38622,
+          "title": "订单项目资料概览.adoc",
+          "chunk_index": 0,
+          "score": 0.0152
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "type": "技术文档",
+      "difficulty": "medium",
+      "query": "自学习的精度优化方法有哪些实施步骤",
+      "gold_leaf_ids": [
+        31795,
+        31796,
+        31797
+      ],
+      "predicted_leaf_ids": [
+        4434,
+        39398,
+        57630,
+        32001,
+        63969,
+        23398,
+        32035,
+        32029,
+        33323,
+        33322
+      ],
+      "hit_leaf_ids_at_5": [],
+      "hit_leaf_ids_at_10": [],
+      "recall_at_5": 0.0,
+      "recall_at_10": 0.0,
+      "hit_at_5": 0,
+      "hit_at_10": 0,
+      "mrr_at_10": 0.0,
+      "ndcg_at_5": 0.0,
+      "ndcg_at_10": 0.0,
+      "latency_ms": 381.29,
+      "keyword_candidates": 20,
+      "vector_candidates": 20,
+      "results": [
+        {
+          "rank": 1,
+          "leaf_id": 4434,
+          "title": "2024年度述职报告大纲.adoc",
+          "chunk_index": 21,
+          "score": 0.0265
+        },
+        {
+          "rank": 2,
+          "leaf_id": 39398,
+          "title": "2024年度述职报告大纲.adoc",
+          "chunk_index": 21,
+          "score": 0.0262
+        },
+        {
+          "rank": 3,
+          "leaf_id": 57630,
+          "title": "到点自学习六期需求分解.adoc",
+          "chunk_index": 31,
+          "score": 0.0164
+        },
+        {
+          "rank": 4,
+          "leaf_id": 32001,
+          "title": "远舢-15号车精度修复工作.adoc",
+          "chunk_index": 1,
+          "score": 0.0164
+        },
+        {
+          "rank": 5,
+          "leaf_id": 63969,
+          "title": "Q2结项项目复盘.adoc",
+          "chunk_index": 18,
+          "score": 0.0161
+        },
+        {
+          "rank": 6,
+          "leaf_id": 23398,
+          "title": "到点自学习效果验证方法.adoc",
+          "chunk_index": 3,
+          "score": 0.0161
+        },
+        {
+          "rank": 7,
+          "leaf_id": 32035,
+          "title": "远舢-到点自学习部署进度跟踪.adoc",
+          "chunk_index": 7,
+          "score": 0.0159
+        },
+        {
+          "rank": 8,
+          "leaf_id": 32029,
+          "title": "远舢-到点自学习部署进度跟踪.adoc",
+          "chunk_index": 1,
+          "score": 0.0159
+        },
+        {
+          "rank": 9,
+          "leaf_id": 33323,
+          "title": "【方案】业务整合五期软件方案.adoc",
+          "chunk_index": 7,
+          "score": 0.0156
+        },
+        {
+          "rank": 10,
+          "leaf_id": 33322,
+          "title": "【方案】业务整合五期软件方案.adoc",
+          "chunk_index": 6,
+          "score": 0.0156
+        }
+      ]
+    }
+  ]
+}

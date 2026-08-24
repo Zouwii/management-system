@@ -1,0 +1,74 @@
+[
+  {
+    "id": "q01-content",
+    "kind": "content",
+    "query": "速度仲裁如何从多个速度来源选择并发布最终速度",
+    "gold_slug": "01-speed-arbitration"
+  },
+  {
+    "id": "q01-hierarchy",
+    "kind": "hierarchy",
+    "query": "本体开发部导航组王睿高速小车的速度仲裁文档",
+    "gold_slug": "01-speed-arbitration"
+  },
+  {
+    "id": "q02-content",
+    "kind": "content",
+    "query": "故障诊断三期如何新增 topic 数据打印插件并录入 bag",
+    "gold_slug": "02-diagnosis-requirements"
+  },
+  {
+    "id": "q02-hierarchy",
+    "kind": "hierarchy",
+    "query": "研发专项知识库故障诊断工具链三期研发文档",
+    "gold_slug": "02-diagnosis-requirements"
+  },
+  {
+    "id": "q03-content",
+    "kind": "content",
+    "query": "叉齿举升控制算子 ForkLift 应该怎么使用",
+    "gold_slug": "03-low-code-dictionary"
+  },
+  {
+    "id": "q03-hierarchy",
+    "kind": "hierarchy",
+    "query": "本体开发部对接组低代码项目的算子字典",
+    "gold_slug": "03-low-code-dictionary"
+  },
+  {
+    "id": "q04-content",
+    "kind": "content",
+    "query": "CCSendCommand service 的 target command mask 和 parameters 如何定义",
+    "gold_slug": "04-ros-interface"
+  },
+  {
+    "id": "q04-hierarchy",
+    "kind": "hierarchy",
+    "query": "研发体系文件软件对接说明中的驱动相关 ROS 接口",
+    "gold_slug": "04-ros-interface"
+  },
+  {
+    "id": "q05-content",
+    "kind": "content",
+    "query": "充电桩直流输出电压怎么用万用表测量，多少伏正常",
+    "gold_slug": "05-agv-maintenance"
+  },
+  {
+    "id": "q05-hierarchy",
+    "kind": "hierarchy",
+    "query": "研发共享文档现场问题排查工程 AGV 硬件维护指导书",
+    "gold_slug": "05-agv-maintenance"
+  },
+  {
+    "id": "q06-content",
+    "kind": "content",
+    "query": "仿真平台用户新增 HTTP 接口的请求和返回是什么",
+    "gold_slug": "06-simulation-http-api"
+  },
+  {
+    "id": "q06-hierarchy",
+    "kind": "hierarchy",
+    "query": "研发专项知识库仿真二期研发文档中的 HTTP 接口说明",
+    "gold_slug": "06-simulation-http-api"
+  }
+]

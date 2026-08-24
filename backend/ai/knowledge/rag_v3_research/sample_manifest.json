@@ -1,0 +1,56 @@
+[
+  {
+    "slug": "01-speed-arbitration",
+    "node_id": "Obva6QBXJw9KMa5xi9eb2zjRWn4qY5Pr",
+    "title": "速度仲裁",
+    "workspace": "本体开发部",
+    "folder_path": "本体开发部 / 3. 导航组 / 3.5 模块 / 王睿 / 高速小车",
+    "raw_file": "samples/raw/01-speed-arbitration.md",
+    "reason": "短篇正常技术文档，包含正文、图示、表格与代码，作为健康对照"
+  },
+  {
+    "slug": "02-diagnosis-requirements",
+    "node_id": "r1R7q3QmWe7L0eawh7No92GwJxkXOEP2",
+    "title": "故障诊断三期需求分解方案",
+    "workspace": "研发专项知识库",
+    "folder_path": "研发专项知识库 / 进行中项目 / 故障诊断工具链 / 三期 / 研发文档",
+    "raw_file": "samples/raw/02-diagnosis-requirements.md",
+    "reason": "HTML 与超长行较多的需求文档，用于观察 Cleaner 和兜底切分"
+  },
+  {
+    "slug": "03-low-code-dictionary",
+    "node_id": "YMyQA2dXW79vMepgiwxgyeG1JzlwrZgb",
+    "title": "低代码算子字典",
+    "workspace": "本体开发部",
+    "folder_path": "本体开发部 / 4. 对接组 / 4.2 项目资料 / 3-低代码",
+    "raw_file": "samples/raw/03-low-code-dictionary.md",
+    "reason": "超长、标题/表格/列表/代码/图片混合文档，用于压力测试"
+  },
+  {
+    "slug": "04-ros-interface",
+    "node_id": "EpGBa2Lm8azLmGpZC30Xo42yWgN7R35y",
+    "title": "驱动相关ROS接口",
+    "workspace": "研发体系文档【JZ-TOTAL】",
+    "folder_path": "研发体系文档【JZ-TOTAL】 / 研发体系文件 / 2.研发文档 / 3.软件对接说明 / 代码接口文档 / 驱动相关ROS接口文档",
+    "raw_file": "samples/raw/04-ros-interface.md",
+    "reason": "表格型接口文档；生产库 8.3 万字符却只有一个 leaf，是明确 Bad Case"
+  },
+  {
+    "slug": "05-agv-maintenance",
+    "node_id": "ZX6GRezwJl7KPA5zhQrvY4zGVdqbropQ",
+    "title": "AGV硬件维护指导书V1.7",
+    "workspace": "研发共享文档",
+    "folder_path": "研发共享文档 / 2.现场问题排查指南 / 工程",
+    "raw_file": "samples/raw/05-agv-maintenance.md",
+    "reason": "无标准 Markdown 标题且图片密集，用于验证原生 block 是否优于 Markdown outline"
+  },
+  {
+    "slug": "06-simulation-http-api",
+    "node_id": "YQBnd5ExVEwO0vDjcj0jkpbv8yeZqMmz",
+    "title": "仿真平台http接口文档",
+    "workspace": "研发专项知识库",
+    "folder_path": "研发专项知识库 / 进行中项目 / 2025年研发项目 / 面向集成商仿真学习调测环境 / 仿真二期 / 研发文档",
+    "raw_file": "samples/raw/06-simulation-http-api.md",
+    "reason": "标题、表格和代码块密集的 API 文档，用于结构完整性测试"
+  }
+]

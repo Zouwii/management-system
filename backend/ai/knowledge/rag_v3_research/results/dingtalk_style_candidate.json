@@ -1,0 +1,165 @@
+{
+  "config": {
+    "target_tokens": 900,
+    "hard_tokens": 1200,
+    "projection_tokens": 480
+  },
+  "samples": [
+    {
+      "slug": "01-speed-arbitration",
+      "title": "速度仲裁",
+      "source_mode": "jsonml",
+      "source_block_count": 9,
+      "section_count": 1,
+      "context_chunk_count": 1,
+      "context_tokens": {
+        "min": 642,
+        "mean": 642.0,
+        "median": 642,
+        "max": 642
+      },
+      "context_over_hard_limit": 0,
+      "retrieval_projection_count": 3,
+      "projection_tokens": {
+        "min": 128,
+        "mean": 246.67,
+        "median": 186,
+        "max": 426
+      },
+      "projection_over_limit": 0,
+      "folder_header_coverage": 1,
+      "section_header_coverage": 1,
+      "visible_lexical_recall_from_markdown": 0.602496
+    },
+    {
+      "slug": "02-diagnosis-requirements",
+      "title": "故障诊断三期需求分解方案",
+      "source_mode": "jsonml",
+      "source_block_count": 19,
+      "section_count": 8,
+      "context_chunk_count": 19,
+      "context_tokens": {
+        "min": 78,
+        "mean": 709.79,
+        "median": 834,
+        "max": 1191
+      },
+      "context_over_hard_limit": 0,
+      "retrieval_projection_count": 51,
+      "projection_tokens": {
+        "min": 71,
+        "mean": 306.59,
+        "median": 369,
+        "max": 478
+      },
+      "projection_over_limit": 0,
+      "folder_header_coverage": 19,
+      "section_header_coverage": 19,
+      "visible_lexical_recall_from_markdown": 0.715404
+    },
+    {
+      "slug": "03-low-code-dictionary",
+      "title": "低代码算子字典",
+      "source_mode": "jsonml",
+      "source_block_count": 244,
+      "section_count": 78,
+      "context_chunk_count": 81,
+      "context_tokens": {
+        "min": 72,
+        "mean": 492.49,
+        "median": 511,
+        "max": 1184
+      },
+      "context_over_hard_limit": 0,
+      "retrieval_projection_count": 156,
+      "projection_tokens": {
+        "min": 56,
+        "mean": 285.07,
+        "median": 274.5,
+        "max": 478
+      },
+      "projection_over_limit": 0,
+      "folder_header_coverage": 81,
+      "section_header_coverage": 81,
+      "visible_lexical_recall_from_markdown": 0.854256
+    },
+    {
+      "slug": "04-ros-interface",
+      "title": "驱动相关ROS接口",
+      "source_mode": "jsonml",
+      "source_block_count": 110,
+      "section_count": 92,
+      "context_chunk_count": 104,
+      "context_tokens": {
+        "min": 107,
+        "mean": 385.48,
+        "median": 282.0,
+        "max": 1192
+      },
+      "context_over_hard_limit": 0,
+      "retrieval_projection_count": 162,
+      "projection_tokens": {
+        "min": 107,
+        "mean": 286.97,
+        "median": 265.5,
+        "max": 478
+      },
+      "projection_over_limit": 0,
+      "folder_header_coverage": 104,
+      "section_header_coverage": 104,
+      "visible_lexical_recall_from_markdown": 0.795166
+    },
+    {
+      "slug": "05-agv-maintenance",
+      "title": "AGV硬件维护指导书V1.7",
+      "source_mode": "element_blocks_fallback",
+      "source_block_count": 881,
+      "section_count": 1,
+      "context_chunk_count": 28,
+      "context_tokens": {
+        "min": 620,
+        "mean": 866.93,
+        "median": 887.5,
+        "max": 900
+      },
+      "context_over_hard_limit": 0,
+      "retrieval_projection_count": 71,
+      "projection_tokens": {
+        "min": 63,
+        "mean": 377.01,
+        "median": 458,
+        "max": 478
+      },
+      "projection_over_limit": 0,
+      "folder_header_coverage": 28,
+      "section_header_coverage": 28,
+      "visible_lexical_recall_from_markdown": 0.834535
+    },
+    {
+      "slug": "06-simulation-http-api",
+      "title": "仿真平台http接口文档",
+      "source_mode": "jsonml",
+      "source_block_count": 292,
+      "section_count": 59,
+      "context_chunk_count": 59,
+      "context_tokens": {
+        "min": 86,
+        "mean": 231.2,
+        "median": 231,
+        "max": 566
+      },
+      "context_over_hard_limit": 0,
+      "retrieval_projection_count": 61,
+      "projection_tokens": {
+        "min": 86,
+        "mean": 226.61,
+        "median": 230,
+        "max": 478
+      },
+      "projection_over_limit": 0,
+      "folder_header_coverage": 59,
+      "section_header_coverage": 59,
+      "visible_lexical_recall_from_markdown": 0.886975
+    }
+  ]
+}

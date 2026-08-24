@@ -1,0 +1,424 @@
+[
+  {
+    "id": 1,
+    "type": "技术文档",
+    "difficulty": "easy",
+    "query": "导航控制器的参数有哪些如何梳理",
+    "relevant_chunk_ids": [
+      57703,
+      57704,
+      57705,
+      57707,
+      57708,
+      57709,
+      57711,
+      57712,
+      57713,
+      57714,
+      57716,
+      57718
+    ],
+    "source_docs": [
+      "控制器参数梳理.adoc"
+    ],
+    "note": "直接查控制器参数梳理.adoc，chunk里包含了具体的参数名"
+  },
+  {
+    "id": 2,
+    "type": "技术文档",
+    "difficulty": "medium",
+    "query": "机器人原地旋转的精度指标是多少",
+    "relevant_chunk_ids": [
+      3705,
+      43004
+    ],
+    "source_docs": [
+      "盲走精度测试.adoc"
+    ],
+    "note": "盲走精度测试.adoc 中有原地旋转绝对精度1%的指标"
+  },
+  {
+    "id": 3,
+    "type": "技术文档",
+    "difficulty": "easy",
+    "query": "ROS中如何录制、查看和回放话题数据",
+    "relevant_chunk_ids": [
+      6552
+    ],
+    "source_docs": [
+      "ROS基础教程.adoc"
+    ],
+    "note": "ROS基础教程中列出了rosbag录制单个、多个或全部话题，以及查看和回放数据的命令"
+  },
+  {
+    "id": 4,
+    "type": "技术文档",
+    "difficulty": "easy",
+    "query": "本体和调度之间的接口协议是什么",
+    "relevant_chunk_ids": [
+      8771,
+      8818
+    ],
+    "source_docs": [
+      "【高速小车】本体&调度协议设计（基于VDA5050).adoc",
+      "STU 本体-调度 接口协议.adoc"
+    ],
+    "note": "多个文档都有相关内容，可能有多个正确答案"
+  },
+  {
+    "id": 5,
+    "type": "技术文档",
+    "difficulty": "medium",
+    "query": "伺服驱动器测试工具的功能设计有哪些",
+    "relevant_chunk_ids": [
+      5021,
+      5023,
+      5025,
+      5027,
+      5032
+    ],
+    "source_docs": [
+      "驱动器测试工具功能设计说明书.adoc"
+    ],
+    "note": "驱动器测试工具功能设计说明书.adoc"
+  },
+  {
+    "id": 6,
+    "type": "技术文档",
+    "difficulty": "medium",
+    "query": "盲走精度测试包含哪些测试项，验收标准是什么",
+    "relevant_chunk_ids": [
+      3704,
+      3705,
+      43003,
+      43004
+    ],
+    "source_docs": [
+      "盲走精度测试.adoc"
+    ],
+    "note": "盲走精度测试.adoc 中有测试项和验收标准的完整说明"
+  },
+  {
+    "id": 7,
+    "type": "操作指南",
+    "difficulty": "easy",
+    "query": "Carly中机器狗有哪些运行状态，各状态分别表示什么",
+    "relevant_chunk_ids": [
+      6415,
+      6416
+    ],
+    "source_docs": [
+      "Carly使用手册.adoc"
+    ],
+    "note": "Carly使用手册中列出了就绪、维护、运行、异常、建图、等待定位和编辑状态及其含义"
+  },
+  {
+    "id": 8,
+    "type": "技术文档",
+    "difficulty": "medium",
+    "query": "嵌入式驱动器的性能指标设计有哪些",
+    "relevant_chunk_ids": [
+      4369,
+      4370,
+      4371,
+      39333,
+      39334,
+      39335
+    ],
+    "source_docs": [
+      "嵌入式驱动器性能指标设计.adoc"
+    ],
+    "note": "嵌入式驱动器性能指标设计.adoc"
+  },
+  {
+    "id": 9,
+    "type": "测试文档",
+    "difficulty": "easy",
+    "query": "零类急停异常处理的测试流程和通过标准是什么",
+    "relevant_chunk_ids": [
+      14670
+    ],
+    "source_docs": [
+      "零类急停异常处理测试流程.adoc"
+    ],
+    "note": "测试要求叉车速度达到0.8m/s以上时拍下急停，观察点云跳动与自动恢复情况并重复约50次"
+  },
+  {
+    "id": 10,
+    "type": "操作指南",
+    "difficulty": "medium",
+    "query": "反光板伺服适用于哪些场景，部署反光板时有哪些尺寸要求",
+    "relevant_chunk_ids": [
+      18715,
+      18716
+    ],
+    "source_docs": [
+      "反光板伺服对接使用指南.adoc"
+    ],
+    "note": "指南说明适用货架、充电桩和机台，最低支持2cm宽反光板，通常推荐5cm"
+  },
+  {
+    "id": 11,
+    "type": "会议纪要",
+    "difficulty": "medium",
+    "query": "OKR复盘会议上导航组和对接组分别讨论了什么",
+    "relevant_chunk_ids": [
+      62854,
+      62855
+    ],
+    "source_docs": [
+      "OKR阶段性复盘会议记录【2023.09.22】.adoc"
+    ],
+    "note": "OKR复盘会议记录文档"
+  },
+  {
+    "id": 12,
+    "type": "技术文档",
+    "difficulty": "medium",
+    "query": "差分车左右轮速度与质心速度、角速度之间是什么关系",
+    "relevant_chunk_ids": [
+      39657,
+      39658
+    ],
+    "source_docs": [
+      "差分车底盘运动能力限制.adoc"
+    ],
+    "note": "文档给出差分底盘逆运动学公式以及轮间距、质心速度、角速度和左右轮速度的定义"
+  },
+  {
+    "id": 13,
+    "type": "会议纪要",
+    "difficulty": "easy",
+    "query": "主管评分的参考标准是什么",
+    "relevant_chunk_ids": [
+      3024
+    ],
+    "source_docs": [
+      "0. 本体开发部制度规范.adoc"
+    ],
+    "note": "制度规范中的主管评分标准表格"
+  },
+  {
+    "id": 14,
+    "type": "技术文档",
+    "difficulty": "medium",
+    "query": "速度仲裁模块如何从多个速度来源中选择并发布最终速度",
+    "relevant_chunk_ids": [
+      14604,
+      14606
+    ],
+    "source_docs": [
+      "速度仲裁.adoc"
+    ],
+    "note": "速度仲裁根据配置订阅不同来源，过滤超时数据，选择最高优先级有效速度并转换发布"
+  },
+  {
+    "id": 15,
+    "type": "故障处理",
+    "difficulty": "easy",
+    "query": "运动学功能初始化失败时，三代机型的执行器数量和底盘类型参数应如何填写",
+    "relevant_chunk_ids": [
+      19105
+    ],
+    "source_docs": [
+      "613001 车型参数填写错误，运动学功能初始化失败.adoc"
+    ],
+    "note": "故障文档列出不同底盘的执行器机构个数以及differ、steer、mecanum底盘类型取值"
+  },
+  {
+    "id": 16,
+    "type": "故障处理",
+    "difficulty": "easy",
+    "query": "执行伺服行为树时不伺服或失败应检查哪些项目",
+    "relevant_chunk_ids": [
+      41703
+    ],
+    "source_docs": [
+      "低代码常见问题排查.adoc"
+    ],
+    "note": "排查项包括block和行为树状态、伺服进程、起始距离、可识别物以及修改后是否重新加载库区"
+  },
+  {
+    "id": 17,
+    "type": "技术文档",
+    "difficulty": "medium",
+    "query": "机械臂安全保护的区域检测如何实现，检测到障碍物后如何处理",
+    "relevant_chunk_ids": [
+      10782,
+      10783
+    ],
+    "source_docs": [
+      "机械臂安全保护功能.adoc"
+    ],
+    "note": "方案使用动静态过滤后的融合点云进行指定区域检测，触发后可报警并停止机械臂，障碍物离开后继续作业"
+  },
+  {
+    "id": 18,
+    "type": "表格",
+    "difficulty": "easy",
+    "query": "导航组2025年的Roadmap包含哪些目标",
+    "relevant_chunk_ids": [
+      3031,
+      3032,
+      3033,
+      3034,
+      3035,
+      3036,
+      3037,
+      3038,
+      3039,
+      3040
+    ],
+    "source_docs": [
+      "2025年导航组Roadmap.adoc",
+      "导航组2025年Roadmap.axls"
+    ],
+    "note": "2025年Roadmap可能有adoc和axls两种格式"
+  },
+  {
+    "id": 19,
+    "type": "跨文档",
+    "difficulty": "medium",
+    "query": "小车性能测试的方法和指标有哪些",
+    "relevant_chunk_ids": [
+      13975,
+      13979,
+      13988,
+      13991,
+      3704,
+      3705,
+      43003,
+      43004
+    ],
+    "source_docs": [
+      "小车性能测试方法.adoc",
+      "盲走精度测试.adoc",
+      "新伺服测试报告.adoc"
+    ],
+    "note": "需要跨多文档综合：测试方法文档+精度测试+伺服测试报告"
+  },
+  {
+    "id": 20,
+    "type": "跨文档",
+    "difficulty": "hard",
+    "query": "移动机器人导航栈的性能瓶颈在哪里，如何系统性地分析和优化",
+    "relevant_chunk_ids": [
+      14046,
+      14063,
+      14075,
+      14077,
+      54897
+    ],
+    "source_docs": [
+      "nav-net CPU占用分析.adoc",
+      "nav-base空闲状态cpu占用分析.adoc",
+      "2026年Q1导航组问题复盘.adoc"
+    ],
+    "note": "跨文档：nav-net + nav-base CPU分析 + Q1复盘中的优化经验"
+  },
+  {
+    "id": 21,
+    "type": "跨文档",
+    "difficulty": "medium",
+    "query": "二维码导航的功能包括哪些有什么版本迭代",
+    "relevant_chunk_ids": [
+      40077,
+      40083,
+      40098,
+      40099,
+      61252,
+      61264,
+      61306,
+      61309
+    ],
+    "source_docs": [
+      "功能设计 | 二维码子图检码扩展（子图列表 + 秒回聚合）.adoc",
+      "低代码算子字典.adoc"
+    ],
+    "note": "二维码导航功能涉及多文档"
+  },
+  {
+    "id": 22,
+    "type": "跨文档",
+    "difficulty": "hard",
+    "query": "导航模块的CPU占用情况如何有哪些优化措施",
+    "relevant_chunk_ids": [
+      14046,
+      14051,
+      14058,
+      14063,
+      14069,
+      14077,
+      54897
+    ],
+    "source_docs": [
+      "nav-net CPU占用分析.adoc",
+      "nav-base空闲状态cpu占用分析.adoc",
+      "2025年Q2导航组问题复盘.adoc"
+    ],
+    "note": "跨文档：CPU分析文档+复盘中的优化措施"
+  },
+  {
+    "id": 23,
+    "type": "跨文档",
+    "difficulty": "medium",
+    "query": "行为树在移动机器人中有哪些应用实例",
+    "relevant_chunk_ids": [
+      9707,
+      9732,
+      9733,
+      55243,
+      55244
+    ],
+    "source_docs": [
+      "行为树基础概念及其在移动机器人中的应用实例.adoc",
+      "行为树节点示教参数传递.adoc"
+    ],
+    "note": "行为树相关两篇文档"
+  },
+  {
+    "id": 24,
+    "type": "操作指南",
+    "difficulty": "medium",
+    "query": "什么情况下需要进行载具外参标定，标定需要哪些参数，如何确认成功",
+    "relevant_chunk_ids": [
+      38509,
+      38510,
+      38511
+    ],
+    "source_docs": [
+      "22. 载具外参标定指南.adoc"
+    ],
+    "note": "指南说明标定适用条件、相机与载具名称、arm2base三轴机械值、标定命令和calib Succeed成功标志"
+  },
+  {
+    "id": 25,
+    "type": "会议纪要",
+    "difficulty": "hard",
+    "query": "2025年CodeReview总结中有哪些改进措施",
+    "relevant_chunk_ids": [
+      11158,
+      11159
+    ],
+    "source_docs": [
+      "2025Q1CodeReview总结.adoc"
+    ],
+    "note": "CodeReview总结文档"
+  },
+  {
+    "id": 26,
+    "type": "技术文档",
+    "difficulty": "medium",
+    "query": "自学习的精度优化方法有哪些实施步骤",
+    "relevant_chunk_ids": [
+      31795,
+      31796,
+      31797
+    ],
+    "source_docs": [
+      "到点自学习实施效率优化.adoc",
+      "【5】自学习计算方法替换实验.adoc"
+    ],
+    "note": "自学习精度优化涉及实施效率优化和计算方法替换两方面"
+  }
+]
