@@ -174,6 +174,63 @@ export function mockFetchIntegrationTeamDetail(user) {
   }));
 }
 
+export function mockFetchApplicationTeamDetail(user) {
+  return request(() => ({
+    rows: filterRowsByDataScope(
+      buildMockTeamEffectiveRows(navTeam.slice(0, 4), '3', '应用组', 'mock-application'),
+      user,
+    ),
+    lastUpdatedAt: new Date().toISOString(),
+  }));
+}
+
+export function mockFetchApplicationTeamReport() {
+  const typeRows = [
+    { label: '本体导航/导航', count: 14, ratio: 58.33 },
+    { label: '本体导航/定位', count: 5, ratio: 20.83 },
+    { label: '本体导航/建图', count: 3, ratio: 12.5 },
+    { label: '本体导航/非本体导航', count: 2, ratio: 8.34 },
+    { label: '合计', count: 24, ratio: 100 },
+  ];
+  const causeRows = (rows, total) => ({ rows: [...rows, { label: '合计', count: total, ratio: 100 }] });
+  const typeColumns = ['本体导航/导航', '本体导航/定位', '本体导航/建图', '本体导航/非本体导航'];
+  return Promise.resolve({
+    code: 200,
+    error: '',
+    data: {
+      period: { start: '2026-04-01T00:00:00', end: '2026-07-01T00:00:00' },
+      scope: 'application',
+      total: 24,
+      typeStats: { rows: typeRows, order: typeColumns },
+      causeStats: [
+        { type: '本体导航/导航', total: 14, ...causeRows([{ label: '软件bug', count: 4, ratio: 28.57 }, { label: '其他模块', count: 6, ratio: 42.86 }, { label: '外部因素', count: 4, ratio: 28.57 }], 14), secondary: {} },
+        { type: '本体导航/定位', total: 5, ...causeRows([{ label: '外部因素', count: 3, ratio: 60 }, { label: '未知原因', count: 2, ratio: 40 }], 5), secondary: {} },
+        { type: '本体导航/建图', total: 3, ...causeRows([{ label: '外部因素', count: 2, ratio: 66.67 }, { label: '未知原因', count: 1, ratio: 33.33 }], 3), secondary: {} },
+      ],
+      promptStats: [],
+      handlingStats: { configured: false, rows: [] },
+      priorityMatrix: { columns: typeColumns, rows: [{ label: '非常紧急', values: Object.fromEntries(typeColumns.map((item) => [item, 0])) }, { label: '紧急', values: Object.fromEntries(typeColumns.map((item) => [item, 0])) }, { label: '普通', values: Object.fromEntries(typeColumns.map((item) => [item, 0])) }] },
+      documentValueMatrix: { configured: false, columns: [], rows: [] },
+      projectMatrix: { columns: typeColumns, rows: [] },
+      onsiteLinks: { count: 0, taskIds: [] },
+      details: [],
+    },
+  });
+}
+
+export function mockFetchApplicationTeamOptions() {
+  return Promise.resolve({
+    code: 200,
+    error: '',
+    data: {
+      members: [{ userId: 'mock-application', name: '应用组示例用户' }],
+      years: [new Date().getFullYear()],
+      quarters: [1, 2, 3, 4],
+      dimensions: {},
+    },
+  });
+}
+
 function toUtcISOString(dateTimeLocalValue) {
   const d = new Date(dateTimeLocalValue);
   if (Number.isNaN(d.getTime())) return dateTimeLocalValue;

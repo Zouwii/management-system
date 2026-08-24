@@ -3,6 +3,7 @@
 Routes:
   GET /nav-team-detail           - Navigation team quarterly detail
   GET /integration-team-detail   - Integration team quarterly detail
+  GET /application-team-detail   - Application team quarterly detail
 """
 
 from flask import request, session
@@ -131,8 +132,8 @@ def _group_detail_rows(team_id_value: str, expected_mode: str = "quarter"):
                 or 0.0
             )
 
-            allocation_delta = scheduled_total - expected_effective_hours
-            completion_delta = completed_total - expected_effective_hours
+            allocation_delta = scheduled_total + overdue_effective_total - expected_effective_hours
+            completion_delta = completed_total + overdue_completed_total - expected_effective_hours
 
             rows.append({
                 "userId": uid,
@@ -163,7 +164,7 @@ def _team_detail_handler(team_id: str, expected_mode: str):
     """Shared handler for both team detail endpoints.
 
     Args:
-        team_id: "0" for nav team, "1" for integration team.
+        team_id: "0" for nav team, "1" for integration team, "3" for application team.
         expected_mode: Quarter mode string.
     """
     projectids = get_config_projectids() or {}
@@ -207,3 +208,15 @@ def integration_team_detail():
     if expected_mode not in {"quarter", "current", "last_quarter"}:
         expected_mode = "quarter"
     return _team_detail_handler("1", expected_mode)
+
+
+@dashboard_bp.route("/application-team-detail", methods=["GET"])
+def application_team_detail():
+    """Get application team (teamId=3) quarter detail dashboard."""
+    user = _require_login()
+    if not user:
+        return _fail("unauthenticated", code=401, data={})
+    expected_mode = str(request.args.get("expected") or "quarter").strip()
+    if expected_mode not in {"quarter", "current", "last_quarter"}:
+        expected_mode = "quarter"
+    return _team_detail_handler("3", expected_mode)

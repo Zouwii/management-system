@@ -37,6 +37,8 @@ def _team_name_from_team_id(team_id_value):
         return "导航组"
     if val == "1":
         return "对接组"
+    if val == "3":
+        return "应用组"
     return "未分组"
 
 

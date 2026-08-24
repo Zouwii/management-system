@@ -42,8 +42,8 @@ export default function SideMenu({
     ? 'inline-flex h-7 min-w-7 items-center justify-center rounded-xl bg-slate-900 px-2 text-xs font-semibold text-white'
     : 'inline-flex h-7 min-w-7 items-center justify-center rounded-xl bg-sky-500 px-2 text-xs font-semibold text-white';
   const chatButtonClass = theme === 'dark'
-    ? 'fixed bottom-5 right-5 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-purple-600 text-white shadow-[0_18px_36px_-18px_rgba(88,28,135,0.8)] transition hover:bg-purple-700 hover:shadow-[0_22px_44px_-18px_rgba(88,28,135,0.9)] lg:bottom-24 lg:left-6 lg:right-auto'
-    : 'fixed bottom-5 right-5 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-purple-600 text-white shadow-[0_18px_36px_-18px_rgba(88,28,135,0.8)] transition hover:bg-purple-700 hover:shadow-[0_22px_44px_-18px_rgba(88,28,135,0.9)] lg:bottom-24 lg:left-6 lg:right-auto';
+    ? 'fixed bottom-5 right-5 z-40 flex h-10 w-10 items-center justify-center rounded-full bg-purple-600 text-white shadow-[0_14px_28px_-16px_rgba(88,28,135,0.8)] transition duration-200 hover:bg-purple-700 hover:shadow-[0_18px_36px_-16px_rgba(88,28,135,0.9)] lg:bottom-24 lg:left-0 lg:right-auto lg:-translate-x-1/2 lg:hover:translate-x-0 lg:focus-visible:translate-x-0'
+    : 'fixed bottom-5 right-5 z-40 flex h-10 w-10 items-center justify-center rounded-full bg-purple-600 text-white shadow-[0_14px_28px_-16px_rgba(88,28,135,0.8)] transition duration-200 hover:bg-purple-700 hover:shadow-[0_18px_36px_-16px_rgba(88,28,135,0.9)] lg:bottom-24 lg:left-0 lg:right-auto lg:-translate-x-1/2 lg:hover:translate-x-0 lg:focus-visible:translate-x-0';
   const collapseStorageKey = `side-menu-collapsed:${theme}:${title}`;
   const [chatOpen, setChatOpen] = useState(false);
 
@@ -197,7 +197,7 @@ export default function SideMenu({
         title="AI知识库问答"
         aria-label="AI知识库问答"
       >
-        <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
+        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
           <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
         </svg>
       </button>

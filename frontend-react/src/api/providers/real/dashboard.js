@@ -323,6 +323,35 @@ export function realFetchIntegrationTeamDetail(_user, params = {}) {
     }));
 }
 
+export function realFetchApplicationTeamDetail(_user, params = {}) {
+  const expected = String(params?.expected || 'quarter');
+  return httpRequest(appendQuery('/dashboard/application-team-detail', { expected }))
+    .then((res) => ({
+      code: 200,
+      error: '',
+      data: {
+        rows: res?.data?.rows || [],
+        memberOptions: res?.data?.memberOptions || [],
+        lastUpdatedAt: res?.data?.lastUpdatedAt || '',
+      },
+    }));
+}
+
+export function realFetchApplicationTeamReport(_user, params = {}) {
+  return httpRequest('/application-team/report', {
+    method: 'POST',
+    body: JSON.stringify({
+      year: Number(params?.year || new Date().getFullYear()),
+      quarter: Number(params?.quarter || 1),
+      executorId: params?.executorId || '',
+    }),
+  });
+}
+
+export function realFetchApplicationTeamOptions() {
+  return httpRequest('/application-team/options');
+}
+
 export function realFetchPersonalHours(_user, params = {}) {
   return Promise.resolve()
     .then(async () => {

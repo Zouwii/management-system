@@ -1,6 +1,7 @@
 import DepartmentOverview from '../pages/DepartmentOverview';
 import NavTeamDetail from '../pages/NavTeamDetail';
 import IntegrationTeamDetail from '../pages/IntegrationTeamDetail';
+import ApplicationTeamPage from '../pages/ApplicationTeamPage';
 import PersonalHoursByRole from '../pages/PersonalHoursByRole';
 import PerformancePage from '../pages/PerformancePage';
 import AIAnalysisPage from '../pages/AIAnalysisPage';
@@ -37,6 +38,14 @@ export const appRouteConfig = [
     allowedRoles: [ROLES.MANAGER, ROLES.ADMIN],
     permissionCode: PAGE_PERMISSION_CODES.INTEGRATION_TEAM_DETAIL,
     element: <IntegrationTeamDetail />,
+  },
+  {
+    path: ROUTE_PATHS.APPLICATION_TEAM,
+    label: '应用组',
+    menu: true,
+    allowedRoles: [ROLES.MANAGER, ROLES.ADMIN],
+    permissionCode: PAGE_PERMISSION_CODES.APPLICATION_TEAM,
+    element: <ApplicationTeamPage />,
   },
   {
     path: ROUTE_PATHS.PERSONAL_HOURS,

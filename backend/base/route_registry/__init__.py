@@ -36,6 +36,7 @@ from base.req_pool.routes import register as register_req_pool
 
 # 算法组同步
 from base.algo.routes import register as register_algo
+from application_team.routes import register as register_application_team
 
 # AI routes now centralized in the ai/ package
 from ai import register_all_routes as register_ai_routes
@@ -48,6 +49,7 @@ def register_all_routes(bp, ok, fail):
     register_projects(bp, ok, fail)
     register_config(bp, ok, fail)
     register_algo(bp, ok, fail)
+    register_application_team(bp, ok, fail)
     register_ai_routes(bp, ok, fail)
     register_perf(bp, ok, fail)
     register_stats(bp, ok, fail)

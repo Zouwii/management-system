@@ -4,6 +4,9 @@ import {
   mockCreateAITaskTicket,
   mockFetchDepartmentOverview,
   mockFetchIntegrationTeamDetail,
+  mockFetchApplicationTeamDetail,
+  mockFetchApplicationTeamReport,
+  mockFetchApplicationTeamOptions,
   mockFetchNavTeamDetail,
   mockFetchPerformanceHistory,
   mockFetchTeamPerformance,
@@ -43,6 +46,9 @@ import {
   realCreateAITaskTicket,
   realFetchDepartmentOverview,
   realFetchIntegrationTeamDetail,
+  realFetchApplicationTeamDetail,
+  realFetchApplicationTeamReport,
+  realFetchApplicationTeamOptions,
   realFetchNavTeamDetail,
   realFetchPerformanceHistory,
   realFetchTeamPerformance,
@@ -81,6 +87,9 @@ import {
 export const fetchDepartmentOverview = createApiSwitch(mockFetchDepartmentOverview, realFetchDepartmentOverview);
 export const fetchNavTeamDetail = createApiSwitch(mockFetchNavTeamDetail, realFetchNavTeamDetail);
 export const fetchIntegrationTeamDetail = createApiSwitch(mockFetchIntegrationTeamDetail, realFetchIntegrationTeamDetail);
+export const fetchApplicationTeamDetail = createApiSwitch(mockFetchApplicationTeamDetail, realFetchApplicationTeamDetail);
+export const fetchApplicationTeamReport = createApiSwitch(mockFetchApplicationTeamReport, realFetchApplicationTeamReport);
+export const fetchApplicationTeamOptions = createApiSwitch(mockFetchApplicationTeamOptions, realFetchApplicationTeamOptions);
 export const fetchPersonalHours = createApiSwitch(mockFetchPersonalHours, realFetchPersonalHours);
 export const fetchPersonalHoursMembers = createApiSwitch(mockFetchPersonalHoursMembers, realFetchPersonalHoursMembers);
 export const fetchPersonalHoursBase = createApiSwitch(mockFetchPersonalHoursBase, realFetchPersonalHoursBase);
@@ -130,4 +139,3 @@ export const fetchMembers = createApiSwitch(mockFetchMembers, realFetchMembers);
 
 export const recalcMemberPerformance = createApiSwitch(mockRecalcMemberPerformance, realRecalcMemberPerformance);
 export const increaseSync = createApiSwitch(mockIncreaseSync, realIncreaseSync);
-

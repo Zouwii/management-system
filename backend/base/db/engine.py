@@ -264,24 +264,43 @@ def init_database() -> None:
     """
     main_tables, perf_tables, kb_tables, onsite_tables, req_pool_tables, algo_tables = _table_registry()
     # seed 阶段会直接使用这两个 ORM 模型
-    from base.db.orm import Config as DbConfig, UserCharacter as DbUserCharacter
+    from base.db.orm import (
+        Config as DbConfig,
+        OnsiteProblemDetail,
+        UserCharacter as DbUserCharacter,
+    )
 
     print("[init_db] creating tables (no drop) ...")
     _execute_table_ops(engine, main_tables, "create")
     _execute_table_ops(perf_engine, perf_tables, "create")
     _execute_table_ops(kb_engine, kb_tables, "create")
     _execute_table_ops(onsite_engine, onsite_tables, "create")
-    # 现场问题 B 表的钉钉任务创建/更新时间；兼容已存在的历史表。
+    # 现场问题 B 表字段迁移；兼容已存在的历史表。
+    #
+    # OnsiteProblemDetail 的字段是逐步增加的，单纯 create(checkfirst=True)
+    # 不会更新已经存在的 onsite_problem_details。历史库如果缺少这些拆列，
+    # B 表同步在 INSERT/UPDATE 时会直接失败。因此这里只对可空字段做增量
+    # ADD COLUMN，保留旧数据，不改变既有列和约束。
     try:
         from sqlalchemy import inspect, text
-        onsite_columns = {c.get("name") for c in inspect(onsite_engine).get_columns("onsite_problem_details")}
+        onsite_table = OnsiteProblemDetail.__table__
+        onsite_columns = {
+            c.get("name") for c in inspect(onsite_engine).get_columns("onsite_problem_details")
+        }
         with onsite_engine.begin() as conn:
-            if "ding_created" not in onsite_columns:
-                conn.execute(text("ALTER TABLE onsite_problem_details ADD COLUMN ding_created DATETIME"))
-            if "ding_updated" not in onsite_columns:
-                conn.execute(text("ALTER TABLE onsite_problem_details ADD COLUMN ding_updated DATETIME"))
+            for column in onsite_table.columns:
+                if column.name in onsite_columns or not column.nullable:
+                    continue
+                column_type = column.type.compile(dialect=onsite_engine.dialect)
+                conn.execute(
+                    text(
+                        "ALTER TABLE onsite_problem_details "
+                        f"ADD COLUMN {column.name} {column_type}"
+                    )
+                )
+                print(f"[init_db] migrate onsite schema: add {column.name} {column_type}")
     except Exception as exc:
-        print(f"[init_db] onsite time columns migration skipped: {exc}")
+        print(f"[init_db] onsite schema migration skipped: {exc}")
     try:
         _execute_table_ops(req_pool_engine, req_pool_tables, "create")
     except Exception as e:

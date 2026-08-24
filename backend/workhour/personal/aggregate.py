@@ -728,6 +728,8 @@ def _team_name_from_team_id(team_id_value: Any) -> str:
         return "导航组"
     if val == "1":
         return "对接组"
+    if val == "3":
+        return "应用组"
     return "未分组"
 
 
@@ -761,7 +763,8 @@ def team_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, Any]
     start_raw = payload.get("start_time")
     end_raw = payload.get("end_time")
     exclude_character_zero = str(payload.get("exclude_character_zero", "true")).strip().lower() not in {"0", "false", "no"}
-    if team_id not in {"0", "1"}:
+    # 0=导航组，1=对接组，3=应用组。算法组(2)使用独立数据源。
+    if team_id not in {"0", "1", "3"}:
         return {"success": False, "error": "invalid teamId", "data": {}}
     if not project_id:
         return {"success": False, "error": "missing projectId", "data": {}}
@@ -879,8 +882,8 @@ def team_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, Any]
                 or 0.0
             )
 
-            allocation_delta = scheduled_total - expected_effective_hours
-            completion_delta = completed_total - expected_effective_hours
+            allocation_delta = scheduled_total + overdue_effective_total - expected_effective_hours
+            completion_delta = completed_total + overdue_completed_total - expected_effective_hours
             rows.append(
                 {
                     "userId": uid,

@@ -7,6 +7,7 @@ export const ROUTE_PATHS = {
   DEPARTMENT_OVERVIEW: '/manager/department-overview',
   NAV_TEAM_DETAIL: '/manager/nav-team-detail',
   INTEGRATION_TEAM_DETAIL: '/manager/integration-team-detail',
+  APPLICATION_TEAM: '/manager/application-team',
   PERSONAL_HOURS: '/employee/personal-hours',
   PERFORMANCE: '/employee/performance',
   AI_ANALYSIS: '/employee/ai-analysis',

@@ -217,14 +217,14 @@ function normalizeHoursRows(rows) {
     const completedHours = Number(row.completedHours || 0);
     const overdueEffectiveHours = Number(row.overdueEffectiveHours || 0);
     const overdueCompletedHours = Number(row.overdueCompletedHours || 0);
-    const allocationActualHours = scheduledHours;
-    const completionActualHours = completedHours;
+    const allocationActualHours = scheduledHours + overdueEffectiveHours;
+    const completionActualHours = completedHours + overdueCompletedHours;
     const allocationDelta = Number.isFinite(Number(row.allocationDelta))
       ? Number(row.allocationDelta)
-      : (scheduledHours - quarterExpectedHours);
+      : (scheduledHours + overdueEffectiveHours - quarterExpectedHours);
     const completionDelta = Number.isFinite(Number(row.completionDelta))
       ? Number(row.completionDelta)
-      : (completedHours - quarterExpectedHours);
+      : (completedHours + overdueCompletedHours - quarterExpectedHours);
     return {
       ...row,
       quarterExpectedHours,
@@ -466,8 +466,14 @@ export default function TeamDetailDashboard({
       selectedExpectedHours: row.quarterExpectedHours,
       allocationInsufficient: row.allocationDelta < 0,
       completionInsufficient: row.completionDelta < 0,
-      allocationRiskLevel: getRiskLevel(row.scheduledHours, row.quarterExpectedHours),
-      completionRiskLevel: getRiskLevel(row.completedHours, row.quarterExpectedHours),
+      allocationRiskLevel: getRiskLevel(
+        row.scheduledHours + row.overdueEffectiveHours,
+        row.quarterExpectedHours,
+      ),
+      completionRiskLevel: getRiskLevel(
+        row.completedHours + row.overdueCompletedHours,
+        row.quarterExpectedHours,
+      ),
     }));
   }, [rows]);
   const visibleHourRows = useMemo(() => {
