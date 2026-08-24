@@ -312,7 +312,7 @@ mock 登录通过账号密码映射角色，当前演示账号如下：
 | [`backend/run_on_pc_daemon.sh`](backend/run_on_pc_daemon.sh) | 管理后端守护进程 | 支持 `start/stop/restart/status/logs`；启动时检查运行环境、安装依赖并按需创建 `.env`，可通过 `INIT_MYSQL=1` 初始化 MySQL；默认端口为 `5002` |
 | [`scripts/02-package.sh`](scripts/02-package.sh) | 构建并生成部署包 | 默认以 `real` 模式构建前端；复制后端和共享 AI skills，排除 `.venv`、业务数据、运行日志、本地模型与缓存，生成 `tar/tb_tool_bt_backend-<时间>.tar.gz` |
 | [`scripts/03-deploy.sh`](scripts/03-deploy.sh) | 部署最新压缩包 | 选择 `tar/` 中最新包上传到脚本内指定服务器；替换远程项目时保留并恢复 `.venv`、`.env`、`data` 和 `local_models`，然后重启守护进程；上传后会删除本地压缩包 |
-| [`onekey-deploy.sh`](onekey-deploy.sh) | 一键打包并部署 | 依次执行 `scripts/02-package.sh` 和 `scripts/03-deploy.sh` |
+| [`onekey-deploy.sh`](onekey-deploy.sh) | 一键打包并部署 | 部署 management-system，并默认同步、重启 6433 模块化诊断终端 |
 | [`scripts/setup-mcp.sh`](scripts/setup-mcp.sh) | 配置 Claude Code 使用 TB MCP | 交互式读取用户名，备份并重写 `~/.claude/mcp.json`，同时启用 `tb-mcp`；会修改当前用户的 Claude 全局配置 |
 
 打包但不部署：
@@ -327,9 +327,40 @@ mock 登录通过账号密码映射角色，当前演示账号如下：
 ./onekey-deploy.sh
 ```
 
+默认情况下，一键部署在 management-system 启动完成后还会部署并重启 6433
+模块化诊断终端。该步骤会同步：
+
+- `jz-claude-skills/skills` 与 `jz-claude-skills/scripts`；
+- `diagnosis-agent/source-docs/jstate_error_codes/agent`；
+- `diagnosis-agent/source-docs/onsite-top` 顶层知识文档和高频映射表。
+
+不会把 `onsite-top/scripts` 报表脚本复制到 6433 的运行知识目录。需要只部署
+management-system 时，可执行：
+
+```bash
+DEPLOY_DIAGKIT_6433=false ./onekey-deploy.sh
+```
+
+6433 也可以独立管理：
+
+```bash
+bash scripts/manage-diagkit-6433.sh check
+bash scripts/manage-diagkit-6433.sh deploy
+bash scripts/manage-diagkit-6433.sh sync-skills
+bash scripts/manage-diagkit-6433.sh sync-docs
+bash scripts/manage-diagkit-6433.sh start
+bash scripts/manage-diagkit-6433.sh stop
+bash scripts/manage-diagkit-6433.sh restart
+bash scripts/manage-diagkit-6433.sh status
+```
+
+管理脚本默认使用 SSH key 登录。临时需要密码登录时，通过环境变量
+`DIAGKIT_REMOTE_PASS` 注入，并确保本机已安装 `sshpass`；不要把密码写入脚本或仓库。
+
 部署脚本包含固定的远程目标配置，并会替换服务器上的现有项目目录。执行 `scripts/03-deploy.sh` 或 `onekey-deploy.sh` 前，必须核对目标服务器、待上传包以及远端保留目录。
 
-现场问题、需求池和知识库的一次性循环同步工具，以及旧 DiagKit 运维脚本已从本仓库移除；相关业务能力仍通过 Flask API 提供。
+现场问题、需求池和知识库的一次性循环同步工具已从本仓库移除；6433 模块化
+DiagKit 仅保留启动、目录同步和服务管理脚本，业务能力仍通过 Flask API 提供。
 
 ## 10 质量检查
 
