@@ -92,3 +92,4 @@
 | 文档 | 说明 |
 |------|------|
 | [ops/server-connection.md](ops/server-connection.md) | 服务器连接：SSH、日志、数据库、重启、同步控制、离线模式 |
+| [ops/2026-08-25-benti-sync-partial-failure-and-member-cursor.md](ops/2026-08-25-benti-sync-partial-failure-and-member-cursor.md) | 团队同步单成员 500 问题记录、部分成功方案与成员独立游标改造计划 |

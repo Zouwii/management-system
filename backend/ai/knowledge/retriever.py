@@ -116,15 +116,16 @@ def search_vector(
     if not query or not query.strip():
         return []
 
-    from ai.knowledge.embedder import _get_model, is_model_ready
+    from ai.knowledge.embedder import (
+        embedding_vector_table,
+        encode_texts,
+        is_model_ready,
+    )
 
     if not is_model_ready():
         return []  # model not loaded yet, skip vector search
 
-    model = _get_model()
-    q_emb = model.encode(
-        [query.strip()], normalize_embeddings=True, show_progress_bar=False
-    )[0]
+    q_emb = encode_texts([query.strip()], batch_size=1)[0]
 
     # Format as pgvector literal — safe because values are our own floats
     vec_str = "[" + ",".join(str(x) for x in q_emb) + "]"
@@ -133,9 +134,10 @@ def search_vector(
     kb = KbSessionLocal()
     try:
         # Step 1: find nearest chunk_ids in pgvector
+        vector_table = embedding_vector_table()
         pg_sql = text(
             f"SELECT chunk_id, 1 - (embedding <=> '{vec_str}') AS score "
-            "FROM chunk_vectors "
+            f"FROM {vector_table} "
             f"ORDER BY embedding <=> '{vec_str}' "
             "LIMIT :limit"
         )

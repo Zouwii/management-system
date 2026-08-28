@@ -214,7 +214,7 @@ def register_v3(bp, ok, fail):
         5. Insert parent chunks, link leaf chunks via parent_id
         6. Embed leaf chunks (depth=1 only)
         """
-        from ai.knowledge.chunker import chunk_document
+        from ai.knowledge.chunk_strategy import chunk_document_for_index
         from ai.knowledge.chunk_storage import persist_chunk_result
         from ai.knowledge.embedder import embed_chunks, delete_vectors
 
@@ -251,9 +251,13 @@ def register_v3(bp, ok, fail):
                     delete_vectors(old_ids)
 
                 # Chunk
-                result = chunk_document(
+                node = db.query(KbNode.breadcrumb).filter(
+                    KbNode.node_id == doc.node_id
+                ).first()
+                result = chunk_document_for_index(
                     doc.node_id, doc.title, doc.content,
-                    doc.outline or "", "FILE"
+                    doc.outline or "", "FILE",
+                    node[0] if node else "",
                 )
                 persisted = persist_chunk_result(db, result)
 

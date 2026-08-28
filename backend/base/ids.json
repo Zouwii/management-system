@@ -17,8 +17,7 @@
       "沈旭东": { "userId": "234765171227529303", "character": 0, "team_id": 1, "is_nav_lead": false, "is_servo_lead": true },
       "李赫":   { "userId": "011168364322856029", "character": 1, "team_id": 1, "is_nav_lead": false, "is_servo_lead": false },
       "刘力璋": { "userId": "02013312354020881768", "character": 2, "team_id": 1, "is_nav_lead": false, "is_servo_lead": false },
-      "戴宇庆": { "userId": "01183307230324910099", "character": 1, "team_id": 1, "is_nav_lead": false, "is_servo_lead": false },
-      "谢宇迪": { "userId": "246760621135238117", "character": 5, "team_id": 1, "is_nav_lead": false, "is_servo_lead": false }
+      "戴宇庆": { "userId": "01183307230324910099", "character": 1, "team_id": 1, "is_nav_lead": false, "is_servo_lead": false }
     },
     "算法组": {
       "刘丰": { "userId": "0525436259671512", "character": 4, "team_id": 2, "is_nav_lead": false, "is_servo_lead": true },
@@ -38,4 +37,3 @@
     "本地开发部": "647854bc4a622b2e3199fa5a"
   }
 }
-

@@ -15,13 +15,13 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 from ai.knowledge.chunk_storage import persist_chunk_result
-from ai.knowledge.chunker import chunk_document
+from ai.knowledge.chunk_strategy import chunk_document_for_index
 from ai.knowledge.embedder import delete_vectors, embed_chunks
 from ai.knowledge.markdown_sync import (
     download_markdown_documents,
     persist_downloaded_markdown,
 )
-from ai.knowledge.models import KbDocument, KbChunk
+from ai.knowledge.models import KbDocument, KbNode, KbChunk
 from ai.knowledge.routes import _sync_workspace
 from ai.knowledge.service import DingTalkKnowledgeClient, get_known_workspaces
 from base.db.engine import KbSessionLocal, SessionLocal
@@ -205,8 +205,17 @@ def _rechunk_documents(doc_ids: List[str]) -> dict:
                 ).all()
             )
             db.query(KbChunk).filter(KbChunk.doc_id == doc.node_id).delete()
-            result = chunk_document(doc.node_id, doc.title, doc.content,
-                                     doc.outline or "", "FILE")
+            node = db.query(KbNode.breadcrumb).filter(
+                KbNode.node_id == doc.node_id
+            ).first()
+            result = chunk_document_for_index(
+                doc.node_id,
+                doc.title,
+                doc.content,
+                doc.outline or "",
+                "FILE",
+                node[0] if node else "",
+            )
             persisted = persist_chunk_result(db, result)
             total_chunks += persisted["total_count"]
         db.commit()

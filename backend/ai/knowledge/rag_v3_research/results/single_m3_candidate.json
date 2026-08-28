@@ -1,0 +1,158 @@
+{
+  "samples": [
+    {
+      "slug": "01-speed-arbitration",
+      "title": "速度仲裁",
+      "chunk_count": 2,
+      "token_stats": {
+        "min": 122,
+        "mean": 450.0,
+        "p95": 778,
+        "max": 778
+      },
+      "over_max_tokens": 0,
+      "folder_header_coverage": 2,
+      "title_header_coverage": 2,
+      "section_header_coverage": 2,
+      "unbalanced_fence_chunks": 0,
+      "table_chunk_count": 1,
+      "table_chunks_without_separator": 0,
+      "outline_count": 1,
+      "cleaner_warnings": []
+    },
+    {
+      "slug": "02-diagnosis-requirements",
+      "title": "故障诊断三期需求分解方案",
+      "chunk_count": 22,
+      "token_stats": {
+        "min": 44,
+        "mean": 683.5,
+        "p95": 1192,
+        "max": 1194
+      },
+      "over_max_tokens": 0,
+      "folder_header_coverage": 22,
+      "title_header_coverage": 22,
+      "section_header_coverage": 22,
+      "unbalanced_fence_chunks": 0,
+      "table_chunk_count": 12,
+      "table_chunks_without_separator": 0,
+      "outline_count": 9,
+      "cleaner_warnings": []
+    },
+    {
+      "slug": "03-low-code-dictionary",
+      "title": "低代码算子字典",
+      "chunk_count": 125,
+      "token_stats": {
+        "min": 44,
+        "mean": 380.26,
+        "p95": 743,
+        "max": 873
+      },
+      "over_max_tokens": 0,
+      "folder_header_coverage": 125,
+      "title_header_coverage": 125,
+      "section_header_coverage": 125,
+      "unbalanced_fence_chunks": 0,
+      "table_chunk_count": 71,
+      "table_chunks_without_separator": 0,
+      "outline_count": 107,
+      "cleaner_warnings": []
+    },
+    {
+      "slug": "04-ros-interface",
+      "title": "驱动相关ROS接口",
+      "chunk_count": 119,
+      "token_stats": {
+        "min": 63,
+        "mean": 352.92,
+        "p95": 1133,
+        "max": 1194
+      },
+      "over_max_tokens": 0,
+      "folder_header_coverage": 119,
+      "title_header_coverage": 119,
+      "section_header_coverage": 119,
+      "unbalanced_fence_chunks": 0,
+      "table_chunk_count": 103,
+      "table_chunks_without_separator": 0,
+      "outline_count": 103,
+      "cleaner_warnings": []
+    },
+    {
+      "slug": "05-agv-maintenance",
+      "title": "AGV硬件维护指导书V1.7",
+      "chunk_count": 345,
+      "token_stats": {
+        "min": 51,
+        "mean": 176.94,
+        "p95": 293,
+        "max": 1196
+      },
+      "over_max_tokens": 0,
+      "folder_header_coverage": 345,
+      "title_header_coverage": 345,
+      "section_header_coverage": 345,
+      "unbalanced_fence_chunks": 0,
+      "table_chunk_count": 2,
+      "table_chunks_without_separator": 0,
+      "outline_count": 339,
+      "cleaner_warnings": [
+        "UNKNOWN_MEDIA_URL",
+        "UNKNOWN_MEDIA_URL",
+        "UNKNOWN_MEDIA_URL",
+        "UNKNOWN_MEDIA_URL",
+        "UNKNOWN_MEDIA_URL",
+        "UNKNOWN_MEDIA_URL",
+        "UNKNOWN_MEDIA_URL",
+        "UNKNOWN_MEDIA_URL",
+        "UNKNOWN_MEDIA_URL",
+        "UNKNOWN_MEDIA_URL",
+        "UNKNOWN_MEDIA_URL",
+        "UNKNOWN_MEDIA_URL",
+        "UNKNOWN_MEDIA_URL",
+        "UNKNOWN_MEDIA_URL",
+        "UNKNOWN_MEDIA_URL",
+        "UNKNOWN_MEDIA_URL",
+        "UNKNOWN_MEDIA_URL",
+        "UNKNOWN_MEDIA_URL",
+        "UNKNOWN_MEDIA_URL",
+        "UNKNOWN_MEDIA_URL",
+        "UNKNOWN_MEDIA_URL",
+        "UNKNOWN_MEDIA_URL",
+        "UNKNOWN_MEDIA_URL",
+        "UNKNOWN_MEDIA_URL",
+        "UNKNOWN_MEDIA_URL",
+        "UNKNOWN_MEDIA_URL",
+        "UNKNOWN_MEDIA_URL",
+        "UNKNOWN_MEDIA_URL",
+        "UNKNOWN_MEDIA_URL",
+        "UNKNOWN_MEDIA_URL",
+        "UNKNOWN_MEDIA_URL",
+        "UNKNOWN_MEDIA_URL",
+        "UNKNOWN_MEDIA_URL"
+      ]
+    },
+    {
+      "slug": "06-simulation-http-api",
+      "title": "仿真平台http接口文档",
+      "chunk_count": 60,
+      "token_stats": {
+        "min": 52,
+        "mean": 190.73,
+        "p95": 368,
+        "max": 482
+      },
+      "over_max_tokens": 0,
+      "folder_header_coverage": 60,
+      "title_header_coverage": 60,
+      "section_header_coverage": 60,
+      "unbalanced_fence_chunks": 0,
+      "table_chunk_count": 41,
+      "table_chunks_without_separator": 0,
+      "outline_count": 119,
+      "cleaner_warnings": []
+    }
+  ]
+}

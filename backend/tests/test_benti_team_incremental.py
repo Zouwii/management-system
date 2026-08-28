@@ -165,6 +165,38 @@ class BentiTeamIncrementalTests(unittest.TestCase):
         update_time.assert_not_called()
         release.assert_called_once()
 
+    def test_member_list_failure_returns_dingtalk_context(self):
+        failure = {
+            "success": False,
+            "data": {
+                "status_code": 500,
+                "dingtalk": {
+                    "code": "InternalError",
+                    "message": "upstream failed",
+                    "requestId": "request-1",
+                },
+            },
+            "meta": {"page_count": 0, "fetched_count": 0},
+        }
+        patches = self._common_patches()
+        with patches[0], patches[1] as release, patches[2], patches[3] as last_time, \
+                patches[4], patches[5], patches[6], patches[7], patches[8], patches[9], \
+                patches[10] as update_time, patch.object(
+                    task_sync, "query_project_tasks_service", return_value=failure
+                ) as query_lists:
+            last_time.return_value = datetime(2026, 8, 1, tzinfo=timezone.utc)
+            result = task_sync.benti_team_incremental_update_service({"projectId": "project-1"})
+
+        self.assertFalse(result["success"])
+        self.assertEqual(query_lists.call_count, 3)
+        self.assertEqual(result["data"]["failedMember"], "u1")
+        self.assertEqual(result["data"]["failedAttempts"], 3)
+        self.assertEqual(result["data"]["failure"]["status_code"], 500)
+        self.assertEqual(result["data"]["failure"]["code"], "InternalError")
+        self.assertEqual(result["data"]["failure"]["request_id"], "request-1")
+        update_time.assert_not_called()
+        release.assert_called_once()
+
 
 if __name__ == "__main__":
     unittest.main()

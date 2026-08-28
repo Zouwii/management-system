@@ -74,6 +74,37 @@ from base.sync.lock import (
 DEFAULT_DB_COMMIT_BATCH_SIZE = 100
 
 
+def _benti_list_failure_context(result: Dict[str, Any]) -> Dict[str, Any]:
+    """Extract a compact, non-secret failure summary for member-list sync logs."""
+    result = result if isinstance(result, dict) else {}
+    data = result.get("data") if isinstance(result.get("data"), dict) else {}
+    dingtalk = data.get("dingtalk") if isinstance(data.get("dingtalk"), dict) else {}
+    meta = result.get("meta") if isinstance(result.get("meta"), dict) else {}
+
+    raw = dingtalk.get("raw")
+    if raw not in (None, ""):
+        raw = str(raw)[:1000]
+
+    context = {
+        "status_code": data.get("status_code"),
+        "error": result.get("error"),
+        "code": dingtalk.get("code") or dingtalk.get("errorCode"),
+        "message": dingtalk.get("message") or dingtalk.get("errorMessage"),
+        "request_id": (
+            dingtalk.get("requestId")
+            or dingtalk.get("request_id")
+            or dingtalk.get("requestid")
+        ),
+        "raw": raw,
+        "page_count": meta.get("page_count"),
+        "fetched_count": meta.get("fetched_count"),
+        "refresh_attempted": meta.get("refresh_attempted"),
+        "refresh_ok": meta.get("refresh_ok"),
+        "refresh_error": meta.get("refresh_error"),
+    }
+    return {key: value for key, value in context.items() if value not in (None, "")}
+
+
 def _parse_iso_dt(s: Optional[str]) -> Optional[datetime]:
     if not s:
         return None
@@ -2078,7 +2109,7 @@ def benti_team_incremental_update_service(payload: Optional[Dict[str, Any]] = No
         tasks_by_id: Dict[str, Dict[str, Any]] = {}
         list_results: Dict[str, Dict[str, Any]] = {}
 
-        for member_id in member_ids:
+        for member_index, member_id in enumerate(member_ids, start=1):
             query_payload = {
                 "userId": member_id,
                 "projectId": project_id,
@@ -2095,15 +2126,45 @@ def benti_team_incremental_update_service(payload: Optional[Dict[str, Any]] = No
                 result = query_project_tasks_service(query_payload)
                 if result.get("success"):
                     break
+                failure_context = _benti_list_failure_context(result)
+                print(
+                    "[benti_sync] member_list_failed "
+                    + json.dumps(
+                        {
+                            "member_id": member_id,
+                            "member_index": member_index,
+                            "member_count": len(member_ids),
+                            "project_id": project_id,
+                            "updated_gte": updated_threshold,
+                            "attempt": attempts,
+                            "max_attempts": 3,
+                            **failure_context,
+                        },
+                        ensure_ascii=False,
+                        default=str,
+                    ),
+                    flush=True,
+                )
             if not result.get("success"):
+                failure_context = _benti_list_failure_context(result)
+                error_detail = json.dumps(
+                    failure_context,
+                    ensure_ascii=False,
+                    default=str,
+                    separators=(",", ":"),
+                )
                 return {
                     "success": False,
-                    "error": "member list failed user={}: {}".format(
-                        member_id, result.get("error", "unknown")
+                    "error": "member list failed user={} after {} attempts: {}".format(
+                        member_id, attempts, error_detail or "unknown"
                     ),
                     "data": {
                         "memberCount": len(member_ids),
                         "completedMembers": len(list_results),
+                        "failedMember": member_id,
+                        "failedMemberIndex": member_index,
+                        "failedAttempts": attempts,
+                        "failure": failure_context,
                         "listResults": list_results,
                     },
                 }

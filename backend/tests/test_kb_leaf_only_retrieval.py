@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import os
 import unittest
 from unittest.mock import patch
 
@@ -36,6 +37,25 @@ class _Model:
 
 
 class LeafOnlyRetrievalTests(unittest.TestCase):
+    def test_embedding_backend_selects_matching_vector_table(self):
+        with patch.dict(os.environ, {"KB_EMBEDDING_MODEL": "bge-m3"}, clear=False):
+            config = embedder.embedding_config()
+        self.assertEqual(config["model"], "m3")
+        self.assertEqual(config["table"], "chunk_vectors_bgem3")
+        self.assertEqual(config["dimension"], 1024)
+
+    def test_embedding_backend_rejects_mismatched_vector_table(self):
+        with patch.dict(
+            os.environ,
+            {
+                "KB_EMBEDDING_MODEL": "bge-m3",
+                "KB_EMBEDDING_VECTOR_TABLE": "chunk_vectors",
+            },
+            clear=False,
+        ):
+            with self.assertRaises(ValueError):
+                embedder.embedding_config()
+
     def test_embedding_defaults_to_leaf_depth(self):
         depth = inspect.signature(embed_chunks).parameters["depth"]
         self.assertEqual(depth.default, 1)
@@ -59,7 +79,7 @@ class LeafOnlyRetrievalTests(unittest.TestCase):
         pg = _CapturingSession(rows=[(11, 0.9)])
         kb = _CapturingSession(rows=[])
         with patch.object(embedder, "is_model_ready", return_value=True), patch.object(
-            embedder, "_get_model", return_value=_Model()
+            embedder, "encode_texts", return_value=[[0.1, 0.2]]
         ), patch.object(
             retriever, "PgVectorSessionLocal", return_value=pg
         ), patch.object(
