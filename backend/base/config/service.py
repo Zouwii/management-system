@@ -2,16 +2,15 @@ import json
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
-from base.dingtalk_client import get_config_projectids, get_config_userids
+from base.dingtalk_client import get_config_projectids
+from base.organization.constants import ROLE_LABELS, stable_role_code
+from base.organization.service import list_all_members
 
 DEFAULT_WORKHOUR_COEFFICIENT = 1.0
 
 
-def _parse_character_coefficients(raw: Any) -> Dict[int, float]:
-    """
-    将 db config.value（JSON 字符串）解析为 {0:0.4,1:0.7,...}。
-    不限制 key 范围，完全按配置表里的数字 key 返回。
-    """
+def _parse_role_coefficients(raw: Any) -> Dict[str, float]:
+    """Parse a stable job_role_code -> coefficient JSON mapping."""
     if raw is None:
         return {}
     try:
@@ -21,13 +20,10 @@ def _parse_character_coefficients(raw: Any) -> Dict[int, float]:
         if not isinstance(data, dict):
             return {}
 
-        out: Dict[int, float] = {}
+        out: Dict[str, float] = {}
         for raw_k, raw_v in data.items():
-            try:
-                k_int = int(str(raw_k).strip())
-            except Exception:
-                continue
-            if k_int < 0:
+            role_code = stable_role_code(raw_k)
+            if not role_code:
                 continue
             try:
                 v_float = float(raw_v)
@@ -35,7 +31,7 @@ def _parse_character_coefficients(raw: Any) -> Dict[int, float]:
                 continue
             if v_float < 0:
                 continue
-            out[k_int] = v_float
+            out[role_code] = v_float
 
         return out
     except Exception:
@@ -43,10 +39,14 @@ def _parse_character_coefficients(raw: Any) -> Dict[int, float]:
 
 
 def get_userids_service() -> Dict[str, Any]:
-    userids = get_config_userids()
-    users: List[Dict[str, str]] = []
-    for name, user_id in userids.items():
-        users.append({"name": str(name), "userId": str(user_id)})
+    users: List[Dict[str, str]] = [
+        {
+            "name": str(member.get("userName") or member.get("userId") or ""),
+            "userId": str(member.get("userId") or ""),
+        }
+        for member in list_all_members()
+        if str(member.get("userId") or "").strip()
+    ]
     return {"success": True, "users": users}
 
 
@@ -57,58 +57,25 @@ def get_projectids_service() -> Dict[str, Any]:
         projects.append({"name": str(name), "projectId": str(project_id)})
     return {"success": True, "projects": projects}
 
-def get_workhour_coefficient_service() -> Dict[str, Any]:
-    """
-    兼容旧字段（如果你还在用的话）。
-    - type: workhour_coefficient
-    - value: 数字（float），例如 0.7
-    """
+def get_workhour_role_coefficients_service() -> Dict[str, Any]:
+    """Read the authoritative job_role_code -> coefficient mapping."""
     from base.db.engine import SessionLocal
     from base.db.orm import Config as DbConfig
 
     session = SessionLocal()
     try:
-        row = session.query(DbConfig).filter(DbConfig.type_ == "workhour_coefficient").first()
-        if not row:
-            return {"success": True, "workhour_coefficient": DEFAULT_WORKHOUR_COEFFICIENT}
-
-        try:
-            v = float(row.value)
-            if not (v >= 0):
-                return {"success": True, "workhour_coefficient": DEFAULT_WORKHOUR_COEFFICIENT}
-            return {"success": True, "workhour_coefficient": v}
-        except Exception:
-            return {"success": True, "workhour_coefficient": DEFAULT_WORKHOUR_COEFFICIENT}
-    finally:
-        session.close()
-
-
-def get_workhour_character_coefficients_service() -> Dict[str, Any]:
-    """
-    读取数据库 config 表里的 character -> coefficient 映射。
-    - type: workhour_character_coefficients
-    - value: JSON 字符串，例如 {"0":0.4,"1":0.7,"2":0.7,"3":1.0}
-    """
-    from base.db.engine import SessionLocal
-    from base.db.orm import Config as DbConfig
-
-    session = SessionLocal()
-    try:
-        row = session.query(DbConfig).filter(DbConfig.type_ == "workhour_character_coefficients").first()
-        mapping = _parse_character_coefficients(getattr(row, "value", None) if row else None)
-        # 前端更方便用字符串 key
+        row = session.query(DbConfig).filter(DbConfig.type_ == "workhour_role_coefficients").first()
+        mapping = _parse_role_coefficients(getattr(row, "value", None) if row else None)
         return {
             "success": True,
-            "workhour_character_coefficients": {str(k): v for k, v in mapping.items()},
+            "workhour_role_coefficients": mapping,
         }
     finally:
         session.close()
 
 
 def get_user_character_service(user_id: str) -> Dict[str, Any]:
-    """
-    根据执行者 user_id 查询 user_character.character，并计算对应 coefficient。
-    """
+    """Resolve a user's stable job role and its work-hour coefficient."""
     from base.db.engine import SessionLocal
     from base.db.orm import Config as DbConfig
     from base.db.orm import UserCharacter as DbUserCharacter
@@ -117,8 +84,8 @@ def get_user_character_service(user_id: str) -> Dict[str, Any]:
     session = SessionLocal()
     try:
         # 1) 读取映射
-        row = session.query(DbConfig).filter(DbConfig.type_ == "workhour_character_coefficients").first()
-        mapping = _parse_character_coefficients(getattr(row, "value", None) if row else None)
+        row = session.query(DbConfig).filter(DbConfig.type_ == "workhour_role_coefficients").first()
+        mapping = _parse_role_coefficients(getattr(row, "value", None) if row else None)
 
         # 2) 读取 user_character
         c_row = (
@@ -126,12 +93,13 @@ def get_user_character_service(user_id: str) -> Dict[str, Any]:
             .filter(DbUserCharacter.user_id == user_id)
             .first()
         )
-        character: int = int(getattr(c_row, "character", 0) or 0)
-        coefficient = float(mapping.get(character, DEFAULT_WORKHOUR_COEFFICIENT))
+        job_role_code = stable_role_code(getattr(c_row, "job_role_code", None))
+        coefficient = float(mapping.get(job_role_code, DEFAULT_WORKHOUR_COEFFICIENT))
         return {
             "success": True,
             "userId": user_id,
-            "character": character,
+            "jobRoleCode": job_role_code,
+            "jobRoleName": ROLE_LABELS.get(job_role_code, "未设置"),
             "workhour_coefficient": coefficient,
         }
     finally:
@@ -351,4 +319,3 @@ def set_workhour_auto_calc_last_date_service(last_date: str) -> Dict[str, Any]:
     # 已按需求改为仅使用 last_update_time 去重；该方法不再写入多余配置字段。
     _ = last_date
     return get_workhour_auto_calc_service()
-

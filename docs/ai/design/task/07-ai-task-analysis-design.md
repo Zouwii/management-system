@@ -125,7 +125,7 @@ ai/task_analysis/
 - 工时数据 → `executor_quarter_workhours_db_service`（与 PersonalHours 同一数据源）
 - 映射表 → `TASK_NATURE_VALUE_ID_TO_CODE` / `TASK_FLOW_STATUS_TO_LABEL` / `BUSINESS_TYPE_TO_LABEL`（与前端 realQueryPersonalHours 一致）
 - 工作日 → `workdays_in_range_service` + `chinese_calendar`
-- 系数 → `get_workhour_character_coefficients_service`
+- 系数 → `get_workhour_role_coefficients_service`（以 `jobRoleCode` 为键）
 
 ### 4.2 步骤 2: 知识库检索
 

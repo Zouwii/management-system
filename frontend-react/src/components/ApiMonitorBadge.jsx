@@ -36,7 +36,7 @@ export default function ApiMonitorBadge() {
       } else {
         setError(json.error || 'fetch failed');
       }
-    } catch (e) {
+    } catch {
       setError('unreachable');
     }
   };

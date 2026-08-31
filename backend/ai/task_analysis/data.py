@@ -69,12 +69,12 @@ def _get_time_range():
     return "", ""
 
 
-def _get_coefficient(user_character: Optional[int]) -> float:
-    from base.config.service import get_workhour_character_coefficients_service
-    coeff_out = get_workhour_character_coefficients_service() or {}
-    coeff_map = coeff_out.get("workhour_character_coefficients") or {}
-    if user_character is not None:
-        return float(coeff_map.get(str(user_character), 1.0) or 1.0)
+def _get_coefficient(job_role_code: Optional[str]) -> float:
+    from base.config.service import get_workhour_role_coefficients_service
+    coeff_out = get_workhour_role_coefficients_service() or {}
+    coeff_map = coeff_out.get("workhour_role_coefficients") or {}
+    if job_role_code:
+        return float(coeff_map.get(str(job_role_code).strip().upper(), 1.0) or 1.0)
     return 1.0
 
 
@@ -310,12 +310,12 @@ def fetch_tasks(
 
     db = SessionLocal()
     try:
-        user_character = None
+        job_role_code = None
         if owner_key:
-            uc = db.query(UserCharacter.character).filter(UserCharacter.user_id == owner_key).first()
+            uc = db.query(UserCharacter.job_role_code).filter(UserCharacter.user_id == owner_key).first()
             if uc and uc[0] is not None:
-                user_character = int(uc[0])
-        coefficient = _get_coefficient(user_character)
+                job_role_code = str(uc[0])
+        coefficient = _get_coefficient(job_role_code)
     finally:
         db.close()
 

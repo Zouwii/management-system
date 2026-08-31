@@ -21,6 +21,8 @@
 |------|------|
 | [architecture/ARCHITECTURE.md](architecture/ARCHITECTURE.md) | 后端架构：目录结构、模块职责、daemon 线程、请求链路 |
 | [architecture/sync-and-lock.md](architecture/sync-and-lock.md) | 同步锁机制设计 |
+| [architecture/organization-backend-v2-design.md](architecture/organization-backend-v2-design.md) | 组织名册、团队岗位编码、Scope、API 与迁移的 V2 当前设计 |
+| [architecture/organization-roster-refactor-plan.md](architecture/organization-roster-refactor-plan.md) | 团队、岗位、Scope 与统一人员范围重构实施计划 |
 
 ---
 

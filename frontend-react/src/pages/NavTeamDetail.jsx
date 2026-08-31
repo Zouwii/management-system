@@ -8,7 +8,7 @@ export default function NavTeamDetail() {
       title="导航组"
       desc=""
       teamName="导航组"
-      teamKey="nav"
+      teamCode="NAV"
       fetcher={fetchNavTeamDetail}
       fallbackRows={navTeam.map((item) => ({ ...item, team: '导航组' }))}
     />

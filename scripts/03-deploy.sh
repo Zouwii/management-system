@@ -23,51 +23,93 @@ if [[ -z "${LATEST_PACKAGE}" ]]; then
 fi
 
 PACKAGE_NAME="$(basename "${LATEST_PACKAGE}")"
+DEPLOY_STAMP="$(date +%Y%m%d-%H%M%S)"
+PRESERVE_DIR=".tb_tool_bt_preserve-${DEPLOY_STAMP}"
 
 echo "[deploy] latest package: ${LATEST_PACKAGE}"
 echo "[deploy] target: ${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_BASE_DIR}"
+echo "[deploy] upload package before stopping the running service..."
+sshpass -p "${REMOTE_PASS}" scp -o StrictHostKeyChecking=no \
+  "${LATEST_PACKAGE}" "${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_BASE_DIR}/"
 
-echo "[deploy] prepare remote directory and clean old project..."
-# 强制使用 REMOTE_BASE_DIR；若当前用户无权限，尝试 sudo 提权创建并授权。
-# 保留服务器已有的虚拟环境和环境配置，避免每次部署重装依赖/丢配置。
-sshpass -p "${REMOTE_PASS}" ssh -o StrictHostKeyChecking=no "${REMOTE_USER}@${REMOTE_HOST}" "
-  set -e
-  if [ ! -d '${REMOTE_BASE_DIR}' ] || [ ! -w '${REMOTE_BASE_DIR}' ]; then
-    echo '${REMOTE_PASS}' | sudo -S mkdir -p '${REMOTE_BASE_DIR}' || {
-      echo '[deploy] 无法创建 ${REMOTE_BASE_DIR}，请确认 jz 具备 sudo 权限'
-      exit 1
-    }
-    echo '${REMOTE_PASS}' | sudo -S chown -R '${REMOTE_USER}:${REMOTE_USER}' '${REMOTE_BASE_DIR}' || {
-      echo '[deploy] 无法修改 ${REMOTE_BASE_DIR} 权限，请联系管理员授权'
-      exit 1
-    }
-  fi
-  cd '${REMOTE_BASE_DIR}'
-  rm -rf .tb_tool_bt_preserve
-  mkdir -p .tb_tool_bt_preserve
-  if [ -d tb_tool_bt/backend/.venv ]; then
-    mv tb_tool_bt/backend/.venv .tb_tool_bt_preserve/.venv
-  fi
-  if [ -f tb_tool_bt/backend/.env ]; then
-    mv tb_tool_bt/backend/.env .tb_tool_bt_preserve/.env
-  fi
-  if [ -d tb_tool_bt/backend/data ]; then
-    mv tb_tool_bt/backend/data .tb_tool_bt_preserve/data
-  fi
-  if [ -d tb_tool_bt/backend/local_models ]; then
-    mv tb_tool_bt/backend/local_models .tb_tool_bt_preserve/local_models
-  fi
-  rm -rf tb_tool_bt
-"
+echo "[deploy] stop daemon and preserve persistent data..."
+sshpass -p "${REMOTE_PASS}" ssh -o StrictHostKeyChecking=no \
+  "${REMOTE_USER}@${REMOTE_HOST}" bash -s -- "${REMOTE_BASE_DIR}" "${PRESERVE_DIR}" <<'REMOTE_PREP'
+set -euo pipefail
+base_dir="$1"
+preserve_dir="$2"
+cd "$base_dir"
+if [ -x tb_tool_bt/backend/run_on_pc_daemon ]; then
+  tb_tool_bt/backend/run_on_pc_daemon stop
+elif [ -x tb_tool_bt/backend/run_on_pc_daemon.sh ]; then
+  bash tb_tool_bt/backend/run_on_pc_daemon.sh stop
+fi
+mkdir -p "$preserve_dir"
+if [ -d tb_tool_bt/backend/.venv ]; then mv tb_tool_bt/backend/.venv "$preserve_dir/.venv"; fi
+if [ -f tb_tool_bt/backend/.env ]; then mv tb_tool_bt/backend/.env "$preserve_dir/.env"; fi
+if [ -d tb_tool_bt/backend/data ]; then mv tb_tool_bt/backend/data "$preserve_dir/data"; fi
+if [ -d tb_tool_bt/backend/local_models ]; then mv tb_tool_bt/backend/local_models "$preserve_dir/local_models"; fi
+if [ -d tb_tool_bt/backend/runtime ]; then
+  mv tb_tool_bt/backend/runtime "$preserve_dir/runtime"
+  rm -f "$preserve_dir/runtime/tb_tool_bt_daemon.pid"
+fi
+rm -rf tb_tool_bt
+REMOTE_PREP
 
-echo "[deploy] upload package..."
-sshpass -p "${REMOTE_PASS}" scp -o StrictHostKeyChecking=no "${LATEST_PACKAGE}" "${REMOTE_USER}@${REMOTE_HOST}:${REMOTE_BASE_DIR}/"
+echo "[deploy] extract, restore persistent data and start daemon..."
+sshpass -p "${REMOTE_PASS}" ssh -o StrictHostKeyChecking=no \
+  "${REMOTE_USER}@${REMOTE_HOST}" bash -s -- "${REMOTE_BASE_DIR}" "${REMOTE_PROJECT_DIR}" "${PACKAGE_NAME}" "${PRESERVE_DIR}" <<'REMOTE_INSTALL'
+set -euo pipefail
+base_dir="$1"
+project_dir="$2"
+package_name="$3"
+preserve_dir="$4"
+cd "$base_dir"
+tar -zxf "$package_name"
+backend_dir="$project_dir/backend"
+if [ -d "$preserve_dir/.venv" ]; then mv "$preserve_dir/.venv" "$backend_dir/.venv"; fi
+if [ -f "$preserve_dir/.env" ]; then mv "$preserve_dir/.env" "$backend_dir/.env"; fi
+if [ -d "$preserve_dir/data" ]; then rm -rf "$backend_dir/data"; mv "$preserve_dir/data" "$backend_dir/data"; fi
+if [ -d "$preserve_dir/local_models" ]; then rm -rf "$backend_dir/local_models"; mv "$preserve_dir/local_models" "$backend_dir/local_models"; fi
+if [ -d "$preserve_dir/runtime" ]; then
+  if [ -d "$backend_dir/runtime/shared" ]; then mv "$backend_dir/runtime/shared" "$preserve_dir/packaged_shared"; fi
+  rm -rf "$backend_dir/runtime"
+  mv "$preserve_dir/runtime" "$backend_dir/runtime"
+  if [ -d "$preserve_dir/packaged_shared" ]; then
+    rm -rf "$backend_dir/runtime/shared"
+    mv "$preserve_dir/packaged_shared" "$backend_dir/runtime/shared"
+  fi
+fi
+rm -rf "$preserve_dir"
+cd "$backend_dir"
+mkdir -p runtime
+sed -i '/^RERANK_ENABLED=/d' .env
+echo 'RERANK_ENABLED=true' >> .env
+echo "[deploy] rerank enabled"
+if [ -x ./run_on_pc_daemon ]; then
+  RERANK_ENABLED=true ./run_on_pc_daemon start
+elif [ -x ./run_on_pc_daemon.sh ]; then
+  RERANK_ENABLED=true bash ./run_on_pc_daemon.sh start
+else
+  echo "run_on_pc_daemon(.sh) 不存在或不可执行" >&2
+  exit 1
+fi
+health_ok=false
+for _ in {1..30}; do
+  if curl -fsS http://127.0.0.1:5002/api/bt/health >/dev/null; then
+    health_ok=true
+    break
+  fi
+  sleep 1
+done
+if [[ "$health_ok" != "true" ]]; then
+  echo "[deploy] health check failed" >&2
+  tail -80 runtime/tb_tool_bt_daemon.log || true
+  exit 1
+fi
+echo "[deploy] health check passed"
+REMOTE_INSTALL
 
 echo "[deploy] local cleanup: rm ${LATEST_PACKAGE}"
 rm -f "${LATEST_PACKAGE}"
-
-echo "[deploy] extract and start daemon with rerank..."
-sshpass -p "${REMOTE_PASS}" ssh -o StrictHostKeyChecking=no "${REMOTE_USER}@${REMOTE_HOST}" \
-  "bash -lc 'set -e; export PATH=\"\$HOME/.local/bin:\$PATH\"; cd \"${REMOTE_BASE_DIR}\"; tar -vzxf \"${PACKAGE_NAME}\"; rm -f \"${PACKAGE_NAME}\"; if [ -d .tb_tool_bt_preserve/.venv ]; then mv .tb_tool_bt_preserve/.venv \"${REMOTE_PROJECT_DIR}/backend/.venv\"; fi; if [ -f .tb_tool_bt_preserve/.env ]; then mv .tb_tool_bt_preserve/.env \"${REMOTE_PROJECT_DIR}/backend/.env\"; fi; if [ -d .tb_tool_bt_preserve/data ]; then rm -rf \"${REMOTE_PROJECT_DIR}/backend/data\"; mv .tb_tool_bt_preserve/data \"${REMOTE_PROJECT_DIR}/backend/data\"; fi; if [ -d .tb_tool_bt_preserve/local_models ]; then rm -rf \"${REMOTE_PROJECT_DIR}/backend/local_models\"; mv .tb_tool_bt_preserve/local_models \"${REMOTE_PROJECT_DIR}/backend/local_models\"; fi; rm -rf .tb_tool_bt_preserve; cd \"${REMOTE_PROJECT_DIR}/backend\"; mkdir -p runtime; echo \"RERANK_ENABLED=true\" >> .env; echo \"[deploy] rerank enabled\"; echo \"[deploy] remote PATH: \$PATH\"; if [[ -x \"./run_on_pc_daemon\" ]]; then RERANK_ENABLED=true ./run_on_pc_daemon start; elif [[ -x \"./run_on_pc_daemon.sh\" ]]; then RERANK_ENABLED=true bash ./run_on_pc_daemon.sh start; else echo \"run_on_pc_daemon(.sh) 不存在或不可执行\"; exit 1; fi'"
-
 echo "[deploy] done."

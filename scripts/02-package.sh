@@ -23,7 +23,11 @@ mkdir -p "${STAGE_DIR}"
 # 只打包 backend 部署所需目录，避免先复制 .venv 等大目录再删除
 tar \
   --exclude="backend/.venv" \
+  --exclude="backend/.env" \
+  --exclude="backend/.env.*" \
   --exclude="backend/__pycache__" \
+  --exclude="backend/tests" \
+  --exclude="backend/**/test_*.py" \
   --exclude="backend/.pytest_cache" \
   --exclude="backend/.mypy_cache" \
   --exclude="backend/.ruff_cache" \

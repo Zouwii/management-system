@@ -12,22 +12,22 @@ import time
 
 from flask import request
 
+from base.auth.access import require_access
 from base.config.service import (
     get_default_time_range_service,
     touch_last_update_time_service,
-    get_workhour_character_coefficients_service,
+    get_workhour_role_coefficients_service,
 )
 from base.sync.task_sync import sync_project_details_in_time_range_service
 from workhour.personal.aggregate import workdays_in_range_service
-from base.config.member_visibility import should_hide_member_in_selector
-from base.dingtalk_client import get_config_projectids, get_config_user_meta, get_config_userids
+from base.dingtalk_client import get_config_projectids
+from base.organization.service import list_all_members, resolve_sync_operator_id
+from base.organization.constants import ROLE_LABELS
 
 from base.route_registry.dashboard import (
     _fail,
     _ok,
     _require_login,
-    _team_name_from_team_id,
-    _to_character,
     dashboard_bp,
 )
 
@@ -35,122 +35,64 @@ from base.route_registry.dashboard import (
 def _load_user_character_members():
     """Load all members from the user_character DB table.
 
-    Returns a list of member dicts with id, name, userId, character, team, teamId,
-    isNavLead, isServoLead.
+    Returns stable organization fields for personal-hours selectors.
     """
-    from base.db.engine import SessionLocal
-    from base.db.orm import UserCharacter as DbUserCharacter
-
-    session = SessionLocal()
-    try:
-        rows = session.query(DbUserCharacter).order_by(DbUserCharacter.user_id.asc()).all()
-        members = []
-        for row in rows:
-            uid = str(getattr(row, "user_id", "") or "").strip()
-            name = str(getattr(row, "name", "") or "").strip()
-            team_id = str(getattr(row, "team_id", "") or "")
-            if not uid:
-                continue
-            # 算法组(team_id=2)不出现在工时管理下拉中
-            if team_id == "2":
-                continue
-            members.append(
-                {
-                    "id": uid,
-                    "name": name or uid,
-                    "userId": uid,
-                    "character": _to_character(getattr(row, "character", None), default=0),
-                    "team": _team_name_from_team_id(getattr(row, "team_id", None)),
-                    "teamId": str(getattr(row, "team_id", "") or ""),
-                    "isNavLead": bool(getattr(row, "is_nav_lead", False)),
-                    "isServoLead": bool(getattr(row, "is_servo_lead", False)),
-                }
-            )
-        return members
-    finally:
-        session.close()
+    members = []
+    for row in list_all_members():
+        uid = str(row.get("userId") or "").strip()
+        if not uid:
+            continue
+        # 算法组使用独立数据源，不出现在个人工时下拉中。
+        if row.get("teamCode") == "ALGORITHM":
+            continue
+        members.append(
+            {
+                "id": uid,
+                "name": row.get("userName") or uid,
+                "userId": uid,
+                "teamCode": row.get("teamCode") or "",
+                "teamName": row.get("teamName") or "未分组",
+                "jobRoleCode": row.get("jobRoleCode") or "",
+                "jobRoleName": row.get("jobRoleName") or "",
+            }
+        )
+    return members
 
 
-def _load_current_user_scope(user_id: str, user_name: str = ""):
-    """Load the current user's scope from the user_character table.
-
-    Returns dict with character, teamId, isNavLead, isServoLead.
-    """
-    from base.db.engine import SessionLocal
-    from base.db.orm import UserCharacter as DbUserCharacter
-
-    uid = str(user_id or "").strip()
-    uname = str(user_name or "").strip()
-    if not uid and not uname:
-        return {"character": None, "teamId": "", "isNavLead": False, "isServoLead": False}
-
-    session = SessionLocal()
-    try:
-        row = None
-        if uid:
-            row = session.query(DbUserCharacter).filter(DbUserCharacter.user_id == uid).first()
-        if not row and uname:
-            row = session.query(DbUserCharacter).filter(DbUserCharacter.name == uname).first()
-        if not row:
-            return {"character": None, "teamId": "", "isNavLead": False, "isServoLead": False}
-        return {
-            "character": _to_character(getattr(row, "character", None), default=0),
-            "teamId": str(getattr(row, "team_id", "") or ""),
-            "isNavLead": bool(getattr(row, "is_nav_lead", False)),
-            "isServoLead": bool(getattr(row, "is_servo_lead", False)),
-        }
-    finally:
-        session.close()
-
-
-def _filter_member_options_by_scope(member_options, current_scope):
-    """Filter member options by the current user's team scope.
-
-    - Hides dual-team leads (character=0 + both nav+servo lead)
-    - Nav lead sees only nav team (teamId=0)
-    - Servo lead sees only servo team (teamId=1)
-    """
-    options = list(member_options or [])
-    options = [m for m in options if not should_hide_member_in_selector(m)]
-
-    is_nav_lead = bool((current_scope or {}).get("isNavLead"))
-    is_servo_lead = bool((current_scope or {}).get("isServoLead"))
-    if is_nav_lead and not is_servo_lead:
-        return [m for m in options if str(m.get("teamId") or "") == "0"]
-    if is_servo_lead and not is_nav_lead:
-        return [m for m in options if str(m.get("teamId") or "") == "1"]
+def _filter_member_options_by_scope(member_options, user):
+    """Apply the authenticated user's explicit data scope to selector rows."""
+    options = [
+        member for member in list(member_options or [])
+        if member.get("jobRoleCode") != "SYSTEM_ADMIN"
+    ]
+    if str((user or {}).get("dataScope") or "") == "team":
+        team_code = str((user or {}).get("teamCode") or "").strip().upper()
+        return [member for member in options if member.get("teamCode") == team_code]
     return options
 
 
 def _load_single_user_character_member(user_id: str, user_name: str = ""):
-    """Load a single member's user_character data from the database."""
-    from base.db.engine import SessionLocal
-    from base.db.orm import UserCharacter as DbUserCharacter
-
+    """Load a single member through the stable roster service."""
     uid = str(user_id or "").strip()
     uname = str(user_name or "").strip()
     if not uid and not uname:
         return None
 
-    session = SessionLocal()
-    try:
-        row = None
-        if uid:
-            row = session.query(DbUserCharacter).filter(DbUserCharacter.user_id == uid).first()
-        if not row and uname:
-            row = session.query(DbUserCharacter).filter(DbUserCharacter.name == uname).first()
-        if not row:
-            return None
-        return {
-            "id": str(getattr(row, "user_id", "") or "").strip(),
-            "name": str(getattr(row, "name", "") or "").strip() or uid or uname,
-            "userId": str(getattr(row, "user_id", "") or "").strip(),
-            "character": int(getattr(row, "character", 0) or 0),
-            "team": _team_name_from_team_id(getattr(row, "team_id", None)),
-            "teamId": str(getattr(row, "team_id", "") or ""),
-        }
-    finally:
-        session.close()
+    row = next((member for member in list_all_members() if (
+        (uid and member.get("userId") == uid)
+        or (uname and member.get("userName") == uname)
+    )), None)
+    if not row:
+        return None
+    return {
+        "id": row.get("userId") or "",
+        "name": row.get("userName") or uid or uname,
+        "userId": row.get("userId") or "",
+        "teamCode": row.get("teamCode") or "",
+        "teamName": row.get("teamName") or "未分组",
+        "jobRoleCode": row.get("jobRoleCode") or "",
+        "jobRoleName": row.get("jobRoleName") or "未设置",
+    }
 
 
 def _build_default_personal_hours_payload(user, target: str):
@@ -204,18 +146,17 @@ def _build_default_personal_hours_payload(user, target: str):
     role = str((user or {}).get("role") or "").strip().lower()
     user_id = str((user or {}).get("user_id") or "").strip()
     user_name = str((user or {}).get("name") or "").strip()
-    coeff_out = get_workhour_character_coefficients_service() or {}
-    workhour_character_coefficients = coeff_out.get("workhour_character_coefficients") or {}
+    coeff_out = get_workhour_role_coefficients_service() or {}
+    workhour_role_coefficients = coeff_out.get("workhour_role_coefficients") or {}
 
     member_options = []
     if role in {"manager", "admin"}:
         all_members = _load_user_character_members()
-        current_scope = _load_current_user_scope(
-            user_id=str((user or {}).get("user_id") or ""),
-            user_name=str((user or {}).get("name") or ""),
-        )
-        scoped_members = _filter_member_options_by_scope(all_members, current_scope)
-        member_options = [{"id": "ALL", "name": "全部人员", "team": "全部", "teamId": ""}] + scoped_members
+        scoped_members = _filter_member_options_by_scope(all_members, user)
+        member_options = [{
+            "id": "ALL", "name": "全部人员", "userId": "",
+            "teamCode": "", "teamName": "全部", "jobRoleCode": "", "jobRoleName": "",
+        }] + scoped_members
     elif user_id or user_name:
         me = _load_single_user_character_member(user_id=user_id, user_name=user_name)
         if me:
@@ -225,13 +166,11 @@ def _build_default_personal_hours_payload(user, target: str):
                 "id": user_id,
                 "name": user_name or user_id,
                 "userId": user_id,
-                "character": None,
-                "team": str((user or {}).get("team") or ""),
-                "teamId": str((user or {}).get("teamId") or ""),
+                "teamCode": str((user or {}).get("teamCode") or ""),
+                "teamName": str((user or {}).get("teamName") or ""),
+                "jobRoleCode": str((user or {}).get("jobRoleCode") or ""),
+                "jobRoleName": str((user or {}).get("jobRoleName") or ""),
             }]
-    elif user_name:
-        member_options = [{"id": user_name, "name": user_name, "team": str((user or {}).get("team") or "")}]
-
     selected_target = str(target or "").strip() or "ALL"
     member_ids = {str(item.get("id") or "").strip() for item in member_options}
     if selected_target not in member_ids:
@@ -246,17 +185,14 @@ def _build_default_personal_hours_payload(user, target: str):
         target_label = str((hit or {}).get("name") or selected_target)
     dashboard["targetLabel"] = target_label
 
-    target_character = None
+    target_role_code = ""
     target_hit = next((x for x in member_options if str(x.get("id") or "") == selected_target), None)
-    if target_hit and target_hit.get("character") is not None:
-        try:
-            target_character = int(target_hit.get("character"))
-        except Exception:
-            target_character = None
+    if target_hit:
+        target_role_code = str(target_hit.get("jobRoleCode") or "")
 
     coeff = 1.0
-    if target_character is not None:
-        coeff = float(workhour_character_coefficients.get(str(target_character), 1.0) or 1.0)
+    if target_role_code:
+        coeff = float(workhour_role_coefficients.get(target_role_code, 1.0) or 1.0)
     wd_out = workdays_in_range_service({
         "start_time": start_time,
         "end_time": end_time,
@@ -278,10 +214,35 @@ def _build_default_personal_hours_payload(user, target: str):
             if str(item.get("month") or "").strip()
         ],
         "dashboard": dashboard,
-        "workhourCharacterCoefficients": workhour_character_coefficients,
+        "workhourRoleCoefficients": workhour_role_coefficients,
         "memberOptions": member_options,
         "selectedTarget": selected_target,
     }
+
+
+def _public_member_option(member):
+    role_code = str(member.get("jobRoleCode") or "").strip()
+    team_code = str(member.get("teamCode") or "").strip()
+    return {
+        "id": str(member.get("id") or member.get("userId") or "").strip(),
+        "name": str(member.get("name") or member.get("userName") or "").strip(),
+        "userId": str(member.get("userId") or member.get("id") or "").strip(),
+        "teamCode": team_code,
+        "teamName": str(member.get("teamName") or "").strip(),
+        "jobRoleCode": role_code,
+        "jobRoleName": str(member.get("jobRoleName") or ROLE_LABELS.get(role_code, "")).strip(),
+    }
+
+
+def _public_personal_hours_payload(payload):
+    """Remove legacy organization fields from personal-hours HTTP payloads."""
+    result = dict(payload or {})
+    result["memberOptions"] = [
+        _public_member_option(member)
+        for member in result.get("memberOptions", [])
+    ]
+    result["workhourRoleCoefficients"] = dict(result.get("workhourRoleCoefficients") or {})
+    return result
 
 
 @dashboard_bp.route("/personal-hours", methods=["GET"])
@@ -293,7 +254,7 @@ def personal_hours():
     target = (request.args.get("target") or user.get("user_id") or user.get("name") or "").strip()
     if not target:
         target = "ALL"
-    return _ok(_build_default_personal_hours_payload(user, target))
+    return _ok(_public_personal_hours_payload(_build_default_personal_hours_payload(user, target)))
 
 
 @dashboard_bp.route("/personal-hours/members", methods=["GET"])
@@ -305,7 +266,7 @@ def personal_hours_members():
     target = (user.get("user_id") or user.get("name") or "").strip() or "ALL"
     out = _build_default_personal_hours_payload(user, target)
     return _ok({
-        "memberOptions": out.get("memberOptions") or [],
+        "memberOptions": _public_personal_hours_payload(out).get("memberOptions") or [],
         "selectedTarget": out.get("selectedTarget") or target,
     })
 
@@ -332,18 +293,15 @@ def personal_hours_query():
     # Recalculate workdays with frontend-provided date range
     start_date = str((out.get("dashboard") or {}).get("defaultRange", {}).get("startDate") or "")
     end_date = str((out.get("dashboard") or {}).get("defaultRange", {}).get("endDate") or "")
-    coeff_map = out.get("workhourCharacterCoefficients") or {}
+    coeff_map = out.get("workhourRoleCoefficients") or {}
     member_options = out.get("memberOptions") or []
-    target_character = None
+    target_role_code = ""
     target_hit = next((x for x in member_options if str(x.get("id") or "") == target), None)
-    if target_hit and target_hit.get("character") is not None:
-        try:
-            target_character = int(target_hit.get("character"))
-        except Exception:
-            target_character = None
+    if target_hit:
+        target_role_code = str(target_hit.get("jobRoleCode") or "")
     coeff = 1.0
-    if target_character is not None:
-        coeff = float(coeff_map.get(str(target_character), 1.0) or 1.0)
+    if target_role_code:
+        coeff = float(coeff_map.get(target_role_code, 1.0) or 1.0)
     wd_out = workdays_in_range_service({
         "start_time": start_date, "end_time": end_date, "compensatoryDays": 0,
     }) or {}
@@ -360,42 +318,26 @@ def personal_hours_query():
         for item in month_workdays
         if str(item.get("month") or "").strip()
     ]
-    return _ok(out)
+    return _ok(_public_personal_hours_payload(out))
 
 
 @dashboard_bp.route("/personal-hours/update", methods=["POST"])
 def personal_hours_update():
     """Trigger task data sync for a time range, then update last_update_time."""
-    user = _require_login()
-    if not user:
-        return _fail("unauthenticated", code=401, data={})
+    user, denied = require_access(_fail, any_roles=("manager", "admin"))
+    if denied:
+        return denied
 
     payload = request.get_json(silent=True) or {}
     is_full_sync = bool(payload.get("fullSync"))
 
     def _resolve_operator_user_id() -> str:
-        """Auto-select an operator user_id: prefer character=0 (admin), else first configured user."""
-        meta = get_config_user_meta() or {}
-        if isinstance(meta, dict):
-            for _name, one in meta.items():
-                if not isinstance(one, dict):
-                    continue
-                try:
-                    ch = _to_character(one.get("character"), default=1)
-                except Exception:
-                    ch = 1
-                if ch == 0:
-                    uid = str(one.get("userId") or "").strip()
-                    if uid:
-                        return uid
-        userids = get_config_userids() or {}
-        if isinstance(userids, dict) and userids:
-            return str(next(iter(userids.values())) or "").strip()
-        return ""
+        """Auto-select an operator from the database roster."""
+        return resolve_sync_operator_id()
 
     user_id = _resolve_operator_user_id()
     if not user_id:
-        return _fail("missing operator userId in ids/config", code=400, data={})
+        return _fail("missing operator userId in database roster", code=400, data={})
 
     projectids = get_config_projectids() or {}
     project_id = ""

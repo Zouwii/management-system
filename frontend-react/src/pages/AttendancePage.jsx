@@ -7,6 +7,7 @@ import {
   fetchWorkdayCosthourMemberSummary,
   fetchWorkdays,
   saveAttendance,
+  fetchOrganizationScopeOptions,
 } from '../api/dashboard';
 import { AttendanceTable } from './WorkdayCostHourStats';
 
@@ -34,7 +35,7 @@ const QUARTER_OPTIONS = generateQuarterOptions();
 export default function AttendancePage() {
   const currentQuarter = `q${Math.floor(new Date().getMonth() / 3) + 1}`;
   const [quarter, setQuarter] = useState(currentQuarter);
-  const [selectedTeamId, setSelectedTeamId] = useState(null);
+  const [selectedTeamCode, setSelectedTeamCode] = useState(null);
   const [memberData, setMemberData] = useState({ teams: [], members: [] });
   const [adjustments, setAdjustments] = useState({});
   const [standardDays, setStandardDays] = useState(0);
@@ -55,17 +56,19 @@ export default function AttendancePage() {
     const payload = { start_time: quarterOption.start, end_time: quarterOption.end };
 
     try {
-      const [memberResponse, workdayResponse, attendanceResponse] = await Promise.all([
+      const [memberResponse, workdayResponse, attendanceResponse, scopeResponse] = await Promise.all([
         fetchWorkdayCosthourMemberSummary(payload),
         fetchWorkdays(payload),
         fetchAttendance(payload),
+        fetchOrganizationScopeOptions('ATTENDANCE'),
       ]);
       const memberResult = memberResponse?.data || {};
-      const teams = memberResult.teams || [];
+      const teams = (scopeResponse?.data?.teams || memberResult.teams || [])
+        .filter((team) => team.teamCode);
       const members = memberResult.members || [];
       setMemberData({ teams, members });
-      setSelectedTeamId((current) => (
-        teams.some((team) => team.teamId === current) ? current : teams[0]?.teamId ?? null
+      setSelectedTeamCode((current) => (
+        teams.some((team) => team.teamCode === current) ? current : teams[0]?.teamCode ?? null
       ));
 
       const workdayResult = workdayResponse?.data || {};
@@ -123,8 +126,6 @@ export default function AttendancePage() {
       const adjustment = adjustments[member.userId] || {};
       return {
         user_id: member.userId,
-        user_name: member.userName,
-        team_id: member.teamId,
         overtime_days: Number(adjustment.overtimeDays || 0),
         leave_days: Number(adjustment.leaveDays || 0),
         statutory_holiday_days: Number(adjustment.holidayDays || 0),
@@ -201,8 +202,8 @@ export default function AttendancePage() {
       ) : (
         <AttendanceTable
           teams={memberData.teams}
-          selectedTeamId={selectedTeamId}
-          onTeamChange={setSelectedTeamId}
+          selectedTeamCode={selectedTeamCode}
+          onTeamChange={setSelectedTeamCode}
           members={memberData.members}
           standardDays={standardDays}
           adjustments={adjustments}

@@ -123,7 +123,7 @@ export default function AIAnalysisPage() {
     setTtydUrl('');
     setTtydError('');
     setTbTtydStarted(false);
-    try { sessionStorage.removeItem(ttydCacheKey); } catch {}
+    try { sessionStorage.removeItem(ttydCacheKey); } catch { /* Storage can be unavailable in privacy mode. */ }
   }, [ttydCacheKey]);
 
   useEffect(() => {
@@ -273,13 +273,13 @@ export default function AIAnalysisPage() {
 
       const result = { modules: d3.data, meta: { taskCount: stats.total_tasks }, stats };
       setDashboardResult(result);
-      try { sessionStorage.setItem(cacheKey, JSON.stringify({ data: result, ts: Date.now() })); } catch {}
+      try { sessionStorage.setItem(cacheKey, JSON.stringify({ data: result, ts: Date.now() })); } catch { /* Cache writes are optional. */ }
     } catch (e) {
       setDashboardError(e.message || '分析失败');
     } finally {
       setAnalysisBusy(false);
     }
-  }, [ownerKey]);
+  }, [cacheKey, ownerKey]);
 
   const scrollToTaskCreate = useCallback(() => {
     window.setTimeout(() => {

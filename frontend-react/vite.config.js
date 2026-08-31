@@ -1,13 +1,16 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { resolve } from 'path'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const currentDir = dirname(fileURLToPath(import.meta.url))
 
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
   build: {
     // 输出到后端的静态目录，由 Flask 托管（static/react）
-    outDir: resolve(__dirname, '../backend/static/react'),
+    outDir: resolve(currentDir, '../backend/static/react'),
     emptyOutDir: true,
   },
   server: {

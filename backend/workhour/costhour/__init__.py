@@ -5,6 +5,6 @@
 
 口径说明：
   - 仅使用 DB.workday_costhour 原始字段直接求和，不做任何工时系数换算。
-  - 与 personal/aggregate.py 不同，本模块不读取 workhour_coefficient 配置表。
+  - 与 personal/aggregate.py 的有效工时口径分离，本模块不应用岗位系数。
   - 单位：人/天（person-day），即 Teambition 填报的原始工作日数值。
 """

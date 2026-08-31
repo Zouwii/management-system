@@ -62,7 +62,7 @@ const QUARTER_OPTIONS = generateQuarterOptions();
 export default function QuarterlyEffectivePerformancePage() {
   const user = useAuthStore((state) => state.user);
   const [quarter, setQuarter] = useState(QUARTER_OPTIONS[0]?.value || '');
-  const [teamFilter, setTeamFilter] = useState('全部');
+  const [teamFilter, setTeamFilter] = useState('ALL');
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -106,8 +106,8 @@ export default function QuarterlyEffectivePerformancePage() {
       );
 
       const teamRows = [
-        ...(navResponse?.data?.rows || []).map((row) => ({ ...row, teamId: row.teamId ?? '0', teamName: row.teamName || row.team || '导航组' })),
-        ...(integrationResponse?.data?.rows || []).map((row) => ({ ...row, teamId: row.teamId ?? '1', teamName: row.teamName || row.team || '对接组' })),
+        ...(navResponse?.data?.rows || []).map((row) => ({ ...row, teamCode: 'NAV', teamName: row.teamName || '导航组' })),
+        ...(integrationResponse?.data?.rows || []).map((row) => ({ ...row, teamCode: 'INTEGRATION', teamName: row.teamName || '对接组' })),
       ];
       const resultMap = new Map();
 
@@ -123,11 +123,12 @@ export default function QuarterlyEffectivePerformancePage() {
         const performance = totalEffectiveHours > 0
           ? completedEffectiveHours / totalEffectiveHours
           : null;
-        const key = userId || `${row.teamId || ''}:${name}`;
+        const key = userId || `${row.teamCode || ''}:${name}`;
 
         resultMap.set(key, {
           userId,
           name,
+          teamCode: row.teamCode,
           teamName: row.teamName || '未分组',
           completedCurrentHours,
           completedOverdueHours,
@@ -157,14 +158,19 @@ export default function QuarterlyEffectivePerformancePage() {
   }, [loadPerformance]);
 
   const teamOptions = useMemo(() => [
-    '全部',
-    ...Array.from(new Set(rows.map((row) => row.teamName).filter(Boolean))),
+    { code: 'ALL', label: '全部团队' },
+    ...Array.from(new Map(
+      rows.filter((row) => row.teamCode).map((row) => [row.teamCode, {
+        code: row.teamCode,
+        label: row.teamName || row.teamCode,
+      }]),
+    ).values()),
   ], [rows]);
 
   const visibleRows = useMemo(() => (
-    teamFilter === '全部'
+    teamFilter === 'ALL'
       ? rows
-      : rows.filter((row) => row.teamName === teamFilter)
+      : rows.filter((row) => row.teamCode === teamFilter)
   ), [rows, teamFilter]);
 
   const summary = useMemo(() => {
@@ -232,19 +238,19 @@ export default function QuarterlyEffectivePerformancePage() {
           </div>
           <div className="mt-6 flex flex-wrap gap-2">
             {teamOptions.map((team) => {
-              const active = teamFilter === team;
+              const active = teamFilter === team.code;
               return (
                 <button
-                  key={team}
+                  key={team.code}
                   type="button"
-                  onClick={() => setTeamFilter(team)}
+                  onClick={() => setTeamFilter(team.code)}
                   className={`rounded-full px-4 py-2 text-sm font-medium transition ${
                     active
                       ? 'bg-slate-900 text-white shadow-sm'
                       : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
                   }`}
                 >
-                  {team === '全部' ? '全部团队' : team}
+                  {team.label}
                 </button>
               );
             })}

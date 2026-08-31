@@ -3,8 +3,8 @@
 模块划分：
   1. 基础数据    — 季度/项目ID/最后同步时间
   2. 工作日      — 法定工作日天数  → workdays_in_range_service
-  3. 成员信息    — 人员列表        → user_character 表
-  4. 工时数据    — 每人排期/逾期   → team_quarter_workhours_db_service(teamId=0) + teamId=1
+  3. 成员信息    — 人员列表        → organization roster Scope
+  4. 工时数据    — 每人排期/逾期   → team_quarter_workhours_db_service(teamCode)
   5. 绩效数据    — 每人绩效档位    → nav_perf_quarter_result / servo_perf_quarter_result
   6. 组装        — 按 userId 合并上述数据 → 统一 rows + stats
 """
@@ -16,27 +16,14 @@ from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Tuple
 
 from base.config.service import get_default_time_range_service
-from base.config.member_visibility import is_dual_team_admin
-from base.db.engine import PerfSessionLocal, SessionLocal
-from base.db.orm import NavPerfQuarterResult, ServoPerfQuarterResult, UserCharacter
+from base.db.engine import PerfSessionLocal
+from base.db.orm import NavPerfQuarterResult, ServoPerfQuarterResult
 from base.dingtalk_client import get_config_projectids
+from base.organization.service import list_scope_members, list_scope_teams
 from workhour.personal.aggregate import team_quarter_workhours_db_service, workdays_in_range_service
 
-_TEAM_LABEL = {"0": "导航组", "1": "对接组"}
-_TEAM_KEY = {"0": "nav", "1": "servo"}
-
-_ROLE_MAP = {
-    0: "组长",
-    1: "软件开发工程师",
-    2: "软件应用工程师",
-    3: "应用工程师",
-    4: "算法工程师",
-    5: "实习生",
-}
-
-def _get_role(character: int) -> str:
-    return _ROLE_MAP.get(character, str(character))
-
+_TEAM_LABEL = {"NAV": "导航组", "INTEGRATION": "对接组"}
+_TEAM_KEY = {"NAV": "nav", "INTEGRATION": "servo"}
 
 # ═══════════════════════════════════════════
 #  1. 基础数据：当前季度、项目 ID、最后同步时间
@@ -123,65 +110,47 @@ def _calc_workday_count(quarter_start: str, quarter_end: str) -> float:
 
 
 # ═══════════════════════════════════════════
-#  3. 成员信息：user_character 表
-#     → 排除：character=9 或 (character=0 且同时是 nav+servo 组长)
-#     → 规则复用 is_dual_team_admin
+#  3. 成员信息：统一组织 Scope
 # ═══════════════════════════════════════════
 
 def _fetch_members() -> List[Dict[str, Any]]:
-    """查询全部可见成员（排除双组管理员）。"""
-    session = SessionLocal()
-    try:
-        rows = session.query(UserCharacter).order_by(UserCharacter.user_id.asc()).all()
-        members = []
-        for r in rows:
-            uid = str(getattr(r, "user_id", "") or "").strip()
-            if not uid:
-                continue
-            tid = str(getattr(r, "team_id", "") or "").strip()
-            # 算法组(team_id=2)不出现在部门总览中
-            if tid == "2":
-                continue
-            char_val = int(getattr(r, "character", 0) or 0)
-
-            # 排除双组管理员：character=9 或 (character=0 且同时 nav+servo 组长)
-            if is_dual_team_admin({
-                "character": char_val,
-                "isNavLead": bool(getattr(r, "is_nav_lead", False)),
-                "isServoLead": bool(getattr(r, "is_servo_lead", False)),
-            }):
-                continue
-
-            members.append({
-                "userId": uid,
-                "userName": str(getattr(r, "name", "") or uid).strip() or uid,
-                "teamKey": _TEAM_KEY.get(tid, tid),
-                "team": _TEAM_LABEL.get(tid, tid or "未分组"),
-                "character": char_val,
-                "isTeamLead": str(getattr(r, "character", "")) in ("0", "9"),
-            })
-        return members
-    finally:
-        session.close()
+    """查询部门有效工时 Scope 成员（仅导航、对接，排除管理员）。"""
+    members = []
+    for member in list_scope_members("DEPARTMENT_EFFECTIVE_HOURS"):
+        team_code = member.get("teamCode") or ""
+        if team_code not in _TEAM_KEY:
+            continue
+        members.append({
+            "userId": member.get("userId"),
+            "userName": member.get("userName") or member.get("userId"),
+            "teamCode": team_code,
+            "teamName": member.get("teamName") or _TEAM_LABEL[team_code],
+            "jobRoleCode": member.get("jobRoleCode", ""),
+            "jobRoleName": member.get("jobRoleName", "未设置"),
+            "isTeamLead": bool(member.get("isTeamLead")),
+        })
+    return members
 
 
 # ═══════════════════════════════════════════
 #  4. 工时数据：复用 team_quarter_workhours_db_service
-#     → 分别调 teamId=0(导航组) + teamId=1(对接组)
-#     → 包含组长，exclude_character_zero=false
+#     → 按部门 Scope 和稳定 teamCode 分别查询导航、对接
 # ═══════════════════════════════════════════
 
 def _fetch_work_hours_map(project_id: str, quarter_start: str, quarter_end: str) -> Dict[str, Dict[str, float]]:
     """返回 {userId: {scheduledHours, completedHours, overdueHours, overdueCompletedHours, coefficient}}。"""
     hours_map: Dict[str, Dict[str, float]] = {}
 
-    for team_id in ("0", "1"):
+    for team in list_scope_teams("DEPARTMENT_EFFECTIVE_HOURS")["teams"]:
+        team_code = team.get("teamCode") or team.get("code") or ""
+        if not team_code:
+            continue
         result = team_quarter_workhours_db_service({
-            "teamId": team_id,
+            "scopeCode": "DEPARTMENT_EFFECTIVE_HOURS",
+            "teamCode": team_code,
             "projectId": project_id,
             "start_time": quarter_start,
             "end_time": quarter_end,
-            "exclude_character_zero": "false",   # 包含组长
         })
         rows = (result.get("data", {}) or {}).get("rows", []) if result.get("success") else []
 
@@ -254,7 +223,8 @@ def _assemble_response(
 
     for m in members:
         uid = m["userId"]
-        tk = m["teamKey"]
+        team_code = m["teamCode"]
+        tk = _TEAM_KEY.get(team_code, "")
         if tk == "nav":
             nav_count += 1
         elif tk == "servo":
@@ -275,10 +245,11 @@ def _assemble_response(
         rows.append({
             "userId": uid,
             "userName": m["userName"],
-            "team": m["team"],
-            "teamKey": tk,
-            "character": m["character"],
-            "role": _get_role(m["character"]),
+            "teamCode": team_code,
+            "teamName": m["teamName"],
+            "jobRoleCode": m["jobRoleCode"],
+            "jobRoleName": m["jobRoleName"],
+            "role": m["jobRoleName"],
             "isTeamLead": m["isTeamLead"],
             # 工时
             "coefficient": coeff,

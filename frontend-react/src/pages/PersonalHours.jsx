@@ -19,8 +19,25 @@ import {
   formatDateTime,
   getDeltaStatus,
 } from '../utils/workHours';
-import { shouldHideMemberInSelector } from '../utils/memberVisibility';
 import { useAuthStore } from '../store/authStore';
+
+function buildInitialQuarterRange(target) {
+  const now = new Date();
+  const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
+  const start = new Date(now.getFullYear(), quarterStartMonth, 1, 0, 0, 0);
+  const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+  const format = (date) => {
+    const pad = (value) => String(value).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
+      + `T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+  };
+  return {
+    startDate: format(start),
+    endDate: format(end),
+    compensatoryDays: Number(fallbackDashboard.compensatoryDays ?? 0),
+    target,
+  };
+}
 
 export default function PersonalHours({ forceCanViewAllPeople = null }) {
   const user = useAuthStore((state) => state.user);
@@ -53,17 +70,11 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
   const [showBusyModal, setShowBusyModal] = useState(false);
   const [quickRangePreset, setQuickRangePreset] = useState('quarter_to_today');
   const [selectedTeam, setSelectedTeam] = useState('');
-  const [hourStatusMember, setHourStatusMember] = useState('ALL');
-  const [hourStatusAllocationSort, setHourStatusAllocationSort] = useState('none');
-  const [hourStatusCompletionSort, setHourStatusCompletionSort] = useState('none');
-  const [hourStatusRange, setHourStatusRange] = useState('quarter');
   const latestQueryRequestIdRef = useRef(0);
-  const isAdmin = user?.role === ROLES.ADMIN;
-  const isManager = user?.role === ROLES.MANAGER;
 
   const normalizeMemberOptionsForViewer = (options = []) => {
     const list = Array.isArray(options) ? options : [];
-    return list.filter((option) => !shouldHideMemberInSelector(option));
+    return list;
   };
 
   function pickConcreteTarget(options = [], preferred = '') {
@@ -100,18 +111,14 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
     };
   }
 
-  async function runInitialQuery(target) {
-    const initialRange = buildQuarterRange(true);
-    const payload = {
-      ...initialRange,
-      target,
-    };
-    const response = await queryPersonalHours(user, payload);
-    return { payload, response };
-  }
-
   useEffect(() => {
     let active = true;
+
+    const runInitialQuery = async (target) => {
+      const payload = buildInitialQuarterRange(target);
+      const response = await queryPersonalHours(user, payload);
+      return { payload, response };
+    };
 
     const init = async () => {
       if (canViewAllPeople) {
@@ -165,40 +172,42 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
     return () => {
       active = false;
     };
-  }, [canViewAllPeople, user]);
+  }, [canViewAllPeople, defaultTarget, user]);
 
-  const workhourCharacterCoefficients = useMemo(() => {
-    const fromDashboard = dashboard.workhourCharacterCoefficients;
+  const workhourRoleCoefficients = useMemo(() => {
+    const fromDashboard = dashboard.workhourRoleCoefficients;
     if (fromDashboard && typeof fromDashboard === 'object') return fromDashboard;
-    return { 0: 0.4, 1: 0.7, 2: 0.7, 3: 1.0, 4: 0.7 };
-  }, [dashboard.workhourCharacterCoefficients]);
-  const selectedCharacter = useMemo(() => {
+    return {
+      TEAM_LEAD: 0.4,
+      SOFTWARE_ENGINEER: 0.7,
+      SOFTWARE_APPLICATION_ENGINEER: 0.7,
+      APPLICATION_ENGINEER: 1.0,
+      ALGORITHM_ENGINEER: 0.7,
+    };
+  }, [dashboard.workhourRoleCoefficients]);
+  const selectedJobRoleCode = useMemo(() => {
     if (canViewAllPeople) {
       const hit = memberOptions.find((x) => String(x?.id || '') === String(selectedTarget || ''));
-      if (hit && hit.character !== undefined && hit.character !== null && String(hit.character).trim() !== '') {
-        return Number(hit.character);
-      }
+      if (hit?.jobRoleCode) return String(hit.jobRoleCode);
     }
-    return Number(user?.character ?? 1);
-  }, [canViewAllPeople, memberOptions, selectedTarget, user?.character]);
+    return '';
+  }, [canViewAllPeople, memberOptions, selectedTarget]);
   const expectedCoefficient = useMemo(() => {
     const backendCoeff = Number(dashboard.expectedCoefficient);
     if (Number.isFinite(backendCoeff) && backendCoeff > 0) {
       return backendCoeff;
     }
-    const key = String(Number.isFinite(selectedCharacter) ? selectedCharacter : 1);
-    const v = Number(workhourCharacterCoefficients?.[key]);
+    const v = Number(workhourRoleCoefficients?.[selectedJobRoleCode]);
     return Number.isFinite(v) && v > 0 ? v : 1.0;
-  }, [dashboard.expectedCoefficient, selectedCharacter, workhourCharacterCoefficients]);
+  }, [dashboard.expectedCoefficient, selectedJobRoleCode, workhourRoleCoefficients]);
   const baseWorkdayCount = Number(dashboard.workdayCount || 0);
   const expectedWorkdayCount = Math.max(baseWorkdayCount - Number(compensatoryDays || 0), 0);
   const expectedEffectiveDays = expectedWorkdayCount * expectedCoefficient;  // 工时数据总览用（乘系数）
-  const rawExpectedWorkdays = expectedWorkdayCount;  // 工作日耗时柱状图用（不乘系数）
   const memberGroupOptions = useMemo(() => {
     if (!canViewAllPeople) return [];
-    const navMembers = memberOptions.filter((option) => option.team === '导航组');
-    const integrationMembers = memberOptions.filter((option) => option.team === '对接组');
-    const others = memberOptions.filter((option) => !['全部', '导航组', '对接组'].includes(String(option.team || '')));
+    const navMembers = memberOptions.filter((option) => option.teamCode === 'NAV');
+    const integrationMembers = memberOptions.filter((option) => option.teamCode === 'INTEGRATION');
+    const others = memberOptions.filter((option) => !['', 'NAV', 'INTEGRATION'].includes(String(option.teamCode || '')));
     return [
       { label: '导航组', options: navMembers },
       { label: '对接组', options: integrationMembers },
@@ -209,16 +218,6 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
     () => memberGroupOptions.find((group) => group.label === selectedTeam)?.options ?? [],
     [memberGroupOptions, selectedTeam],
   );
-  const hourStatusMemberOptions = useMemo(() => {
-    const base = (memberOptions || [])
-      .filter((option) => String(option?.id || '').trim() && String(option?.id || '').trim() !== 'ALL')
-      .map((option) => ({
-        id: String(option.id),
-        name: String(option.name || option.id),
-      }));
-    return [{ id: 'ALL', name: '全部成员' }, ...base];
-  }, [memberOptions]);
-
   useEffect(() => {
     if (!canViewAllPeople) return;
     if (!memberGroupOptions.length) return;
@@ -344,7 +343,7 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
     roots.forEach(appendNode);
     nextTasks.forEach(appendNode);
     return ordered;
-  }, [dashboard.taskDetails, quarterFilter, showAllTasks, statusFilter, taskFilter, taskSort]);
+  }, [dashboard.taskDetails, quarterFilter, statusFilter, taskFilter, taskSort]);
   const visibleTasks = filteredTasks;
   const visibleTaskIds = useMemo(
     () => new Set(visibleTasks.map((task) => String(task.taskId || '').trim()).filter(Boolean)),
@@ -435,7 +434,7 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
     const effectiveRatio = total > 0 ? Math.round((effectiveHours / total) * 100) : 0;
     const costRatio = total > 0 ? 100 - effectiveRatio : 0;
     return { effectiveHours, costHours, effectiveRatio, costRatio };
-  }, [dashboard.taskDetails]);
+  }, [dashboard.issueHandlingHours, dashboard.softwareDevHours, dashboard.taskDetails]);
   const monthlyWorkdayData = useMemo(() => {
     const normalizeMonthLabel = (rawMonth) => {
       const txt = String(rawMonth || '').trim();
@@ -653,7 +652,6 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
         const devFail = dev.fail ?? 0;
         const issueOk = issue.ok ?? 0;
         const issueFail = issue.fail ?? 0;
-        const totalOk = devOk + issueOk;
         const totalFail = devFail + issueFail;
         setActionMessage(
           `已同步 DEV ${devOk}/${d.user_count ?? '?'}人`
@@ -824,7 +822,7 @@ export default function PersonalHours({ forceCanViewAllPeople = null }) {
                 >
                   {memberOptions.map((option) => (
                     <option key={option.id} value={option.id}>
-                      {option.team === '全部' ? option.name : `${option.name} · ${option.team}`}
+                      {option.teamName === '全部' ? option.name : `${option.name} · ${option.teamName || '未分组'}`}
                     </option>
                   ))}
                 </select>

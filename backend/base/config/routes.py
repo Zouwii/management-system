@@ -5,8 +5,7 @@ from flask import request
 from base.config.service import (
     get_projectids_service,
     get_userids_service,
-    get_workhour_coefficient_service,
-    get_workhour_character_coefficients_service,
+    get_workhour_role_coefficients_service,
     get_user_character_service,
     get_last_update_time_service,
     get_default_time_range_service,
@@ -32,17 +31,10 @@ def register(bp, ok, fail):
         except Exception as e:
             return fail(str(e), code=500, data={})
 
-    @bp.route("/config/workhour_coefficient", methods=["GET"])
-    def get_config_workhour_coefficient():
+    @bp.route("/config/workhour_role_coefficients", methods=["GET"])
+    def get_config_workhour_role_coefficients():
         try:
-            return ok(get_workhour_coefficient_service())
-        except Exception as e:
-            return fail(str(e), code=500, data={})
-
-    @bp.route("/config/workhour_character_coefficients", methods=["GET"])
-    def get_config_workhour_character_coefficients():
-        try:
-            return ok(get_workhour_character_coefficients_service())
+            return ok(get_workhour_role_coefficients_service())
         except Exception as e:
             return fail(str(e), code=500, data={})
 

@@ -2,6 +2,7 @@
 
 from flask import request
 
+from base.auth.access import require_access
 from performance.service import (
     fill_member_input_service,
     calculate_member_quarter_performance_service,
@@ -15,8 +16,17 @@ from performance.service import (
 
 
 def register(bp, ok, fail):
+    def require_read():
+        return require_access(fail, any_permissions=("page.performance",))
+
+    def require_write():
+        return require_access(fail, any_permissions=("button.review_member",))
+
     @bp.route("/perf/fill-quarter-member", methods=["POST"])
     def perf_fill_quarter_member():
+        _, denied = require_write()
+        if denied:
+            return denied
         try:
             payload = request.get_json(silent=True) or {}
             out = fill_member_input_service(payload)
@@ -28,6 +38,9 @@ def register(bp, ok, fail):
 
     @bp.route("/perf/calculate-quarter-member", methods=["POST"])
     def perf_calculate_quarter_member():
+        _, denied = require_write()
+        if denied:
+            return denied
         try:
             payload = request.get_json(silent=True) or {}
             out = calculate_member_quarter_performance_service(payload)
@@ -39,12 +52,15 @@ def register(bp, ok, fail):
 
     @bp.route("/perf/query", methods=["GET"])
     def perf_query():
+        _, denied = require_read()
+        if denied:
+            return denied
         try:
             payload = {
                 "year": request.args.get("year"),
                 "quarter": request.args.get("quarter"),
                 "user_id": request.args.get("userId", request.args.get("user_id", "")),
-                "team_key": request.args.get("teamKey", request.args.get("team_key", "")),
+                "teamCode": request.args.get("teamCode", ""),
             }
             out = query_quarter_performance_service(payload)
             if out.get("success"):
@@ -55,11 +71,14 @@ def register(bp, ok, fail):
 
     @bp.route("/perf/team-import-users", methods=["GET"])
     def perf_team_import_users():
+        _, denied = require_write()
+        if denied:
+            return denied
         try:
             payload = {
                 "year": request.args.get("year"),
                 "quarter": request.args.get("quarter"),
-                "team": request.args.get("team"),
+                "teamCode": request.args.get("teamCode"),
             }
             out = list_team_import_users_service(payload)
             if out.get("success"):
@@ -70,6 +89,9 @@ def register(bp, ok, fail):
 
     @bp.route("/perf/batch-import", methods=["POST"])
     def perf_batch_import():
+        _, denied = require_write()
+        if denied:
+            return denied
         try:
             payload = request.get_json(silent=True) or {}
             out = batch_import_service(payload)
@@ -81,6 +103,9 @@ def register(bp, ok, fail):
 
     @bp.route("/perf/update-quarter-member", methods=["POST"])
     def perf_update_quarter_member():
+        _, denied = require_write()
+        if denied:
+            return denied
         try:
             payload = request.get_json(silent=True) or {}
             out = update_member_performance_service(payload)
@@ -92,6 +117,9 @@ def register(bp, ok, fail):
 
     @bp.route("/perf/teams", methods=["GET"])
     def perf_teams():
+        _, denied = require_read()
+        if denied:
+            return denied
         try:
             out = list_teams_service()
             if out.get("success"):
@@ -102,8 +130,11 @@ def register(bp, ok, fail):
 
     @bp.route("/perf/members", methods=["GET"])
     def perf_members():
+        _, denied = require_read()
+        if denied:
+            return denied
         try:
-            payload = {"team": request.args.get("team", "")}
+            payload = {"teamCode": request.args.get("teamCode", "")}
             out = list_members_service(payload)
             if out.get("success"):
                 return ok(out.get("data") or {})

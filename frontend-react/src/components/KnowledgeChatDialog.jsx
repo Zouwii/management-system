@@ -8,6 +8,21 @@ const suggestedQuestions = [
   '怎么根据工时分析生成任务单？',
 ];
 
+function UserAvatar() {
+  return (
+    <div
+      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-slate-600"
+      role="img"
+      aria-label="用户头像"
+      title="用户"
+    >
+      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.8} stroke="currentColor" aria-hidden="true">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6.75a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.5 20.25a7.5 7.5 0 0 1 15 0" />
+      </svg>
+    </div>
+  );
+}
+
 export default function KnowledgeChatDialog({ open, onClose }) {
   const [sessionId, setSessionId] = useState('');
   const [messages, setMessages] = useState([]);
@@ -135,7 +150,6 @@ export default function KnowledgeChatDialog({ open, onClose }) {
             </div>
             <div className="min-w-0">
               <div className="text-[15px] font-semibold leading-5 text-slate-900">AI知识库问答</div>
-              <div className="mt-0.5 text-[12px] leading-4 text-slate-500">本地 skill · 向量知识库 · 流式回答</div>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -187,7 +201,7 @@ export default function KnowledgeChatDialog({ open, onClose }) {
           ) : null}
           <div className="space-y-3">
             {messages.map((message, index) => (
-              <div key={`${message.role}-${index}`} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div key={`${message.role}-${index}`} className={`flex items-end gap-2 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[82%] rounded-lg px-3 py-2 text-[13px] leading-6 shadow-sm ${
                   message.role === 'user'
                     ? 'bg-slate-900 text-white'
@@ -207,6 +221,7 @@ export default function KnowledgeChatDialog({ open, onClose }) {
                     </div>
                   ) : null}
                 </div>
+                {message.role === 'user' ? <UserAvatar /> : null}
               </div>
             ))}
             <div ref={scrollRef} />

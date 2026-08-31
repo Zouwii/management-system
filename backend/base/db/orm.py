@@ -338,14 +338,7 @@ class UpdateLock(Base):
 
 
 class UserCharacter(Base):
-    """
-    用户维度的 character 配置表（供你之后手动填充）
-
-    字段：
-    - 中文名：name
-    - 钉钉用户 id：user_id
-    - character：character（1/2/3/4）
-    """
+    """Organization roster; stable codes are authoritative at runtime."""
 
     __tablename__ = "user_character"
 
@@ -357,9 +350,14 @@ class UserCharacter(Base):
     # 组别归属（用于绩效数据的归属判断）
     team_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
 
-    # 组长标记：导航组/对接组是否为组长
+    # team_id/character are retained only for migration audit and rollback.
+    team_code: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    job_role_code: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+
+    # 组长权限标记：导航组/对接组/应用三组
     is_nav_lead: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     is_servo_lead: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    is_p3_lead: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 
     # 钉钉 unionId（OAuth 登录后回填，用于知识库 API 调用等场景）
     union_id: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, default=None)
@@ -432,6 +430,7 @@ class MemberAttendance(Base):
     user_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     user_name: Mapped[str] = mapped_column(String(128), nullable=False, default="")
     team_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
+    team_code: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)
     year: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     quarter: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     overtime_days: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)

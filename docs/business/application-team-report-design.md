@@ -4,11 +4,13 @@
 
 应用组问题分析是独立业务，不复用工作日耗时的查询、聚合或接口。主数据来自
 `program_issue_detail`；现场单关联和排查文档价值来自独立的
-`onsite_problem_details`；用户筛选来自 `user_character.team_id = '3'`。
+`onsite_problem_details`；应用组用户来自组织 Scope `APPLICATION_TEAM_VIEW`，即
+`team_code=NAV AND job_role_code=APPLICATION_ENGINEER`。应用三组使用独立的
+`APP_THREE_TEAM_VIEW`，不能再把历史 `team_id=3` 当作运行时业务规则。
 
 ## 2. 查询接口
 
-### `GET /api/application-team/options`
+### `GET /api/bt/application-team/options`
 
 用于初始化筛选器，不返回报表结果：
 
@@ -30,7 +32,7 @@
 
 `years`、`quarters` 和 `dimensions` 都由 SQL 实际已有记录生成，不在前端维护枚举。
 
-### `POST /api/application-team/report`
+### `POST /api/bt/application-team/report`
 
 请求体：
 
@@ -42,6 +44,15 @@
 使用 `program_issue_detail`，用户口径是 `executor_id`，时间口径是
 `created_at_ding`，不使用 `need_statistic`。查询时间范围是季度左闭右开：
 `[created_at_ding >= start, created_at_ding < end)`。
+
+应用三组复用相同响应契约，对应接口为：
+
+```text
+GET  /api/bt/app-three-team/options
+POST /api/bt/app-three-team/report
+```
+
+四个接口都要求有效登录会话及对应页面权限。
 
 ## 3. 最终结果表数量
 

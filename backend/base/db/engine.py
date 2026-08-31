@@ -258,17 +258,13 @@ def init_database() -> None:
     """
     数据库初始化入口（仅 init，不做 drop）：
     - create tables if not exists（主库 + 绩效库）
-    - seed 默认配置（config 表、user_character 初始数据等）
+    - seed 默认配置（不自动导入人员；人员由 organization.migration 显式导入）
 
     设计目标：初始化内容“可视化、可读、可维护”。
     """
     main_tables, perf_tables, kb_tables, onsite_tables, req_pool_tables, algo_tables = _table_registry()
     # seed 阶段会直接使用这两个 ORM 模型
-    from base.db.orm import (
-        Config as DbConfig,
-        OnsiteProblemDetail,
-        UserCharacter as DbUserCharacter,
-    )
+    from base.db.orm import Config as DbConfig, OnsiteProblemDetail
 
     print("[init_db] creating tables (no drop) ...")
     _execute_table_ops(engine, main_tables, "create")
@@ -654,8 +650,10 @@ def init_database() -> None:
         try:
             cols_user = {c.get("name") for c in inspector.get_columns("user_character")}
             with engine.begin() as conn:
-                if "team_id" not in cols_user:
-                    conn.execute(text("ALTER TABLE user_character ADD COLUMN team_id VARCHAR(64)"))
+                if "team_code" not in cols_user:
+                    conn.execute(text("ALTER TABLE user_character ADD COLUMN team_code VARCHAR(64)"))
+                if "job_role_code" not in cols_user:
+                    conn.execute(text("ALTER TABLE user_character ADD COLUMN job_role_code VARCHAR(64)"))
                 if "is_nav_lead" not in cols_user:
                     conn.execute(
                         text(
@@ -668,17 +666,29 @@ def init_database() -> None:
                             "ALTER TABLE user_character ADD COLUMN is_servo_lead BOOLEAN NOT NULL DEFAULT 0"
                         )
                     )
+                if "is_p3_lead" not in cols_user:
+                    conn.execute(
+                        text(
+                            "ALTER TABLE user_character ADD COLUMN is_p3_lead BOOLEAN NOT NULL DEFAULT 0"
+                        )
+                    )
                 if "union_id" not in cols_user:
                     conn.execute(
                         text("ALTER TABLE user_character ADD COLUMN union_id VARCHAR(128)")
                     )
-        except Exception:
-            # 不阻断服务启动；由上层业务容错或你手工执行迁移
-            pass
+                # Data backfill is intentionally not performed at startup.
+                # base.organization.migration owns all legacy-data changes so
+                # dry-run, audit and the historical team_id=3 ambiguity remain
+                # visible to operators.
+        except Exception as exc:
+            raise RuntimeError("failed to prepare user_character organization columns") from exc
 
         # member_attendance 表字段补齐：保存每位成员按季度录入的法定带薪假。
         try:
             cols_attendance = {c.get("name") for c in inspector.get_columns("member_attendance")}
+            if "team_code" not in cols_attendance:
+                with engine.begin() as conn:
+                    conn.execute(text("ALTER TABLE member_attendance ADD COLUMN team_code VARCHAR(64)"))
             if "statutory_holiday_days" not in cols_attendance:
                 with engine.begin() as conn:
                     conn.execute(
@@ -723,8 +733,8 @@ def init_database() -> None:
                 # 时间范围（动态计算：年初 ~ 当前季度末）
                 "start_time": start_dt.isoformat(),
                 "end_time": end_dt.isoformat(),
-                # character -> coefficient（工时折算系数映射）
-                "workhour_character_coefficients": '{"0":0.4,"1":0.8,"2":0.8,"3":1.0,"4":0.8,"5":0.5}',
+                # job_role_code -> coefficient（工时折算系数映射）
+                "workhour_role_coefficients": '{"TEAM_LEAD":0.4,"SOFTWARE_ENGINEER":0.8,"SOFTWARE_APPLICATION_ENGINEER":0.8,"APPLICATION_ENGINEER":1.0,"ALGORITHM_ENGINEER":0.8,"INTERN":0.5,"SYSTEM_ADMIN":0.4}',
                 # UI 展示“上次更新时间”（固定为 1970，避免每次启动都更新时间）
                 "last_update_time": "1970-01-01T00:00:00+00:00",
                 # 自动更新配置
@@ -741,7 +751,7 @@ def init_database() -> None:
                 "end_time",
                 "last_update_time",
                 # 保留数据库中已维护的系数映射，重启不覆盖
-                "workhour_character_coefficients",
+                "workhour_role_coefficients",
             }
 
             def _ensure(cfg_type: str, value: str):
@@ -762,40 +772,6 @@ def init_database() -> None:
             for k, v in default_config_seed.items():
                 _ensure(k, v)
 
-            # 初始化 user_character：把 ids.json 中的用户先落库
-            # 你之后可以直接在数据库里维护 character/team_id/is_nav_lead/is_servo_lead。
-            try:
-                from base.dingtalk_client import get_config_user_meta
-
-                user_meta = get_config_user_meta()
-                for name, meta in (user_meta or {}).items():
-                    nm = str(name)
-                    uid = str((meta or {}).get("userId") or "").strip()
-                    if not uid:
-                        continue
-                    existing_u = (
-                        session.query(DbUserCharacter)
-                        .filter(DbUserCharacter.user_id == uid)
-                        .first()
-                    )
-                    if existing_u:
-                        # 已有记录不覆盖，避免 init_db 把你手工维护的角色/组别改回去。
-                        continue
-                    else:
-                        init_character = int((meta or {}).get("character", 0) or 0)
-                        session.add(
-                            DbUserCharacter(
-                                user_id=uid,
-                                name=nm,
-                                character=init_character,
-                                team_id=str((meta or {}).get("team_id")) if (meta or {}).get("team_id") is not None else None,
-                                is_nav_lead=bool((meta or {}).get("is_nav_lead", False)),
-                                is_servo_lead=bool((meta or {}).get("is_servo_lead", False)),
-                            )
-                        )
-            except Exception:
-                # IDs 初始化失败不阻断服务启动
-                pass
             session.commit()
         finally:
             session.close()

@@ -5,7 +5,7 @@ let _cachedUserids = null;
 let _cachedUseridsKey = '';
 let _configWarmupPromise = null;
 const MEMBERS_CACHE_TTL_MS = 10 * 60 * 1000;
-const MEMBERS_CACHE_KEY_PREFIX = 'personal_hours_members_cache_v1';
+const MEMBERS_CACHE_KEY_PREFIX = 'personal_hours_members_cache_v2';
 
 function appendQuery(path, params = {}) {
   const searchParams = new URLSearchParams();
@@ -47,11 +47,10 @@ function _normalizeMemberOptions(users = []) {
     id: String(u.id || ''),
     name: String(u.name || ''),
     userId: String(u.userId || u.id || ''),
-    team: String(u.team || ''),
-    teamId: String(u.teamId || ''),
-    character: u.character === undefined || u.character === null || String(u.character).trim() === ''
-      ? null
-      : Number(u.character),
+    teamCode: String(u.teamCode || ''),
+    teamName: String(u.teamName || ''),
+    jobRoleCode: String(u.jobRoleCode || ''),
+    jobRoleName: String(u.jobRoleName || ''),
   }));
 }
 
@@ -247,32 +246,7 @@ export function realFetchDepartmentOverview(_user, params = {}) {
 
 export function realFetchNavTeamDetail(_user, params = {}) {
   const expected = String(params?.expected || 'quarter');
-  const now = new Date();
-  const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
-  const pad = (n) => String(n).padStart(2, '0');
-  const formatLocalInput = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-  const start = expected === 'last_quarter'
-    ? new Date(quarterStartMonth === 0 ? now.getFullYear() - 1 : now.getFullYear(), quarterStartMonth === 0 ? 9 : quarterStartMonth - 3, 1, 0, 0, 0)
-    : new Date(now.getFullYear(), quarterStartMonth, 1, 0, 0, 0);
-  const end = expected === 'current'
-    ? new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
-    : expected === 'last_quarter'
-      ? new Date(now.getFullYear(), quarterStartMonth, 0, 23, 59, 59)
-      : new Date(now.getFullYear(), quarterStartMonth + 3, 0, 23, 59, 59);
-  return Promise.resolve()
-    .then(async () => {
-      const projectId = await fetchProjectId();
-      return httpRequest('/bt/stats/team_quarter_workhours', {
-        method: 'POST',
-        body: JSON.stringify({
-          teamId: '0',
-          projectId,
-          start_time: params.startDate || formatLocalInput(start),
-          end_time: params.endDate || formatLocalInput(end),
-          exclude_character_zero: true,
-        }),
-      });
-    })
+  return httpRequest(appendQuery('/dashboard/nav-team-detail', { expected }))
     .then((res) => ({
       code: 200,
       error: '',
@@ -286,32 +260,7 @@ export function realFetchNavTeamDetail(_user, params = {}) {
 
 export function realFetchIntegrationTeamDetail(_user, params = {}) {
   const expected = String(params?.expected || 'quarter');
-  const now = new Date();
-  const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3;
-  const pad = (n) => String(n).padStart(2, '0');
-  const formatLocalInput = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-  const start = expected === 'last_quarter'
-    ? new Date(quarterStartMonth === 0 ? now.getFullYear() - 1 : now.getFullYear(), quarterStartMonth === 0 ? 9 : quarterStartMonth - 3, 1, 0, 0, 0)
-    : new Date(now.getFullYear(), quarterStartMonth, 1, 0, 0, 0);
-  const end = expected === 'current'
-    ? new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
-    : expected === 'last_quarter'
-      ? new Date(now.getFullYear(), quarterStartMonth, 0, 23, 59, 59)
-      : new Date(now.getFullYear(), quarterStartMonth + 3, 0, 23, 59, 59);
-  return Promise.resolve()
-    .then(async () => {
-      const projectId = await fetchProjectId();
-      return httpRequest('/bt/stats/team_quarter_workhours', {
-        method: 'POST',
-        body: JSON.stringify({
-          teamId: '1',
-          projectId,
-          start_time: params.startDate || formatLocalInput(start),
-          end_time: params.endDate || formatLocalInput(end),
-          exclude_character_zero: true,
-        }),
-      });
-    })
+  return httpRequest(appendQuery('/dashboard/integration-team-detail', { expected }))
     .then((res) => ({
       code: 200,
       error: '',
@@ -337,8 +286,23 @@ export function realFetchApplicationTeamDetail(_user, params = {}) {
     }));
 }
 
+export function realFetchAppThreeTeamDetail(_user, params = {}) {
+  const expected = String(params?.expected || 'quarter');
+  return httpRequest(appendQuery('/dashboard/app-three-team-detail', { expected }))
+    .then((res) => ({
+      code: 200,
+      error: '',
+      data: {
+        rows: res?.data?.rows || [],
+        memberOptions: res?.data?.memberOptions || [],
+        lastUpdatedAt: res?.data?.lastUpdatedAt || '',
+      },
+    }));
+}
+
 export function realFetchApplicationTeamReport(_user, params = {}) {
-  return httpRequest('/application-team/report', {
+  const appThree = params?.scopeCode === 'APP_THREE_TEAM_VIEW';
+  return httpRequest(appThree ? '/app-three-team/report' : '/application-team/report', {
     method: 'POST',
     body: JSON.stringify({
       year: Number(params?.year || new Date().getFullYear()),
@@ -348,8 +312,9 @@ export function realFetchApplicationTeamReport(_user, params = {}) {
   });
 }
 
-export function realFetchApplicationTeamOptions() {
-  return httpRequest('/application-team/options');
+export function realFetchApplicationTeamOptions(_user, params = {}) {
+  const appThree = params?.scopeCode === 'APP_THREE_TEAM_VIEW';
+  return httpRequest(appThree ? '/app-three-team/options' : '/application-team/options');
 }
 
 export function realFetchPersonalHours(_user, params = {}) {
@@ -658,7 +623,7 @@ export function realFetchTeamPerformance(_user, params = {}) {
   return httpRequest(appendQuery('/bt/perf/query', {
     year: params.year,
     quarter: params.quarter,
-    teamKey: params.teamKey,
+    teamCode: params.teamCode,
   }));
 }
 
@@ -749,6 +714,12 @@ export function realFetchWorkdayCosthourTeamSummary(payload = {}) {
   });
 }
 
+export function realFetchOrganizationScopeOptions(scopeCode, params = {}) {
+  const query = new URLSearchParams(params).toString();
+  const suffix = query ? `?${query}` : '';
+  return httpRequest(`/bt/organization/scopes/${encodeURIComponent(scopeCode || '')}/options${suffix}`);
+}
+
 export function realFetchWorkdayCosthourDeptAggregate(payload = {}) {
   return httpRequest('/bt/stats/workday_costhour/department_aggregate', {
     method: 'POST',
@@ -808,7 +779,7 @@ export function realFetchTeamImportUsers(params = {}) {
   const qs = new URLSearchParams({
     year: params.year || '',
     quarter: params.quarter || '',
-    team: params.team || '',
+    teamCode: params.teamCode || '',
   }).toString();
   return httpRequest(`/bt/perf/team-import-users?${qs}`);
 }
@@ -833,8 +804,8 @@ export function realFetchTeams() {
   return httpRequest('/bt/perf/teams');
 }
 
-export function realFetchMembers(team = '') {
-  const qs = team ? `?team=${encodeURIComponent(team)}` : '';
+export function realFetchMembers(teamCode = '') {
+  const qs = teamCode ? `?teamCode=${encodeURIComponent(teamCode)}` : '';
   return httpRequest(`/bt/perf/members${qs}`);
 }
 

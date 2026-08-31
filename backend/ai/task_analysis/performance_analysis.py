@@ -47,7 +47,7 @@ def _llm_call(messages: list, max_tokens: int = 16384) -> str:
     cfg = _load_config()
     base = str(cfg.get("base_url", "")).strip().rstrip("/")
     api_key = str(cfg.get("api_key", "")).strip()
-    model = str(cfg.get("model", "MiniMax-M2.7")).strip()
+    model = str(cfg.get("model", "deepseek-v4-flash")).strip()
     resp = requests.post(
         f"{base}/v1/chat/completions",
         headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},

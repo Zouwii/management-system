@@ -6,8 +6,7 @@ import ManagerLayout from '../layouts/ManagerLayout';
 import { ROUTE_PATHS } from '../constants/routes';
 import { useAuthStore } from '../store/authStore';
 import { formatDateTime } from '../utils/workHours';
-import { fetchMembers, fetchTeamPerformance } from '../api/dashboard';
-import { shouldHideMemberInSelector } from '../utils/memberVisibility';
+import { fetchOrganizationScopeOptions, fetchTeamPerformance } from '../api/dashboard';
 
 const PERFORMANCE_LINE_COLORS = [
   '#2563eb',
@@ -307,9 +306,11 @@ function buildExpectedDateRange(view) {
 export default function TeamDetailDashboard({
   title,
   desc,
-  teamKey,
+  teamCode,
   fetcher,
   fallbackRows,
+  organizationScopeCode = 'DEPARTMENT_EFFECTIVE_HOURS',
+  showPerformance = true,
 }) {
   const user = useAuthStore((state) => state.user);
   const [searchParams] = useSearchParams();
@@ -337,7 +338,7 @@ export default function TeamDetailDashboard({
   const defaultQuarter = useMemo(() => getDefaultQuarter(), []);
   const [performanceQueryVersion, setPerformanceQueryVersion] = useState(0);
   const [performanceTrendData, setPerformanceTrendData] = useState([]);
-  const [perfLoading, setPerfLoading] = useState(true);
+  const [perfLoading, setPerfLoading] = useState(showPerformance);
 
   // 默认拉取最新绩效季度及之前最多 8 个季度，用于团队趋势图。
   useEffect(() => {
@@ -347,7 +348,9 @@ export default function TeamDetailDashboard({
       .slice(appliedIndex >= 0 ? appliedIndex : 0, (appliedIndex >= 0 ? appliedIndex : 0) + 8)
       .reverse();
 
-    if (!teamKey || trendQuarters.length === 0) return;
+    if (!showPerformance || !teamCode || trendQuarters.length === 0) {
+      return undefined;
+    }
 
     Promise.all(trendQuarters.map(async (quarterLabel) => {
       const parsed = parseQuarterLabel(quarterLabel);
@@ -357,7 +360,7 @@ export default function TeamDetailDashboard({
         const response = await fetchTeamPerformance(user, {
           year: parsed.year,
           quarter: parsed.quarter,
-          teamKey,
+          teamCode,
         });
         return {
           quarter: quarterLabel,
@@ -373,7 +376,7 @@ export default function TeamDetailDashboard({
     });
 
     return () => { active = false; };
-  }, [defaultQuarter, performanceQuarters, performanceQueryVersion, teamKey, user]);
+  }, [defaultQuarter, performanceQuarters, performanceQueryVersion, showPerformance, teamCode, user]);
 
   function handlePerformanceQuery() {
     setPerfLoading(true);
@@ -394,13 +397,12 @@ export default function TeamDetailDashboard({
       setLastUpdatedAt(String(response?.data?.lastUpdatedAt || ''));
     });
 
-    // 下拉成员列表：统一从 /perf/members?team= 获取，排除管理员
-    if (teamKey) {
-      fetchMembers(teamKey).then((res) => {
+    // 下拉成员列表：统一从组织 Scope 获取，排除管理员
+    if (teamCode) {
+      fetchOrganizationScopeOptions(organizationScopeCode, { teamCode }).then((res) => {
         if (!active) return;
         const names = (res?.data?.members || [])
-          .filter((m) => !shouldHideMemberInSelector(m))
-          .map((m) => m.userName)
+          .map((m) => m.userName || m.userId)
           .filter(Boolean);
         setMemberOptions(names.length ? ['全部', ...names] : ['全部']);
       }).catch(() => {});
@@ -409,7 +411,7 @@ export default function TeamDetailDashboard({
     return () => {
       active = false;
     };
-  }, [dateRange, expectedView, fallbackRows, fetcher, teamKey, user]);
+  }, [dateRange, expectedView, fallbackRows, fetcher, organizationScopeCode, teamCode, user]);
 
   useEffect(() => {
     const expectedParam = searchParams.get('expected');
@@ -621,7 +623,7 @@ export default function TeamDetailDashboard({
         )}
       />
 
-      <Card className="overflow-hidden">
+      {showPerformance ? <Card className="overflow-hidden">
         <div className="border-b border-slate-200 bg-slate-50 px-5 py-5">
           <div className="text-lg font-semibold">工时情况</div>
         </div>
@@ -818,7 +820,7 @@ export default function TeamDetailDashboard({
             </tbody>
           </table>
         </div>
-      </Card>
+      </Card> : null}
 
       <Card className="overflow-hidden">
         <div className="border-b border-slate-200 bg-slate-50 px-5 py-5">

@@ -2,6 +2,7 @@ import DepartmentOverview from '../pages/DepartmentOverview';
 import NavTeamDetail from '../pages/NavTeamDetail';
 import IntegrationTeamDetail from '../pages/IntegrationTeamDetail';
 import ApplicationTeamPage from '../pages/ApplicationTeamPage';
+import AppThreeTeamPage from '../pages/AppThreeTeamPage';
 import PersonalHoursByRole from '../pages/PersonalHoursByRole';
 import PerformancePage from '../pages/PerformancePage';
 import AIAnalysisPage from '../pages/AIAnalysisPage';
@@ -46,6 +47,14 @@ export const appRouteConfig = [
     allowedRoles: [ROLES.MANAGER, ROLES.ADMIN],
     permissionCode: PAGE_PERMISSION_CODES.APPLICATION_TEAM,
     element: <ApplicationTeamPage />,
+  },
+  {
+    path: ROUTE_PATHS.APP_THREE_TEAM,
+    label: '应用三组',
+    menu: true,
+    allowedRoles: [ROLES.MANAGER, ROLES.ADMIN],
+    permissionCode: PAGE_PERMISSION_CODES.APP_THREE_TEAM,
+    element: <AppThreeTeamPage />,
   },
   {
     path: ROUTE_PATHS.PERSONAL_HOURS,

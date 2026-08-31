@@ -60,6 +60,14 @@ export const sideMenuConfig = [
     permissionCode: PAGE_PERMISSION_CODES.APPLICATION_TEAM,
   },
   {
+    path: ROUTE_PATHS.APP_THREE_TEAM,
+    label: '应用三组',
+    employeeLabel: '应用三组',
+    section: '团队',
+    allowedRoles: [ROLES.MANAGER, ROLES.ADMIN],
+    permissionCode: PAGE_PERMISSION_CODES.APP_THREE_TEAM,
+  },
+  {
     path: ROUTE_PATHS.PERSONAL_HOURS,
     label: '工时管理',
     employeeLabel: '工时管理',

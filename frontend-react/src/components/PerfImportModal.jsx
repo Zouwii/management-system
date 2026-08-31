@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchTeamImportUsers, batchImportScores, updateMemberPerformance, fetchTeams, recalcMemberPerformance } from '../api/dashboard';
+import { fetchTeamImportUsers, batchImportScores, updateMemberPerformance, fetchOrganizationScopeOptions, recalcMemberPerformance } from '../api/dashboard';
 import Card from './Card';
 
 const CURRENT_YEAR = new Date().getFullYear();
@@ -41,7 +41,7 @@ function mapMembers(list) {
 export default function PerfImportModal({ open, onClose }) {
   const [year, setYear] = useState(CURRENT_YEAR);
   const [quarter, setQuarter] = useState(CURRENT_QUARTER);
-  const [team, setTeam] = useState('nav');
+  const [teamCode, setTeamCode] = useState('NAV');
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -53,20 +53,23 @@ export default function PerfImportModal({ open, onClose }) {
 
   useEffect(() => {
     if (!open) return;
-    fetchTeams().then((res) => {
-      const list = res?.data?.teams || [];
+    fetchOrganizationScopeOptions('QUARTER_PERFORMANCE').then((res) => {
+      const list = (res?.data?.teams || []).map((teamOption) => ({
+        teamCode: teamOption.teamCode,
+        teamName: teamOption.teamName,
+      })).filter((teamOption) => teamOption.teamCode);
       setTeams(list);
-      if (list.length && !list.find((t) => t.key === team)) {
-        setTeam(list[0].key);
+      if (list.length && !list.find((t) => t.teamCode === teamCode)) {
+        setTeamCode(list[0].teamCode);
       }
     }).catch(() => {});
-  }, [open]);
+  }, [open, teamCode]);
 
   useEffect(() => {
     if (!open) return;
     setLoading(true);
     setMessage('');
-    fetchTeamImportUsers({ year, quarter, team })
+    fetchTeamImportUsers({ year, quarter, teamCode })
       .then((res) => {
         if (res?.data?.members) {
           setMembers(mapMembers(res.data.members));
@@ -74,7 +77,7 @@ export default function PerfImportModal({ open, onClose }) {
       })
       .catch(() => setMessage('加载失败'))
       .finally(() => setLoading(false));
-  }, [open, year, quarter, team]);
+  }, [open, year, quarter, teamCode]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -140,7 +143,7 @@ export default function PerfImportModal({ open, onClose }) {
         setMessage(`保存完成: ${ok} 成功, ${fail} 失败`);
 
         // 保存后自动刷新，确保编辑模式展开明细看到最新结果
-        const res = await fetchTeamImportUsers({ year, quarter, team });
+        const res = await fetchTeamImportUsers({ year, quarter, teamCode });
         if (res?.data?.members) {
           setMembers(mapMembers(res.data.members));
         }
@@ -169,12 +172,12 @@ export default function PerfImportModal({ open, onClose }) {
           return;
         }
 
-        const res = await batchImportScores({ year, quarter, team, members: toSave });
+        const res = await batchImportScores({ year, quarter, members: toSave });
         if (res?.data?.ok !== undefined) {
           setMessage(`导入完成: ${res.data.ok} 成功, ${res.data.fail} 失败`);
         }
         // 保存后自动刷新，展示计算结果
-        const ref = await fetchTeamImportUsers({ year, quarter, team });
+        const ref = await fetchTeamImportUsers({ year, quarter, teamCode });
         if (ref?.data?.members) {
           setMembers(mapMembers(ref.data.members));
         }
@@ -210,7 +213,7 @@ export default function PerfImportModal({ open, onClose }) {
         });
       } else {
         await batchImportScores({
-          year, quarter, team,
+          year, quarter,
           members: [{
             userId,
             workHourScore: toNum(m._wh),
@@ -221,7 +224,7 @@ export default function PerfImportModal({ open, onClose }) {
       // 再触发计算
       await recalcMemberPerformance({ year, quarter, userId });
       // 刷新数据
-      const res = await fetchTeamImportUsers({ year, quarter, team });
+      const res = await fetchTeamImportUsers({ year, quarter, teamCode });
       if (res?.data?.members) {
         setMembers(mapMembers(res.data.members));
       }
@@ -271,19 +274,19 @@ export default function PerfImportModal({ open, onClose }) {
             ))}
           </select>
           <select
-            value={team}
-            onChange={(e) => setTeam(e.target.value)}
+            value={teamCode}
+            onChange={(e) => setTeamCode(e.target.value)}
             className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none"
           >
             {teams.map((t) => (
-              <option key={t.key} value={t.key}>{t.label}</option>
+              <option key={t.teamCode} value={t.teamCode}>{t.teamName}</option>
             ))}
           </select>
           <button
             onClick={() => {
               setMembers([]);
               setLoading(true);
-              fetchTeamImportUsers({ year, quarter, team })
+              fetchTeamImportUsers({ year, quarter, teamCode })
                 .then((res) => {
                   if (res?.data?.members) {
                     setMembers(mapMembers(res.data.members));

@@ -35,6 +35,12 @@ backend/
 │   │   ├── routes.py               #     配置读写
 │   │   ├── service.py              #     配置服务 + 工时自动计算
 │   │   └── member_visibility.py    #     成员可见性
+│   ├── organization/               #   组织名册与业务人员范围
+│   │   ├── constants.py            #     团队/岗位稳定编码和兼容映射
+│   │   ├── scopes.py               #     业务 Scope 策略
+│   │   ├── service.py              #     统一 Roster 查询服务
+│   │   ├── routes.py               #     团队/人员选项 API
+│   │   └── migration.py            #     ids.json 一次性显式迁移
 │   ├── stats/                      #   统计汇总
 │   ├── api_monitor.py              #   钉钉 API 调用监控（DB 持久化 + 按日查询）
 │   │   └── routes.py               #
@@ -121,9 +127,11 @@ v2 重构后采用 **base 核心包 + 功能模块** 的扁平化结构。基础
 
 **依赖规则：**
 - `base/db/` 和 `base/dingtalk_client.py` 为最底层，不依赖其他业务模块
-- `base/` 子模块（auth/sync/projects/config/stats/health）依赖 `base/db/` 和 `base/dingtalk_client.py`
+- `base/` 子模块（auth/sync/projects/config/organization/stats/health）依赖 `base/db/` 和 `base/dingtalk_client.py`
 - `ai/`、`workhour/`、`performance/` 依赖 `base/db/` 和 `base/dingtalk_client.py`
 - `route_registry/` 聚合所有模块的路由注册
+
+组织名册和业务人员范围的详细边界见 [后端组织名册与业务范围 V2 设计](./organization-backend-v2-design.md)。业务模块应通过 `base.organization.service` 获取人员范围，不再自行解释数字团队 ID、中文团队名或人员白名单。
 
 ### 例外：AI 模块
 
@@ -263,9 +271,9 @@ GET  /api/dashboard/integration-team-detail → 对接组详情
 
 | 角色 | 条件 | 数据范围 | 首页 |
 |------|------|----------|------|
-| employee | character ∈ {1,2,3} | self | /employee/personal-hours |
-| manager | character = 0, 单一组长 | team | /manager/nav-team-detail 或 integration-team-detail |
-| admin | character = 0, 同时是导航组长+对接组长 | all | /manager/department-overview |
+| employee | 非 `TEAM_LEAD` / `SYSTEM_ADMIN` 岗位 | self | /employee/personal-hours |
+| manager | `TEAM_LEAD` + `is_nav_lead` / `is_servo_lead` / `is_p3_lead` | team | 对应团队详情页 |
+| admin | `SYSTEM_ADMIN`，或同时为导航与对接组长 | all | /manager/department-overview |
 
 权限推导链：`resolve_user_profile()` → `_derive_role_and_access()` → 返回 permissionCodes / homePath / dataScope
 
@@ -285,7 +293,7 @@ _ok(data)   → {"code": 200, "data": data, "error": ""}
 _fail(msg)  → {"code": 400, "data": {}, "error": msg}
 ```
 
-两个蓝图共享同一个 MySQL（通过 `base/db/` 的 SQLAlchemy session），但 dashboard 有自己的 session 鉴权（`_require_login()` 读 Flask session）。
+两个蓝图共享同一个 MySQL（通过 `base/db/` 的 SQLAlchemy session）。业务路由统一通过 `base.auth.access.require_access()` 校验 Flask Session 和权限码；dashboard 的普通个人查询仍通过 `_require_login()` 读取当前会话。
 
 ## 数据库
 

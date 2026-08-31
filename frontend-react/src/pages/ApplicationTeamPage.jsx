@@ -54,7 +54,7 @@ function MatrixTable({ matrix, empty = '暂无数据' }) {
   );
 }
 
-export default function ApplicationTeamPage({ user }) {
+export default function ApplicationTeamPage({ user, scopeCode = 'APPLICATION_TEAM_VIEW', pageTitle = '应用组问题分析', pageDescription = '独立于有效工时的应用组问题处理统计' }) {
   const currentYear = new Date().getFullYear();
   const [filterOptions, setFilterOptions] = useState({ years: [currentYear], quarters: [1, 2, 3, 4], members: [] });
   const [year, setYear] = useState(currentYear);
@@ -67,7 +67,7 @@ export default function ApplicationTeamPage({ user }) {
 
   useEffect(() => {
     let active = true;
-    fetchApplicationTeamOptions(user)
+    fetchApplicationTeamOptions(user, { scopeCode })
       .then((response) => {
         if (!active) return;
         const data = response?.data || {};
@@ -82,12 +82,12 @@ export default function ApplicationTeamPage({ user }) {
       })
       .finally(() => { if (active) setOptionsLoading(false); });
     return () => { active = false; };
-  }, [currentYear, user]);
+  }, [currentYear, user, scopeCode]);
 
   const queryReport = () => {
     setLoading(true);
     setError('');
-    fetchApplicationTeamReport(user, { year, quarter, executorId })
+    fetchApplicationTeamReport(user, { year, quarter, executorId, scopeCode })
       .then((response) => setReport(response?.data || {}))
       .catch((reason) => setError(reason?.message || '应用组问题报表查询失败'))
       .finally(() => setLoading(false));
@@ -98,7 +98,7 @@ export default function ApplicationTeamPage({ user }) {
     <ManagerLayout>
       <Card className="p-5 lg:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <SectionTitle title="应用组问题分析" description="独立于有效工时的应用组问题处理统计" />
+          <SectionTitle title={pageTitle} description={pageDescription} />
           <div className="flex flex-wrap items-center gap-2">
             <select value={year} onChange={(event) => setYear(Number(event.target.value))} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
               {filterOptions.years.map((item) => <option key={item} value={item}>{item}年</option>)}

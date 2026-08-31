@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 
 from base.db import get_session
 from base.db.orm import MemberAttendance
+from base.organization.service import list_scope_members
+from base.organization.constants import stable_team_code
 
 
 def _quarter_from_start(start_time: str) -> tuple[int, int]:
@@ -33,7 +35,7 @@ def get_attendance_service(payload: dict) -> dict:
         payload: { start_time: str }
 
     Returns:
-        { success: bool, data: { records: [{user_id, user_name, team_id,
+        { success: bool, data: { records: [{user_id, user_name, teamCode,
            overtime_days, leave_days, statutory_holiday_days, effective_work_days,
            year, quarter}] }, error: str | None }
     """
@@ -50,20 +52,26 @@ def get_attendance_service(payload: dict) -> dict:
             )
             .all()
         )
-        records = [
-            {
-                "user_id": r.user_id,
-                "user_name": r.user_name,
-                "team_id": r.team_id,
-                "overtime_days": r.overtime_days,
-                "leave_days": r.leave_days,
-                "statutory_holiday_days": r.statutory_holiday_days,
-                "effective_work_days": r.effective_work_days,
-                "year": r.year,
-                "quarter": r.quarter,
-            }
-            for r in rows
-        ]
+        saved = {str(r.user_id).strip(): r for r in rows}
+        records = []
+        # Always return the complete ATTENDANCE roster, including members
+        # without a saved row for this quarter.
+        for member in list_scope_members("ATTENDANCE"):
+            user_id = str(member.get("userId") or "").strip()
+            if not user_id:
+                continue
+            row = saved.get(user_id)
+            records.append({
+                "user_id": user_id,
+                "user_name": member.get("userName") or user_id,
+                "teamCode": member.get("teamCode") or "",
+                "overtime_days": row.overtime_days if row else 0,
+                "leave_days": row.leave_days if row else 0,
+                "statutory_holiday_days": row.statutory_holiday_days if row else 0,
+                "effective_work_days": row.effective_work_days if row else 0,
+                "year": year,
+                "quarter": quarter,
+            })
         return {"success": True, "data": {"records": records, "year": year, "quarter": quarter}}
     except Exception as e:
         return {"success": False, "error": str(e), "data": {}}
@@ -77,7 +85,7 @@ def save_attendance_service(payload: dict) -> dict:
     Args:
         payload: {
             start_time: str,
-            records: [{ user_id, user_name, team_id, overtime_days,
+            records: [{ user_id, overtime_days,
                         leave_days, statutory_holiday_days, effective_work_days }]
         }
 
@@ -93,12 +101,20 @@ def save_attendance_service(payload: dict) -> dict:
 
     session = get_session()
     try:
+        roster = {
+            str(member.get("userId") or "").strip(): member
+            for member in list_scope_members("ATTENDANCE")
+            if str(member.get("userId") or "").strip()
+        }
         saved = 0
         now = datetime.now(timezone.utc)
         for record in records:
             user_id = str(record.get("user_id", "")).strip()
-            if not user_id:
+            member = roster.get(user_id)
+            if not user_id or member is None:
                 continue
+            canonical_name = str(member.get("userName") or user_id)
+            team_code = stable_team_code(member.get("teamCode"))
 
             existing = (
                 session.query(MemberAttendance)
@@ -115,15 +131,15 @@ def save_attendance_service(payload: dict) -> dict:
                 existing.leave_days = float(record.get("leave_days", 0) or 0)
                 existing.statutory_holiday_days = float(record.get("statutory_holiday_days", 0) or 0)
                 existing.effective_work_days = float(record.get("effective_work_days", 0) or 0)
-                existing.user_name = str(record.get("user_name", existing.user_name))
-                existing.team_id = str(record.get("team_id", "")) if record.get("team_id") is not None else existing.team_id
+                existing.user_name = canonical_name
+                existing.team_code = team_code or existing.team_code
                 existing.updated_at = now
             else:
                 session.add(
                     MemberAttendance(
                         user_id=user_id,
-                        user_name=str(record.get("user_name", "")),
-                        team_id=str(record.get("team_id", "")) if record.get("team_id") is not None else None,
+                        user_name=canonical_name,
+                        team_code=team_code or None,
                         year=year,
                         quarter=quarter,
                         overtime_days=float(record.get("overtime_days", 0) or 0),

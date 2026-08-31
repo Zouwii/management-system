@@ -83,7 +83,7 @@ def register(bp, ok, fail):
     def increase_sync():
         """增量同步：委托给 benti_team_incremental_update_service（去重优化版）。
 
-        仅同步本体团队（team_id 0/1）20 人，列表及明细均跨成员去重，
+        仅同步本体团队（NAV / INTEGRATION），列表及明细均跨成员去重，
         相比旧版"逐用户全量拉取"节省 80%+ API 调用量。
         """
 

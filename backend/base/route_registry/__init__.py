@@ -20,6 +20,7 @@ from base.auth.routes import register as register_auth
 from base.sync.routes import register as register_sync
 from base.projects.routes import register as register_projects
 from base.config.routes import register as register_config
+from base.organization.routes import register as register_organization
 from performance.routes import register as register_perf
 from base.stats.routes import register as register_stats
 from workhour.costhour.routes import register as register_costhour
@@ -48,6 +49,7 @@ def register_all_routes(bp, ok, fail):
     register_sync(bp, ok, fail)
     register_projects(bp, ok, fail)
     register_config(bp, ok, fail)
+    register_organization(bp, ok, fail)
     register_algo(bp, ok, fail)
     register_application_team(bp, ok, fail)
     register_ai_routes(bp, ok, fail)

@@ -12,7 +12,8 @@ from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from base.db.engine import OnsiteSessionLocal, SessionLocal
-from base.db.orm import OnsiteProblemDetail, ProgramIssueDetail, UserCharacter
+from base.db.orm import OnsiteProblemDetail, ProgramIssueDetail
+from base.organization.service import list_scope_members
 
 
 TYPE_ORDER = [
@@ -26,16 +27,6 @@ TYPE_ORDER = [
 CAUSE_TYPE_ORDER = ["本体导航/导航", "本体导航/定位", "本体导航/建图"]
 PROMPT_TYPE_ORDER = ["本体导航/导航", "本体导航/定位"]
 PRIORITY_ORDER = ["非常紧急", "紧急", "普通"]
-# 历史数据中部分应用工程师仍保留在导航组 team_id=0；在人员表完成迁移前，
-# 用这份兼容名单保证应用组报表不会把他们漏掉。
-APPLICATION_TEAM_USER_IDS = {
-    "2108411066921750",  # 潘铮
-    "265352386036276420",  # 郑世玉
-    "495200335237410081",  # 钟昌郎
-    "312542394537803309",  # 陈文斌
-}
-
-
 def _quarter_range(year: Any, quarter: Any) -> Tuple[datetime, datetime]:
     year_int = int(year)
     quarter_int = int(str(quarter).upper().replace("Q", ""))
@@ -121,26 +112,17 @@ def _record_from_row(row: ProgramIssueDetail) -> Dict[str, Any]:
     }
 
 
-def _application_members(session) -> List[Dict[str, str]]:
-    """返回应用组人员选项；人员身份来自 user_character，不在接口中写死姓名。"""
-    rows = (
-        session.query(UserCharacter.user_id, UserCharacter.name)
-        .filter(UserCharacter.team_id == "3")
-        .order_by(UserCharacter.name.asc(), UserCharacter.user_id.asc())
-        .all()
-    )
-    members = {str(user_id): {"userId": str(user_id), "name": _text(name)} for user_id, name in rows if user_id}
-    legacy_rows = (
-        session.query(UserCharacter.user_id, UserCharacter.name)
-        .filter(UserCharacter.user_id.in_(APPLICATION_TEAM_USER_IDS))
-        .all()
-    )
-    for user_id, name in legacy_rows:
-        members.setdefault(str(user_id), {"userId": str(user_id), "name": _text(name)})
-    # 历史数据兼容人员没有迁移 team_id 时，仍从问题表中发现其身份；姓名优先从人员表取。
-    for user_id in APPLICATION_TEAM_USER_IDS:
-        members.setdefault(user_id, {"userId": user_id, "name": user_id})
-    return list(members.values())
+def _application_members(scope_code: str = "APPLICATION_TEAM_VIEW") -> List[Dict[str, str]]:
+    """返回指定应用相关 Scope 的动态人员视图。"""
+    return [
+        {
+            "userId": member["userId"],
+            "name": _text(member.get("userName") or member["userId"]),
+            "teamCode": member.get("teamCode", "NAV"),
+            "jobRoleCode": member.get("jobRoleCode", "APPLICATION_ENGINEER"),
+        }
+        for member in list_scope_members(scope_code)
+    ]
 
 
 def _distinct_sql_values(rows: Iterable[ProgramIssueDetail], *fields: str) -> Dict[str, List[str]]:
@@ -154,11 +136,11 @@ def _distinct_sql_values(rows: Iterable[ProgramIssueDetail], *fields: str) -> Di
     return {field: sorted(items) for field, items in values.items()}
 
 
-def application_team_options_service() -> Dict[str, Any]:
+def application_team_options_service(scope_code: str = "APPLICATION_TEAM_VIEW") -> Dict[str, Any]:
     """查询应用组报表的筛选项及 SQL 维度值。"""
     session = SessionLocal()
     try:
-        members = _application_members(session)
+        members = _application_members(scope_code)
         member_ids = [item["userId"] for item in members]
         rows = (
             session.query(ProgramIssueDetail)
@@ -239,7 +221,11 @@ def _result_table_definitions() -> List[Dict[str, Any]]:
     ]
 
 
-def application_team_report_service(payload: Dict[str, Any]) -> Dict[str, Any]:
+def application_team_report_service(
+    payload: Dict[str, Any],
+    scope_code: str = "APPLICATION_TEAM_VIEW",
+    scope_name: str = "application",
+) -> Dict[str, Any]:
     payload = payload or {}
     try:
         start, end = _quarter_range(payload.get("year", datetime.now().year), payload.get("quarter", "Q1"))
@@ -249,15 +235,15 @@ def application_team_report_service(payload: Dict[str, Any]) -> Dict[str, Any]:
     session = SessionLocal()
     onsite_session = OnsiteSessionLocal()
     try:
-        members = _application_members(session)
+        members = _application_members(scope_code)
         application_ids = [item["userId"] for item in members]
         executor_id = str(payload.get("executorId") or payload.get("userId") or "").strip()
         if executor_id:
             if executor_id not in set(application_ids):
-                return {"success": False, "error": "executorId is not an application-team member", "data": {}}
+                return {"success": False, "error": "executorId is not in the requested team scope", "data": {}}
             application_ids = [executor_id]
         if not application_ids:
-            return {"success": True, "data": _empty_report(start, end)}
+            return {"success": True, "data": _empty_report(start, end, scope_name, scope_code)}
 
         rows = (
             session.query(ProgramIssueDetail)
@@ -314,7 +300,7 @@ def application_team_report_service(payload: Dict[str, Any]) -> Dict[str, Any]:
         )
         return {"success": True, "data": {
             "period": {"start": start.isoformat(), "end": end.isoformat()},
-            "scope": {"team": "application", "executorId": executor_id or None},
+            "scope": {"scopeName": scope_name, "scopeCode": scope_code, "executorId": executor_id or None},
             "filters": {"year": int(payload.get("year", start.year)), "quarter": f"Q{(start.month - 1) // 3 + 1}", "executorId": executor_id or None},
             "members": members,
             "total": total,
@@ -336,10 +322,15 @@ def application_team_report_service(payload: Dict[str, Any]) -> Dict[str, Any]:
         session.close()
 
 
-def _empty_report(start: datetime, end: datetime) -> Dict[str, Any]:
+def _empty_report(
+    start: datetime,
+    end: datetime,
+    scope_name: str = "application",
+    scope_code: str = "APPLICATION_TEAM_VIEW",
+) -> Dict[str, Any]:
     return {
         "period": {"start": start.isoformat(), "end": end.isoformat()},
-        "scope": {"team": "application", "executorId": None},
+        "scope": {"scopeName": scope_name, "scopeCode": scope_code, "executorId": None},
         "filters": {"year": start.year, "quarter": f"Q{(start.month - 1) // 3 + 1}", "executorId": None},
         "members": [],
         "total": 0,

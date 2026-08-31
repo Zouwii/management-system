@@ -1,13 +1,12 @@
 import { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { fetchPerformanceHistory, fetchMembers, fetchTeams } from '../api/dashboard';
+import { fetchPerformanceHistory, fetchOrganizationScopeOptions } from '../api/dashboard';
 import Card from '../components/Card';
 import SectionTitle from '../components/SectionTitle';
 import { ROLES } from '../constants/roles';
 import EmployeeLayout from '../layouts/EmployeeLayout';
 import { performanceArchives as fallbackArchives } from '../mock/platformData';
 import { useAuthStore } from '../store/authStore';
-import { shouldHideMemberInSelector } from '../utils/memberVisibility';
 
 const PERFORMANCE_THRESHOLD = 1.0;
 const BAND_GUIDES = [
@@ -104,7 +103,7 @@ function HelpLabel({ label, tip, highlighted = false }) {
 export default function PerformancePage() {
   const user = useAuthStore((state) => state.user);
   const canViewAllPeople = user?.role === ROLES.MANAGER || user?.role === ROLES.ADMIN;
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const targetFromQuery = searchParams.get('target') ?? '';
   const defaultTarget = canViewAllPeople
     ? (targetFromQuery || user?.name || fallbackArchives.李四.targetLabel)
@@ -121,25 +120,28 @@ export default function PerformancePage() {
   // 加载小组列表
   useEffect(() => {
     if (!canViewAllPeople) return;
-    fetchTeams().then((res) => {
-      const list = res?.data?.teams || [];
+    fetchOrganizationScopeOptions('QUARTER_PERFORMANCE').then((res) => {
+      const list = (res?.data?.teams || []).map((team) => ({
+        key: team.key || ({ NAV: 'nav', INTEGRATION: 'servo' }[team.teamCode || team.code] || ''),
+        label: team.label || team.teamName || team.name,
+      })).filter((team) => team.key);
       setTeams(list);
       if (list.length && !selectedTeam) {
         setSelectedTeam(list[0].key);
       }
     }).catch(() => {});
-  }, [canViewAllPeople]);
+  }, [canViewAllPeople, selectedTeam]);
 
   // 加载成员列表（按选中小组过滤）
   useEffect(() => {
     if (!canViewAllPeople || !selectedTeam) return;
-    fetchMembers(selectedTeam).then((res) => {
+    const teamCode = ({ nav: 'NAV', servo: 'INTEGRATION' })[selectedTeam] || selectedTeam;
+    fetchOrganizationScopeOptions('QUARTER_PERFORMANCE', { teamCode }).then((res) => {
       const mapped = (res?.data?.members || [])
-        .filter((m) => !shouldHideMemberInSelector(m))
         .map((m) => ({
-          id: m.userName,
-          name: m.userName,
-          team: m.teamLabel || '',
+          id: m.userName || m.userId,
+          name: m.userName || m.userId,
+          team: m.teamName || m.teamLabel || '',
           userId: m.userId,
         }));
       setMemberOptions(mapped);
@@ -147,7 +149,7 @@ export default function PerformancePage() {
         setSelectedTarget(mapped[0].id);
       }
     }).catch(() => {});
-  }, [canViewAllPeople, selectedTeam]);
+  }, [canViewAllPeople, selectedTarget, selectedTeam]);
 
   useEffect(() => {
     if (initialLoadDone.current) return;

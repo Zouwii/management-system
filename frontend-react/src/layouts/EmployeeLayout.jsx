@@ -25,7 +25,7 @@ export default function EmployeeLayout({ children }) {
 
   const title = useEmployeeTheme ? user?.name ?? '李四' : '本体开发部数据管理平台';
   const subtitle = useEmployeeTheme
-    ? `${user?.team ?? '导航组'} / ${ROLE_LABELS[role]}个人端`
+    ? `${user?.teamName ?? '未分组'} / ${ROLE_LABELS[role]}个人端`
     : `${ROLE_LABELS[role]}端 / 组织级权限`;
 
   const note = '';

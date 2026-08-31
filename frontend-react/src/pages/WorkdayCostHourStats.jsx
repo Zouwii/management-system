@@ -8,6 +8,7 @@ import {
   fetchWorkdayCosthourTaskDetail,
   fetchWorkdayCosthourProjectNameDetail,
   fetchWorkdays,
+  fetchOrganizationScopeOptions,
 } from '../api/dashboard';
 
 // ── 动态季度选项（基于当前年份） ──
@@ -40,16 +41,14 @@ function generateQuarterOptions() {
 
 const QUARTER_OPTIONS = generateQuarterOptions();
 
-const WORKDAY_TEAMS = [
-  { teamId: '0', teamName: '导航组' },
-  { teamId: '1', teamName: '对接组' },
-];
-
-function mergeWorkdayTeams(teams = []) {
-  const teamMap = new Map(teams.map((team) => [String(team.teamId), team]));
-  return WORKDAY_TEAMS.map((team) => ({
-    ...team,
-    ...(teamMap.get(team.teamId) || {}),
+function mergeWorkdayTeams(teams = [], scopeTeams = []) {
+  const teamMap = new Map(teams.map((team) => [String(team.teamCode), team]));
+  const scopeMap = new Map(scopeTeams.map((team) => [String(team.teamCode), team]));
+  return Array.from(new Set([...scopeMap.keys(), ...teamMap.keys()])).map((teamCode) => ({
+    ...(scopeMap.get(teamCode) || {}),
+    ...(teamMap.get(teamCode) || {}),
+    teamCode,
+    teamName: teamMap.get(teamCode)?.teamName || scopeMap.get(teamCode)?.teamName || '未分组',
   }));
 }
 
@@ -63,17 +62,17 @@ function formatDays(hours) {
 
 // ── 小组选择器 ──
 
-function TeamSelector({ teams = [], selectedTeamId, onSelect }) {
+function TeamSelector({ teams = [], selectedTeamCode, onSelect }) {
   return (
     <div className="flex items-center gap-2">
       <label className="whitespace-nowrap text-sm font-medium text-slate-600">当前小组</label>
       <select
-        value={selectedTeamId ?? ''}
+        value={selectedTeamCode ?? ''}
         onChange={(e) => onSelect(e.target.value)}
         className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 outline-none focus:border-slate-400"
       >
         {teams.map((t) => (
-          <option key={t.teamId} value={t.teamId}>{t.teamName}</option>
+          <option key={t.teamCode} value={t.teamCode}>{t.teamName}</option>
         ))}
       </select>
     </div>
@@ -305,8 +304,8 @@ function DualBarChart({ data = {}, title = '' }) {
 
 // ── 员工出勤表（由独立出勤页面复用） ──
 
-export function AttendanceTable({ teams = [], selectedTeamId, onTeamChange, members = [], standardDays = 0, adjustments = {}, onAdjustmentChange, onSave, saving = false }) {
-  const selectedMembers = members.filter((m) => !selectedTeamId || m.teamId === selectedTeamId);
+export function AttendanceTable({ teams = [], selectedTeamCode, onTeamChange, members = [], standardDays = 0, adjustments = {}, onAdjustmentChange, onSave, saving = false }) {
+  const selectedMembers = members.filter((m) => !selectedTeamCode || m.teamCode === selectedTeamCode);
   const hasAdjustments = Object.keys(adjustments).length > 0;
 
   return (
@@ -322,12 +321,12 @@ export function AttendanceTable({ teams = [], selectedTeamId, onTeamChange, memb
           <div className="flex items-center gap-2">
             <label className="whitespace-nowrap text-sm font-medium text-slate-600">组别</label>
             <select
-              value={selectedTeamId || ''}
+              value={selectedTeamCode || ''}
               onChange={(e) => onTeamChange(e.target.value)}
               className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none focus:border-slate-400"
             >
               {teams.map((team) => (
-                <option key={team.teamId} value={team.teamId}>{team.teamName}</option>
+                <option key={team.teamCode} value={team.teamCode}>{team.teamName}</option>
               ))}
             </select>
           </div>
@@ -650,12 +649,13 @@ function ProjectNameDetailTable({ details = [] }) {
 
 export default function WorkdayCostHourStats() {
   const [quarter, setQuarter] = useState('q1');
-  const [selectedTeamId, setSelectedTeamId] = useState(null);
+  const [selectedTeamCode, setSelectedTeamCode] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   // 接口1：各小组汇总
   const [teamData, setTeamData] = useState({ timeRange: {}, total: {}, teams: [] });
+  const [scopeTeams, setScopeTeams] = useState([]);
   // 接口2：部门聚合
   const [deptData, setDeptData] = useState({ timeRange: {}, total: {}, byProjectType: {}, byVehicleType: {} });
   // 接口3：任务状态明细
@@ -670,7 +670,7 @@ export default function WorkdayCostHourStats() {
     [quarter],
   );
 
-  const teamOptions = useMemo(() => mergeWorkdayTeams(teamData.teams), [teamData.teams]);
+  const teamOptions = useMemo(() => mergeWorkdayTeams(teamData.teams, scopeTeams), [teamData.teams, scopeTeams]);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -678,17 +678,20 @@ export default function WorkdayCostHourStats() {
     const payload = { start_time: quarterOption.start, end_time: quarterOption.end };
 
     try {
-      const [tRes, dRes, sRes, pnRes, wRes] = await Promise.all([
+      const [tRes, dRes, sRes, pnRes, wRes, scopeRes] = await Promise.all([
         fetchWorkdayCosthourTeamSummary(payload),
         fetchWorkdayCosthourDeptAggregate(payload),
         fetchWorkdayCosthourTaskDetail(payload),
         fetchWorkdayCosthourProjectNameDetail(payload),
         fetchWorkdays(payload),
+        fetchOrganizationScopeOptions('WORKDAY_COST'),
       ]);
       const t = tRes?.data || {};
       setTeamData({ timeRange: t.timeRange || {}, total: t.total || {}, teams: t.teams || [] });
-      if (!selectedTeamId && t.teams?.length) {
-        setSelectedTeamId(t.teams[0].teamId);
+      const scopeTeamRows = (scopeRes?.data?.teams || []).filter((team) => team.teamCode);
+      setScopeTeams(scopeTeamRows);
+      if (!selectedTeamCode && (scopeTeamRows.length || t.teams?.length)) {
+        setSelectedTeamCode(scopeTeamRows[0]?.teamCode || t.teams[0]?.teamCode);
       }
 
       const d = dRes?.data || {};
@@ -708,7 +711,7 @@ export default function WorkdayCostHourStats() {
     } finally {
       setLoading(false);
     }
-  }, [quarterOption, selectedTeamId]);
+  }, [quarterOption, selectedTeamCode]);
 
   // 首次加载
   useEffect(() => {
@@ -721,8 +724,8 @@ export default function WorkdayCostHourStats() {
   }, [loadAll]);
 
   const currentTeam = useMemo(
-    () => teamOptions.find((t) => t.teamId === selectedTeamId) || teamOptions[0] || {},
-    [teamOptions, selectedTeamId],
+    () => teamOptions.find((t) => t.teamCode === selectedTeamCode) || teamOptions[0] || {},
+    [teamOptions, selectedTeamCode],
   );
 
   return (
@@ -783,8 +786,8 @@ export default function WorkdayCostHourStats() {
                 <div className="flex items-center gap-2">
                   <TeamSelector
                     teams={teamOptions}
-                    selectedTeamId={selectedTeamId}
-                    onSelect={setSelectedTeamId}
+          selectedTeamCode={selectedTeamCode}
+          onSelect={setSelectedTeamCode}
                   />
                 </div>
               </div>
