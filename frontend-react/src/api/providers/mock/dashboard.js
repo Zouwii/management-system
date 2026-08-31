@@ -20,6 +20,15 @@ import { mockAccounts, mockUsers } from '../../../mock/auth';
 
 const ALL_TARGET = 'ALL';
 const BASE_REFERENCE_HOURS = 156;
+const TEAM_CODE_BY_NAME = { 导航组: 'NAV', 对接组: 'INTEGRATION', 算法组: 'ALGORITHM', 应用三组: 'APP_THREE' };
+const JOB_ROLE_CODE_BY_NAME = {
+  组长: 'TEAM_LEAD',
+  软件开发工程师: 'SOFTWARE_ENGINEER',
+  软件应用工程师: 'SOFTWARE_APPLICATION_ENGINEER',
+  应用工程师: 'APPLICATION_ENGINEER',
+  算法工程师: 'ALGORITHM_ENGINEER',
+  实习生: 'INTERN',
+};
 
 function roundHours(value) {
   return Math.max(Math.round(value), 1);
@@ -30,11 +39,17 @@ function buildMemberOptions(user) {
   const options = rows.map((row) => ({
     id: row.name,
     name: row.name,
-    team: row.team,
+    userId: row.userId || row.id || row.name,
+    teamCode: row.teamCode || TEAM_CODE_BY_NAME[row.team] || '',
+    teamName: row.teamName || row.team || '未分组',
+    jobRoleCode: row.jobRoleCode || JOB_ROLE_CODE_BY_NAME[row.role] || 'SOFTWARE_ENGINEER',
+    jobRoleName: row.jobRoleName || row.role || '软件开发工程师',
   }));
 
   if (user?.role === ROLES.MANAGER || user?.role === ROLES.ADMIN) {
-    return [{ id: ALL_TARGET, name: '全部人员', team: '全部' }, ...options];
+    return [{
+      id: ALL_TARGET, name: '全部人员', userId: '', teamCode: '', teamName: '全部', jobRoleCode: '', jobRoleName: '',
+    }, ...options];
   }
 
   return options;
@@ -135,16 +150,15 @@ export function mockFetchDepartmentOverview(user) {
   });
 }
 
-function buildMockTeamEffectiveRows(items, teamId, teamName, userIdPrefix) {
+function buildMockTeamEffectiveRows(items, teamCode, teamName, userIdPrefix) {
   return items.map((item, index) => {
     const completedHours = Math.max(0, 45 - index * 2);
     const overdueCompletedHours = index % 2 === 0 ? 2 : 1;
     return {
       ...item,
       userId: `${userIdPrefix}-${index + 1}`,
-      teamId,
+      teamCode,
       teamName,
-      team: teamName,
       quarterExpectedHours: 52,
       scheduledHours: Math.max(0, 51 - index),
       completedHours,
@@ -157,7 +171,7 @@ function buildMockTeamEffectiveRows(items, teamId, teamName, userIdPrefix) {
 export function mockFetchNavTeamDetail(user) {
   return request(() => ({
     rows: filterRowsByDataScope(
-      buildMockTeamEffectiveRows(navTeam, '0', '导航组', 'mock-nav'),
+      buildMockTeamEffectiveRows(navTeam, 'NAV', '导航组', 'mock-nav'),
       user,
     ),
     lastUpdatedAt: new Date().toISOString(),
@@ -167,7 +181,7 @@ export function mockFetchNavTeamDetail(user) {
 export function mockFetchIntegrationTeamDetail(user) {
   return request(() => ({
     rows: filterRowsByDataScope(
-      buildMockTeamEffectiveRows(integrationTeam, '1', '对接组', 'mock-integration'),
+      buildMockTeamEffectiveRows(integrationTeam, 'INTEGRATION', '对接组', 'mock-integration'),
       user,
     ),
     lastUpdatedAt: new Date().toISOString(),
@@ -177,14 +191,24 @@ export function mockFetchIntegrationTeamDetail(user) {
 export function mockFetchApplicationTeamDetail(user) {
   return request(() => ({
     rows: filterRowsByDataScope(
-      buildMockTeamEffectiveRows(navTeam.slice(0, 4), '3', '应用组', 'mock-application'),
+      buildMockTeamEffectiveRows(navTeam.slice(0, 4), 'NAV', '导航组', 'mock-application'),
       user,
     ),
     lastUpdatedAt: new Date().toISOString(),
   }));
 }
 
-export function mockFetchApplicationTeamReport() {
+export function mockFetchAppThreeTeamDetail(user) {
+  return request(() => ({
+    rows: filterRowsByDataScope(
+      buildMockTeamEffectiveRows(navTeam.slice(0, 2), 'APP_THREE', '应用三组', 'mock-app-three'),
+      user,
+    ),
+    lastUpdatedAt: new Date().toISOString(),
+  }));
+}
+
+export function mockFetchApplicationTeamReport(_user, params = {}) {
   const typeRows = [
     { label: '本体导航/导航', count: 14, ratio: 58.33 },
     { label: '本体导航/定位', count: 5, ratio: 20.83 },
@@ -199,7 +223,7 @@ export function mockFetchApplicationTeamReport() {
     error: '',
     data: {
       period: { start: '2026-04-01T00:00:00', end: '2026-07-01T00:00:00' },
-      scope: 'application',
+      scope: params?.scopeCode === 'APP_THREE_TEAM_VIEW' ? 'app_three' : 'application',
       total: 24,
       typeStats: { rows: typeRows, order: typeColumns },
       causeStats: [
@@ -218,12 +242,12 @@ export function mockFetchApplicationTeamReport() {
   });
 }
 
-export function mockFetchApplicationTeamOptions() {
+export function mockFetchApplicationTeamOptions(_user, params = {}) {
   return Promise.resolve({
     code: 200,
     error: '',
     data: {
-      members: [{ userId: 'mock-application', name: '应用组示例用户' }],
+      members: [{ userId: 'mock-application', name: params?.scopeCode === 'APP_THREE_TEAM_VIEW' ? '应用三组示例用户' : '应用组示例用户' }],
       years: [new Date().getFullYear()],
       quarters: [1, 2, 3, 4],
       dimensions: {},
@@ -401,14 +425,26 @@ async function buildPersonalHoursByQuarterAgg({ user, target, compensatoryDays }
 
     const memberOptions = canViewAllPeople
       ? [
-          { id: ALL_TARGET, name: '全部人员', team: '全部' },
+          { id: ALL_TARGET, name: '全部人员', userId: '', teamCode: '', teamName: '全部', jobRoleCode: '', jobRoleName: '' },
           ...userids.map((u) => ({
             id: u.name,
             name: u.name,
-            team: u.name === user?.name ? user?.team || '' : '未知',
+            userId: u.userId || u.id || u.name,
+            teamCode: u.name === user?.name ? user?.teamCode || '' : '',
+            teamName: u.name === user?.name ? user?.teamName || '' : '未知',
+            jobRoleCode: u.name === user?.name ? user?.jobRoleCode || '' : 'SOFTWARE_ENGINEER',
+            jobRoleName: u.name === user?.name ? user?.jobRoleName || '' : '软件开发工程师',
           })),
         ]
-      : [{ id: user?.name || target, name: user?.name || target, team: user?.team || '' }];
+      : [{
+          id: user?.name || target,
+          name: user?.name || target,
+          userId: user?.user_id || user?.id || '',
+          teamCode: user?.teamCode || '',
+          teamName: user?.teamName || '',
+          jobRoleCode: user?.jobRoleCode || '',
+          jobRoleName: user?.jobRoleName || '',
+        }];
 
     return {
       trend: sourceTrend,
@@ -645,7 +681,7 @@ export function mockFetchPermissionMatrix() {
       password: account.password,
       name: user?.name ?? '-',
       roleLabel: user?.roleLabel ?? '-',
-      team: user?.team ?? '-',
+      team: user?.teamName ?? '-',
       dataScopeLabel: getDataScopeLabel(user?.dataScope),
       permissionCodes: user?.permissionCodes ?? [],
     };
@@ -663,7 +699,7 @@ const mockTeamSummaryData = {
   total: { hours: 97, taskCount: 58 },
   teams: [
     {
-      teamId: '0',
+      teamCode: 'NAV',
       teamName: '导航组',
       totalHours: 52,
       totalCount: 30,
@@ -684,7 +720,7 @@ const mockTeamSummaryData = {
       },
     },
     {
-      teamId: '1',
+      teamCode: 'INTEGRATION',
       teamName: '对接组',
       totalHours: 45,
       totalCount: 28,
@@ -767,6 +803,47 @@ export function mockFetchWorkdayCosthourTeamSummary() {
   return delay({ code: 200, data: mockTeamSummaryData });
 }
 
+export function mockFetchOrganizationScopeOptions(scopeCode = '', params = {}) {
+  const teamsByScope = {
+    WORKDAY_COST: [
+      { teamCode: 'NAV', teamName: '导航组' },
+      { teamCode: 'INTEGRATION', teamName: '对接组' },
+      { teamCode: 'ALGORITHM', teamName: '算法组' },
+    ],
+    ATTENDANCE: [
+      { teamCode: 'NAV', teamName: '导航组' },
+      { teamCode: 'INTEGRATION', teamName: '对接组' },
+      { teamCode: 'ALGORITHM', teamName: '算法组' },
+    ],
+    QUARTER_PERFORMANCE: [
+      { teamCode: 'NAV', teamName: '导航组' },
+      { teamCode: 'INTEGRATION', teamName: '对接组' },
+    ],
+    APPLICATION_TEAM_VIEW: [
+      { teamCode: 'NAV', teamName: '导航组' },
+    ],
+    APP_THREE_TEAM_VIEW: [
+      { teamCode: 'APP_THREE', teamName: '应用三组' },
+    ],
+  };
+  const teamCode = String(params?.teamCode || '').toUpperCase();
+  const membersByScope = {
+    QUARTER_PERFORMANCE: Object.entries({ NAV: 'nav', INTEGRATION: 'servo' })
+      .filter(([code]) => !teamCode || code === teamCode)
+      .flatMap(([code, key]) => mockPerformanceTeams[key].map((member) => ({
+        userId: member.userId,
+        userName: member.userName,
+        teamCode: code,
+        teamName: code === 'NAV' ? '导航组' : '对接组',
+        jobRoleCode: member.jobRoleCode,
+        jobRoleName: member.jobRoleName,
+      }))),
+    APPLICATION_TEAM_VIEW: [{ userId: 'mock-application', userName: '应用组示例用户', teamCode: 'NAV', teamName: '导航组', jobRoleCode: 'APPLICATION_ENGINEER', jobRoleName: '应用工程师' }],
+    APP_THREE_TEAM_VIEW: [{ userId: 'mock-app-three', userName: '应用三组示例用户', teamCode: 'APP_THREE', teamName: '应用三组', jobRoleCode: 'SOFTWARE_ENGINEER', jobRoleName: '软件开发工程师' }],
+  };
+  return delay({ code: 200, data: { scopeCode, teams: teamsByScope[scopeCode] || [], members: membersByScope[scopeCode] || [] } });
+}
+
 export function mockFetchWorkdayCosthourDeptAggregate() {
   return delay({ code: 200, data: mockDeptAggregateData });
 }
@@ -779,22 +856,24 @@ const mockMemberSummaryData = {
   timeRange: { start_time: '2026-01-01T00:00:00', end_time: '2026-03-31T23:59:59' },
   total: { hours: 97, taskCount: 58 },
   teams: [
-    { teamId: '0', teamName: '导航组' },
-    { teamId: '1', teamName: '对接组' },
+    { teamCode: 'NAV', teamName: '导航组' },
+    { teamCode: 'INTEGRATION', teamName: '对接组' },
+    { teamCode: 'ALGORITHM', teamName: '算法组' },
   ],
   members: [
-    { userId: 'u1', userName: '张三', teamId: '0', teamName: '导航组', workdayCosthour: 55, taskCount: 20 },
-    { userId: 'u2', userName: '李四', teamId: '0', teamName: '导航组', workdayCosthour: 42, taskCount: 10 },
-    { userId: 'u3', userName: '王五', teamId: '1', teamName: '对接组', workdayCosthour: 45, taskCount: 28 },
+    { userId: 'u1', userName: '张三', teamCode: 'NAV', teamName: '导航组', workdayCosthour: 55, taskCount: 20 },
+    { userId: 'u2', userName: '李四', teamCode: 'NAV', teamName: '导航组', workdayCosthour: 42, taskCount: 10 },
+    { userId: 'u3', userName: '王五', teamCode: 'INTEGRATION', teamName: '对接组', workdayCosthour: 45, taskCount: 28 },
+    { userId: 'u4', userName: '赵六', teamCode: 'ALGORITHM', teamName: '算法组', workdayCosthour: 0, taskCount: 0 },
   ],
 };
 
 export function mockFetchWorkdayCosthourMemberSummary(payload = {}) {
-  const teamId = String(payload?.team_id || '');
-  const members = teamId
-    ? mockMemberSummaryData.members.filter((m) => m.teamId === teamId)
+  const teamCode = String(payload?.teamCode || '');
+  const members = teamCode
+    ? mockMemberSummaryData.members.filter((m) => m.teamCode === teamCode)
     : mockMemberSummaryData.members;
-  return delay({ code: 200, data: { ...mockMemberSummaryData, teamId, members } });
+  return delay({ code: 200, data: { ...mockMemberSummaryData, teamCode, members } });
 }
 
 const mockProjectNameDetailData = {
@@ -896,8 +975,8 @@ export function mockFetchAttendance() {
     code: 200,
     data: {
       records: [
-        { user_id: 'u1', user_name: '张三', team_id: 'nav', overtime_days: 2, leave_days: 1, statutory_holiday_days: 7, effective_work_days: 52, year: 2026, quarter: 1 },
-        { user_id: 'u2', user_name: '李四', team_id: 'servo', overtime_days: 0, leave_days: 0.5, statutory_holiday_days: 7, effective_work_days: 52, year: 2026, quarter: 1 },
+        { user_id: 'u1', user_name: '张三', teamCode: 'NAV', overtime_days: 2, leave_days: 1, statutory_holiday_days: 7, effective_work_days: 52, year: 2026, quarter: 1 },
+        { user_id: 'u2', user_name: '李四', teamCode: 'INTEGRATION', overtime_days: 0, leave_days: 0.5, statutory_holiday_days: 7, effective_work_days: 52, year: 2026, quarter: 1 },
       ],
       year: 2026,
       quarter: 1,
@@ -913,19 +992,19 @@ export function mockSaveAttendance() {
 
 const mockPerformanceTeams = {
   nav: [
-    { userId: 'mock-nav-lead', userName: '导航主管', character: 0, isTeamLead: true },
-    { userId: 'mock-nav-lisi', userName: '李四', character: 1, isTeamLead: false },
-    { userId: 'mock-nav-wangqiang', userName: '王强', character: 4, isTeamLead: false },
-    { userId: 'mock-nav-chenchen', userName: '陈晨', character: 1, isTeamLead: false },
-    { userId: 'mock-nav-zhaolei', userName: '赵磊', character: 4, isTeamLead: false },
+    { userId: 'mock-nav-lead', userName: '导航主管', jobRoleCode: 'TEAM_LEAD', jobRoleName: '组长', isTeamLead: true },
+    { userId: 'mock-nav-lisi', userName: '李四', jobRoleCode: 'SOFTWARE_ENGINEER', jobRoleName: '软件开发工程师', isTeamLead: false },
+    { userId: 'mock-nav-wangqiang', userName: '王强', jobRoleCode: 'ALGORITHM_ENGINEER', jobRoleName: '算法工程师', isTeamLead: false },
+    { userId: 'mock-nav-chenchen', userName: '陈晨', jobRoleCode: 'SOFTWARE_ENGINEER', jobRoleName: '软件开发工程师', isTeamLead: false },
+    { userId: 'mock-nav-zhaolei', userName: '赵磊', jobRoleCode: 'ALGORITHM_ENGINEER', jobRoleName: '算法工程师', isTeamLead: false },
   ],
   servo: [
-    { userId: 'mock-servo-lead', userName: '对接主管', character: 0, isTeamLead: true },
-    { userId: 'mock-servo-suntao', userName: '孙涛', character: 2, isTeamLead: false },
-    { userId: 'mock-servo-zhoukai', userName: '周凯', character: 2, isTeamLead: false },
-    { userId: 'mock-servo-hejun', userName: '何俊', character: 1, isTeamLead: false },
-    { userId: 'mock-servo-liuyang', userName: '刘洋', character: 1, isTeamLead: false },
-    { userId: 'mock-servo-wubin', userName: '吴彬', character: 2, isTeamLead: false },
+    { userId: 'mock-servo-lead', userName: '对接主管', jobRoleCode: 'TEAM_LEAD', jobRoleName: '组长', isTeamLead: true },
+    { userId: 'mock-servo-suntao', userName: '孙涛', jobRoleCode: 'SOFTWARE_APPLICATION_ENGINEER', jobRoleName: '软件应用工程师', isTeamLead: false },
+    { userId: 'mock-servo-zhoukai', userName: '周凯', jobRoleCode: 'SOFTWARE_APPLICATION_ENGINEER', jobRoleName: '软件应用工程师', isTeamLead: false },
+    { userId: 'mock-servo-hejun', userName: '何俊', jobRoleCode: 'SOFTWARE_ENGINEER', jobRoleName: '软件开发工程师', isTeamLead: false },
+    { userId: 'mock-servo-liuyang', userName: '刘洋', jobRoleCode: 'SOFTWARE_ENGINEER', jobRoleName: '软件开发工程师', isTeamLead: false },
+    { userId: 'mock-servo-wubin', userName: '吴彬', jobRoleCode: 'SOFTWARE_APPLICATION_ENGINEER', jobRoleName: '软件应用工程师', isTeamLead: false },
   ],
 };
 
@@ -952,7 +1031,9 @@ function buildMockImportMember(member) {
   const hasResult = calcStatus === 'calculated' || calcStatus === 'archived';
 
   return {
-    ...member,
+    userId: member.userId,
+    userName: member.userName,
+    isTeamLead: member.isTeamLead,
     workHourScore: hasInput ? current.hourScore : null,
     supervisorScore: hasInput ? current.managerScore : null,
     calcStatus,
@@ -969,8 +1050,8 @@ function buildMockImportMember(member) {
 }
 
 export function mockFetchTeamImportUsers(params = {}) {
-  const teamKey = params.team === 'servo' ? 'servo' : 'nav';
-  const members = mockPerformanceTeams[teamKey].map(buildMockImportMember);
+  const teamBucket = params.teamCode === 'INTEGRATION' ? 'servo' : 'nav';
+  const members = mockPerformanceTeams[teamBucket].map(buildMockImportMember);
   return delay({ code: 200, error: '', data: { members, count: members.length } });
 }
 
@@ -987,22 +1068,24 @@ export function mockFetchTeams() {
     code: 200, error: '',
     data: {
       teams: [
-        { key: 'nav', label: '导航组' },
-        { key: 'servo', label: '对接组' },
+        { teamCode: 'NAV', teamName: '导航组' },
+        { teamCode: 'INTEGRATION', teamName: '对接组' },
       ],
     },
   });
 }
 
-export function mockFetchMembers(teamKey = 'nav') {
-  const resolvedTeam = teamKey === 'servo' ? 'servo' : 'nav';
+export function mockFetchMembers(teamCode = 'NAV') {
+  const resolvedTeam = teamCode === 'INTEGRATION' ? 'servo' : 'nav';
+  const resolvedTeamCode = resolvedTeam === 'nav' ? 'NAV' : 'INTEGRATION';
   const teamLabel = resolvedTeam === 'nav' ? '导航组' : '对接组';
   const members = mockPerformanceTeams[resolvedTeam].map((member) => ({
-    ...member,
-    teamKey: resolvedTeam,
-    teamLabel,
-    isNavLead: resolvedTeam === 'nav' && member.isTeamLead,
-    isServoLead: resolvedTeam === 'servo' && member.isTeamLead,
+    userId: member.userId,
+    userName: member.userName,
+    teamCode: resolvedTeamCode,
+    teamName: teamLabel,
+    jobRoleCode: member.isTeamLead ? 'TEAM_LEAD' : 'SOFTWARE_ENGINEER',
+    jobRoleName: member.isTeamLead ? '组长' : '软件开发工程师',
   }));
 
   return delay({
@@ -1030,11 +1113,11 @@ export function mockIncreaseSync() {
 }
 
 export function mockFetchTeamPerformance(_user, params = {}) {
-  const teamKey = params.teamKey === 'servo' ? 'servo' : 'nav';
+  const teamBucket = params.teamCode === 'INTEGRATION' ? 'servo' : 'nav';
   const requestedYear = Number(params.year);
   const requestedQuarter = Number(params.quarter);
   const quarterLabel = `${requestedYear} Q${requestedQuarter}`;
-  const results = mockPerformanceTeams[teamKey].map((member) => {
+  const results = mockPerformanceTeams[teamBucket].map((member) => {
     const archive = performanceArchives[member.userName] ?? performanceArchives.李四;
     const performance = archive.history.find((item) => item.quarter === quarterLabel);
     if (!performance) return null;
@@ -1042,6 +1125,8 @@ export function mockFetchTeamPerformance(_user, params = {}) {
     return {
       userId: member.userId,
       userName: member.userName,
+      teamCode: teamBucket === 'servo' ? 'INTEGRATION' : 'NAV',
+      teamName: teamBucket === 'servo' ? '对接组' : '导航组',
       year: requestedYear,
       quarter: requestedQuarter,
       finalScore: performance.finalScore,

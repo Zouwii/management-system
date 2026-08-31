@@ -22,9 +22,9 @@ from base.db.orm import (
     ProjectTaskDetail,
     ProjectTaskOverdueDetail,
     SyncFailure,
-    UserCharacter as DbUserCharacter,
 )
 from base.projects.task_service import query_project_tasks_service, query_user_tasks_service
+from base.organization.service import list_scope_member_ids
 from workhour.personal.util import parse_workhour_from_task_dict
 from base.dingtalk_client import get_valid_access_token
 
@@ -227,19 +227,8 @@ def _record_sync_failures(
 
 
 def _load_allowed_executor_ids() -> set:
-    """只允许本体两组 executor；算法组不得进入本体同步链路。"""
-    sess = SessionLocal()
-    try:
-        rows = (
-            sess.query(DbUserCharacter.user_id)
-            .filter(DbUserCharacter.team_id.in_(("0", "1")))
-            .order_by(DbUserCharacter.user_id)
-            .all()
-        )
-        out = {str((r[0] or "")).strip() for r in rows if r and str((r[0] or "")).strip()}
-        return out
-    finally:
-        sess.close()
+    """Return the TB-sync roster from the centralized business Scope."""
+    return set(list_scope_member_ids("TB_TASK_SYNC"))
 
 
 def _extract_detail_item(dres: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -1459,10 +1448,12 @@ def sync_project_details_in_time_range_service(payload: Dict[str, Any]) -> Dict[
         or DEFAULT_WORKHOUR_FIELD_ID
     )
 
+    business_type_mapping = _get_business_type_tag_mapping()
+    task_flow_status_mapping = _get_task_flow_status_mapping()
     allowed_executor_ids = _load_allowed_executor_ids()
     session = SessionLocal()
     task_specs: List[Dict[str, str]] = []
-    skipped_by_character = 0
+    skipped_outside_roster = 0
     try:
         rows = (
             session.query(ProjectTask)
@@ -1480,15 +1471,15 @@ def sync_project_details_in_time_range_service(payload: Dict[str, Any]) -> Dict[
             if not executor_id or not task_id:
                 continue
             if allowed_executor_ids and executor_id not in allowed_executor_ids:
-                skipped_by_character += 1
+                skipped_outside_roster += 1
                 continue
             task_specs.append({"task_id": task_id, "executor_id": executor_id, "project_id": project_id})
     finally:
         session.close()
-    if skipped_by_character > 0:
+    if skipped_outside_roster > 0:
         print(
-            "[time_range_update] skipped_by_character={} (executor not in user_character)".format(
-                skipped_by_character
+            "[time_range_update] skipped_outside_roster={} (executor not in user_character)".format(
+                skipped_outside_roster
             )
         )
 
@@ -1564,6 +1555,8 @@ def sync_project_details_in_time_range_service(payload: Dict[str, Any]) -> Dict[
                     continue
 
                 tag_ids = item.get("tagIds") or item.get("tagids") or []
+                business_type = _resolve_business_type_from_tags(tag_ids, business_type_mapping)
+                task_flow_status_id = _resolve_task_flow_status_id(item, task_flow_status_mapping)
                 is_overdue = False
                 if isinstance(tag_ids, list):
                     for t in tag_ids:
@@ -1734,7 +1727,7 @@ def sync_project_details_in_time_range_service(payload: Dict[str, Any]) -> Dict[
             "a_sync": sync_out.get("data") or {},
             "b_sync": {
                 "task_count_in_a": len(task_specs),
-                "skipped_by_character": skipped_by_character,
+                "skipped_outside_roster": skipped_outside_roster,
                 "b_upserts": b_upserts,
                 "b_fail": b_fail,
                 "b_fail_initial": b_fail_initial,
@@ -1810,7 +1803,7 @@ def normal_incremental_update_service(payload: Dict[str, Any], skip_update_time:
     all_rows = ding.get("result") if isinstance(ding.get("result"), list) else []
     scenario_id = str(payload.get("scenarioFieldConfigId") or DEFAULT_SCENARIO_FIELD_CONFIG_ID)
     inc_specs: List[Dict[str, str]] = []
-    inc_skipped_by_character = 0
+    inc_skipped_outside_roster = 0
     for r in all_rows:
         if not isinstance(r, dict):
             continue
@@ -1822,7 +1815,7 @@ def normal_incremental_update_service(payload: Dict[str, Any], skip_update_time:
         if not tid or not ex:
             continue
         if allowed_executor_ids and ex not in allowed_executor_ids:
-            inc_skipped_by_character += 1
+            inc_skipped_outside_roster += 1
             continue
         inc_specs.append({"task_id": tid, "executor_id": ex, "project_id": project_id})
 
@@ -1906,8 +1899,8 @@ def normal_incremental_update_service(payload: Dict[str, Any], skip_update_time:
             },
             "a_sync": a_out.get("data") or {},
             "incremental_bc": {"count": len(inc_specs), "ok": inc_ok, "fail": inc_fail, "failures": inc_failures[:20]},
-            "character_filter": {
-                "incremental_skipped_by_character": inc_skipped_by_character,
+            "roster_filter": {
+                "incremental_skipped_outside_roster": inc_skipped_outside_roster,
             },
         },
     }
@@ -2065,7 +2058,7 @@ def benti_team_incremental_update_service(payload: Optional[Dict[str, Any]] = No
     """本体团队去重增量更新：20 名本体成员各查一次，任务明细全局只查一次。
 
     与清表全量更新保持同一数据口径，但这里只做 upsert：
-    - 仅导航组、对接组（team_id 0/1），不查询或写入算法组；
+    - 仅导航组、对接组（TB_TASK_SYNC Scope），不查询或写入算法组；
     - 单次列表查询同时接收 DEV、Issue，跨成员按 taskId 去重；
     - 所有远端列表和明细成功后才写库并推进 last_update_time；
     - 明细请求并发执行，失败最多重试三轮。

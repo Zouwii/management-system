@@ -148,27 +148,11 @@ def create_app() -> Flask:
     _sync_scheduler = BackgroundScheduler(timezone=ZoneInfo("Asia/Shanghai"))
 
     def _resolve_sync_user_project() -> tuple:
-        """从 config 表解析 userId 和 projectId，供定时同步使用。"""
-        from base.dingtalk_client import get_config_projectids, get_config_user_meta, get_config_userids
+        """从数据库人员表解析 userId，从配置解析 projectId。"""
+        from base.dingtalk_client import get_config_projectids
+        from base.organization.service import resolve_sync_operator_id
 
-        user_id = ""
-        meta = get_config_user_meta() or {}
-        if isinstance(meta, dict):
-            for _name, one in meta.items():
-                if not isinstance(one, dict):
-                    continue
-                try:
-                    ch = int(one.get("character", 1))
-                except Exception:
-                    ch = 1
-                if ch == 0:
-                    user_id = str(one.get("userId") or "").strip()
-                    if user_id:
-                        break
-        if not user_id:
-            userids = get_config_userids() or {}
-            if isinstance(userids, dict) and userids:
-                user_id = str(next(iter(userids.values())) or "").strip()
+        user_id = resolve_sync_operator_id()
 
         projectids = get_config_projectids() or {}
         project_id = ""

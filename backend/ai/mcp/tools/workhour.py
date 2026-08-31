@@ -69,7 +69,7 @@ def register_tool(mcp, resolve_user_fn):
 
         data = svc_result.get("data", {})
 
-        from base.config.service import get_workhour_character_coefficients_service
+        from base.config.service import get_workhour_role_coefficients_service
         from base.db.engine import SessionLocal
         from base.db.orm import UserCharacter as DbUserCharacter
 
@@ -92,11 +92,11 @@ def register_tool(mcp, resolve_user_fn):
         coefficient = 1.0
         db = SessionLocal()
         try:
-            uc = db.query(DbUserCharacter.character).filter(DbUserCharacter.user_id == uid).first()
+            uc = db.query(DbUserCharacter.job_role_code).filter(DbUserCharacter.user_id == uid).first()
             if uc and uc[0] is not None:
-                coeff_out = get_workhour_character_coefficients_service() or {}
-                coeff_map = coeff_out.get("workhour_character_coefficients") or {}
-                coefficient = float(coeff_map.get(str(int(uc[0])), 1.0) or 1.0)
+                coeff_out = get_workhour_role_coefficients_service() or {}
+                coeff_map = coeff_out.get("workhour_role_coefficients") or {}
+                coefficient = float(coeff_map.get(str(uc[0]).strip().upper(), 1.0) or 1.0)
         finally:
             db.close()
 

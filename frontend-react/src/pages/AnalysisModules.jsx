@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 
 const ITEMS_PER_PAGE = 3;
 
@@ -118,16 +118,20 @@ export default function AnalysisModules({
   const selectedTone = keywordTone(activeKeywordIndex);
 
   // ── Pagination state ──────────────────────────────────────────
-  const [autoPage, setAutoPage] = useState(0);
-  const [capPage, setCapPage] = useState(0);
-
   const allAutonomous = modules.autonomous_suggestions?.suggestions || [];
   const allCapability = modules.capability_suggestions?.suggestions || [];
   const risk = modules.task_risk_analysis || {};
 
+  const autoSignature = allAutonomous.map((item) => JSON.stringify(item)).join('|');
+  const capSignature = allCapability.map((item) => JSON.stringify(item)).join('|');
+  const [autoPagination, setAutoPagination] = useState({ signature: autoSignature, page: 0 });
+  const [capPagination, setCapPagination] = useState({ signature: capSignature, page: 0 });
+
   const autoPages = Math.max(1, Math.ceil(allAutonomous.length / ITEMS_PER_PAGE));
   const capPages = Math.max(1, Math.ceil(allCapability.length / ITEMS_PER_PAGE));
 
+  const autoPage = autoPagination.signature === autoSignature ? autoPagination.page : 0;
+  const capPage = capPagination.signature === capSignature ? capPagination.page : 0;
   const safeAutoPage = Math.min(autoPage, autoPages - 1);
   const safeCapPage = Math.min(capPage, capPages - 1);
 
@@ -140,18 +144,14 @@ export default function AnalysisModules({
     (safeCapPage + 1) * ITEMS_PER_PAGE,
   );
 
-  const nextAutoPage = () => setAutoPage((p) => (p + 1) % autoPages);
-  const nextCapPage = () => setCapPage((p) => (p + 1) % capPages);
-
-  // Reset pagination when new analysis data arrives
-  const lastLenRef = useRef({ a: 0, c: 0 });
-  useEffect(() => {
-    if (lastLenRef.current.a !== allAutonomous.length || lastLenRef.current.c !== allCapability.length) {
-      lastLenRef.current = { a: allAutonomous.length, c: allCapability.length };
-      setAutoPage(0);
-      setCapPage(0);
-    }
-  }, [allAutonomous.length, allCapability.length]);
+  const nextAutoPage = () => setAutoPagination((current) => ({
+    signature: autoSignature,
+    page: ((current.signature === autoSignature ? current.page : 0) + 1) % autoPages,
+  }));
+  const nextCapPage = () => setCapPagination((current) => ({
+    signature: capSignature,
+    page: ((current.signature === capSignature ? current.page : 0) + 1) % capPages,
+  }));
 
   const assigned = Math.round(stats.assigned_pct || 0);
   const autonomousPct = Math.round(stats.autonomous_pct || 0);

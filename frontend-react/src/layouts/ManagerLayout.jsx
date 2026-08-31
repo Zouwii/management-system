@@ -21,7 +21,7 @@ export default function ManagerLayout({ children }) {
 
   const subtitle = role === ROLES.ADMIN
     ? `${ROLE_LABELS[role]} / 全局权限`
-    : `${user?.team ?? '团队'}主管 / 组级权限`;
+    : `${user?.teamName ?? '团队'}主管 / 组级权限`;
 
   const note = '';
 

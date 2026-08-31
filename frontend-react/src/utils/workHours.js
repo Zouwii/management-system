@@ -44,7 +44,7 @@ export function calculateExpectedEffectiveDays(startDate, endDate, holidays = []
   try {
     // 对齐 Vue 旧口径：使用 chinese-workday（含法定节假日与调休补班）。
     workdays = Number(countWorkdays(startYmd, endYmd) || 0);
-  } catch (e) {
+  } catch {
     workdays = 0;
   }
 
@@ -170,8 +170,13 @@ export function buildMonthlyTrend(baseTrend = [], tasks = []) {
 
   return Array.from(monthlyBuckets.values())
     .sort((left, right) => Number(left.month.replace('月', '')) - Number(right.month.replace('月', '')))
-    .map(({ taskCount, completedTaskCount, ...item }) => ({
-      ...item,
-      completionRate: item.effective > 0 ? `${Math.round((item.completed / item.effective) * 100)}%` : '0%',
-    }));
+    .map((item) => {
+      const result = { ...item };
+      delete result.taskCount;
+      delete result.completedTaskCount;
+      return {
+        ...result,
+        completionRate: result.effective > 0 ? `${Math.round((result.completed / result.effective) * 100)}%` : '0%',
+      };
+    });
 }

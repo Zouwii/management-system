@@ -53,10 +53,6 @@ function getCompletedHours(row) {
     + toNumber(row.overdueCompletedHours ?? row.quarterlyOverdueCompletedHours, 0);
 }
 
-function getFinalScore(row) {
-  return toNumber(row.finalScore ?? row.finalPerformance, 0);
-}
-
 function getPrevFinalScore(row) {
   return toNumber(row.prevFinalScore ?? row.finalScore ?? row.finalPerformance, 0);
 }

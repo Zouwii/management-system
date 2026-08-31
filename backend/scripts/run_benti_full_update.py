@@ -197,11 +197,11 @@ def _api_usage_after(max_id: int) -> Dict[str, Any]:
 def _members() -> list[str]:
     session = SessionLocal()
     try:
-        # 本体全量只覆盖导航组和对接组；算法组(team_id=2)只参与工作日耗时，
+        # 本体全量只覆盖导航组和对接组；算法组只参与工作日耗时，
         # 不得作为本体项目查询或明细写入的成员范围。
         rows = (
             session.query(UserCharacter.user_id)
-            .filter(UserCharacter.team_id.in_(("0", "1")))
+            .filter(UserCharacter.team_code.in_(("NAV", "INTEGRATION")))
             .order_by(UserCharacter.user_id)
             .all()
         )

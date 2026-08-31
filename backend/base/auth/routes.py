@@ -66,8 +66,8 @@ def register(bp, ok, fail):
                     users.append({
                         "user_id": row.user_id,
                         "name": row.name or row.user_id,
-                        "character": row.character,
-                        "team_id": row.team_id,
+                        "teamCode": str(row.team_code or ""),
+                        "jobRoleCode": str(row.job_role_code or ""),
                     })
                 return ok({"users": users})
             finally:

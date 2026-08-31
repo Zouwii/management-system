@@ -28,54 +28,6 @@ def _require_login():
     return session.get("auth_user")
 
 
-def _team_name_from_team_id(team_id_value):
-    """Map team_id integer to Chinese team name."""
-    if team_id_value is None:
-        return "未分组"
-    val = str(team_id_value).strip()
-    if val == "0":
-        return "导航组"
-    if val == "1":
-        return "对接组"
-    if val == "3":
-        return "应用组"
-    return "未分组"
-
-
-def _to_character(value, default: int = 0) -> int:
-    """Safely parse character value to int, avoiding 0-or-1 ambiguity."""
-    try:
-        if value is None:
-            return int(default)
-        return int(value)
-    except Exception:
-        return int(default)
-
-
-def _member_role_label_from_user_character(character_value, is_nav_lead, is_servo_lead):
-    """Map character integer to Chinese role label.
-
-    0=组长, 1=软件开发工程师, 2=软件应用工程师, 3=应用工程师, 4=算法工程师, 5=实习生
-    """
-    try:
-        c = int(character_value)
-    except Exception:
-        c = 1
-    if c == 0:
-        return "组长"
-    if c == 1:
-        return "软件开发工程师"
-    if c == 2:
-        return "软件应用工程师"
-    if c == 3:
-        return "应用工程师"
-    if c == 4:
-        return "算法工程师"
-    if c == 5:
-        return "实习生"
-    return "软件开发工程师"
-
-
 def _current_quarter_utc_range(expected_mode: str = "quarter"):
     """Calculate start/end UTC datetimes for a statistical window.
 

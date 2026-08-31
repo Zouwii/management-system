@@ -20,52 +20,10 @@ from base.db.orm import (
     ProjectTaskOverdueDetail,
     UserCharacter as DbUserCharacter,
 )
+from base.organization.constants import TEAM_LABELS, stable_team_code
+from base.organization.service import list_scope_member_ids, list_scope_members, list_scope_teams
 
 SH_TZ = ZoneInfo("Asia/Shanghai")
-
-# 工作日耗时统计参与人员白名单
-WHITELIST_USER_IDS = {
-    "01195014075436361289",  # 邹宏睿 导航组
-    "010408241117947540",    # 王睿   导航组
-    "250124013220811839",    # 何鸿颉 导航组
-    "2739002424650905",      # 何华   导航组
-    "27274739521079424",     # 蒲曲   导航组
-    "396813112226338830",    # 杨沅钋 导航组
-    "234765171227529303",    # 沈旭东 对接组
-    "011168364322856029",    # 李赫   对接组
-    "02013312354020881768",  # 刘力璋 对接组
-    "01183307230324910099",  # 戴宇庆 对接组
-    # 算法组
-    "0525436259671512",      # 刘丰
-    "2464543025951000",      # 琚玲
-    "555363695138848564",    # 高尔峰
-    "22665556381168535",     # 邵京
-    "2409506118778941",      # 庞涛
-}
-
-# 出勤表专用分组：不修改 ids.json，也不改变 user_character 的全局 team_id。
-# 这些人员属于当前 ids.json 导航组，但不在导航统计白名单中。
-ATTENDANCE_APPLICATION_USER_IDS = {
-    "2108411066921750",      # 潘铮
-    "265352386036276420",    # 郑世玉
-    "495200335237410081",    # 钟昌郎
-    "312542394537803309",    # 陈文斌
-}
-ATTENDANCE_PARTICIPANT_USER_IDS = WHITELIST_USER_IDS | ATTENDANCE_APPLICATION_USER_IDS
-ATTENDANCE_NAV_USER_IDS = {
-    "01195014075436361289", "010408241117947540", "250124013220811839",
-    "2739002424650905", "27274739521079424", "396813112226338830",
-}
-ATTENDANCE_SERVO_USER_IDS = {
-    "234765171227529303", "011168364322856029",
-    "02013312354020881768", "01183307230324910099",
-}
-ATTENDANCE_ALGO_USER_IDS = {
-    "0525436259671512", "2464543025951000", "555363695138848564",
-    "22665556381168535", "2409506118778941",
-}
-
-
 def _to_utc_dt_safe(v: Any) -> Optional[datetime]:
     s = str(v or "").strip()
     if not s:
@@ -83,33 +41,12 @@ def _to_utc_dt_safe(v: Any) -> Optional[datetime]:
     return dt
 
 
-def _team_name_static(team_id_value: Any) -> str:
-    val = str(team_id_value or "").strip()
-    if val == "0":
-        return "导航组"
-    if val == "1":
-        return "对接组"
-    if val == "2":
-        return "算法组"
-    if val == "3":
-        return "应用组"
-    return "未分组"
-
-
-def _attendance_team_id(user_id: str, db_team_id: Any) -> str:
-    """团队数据缺失时按统计名单配置兜底，避免出勤表出现未分组。"""
-    tid = str(db_team_id or "").strip()
-    if user_id in ATTENDANCE_APPLICATION_USER_IDS:
-        return "3"
-    if tid:
-        return tid
-    if user_id in ATTENDANCE_NAV_USER_IDS:
-        return "0"
-    if user_id in ATTENDANCE_SERVO_USER_IDS:
-        return "1"
-    if user_id in ATTENDANCE_ALGO_USER_IDS:
-        return "2"
-    return ""
+def _scope_member_ids(scope_code: str) -> set[str]:
+    return {
+        str(uid).strip()
+        for uid in list_scope_member_ids(scope_code, session_factory=SessionLocal)
+        if str(uid).strip()
+    }
 
 
 def _resolve_time_range(payload: Dict[str, Any]) -> Tuple[Optional[datetime], Optional[datetime], Optional[str]]:
@@ -133,12 +70,13 @@ def _query_workday_costhour_base(
     核心查询：三张明细表统一拉取，关联 user_character 获取团队信息。
 
     返回每行:
-      { userId, userName, teamId, teamName, taskType, businessType,
+      { userId, userName, teamCode, teamName, taskType, businessType,
         taskId, content, workdayCosthour }
     """
     session = SessionLocal()
     algo_session = AlgoSessionLocal()
     try:
+        allowed_member_ids = _scope_member_ids("WORKDAY_COST")
         # ── 软件开发：B 表（本季度排期） ──
         b_rows = (
             session.query(
@@ -305,13 +243,13 @@ def _query_workday_costhour_base(
                     continue
                 user_map[uid] = {
                     "name": str(getattr(uc, "name", "") or uid),
-                    "teamId": str(getattr(uc, "team_id", "") or ""),
+                    "teamCode": stable_team_code(getattr(uc, "team_code", None)),
                 }
 
         def _resolve_team(uid: str):
             m = user_map.get(uid, {})
-            tid = _attendance_team_id(uid, m.get("teamId", ""))
-            return tid, _team_name_static(tid), m.get("name", uid)
+            team_code = str(m.get("teamCode") or "")
+            return team_code, TEAM_LABELS.get(team_code, "未分组"), m.get("name", uid)
 
         # ── 组装统一行 ──
         results: List[Dict[str, Any]] = []
@@ -335,11 +273,11 @@ def _query_workday_costhour_base(
             # 排除工作日耗时为 0 或无数据的条目
             if wdc is None or not (wdc == wdc and float(wdc) > 0):
                 continue
-            team_id, team_name, user_name = _resolve_team(uid)
+            team_code, team_name, user_name = _resolve_team(uid)
             results.append({
                 "userId": uid,
                 "userName": user_name,
-                "teamId": team_id,
+                "teamCode": team_code,
                 "teamName": team_name,
                 "taskType": "软件开发",
                 "projectType": _project_type_label(pc1),
@@ -370,11 +308,11 @@ def _query_workday_costhour_base(
             task_id_str = str(tid or "")
             if task_id_str in b_task_ids:
                 continue  # B 表已有，跳过
-            team_id, team_name, user_name = _resolve_team(uid)
+            team_code, team_name, user_name = _resolve_team(uid)
             results.append({
                 "userId": uid,
                 "userName": user_name,
-                "teamId": team_id,
+                "teamCode": team_code,
                 "teamName": team_name,
                 "taskType": "软件开发",
                 "projectType": _project_type_label(pc1),
@@ -397,11 +335,11 @@ def _query_workday_costhour_base(
             # 排除工作日耗时为 0 或无数据的条目
             if wdc is None or not (wdc == wdc and float(wdc) > 0):
                 continue
-            team_id, team_name, user_name = _resolve_team(uid)
+            team_code, team_name, user_name = _resolve_team(uid)
             results.append({
                 "userId": uid,
                 "userName": user_name,
-                "teamId": team_id,
+                "teamCode": team_code,
                 "teamName": team_name,
                 "taskType": "问题处理",
                 "projectType": _project_type_label(pc1),
@@ -421,11 +359,11 @@ def _query_workday_costhour_base(
                 continue
             if wdc is None or not (wdc == wdc and float(wdc) > 0):
                 continue
-            team_id, team_name, user_name = _resolve_team(uid)
+            team_code, team_name, user_name = _resolve_team(uid)
             results.append({
                 "userId": uid,
                 "userName": user_name,
-                "teamId": team_id,
+                "teamCode": team_code,
                 "teamName": team_name,
                 "taskType": "软件开发",
                 "projectType": _project_type_label(pc1),
@@ -445,11 +383,11 @@ def _query_workday_costhour_base(
                 continue
             if wdc is None or not (wdc == wdc and float(wdc) > 0):
                 continue
-            team_id, team_name, user_name = _resolve_team(uid)
+            team_code, team_name, user_name = _resolve_team(uid)
             results.append({
                 "userId": uid,
                 "userName": user_name,
-                "teamId": team_id,
+                "teamCode": team_code,
                 "teamName": team_name,
                 "taskType": "问题处理",
                 "projectType": _project_type_label(pc1),
@@ -460,8 +398,11 @@ def _query_workday_costhour_base(
                 "projectName3": str(pn3 or "").strip() if pn3 else "",
             })
 
-        # ── 白名单过滤：只保留指定参与人员 ──
-        results = [r for r in results if r["userId"] in ATTENDANCE_PARTICIPANT_USER_IDS]
+        # ── 统一 Scope 过滤：只保留 WORKDAY_COST 成员 ──
+        results = [
+            r for r in results
+            if r["userId"] in allowed_member_ids and r.get("teamCode")
+        ]
 
         return results
     finally:
@@ -546,16 +487,17 @@ def workday_costhour_team_summary_service(payload: Dict[str, Any]) -> Dict[str, 
 
     team_buckets: Dict[str, List[Dict[str, Any]]] = {}
     for r in rows:
-        tid = r.get("teamId", "")
-        team_buckets.setdefault(tid, []).append(r)
+        team_code = stable_team_code(r.get("teamCode"))
+        if team_code:
+            team_buckets.setdefault(team_code, []).append(r)
 
     teams = []
-    for tid in sorted(team_buckets.keys()):
-        team_rows = team_buckets[tid]
-        tname = team_rows[0].get("teamName", _team_name_static(tid)) if team_rows else _team_name_static(tid)
+    for team_code in sorted(team_buckets.keys()):
+        team_rows = team_buckets[team_code]
+        tname = TEAM_LABELS.get(team_code, team_code)
         tt = _total_hours_and_count(team_rows)
         teams.append({
-            "teamId": tid,
+            "teamCode": team_code,
             "teamName": tname,
             "totalHours": tt["hours"],
             "totalCount": tt["taskCount"],
@@ -681,41 +623,35 @@ def workday_costhour_member_summary_service(payload: Dict[str, Any]) -> Dict[str
     if err:
         return {"success": False, "error": err, "data": {}}
 
-    team_id_filter = str(payload.get("team_id", "") or "").strip()
+    raw_team_filter = str(payload.get("teamCode", "") or "").strip().upper()
+    team_code_filter = raw_team_filter if raw_team_filter in TEAM_LABELS else ""
+    if raw_team_filter and not team_code_filter:
+        return {"success": False, "error": "unknown teamCode", "data": {}}
 
     rows = _query_workday_costhour_base(start_dt, end_dt)
-    if team_id_filter:
-        rows = [r for r in rows if str(r.get("teamId", "") or "").strip() == team_id_filter]
+    if team_code_filter:
+        rows = [
+            r for r in rows
+            if stable_team_code(r.get("teamCode")) == team_code_filter
+        ]
 
-    # 出勤表人员名单是固定参与人员 roster，不能因某季度没有任务数据而缩减。
-    # 先从 user_character 补齐所有人员，再把本季度工时聚合到对应人员。
+    # ATTENDANCE Scope 是固定参与人员 roster，不能因某季度没有任务数据而缩减。
+    # 先从统一 roster 补齐所有人员，再把本季度工时聚合到对应人员。
     member_map: Dict[str, Dict[str, Any]] = {}
-    roster_session = SessionLocal()
-    try:
-        roster_rows = (
-            roster_session.query(DbUserCharacter)
-            .filter(DbUserCharacter.user_id.in_(list(ATTENDANCE_PARTICIPANT_USER_IDS)))
-            .all()
-        )
-        roster_by_id = {
-            str(getattr(item, "user_id", "") or "").strip(): item
-            for item in roster_rows
-        }
-    finally:
-        roster_session.close()
-
-    for uid in sorted(ATTENDANCE_PARTICIPANT_USER_IDS):
-        profile = roster_by_id.get(uid)
-        actual_team_id = str(getattr(profile, "team_id", "") or "") if profile else ""
-        team_id = _attendance_team_id(uid, actual_team_id)
-        team_name = _team_name_static(team_id)
-        user_name = str(getattr(profile, "name", "") or uid) if profile else uid
-        if team_id_filter and team_id != team_id_filter:
+    roster_members = list_scope_members("ATTENDANCE", team_code_filter or None)
+    for profile in roster_members:
+        uid = str(profile.get("userId") or "").strip()
+        team_code = str(profile.get("teamCode") or "").strip()
+        if not uid or not team_code:
+            continue
+        team_name = profile.get("teamName") or TEAM_LABELS.get(team_code, team_code)
+        user_name = str(profile.get("userName") or uid)
+        if team_code_filter and team_code != team_code_filter:
             continue
         member_map[uid] = {
             "userId": uid,
             "userName": user_name,
-            "teamId": team_id,
+            "teamCode": team_code,
             "teamName": team_name,
             "workdayCosthour": 0.0,
             "taskCount": 0,
@@ -725,15 +661,16 @@ def workday_costhour_member_summary_service(payload: Dict[str, Any]) -> Dict[str
         uid = str(r.get("userId", "") or "").strip()
         if not uid:
             continue
-        if uid not in ATTENDANCE_PARTICIPANT_USER_IDS:
+        if uid not in member_map:
             continue
-        if team_id_filter and str(r.get("teamId", "") or "").strip() != team_id_filter:
+        row_team_code = stable_team_code(r.get("teamCode"))
+        if team_code_filter and row_team_code != team_code_filter:
             continue
         bucket = member_map.setdefault(uid, {
             "userId": uid,
             "userName": r.get("userName", uid),
-            "teamId": str(r.get("teamId", "") or ""),
-            "teamName": r.get("teamName") or _team_name_static(r.get("teamId")),
+            "teamCode": row_team_code,
+            "teamName": r.get("teamName") or TEAM_LABELS.get(row_team_code, row_team_code),
             "workdayCosthour": 0.0,
             "taskCount": 0,
         })
@@ -744,15 +681,14 @@ def workday_costhour_member_summary_service(payload: Dict[str, Any]) -> Dict[str
     for item in member_map.values():
         item["workdayCosthour"] = round(float(item.get("workdayCosthour") or 0.0), 2)
         members.append(item)
-    members.sort(key=lambda x: (str(x.get("teamId", "")), str(x.get("userName", ""))))
+    members.sort(key=lambda x: (str(x.get("teamCode", "")), str(x.get("userName", ""))))
 
-    teams_seen: Dict[str, str] = {}
-    for m in members:
-        tid = str(m.get("teamId", "") or "")
-        teams_seen[tid] = m.get("teamName") or _team_name_static(tid)
     teams = [
-        {"teamId": tid, "teamName": teams_seen[tid]}
-        for tid in sorted(teams_seen.keys())
+        {
+            "teamCode": team.get("teamCode") or team.get("code"),
+            "teamName": team.get("teamName") or team.get("name"),
+        }
+        for team in list_scope_teams("ATTENDANCE")["teams"]
     ]
 
     return {
@@ -762,8 +698,8 @@ def workday_costhour_member_summary_service(payload: Dict[str, Any]) -> Dict[str
                 "start_time": start_dt.isoformat(),
                 "end_time": end_dt.isoformat(),
             },
-            "teamId": team_id_filter,
-            "teamName": _team_name_static(team_id_filter) if team_id_filter else "全部",
+            "teamCode": team_code_filter,
+            "teamName": TEAM_LABELS.get(team_code_filter, "全部") if team_code_filter else "全部",
             "teams": teams,
             "members": members,
             "total": _total_hours_and_count(rows),
@@ -775,31 +711,32 @@ def workday_costhour_member_summary_service(payload: Dict[str, Any]) -> Dict[str
 
 def workday_costhour_team_project_detail_service(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
-    按 teamId + projectType 过滤，返回每条任务的明细列表。
+    按 teamCode + projectType 过滤，返回每条任务的明细列表。
 
     参数:
       - start_time / end_time (必填)
-      - team_id (必填): "0"=导航组, "1"=对接组
+      - teamCode (必填): 如 "NAV"、"INTEGRATION"
       - project_type (必填): 如 "产品项目"、"研发项目"、"订单项目"
     """
     start_dt, end_dt, err = _resolve_time_range(payload)
     if err:
         return {"success": False, "error": err, "data": {}}
 
-    team_id = str(payload.get("team_id", "")).strip()
+    team_code = str(payload.get("teamCode", "") or "").strip().upper()
     project_type = str(payload.get("project_type", "")).strip()
 
-    if not team_id:
-        return {"success": False, "error": "team_id is required", "data": {}}
+    if team_code not in TEAM_LABELS:
+        return {"success": False, "error": "valid teamCode is required", "data": {}}
     if not project_type:
         return {"success": False, "error": "project_type is required", "data": {}}
 
     rows = _query_workday_costhour_base(start_dt, end_dt)
 
-    # 按 teamId + projectType 过滤
+    # 按稳定团队编码 + projectType 过滤
     filtered = [
         r for r in rows
-        if r.get("teamId") == team_id and r.get("projectType") == project_type
+        if stable_team_code(r.get("teamCode")) == team_code
+        and r.get("projectType") == project_type
     ]
 
     # 组装明细列表
@@ -826,8 +763,8 @@ def workday_costhour_team_project_detail_service(payload: Dict[str, Any]) -> Dic
                 "start_time": start_dt.isoformat(),
                 "end_time": end_dt.isoformat(),
             },
-            "teamId": team_id,
-            "teamName": _team_name_static(team_id),
+            "teamCode": team_code,
+            "teamName": TEAM_LABELS[team_code],
             "projectType": project_type,
             "total": total,
             "items": items,

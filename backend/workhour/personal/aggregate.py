@@ -24,9 +24,10 @@ from base.db.orm import (
     UserCharacter as DbUserCharacter,
 )
 from base.projects.task_service import query_project_tasks_service, query_user_tasks_service
-from base.config.service import get_workhour_character_coefficients_service
+from base.config.service import get_workhour_role_coefficients_service
+from base.organization.constants import ROLE_LABELS, TEAM_LABELS, stable_role_code
+from base.organization.service import list_scope_member_ids
 from workhour.personal.util import parse_workhour_from_task_dict
-from base.config.member_visibility import should_hide_member_in_selector
 
 DEFAULT_SCENARIO_FIELD_CONFIG_ID = "647854bcd999c893061ef8b5"
 ISSUE_SCENARIO_FIELD_CONFIG_ID = "665ee4b95b46f34b3e0463a8"
@@ -711,45 +712,6 @@ def workdays_in_range_service(payload: Dict[str, Any]) -> Dict[str, Any]:
     return result
 
 
-def _to_character(value: Any, default: int = 0) -> int:
-    try:
-        if value is None:
-            return int(default)
-        return int(value)
-    except Exception:
-        return int(default)
-
-
-def _team_name_from_team_id(team_id_value: Any) -> str:
-    if team_id_value is None:
-        return "未分组"
-    val = str(team_id_value).strip()
-    if val == "0":
-        return "导航组"
-    if val == "1":
-        return "对接组"
-    if val == "3":
-        return "应用组"
-    return "未分组"
-
-
-def _member_role_label_from_user_character(character_value: Any) -> str:
-    c = _to_character(character_value, default=1)
-    if c == 0:
-        return "组长"
-    if c == 1:
-        return "软件开发工程师"
-    if c == 2:
-        return "软件应用工程师"
-    if c == 3:
-        return "应用工程师"
-    if c == 4:
-        return "算法工程师"
-    if c == 5:
-        return "实习生"
-    return "软件开发工程师"
-
-
 def team_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
     团队维度季度工时聚合（单接口返回 team-detail 需要的数据）：
@@ -758,14 +720,13 @@ def team_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, Any]
     - lastUpdatedAt：页面右上角“最后同步”
     """
     payload = payload or {}
-    team_id = str(payload.get("teamId") or payload.get("team_id") or "").strip()
+    scope_code = str(payload.get("scopeCode") or "").strip()
+    team_code_filter = str(payload.get("teamCode") or "").strip().upper()
     project_id = str(payload.get("projectId") or payload.get("project_id") or "").strip()
     start_raw = payload.get("start_time")
     end_raw = payload.get("end_time")
-    exclude_character_zero = str(payload.get("exclude_character_zero", "true")).strip().lower() not in {"0", "false", "no"}
-    # 0=导航组，1=对接组，3=应用组。算法组(2)使用独立数据源。
-    if team_id not in {"0", "1", "3"}:
-        return {"success": False, "error": "invalid teamId", "data": {}}
+    if not scope_code or not team_code_filter:
+        return {"success": False, "error": "scopeCode and teamCode are required", "data": {}}
     if not project_id:
         return {"success": False, "error": "missing projectId", "data": {}}
 
@@ -792,8 +753,8 @@ def team_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, Any]
     if start_dt > end_dt:
         return {"success": False, "error": "start_time must be <= end_time", "data": {}}
 
-    coeff_out = get_workhour_character_coefficients_service() or {}
-    coeff_map = coeff_out.get("workhour_character_coefficients") or {}
+    coeff_out = get_workhour_role_coefficients_service() or {}
+    coeff_map = coeff_out.get("workhour_role_coefficients") or {}
     wd_out = workdays_in_range_service(
         {
             "start_time": start_dt.isoformat(),
@@ -805,11 +766,16 @@ def team_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, Any]
 
     session = SessionLocal()
     try:
+        try:
+            allowed_ids = list_scope_member_ids(scope_code, team_code_filter)
+        except ValueError as exc:
+            return {"success": False, "error": str(exc), "data": {}}
+        members_query = session.query(DbUserCharacter)
         members = (
-            session.query(DbUserCharacter)
-            .filter(DbUserCharacter.team_id == team_id)
+            members_query.filter(DbUserCharacter.user_id.in_(sorted(allowed_ids)))
             .order_by(DbUserCharacter.user_id.asc())
             .all()
+            if allowed_ids else []
         )
 
         rows: List[Dict[str, Any]] = []
@@ -818,21 +784,9 @@ def team_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, Any]
             uid = str(getattr(m, "user_id", "") or "").strip()
             if not uid:
                 continue
-            member_character = _to_character(getattr(m, "character", None), default=0)
-            # 仅隐藏“管理员”：character=0 且同时 nav+servo lead。
-            if exclude_character_zero:
-                is_nav_lead = bool(getattr(m, "is_nav_lead", False))
-                is_servo_lead = bool(getattr(m, "is_servo_lead", False))
-                if should_hide_member_in_selector(
-                    {
-                        "character": member_character,
-                        "isNavLead": is_nav_lead,
-                        "isServoLead": is_servo_lead,
-                    }
-                ):
-                    continue
+            job_role_code = stable_role_code(getattr(m, "job_role_code", None))
             name = str(getattr(m, "name", "") or uid)
-            coefficient = float(coeff_map.get(str(member_character), 1.0) or 1.0)
+            coefficient = float(coeff_map.get(job_role_code, 1.0) or 1.0)
             expected_effective_hours = quarter_expected_days * coefficient
 
             b_base = (
@@ -888,10 +842,10 @@ def team_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, Any]
                 {
                     "userId": uid,
                     "name": name,
-                    "role": _member_role_label_from_user_character(member_character),
+                    "role": ROLE_LABELS.get(job_role_code, "未设置"),
+                    "jobRoleCode": job_role_code,
                     "quarterExpectedHours": round(expected_effective_hours, 2),
                     "workdayCount": round(quarter_expected_days, 2),
-                    "character": member_character,
                     "coefficient": coefficient,
                     "scheduledHours": round(scheduled_total, 2),
                     "completedHours": round(completed_total, 2),
@@ -902,12 +856,14 @@ def team_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, Any]
                     "hours": round(scheduled_total, 2),
                 }
             )
+            member_team_code = str(getattr(m, "team_code", "") or "").strip().upper()
             member_options.append(
                 {
                     "id": uid,
                     "name": name,
-                    "team": _team_name_from_team_id(getattr(m, "team_id", None)),
-                    "teamId": str(getattr(m, "team_id", "") or ""),
+                    "teamCode": member_team_code,
+                    "teamName": TEAM_LABELS.get(member_team_code, "未分组"),
+                    "jobRoleCode": job_role_code,
                 }
             )
 
@@ -919,7 +875,8 @@ def team_quarter_workhours_db_service(payload: Dict[str, Any]) -> Dict[str, Any]
                 "rows": rows,
                 "memberOptions": member_options,
                 "lastUpdatedAt": last_updated_at,
-                "teamId": team_id,
+                "scopeCode": scope_code,
+                "teamCode": team_code_filter,
                 "projectId": project_id,
                 "timeRange": {
                     "start_time": start_dt.isoformat(),

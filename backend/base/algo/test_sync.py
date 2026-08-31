@@ -312,6 +312,8 @@ class AlgoCosthourScopeTest(unittest.TestCase):
                 name="刘丰",
                 character=4,
                 team_id="2",
+                team_code="ALGORITHM",
+                job_role_code="ALGORITHM_ENGINEER",
             )
         )
         for task_id, need_statistic, hours in (
@@ -351,7 +353,7 @@ class AlgoCosthourScopeTest(unittest.TestCase):
 
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["taskId"], "included")
-        self.assertEqual(rows[0]["teamId"], "2")
+        self.assertEqual(rows[0]["teamCode"], "ALGORITHM")
         self.assertEqual(rows[0]["teamName"], "算法组")
         self.assertEqual(rows[0]["taskType"], "软件开发")
         main_engine.dispose()

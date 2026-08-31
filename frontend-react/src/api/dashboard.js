@@ -5,6 +5,7 @@ import {
   mockFetchDepartmentOverview,
   mockFetchIntegrationTeamDetail,
   mockFetchApplicationTeamDetail,
+  mockFetchAppThreeTeamDetail,
   mockFetchApplicationTeamReport,
   mockFetchApplicationTeamOptions,
   mockFetchNavTeamDetail,
@@ -26,6 +27,7 @@ import {
   mockAnalyzeDashboard,
   mockApplySuggestion,
   mockFetchWorkdayCosthourTeamSummary,
+  mockFetchOrganizationScopeOptions,
   mockFetchWorkdayCosthourDeptAggregate,
   mockFetchWorkdayCosthourTaskDetail,
   mockFetchWorkdayCosthourMemberSummary,
@@ -47,6 +49,7 @@ import {
   realFetchDepartmentOverview,
   realFetchIntegrationTeamDetail,
   realFetchApplicationTeamDetail,
+  realFetchAppThreeTeamDetail,
   realFetchApplicationTeamReport,
   realFetchApplicationTeamOptions,
   realFetchNavTeamDetail,
@@ -68,6 +71,7 @@ import {
   realAnalyzeDashboard,
   realApplySuggestion,
   realFetchWorkdayCosthourTeamSummary,
+  realFetchOrganizationScopeOptions,
   realFetchWorkdayCosthourDeptAggregate,
   realFetchWorkdayCosthourTaskDetail,
   realFetchWorkdayCosthourMemberSummary,
@@ -88,6 +92,7 @@ export const fetchDepartmentOverview = createApiSwitch(mockFetchDepartmentOvervi
 export const fetchNavTeamDetail = createApiSwitch(mockFetchNavTeamDetail, realFetchNavTeamDetail);
 export const fetchIntegrationTeamDetail = createApiSwitch(mockFetchIntegrationTeamDetail, realFetchIntegrationTeamDetail);
 export const fetchApplicationTeamDetail = createApiSwitch(mockFetchApplicationTeamDetail, realFetchApplicationTeamDetail);
+export const fetchAppThreeTeamDetail = createApiSwitch(mockFetchAppThreeTeamDetail, realFetchAppThreeTeamDetail);
 export const fetchApplicationTeamReport = createApiSwitch(mockFetchApplicationTeamReport, realFetchApplicationTeamReport);
 export const fetchApplicationTeamOptions = createApiSwitch(mockFetchApplicationTeamOptions, realFetchApplicationTeamOptions);
 export const fetchPersonalHours = createApiSwitch(mockFetchPersonalHours, realFetchPersonalHours);
@@ -122,6 +127,7 @@ export const createKnowledgeChatSession = createApiSwitch(mockCreateKnowledgeCha
 export const analyzeDashboard = createApiSwitch(mockAnalyzeDashboard, realAnalyzeDashboard);
 export const applySuggestion = createApiSwitch(mockApplySuggestion, realApplySuggestion);
 export const fetchWorkdayCosthourTeamSummary = createApiSwitch(mockFetchWorkdayCosthourTeamSummary, realFetchWorkdayCosthourTeamSummary);
+export const fetchOrganizationScopeOptions = createApiSwitch(mockFetchOrganizationScopeOptions, realFetchOrganizationScopeOptions);
 export const fetchWorkdayCosthourDeptAggregate = createApiSwitch(mockFetchWorkdayCosthourDeptAggregate, realFetchWorkdayCosthourDeptAggregate);
 export const fetchWorkdayCosthourTaskDetail = createApiSwitch(mockFetchWorkdayCosthourTaskDetail, realFetchWorkdayCosthourTaskDetail);
 export const fetchWorkdayCosthourMemberSummary = createApiSwitch(mockFetchWorkdayCosthourMemberSummary, realFetchWorkdayCosthourMemberSummary);

@@ -9,6 +9,8 @@ from sqlalchemy import select
 
 from base.db.engine import PerfSessionLocal, SessionLocal
 from base.db.orm import NavPerfQuarterResult, ServoPerfQuarterResult, UserCharacter
+from base.organization.constants import stable_team_code
+from base.organization.service import list_scope_members, list_scope_teams
 
 
 def _to_decimal_3(x: Any) -> Decimal:
@@ -73,32 +75,33 @@ def _map_company_score(final_score: Decimal) -> Decimal:
     return mapping.get(final_score, Decimal("0.000"))
 
 
-def _select_model_by_team_id(user_id: str):
-    """根据主库 user_character.team_id 选择 nav/servo 表模型。"""
+def _select_model_by_team_code(user_id: str):
+    """根据 roster 团队编码选择导航/对接绩效表。"""
     uc_sess = SessionLocal()
     try:
         c_row = uc_sess.query(UserCharacter).filter(UserCharacter.user_id == user_id).first()
-        if not c_row or not getattr(c_row, "team_id", None):
-            raise ValueError("missing user_character.team_id for user")
-        team_id = str(c_row.team_id)
+        if not c_row:
+            raise ValueError("missing user_character roster row for user")
+        team_code = stable_team_code(getattr(c_row, "team_code", None))
     finally:
         uc_sess.close()
 
-    if team_id in {"nav", "0", "navigation"}:
+    if team_code == "NAV":
         return NavPerfQuarterResult
-    if team_id in {"servo", "1", "service", "对接", "servo_team"}:
+    if team_code == "INTEGRATION":
         return ServoPerfQuarterResult
-    raise ValueError(f"unsupported team_id: {team_id}")
+    raise ValueError(f"unsupported team: {team_code or 'unknown'}")
 
 
 def _get_is_team_lead(user_id: str) -> bool:
-    """从主库 UserCharacter.character 读取身份快照。0=组长, 9=管理员(组长等效)。"""
+    """Read the stable roster role used for the performance snapshot."""
     uc_sess = SessionLocal()
     try:
         c_row = uc_sess.query(UserCharacter).filter(UserCharacter.user_id == user_id).first()
         if not c_row:
             return False
-        return str(getattr(c_row, "character", "")) in ("0", "9")
+        role = str(getattr(c_row, "job_role_code", "") or "").strip().upper()
+        return role in {"TEAM_LEAD", "SYSTEM_ADMIN"}
     finally:
         uc_sess.close()
 
@@ -123,7 +126,7 @@ def fill_member_input_service(payload: Dict[str, Any]) -> Dict[str, Any]:
     now = datetime.now(timezone.utc)
     session = PerfSessionLocal()
     try:
-        Model = _select_model_by_team_id(user_id)
+        Model = _select_model_by_team_code(user_id)
 
         # 0 + 空 → 删除已有记录
         if (hour_score == 0 and manager_score is None) or (hour_score is None and manager_score == 0):
@@ -216,35 +219,37 @@ def fill_member_input_service(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 def query_quarter_performance_service(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
-    查询绩效结果：year + quarter 必填，user_id / team_key 可选。
-    team_key: nav → 只查导航组, servo → 只查对接组, 空 → 查两个组。
+    查询绩效结果：year + quarter 必填，user_id / teamCode 可选。
     """
     payload = payload or {}
     year = int(payload.get("year"))
     quarter = int(payload.get("quarter"))
     user_id = str(payload.get("user_id") or payload.get("userId") or payload.get("userid") or "").strip()
-    team_key = str(payload.get("team_key") or payload.get("teamKey") or "").strip().lower()
+    team_code = str(payload.get("teamCode") or "").strip().upper()
+    if team_code and team_code not in _TEAM_KEY_BY_CODE:
+        return {"success": False, "error": f"unknown teamCode: {team_code}", "data": {}}
 
     TEAM_MODEL_MAP = {
-        "nav": (NavPerfQuarterResult, "导航组"),
-        "servo": (ServoPerfQuarterResult, "对接组"),
+        "NAV": (NavPerfQuarterResult, "NAV", "导航组"),
+        "INTEGRATION": (ServoPerfQuarterResult, "INTEGRATION", "对接组"),
     }
-    models = [TEAM_MODEL_MAP[team_key]] if team_key in TEAM_MODEL_MAP else [
-        (NavPerfQuarterResult, "导航组"),
-        (ServoPerfQuarterResult, "对接组"),
+    models = [TEAM_MODEL_MAP[team_code]] if team_code in TEAM_MODEL_MAP else [
+        (NavPerfQuarterResult, "NAV", "导航组"),
+        (ServoPerfQuarterResult, "INTEGRATION", "对接组"),
     ]
 
     session = PerfSessionLocal()
     try:
         results = []
-        for Model, team_label in models:
+        for Model, result_team_code, team_label in models:
             stmt = select(Model).where(Model.year == year, Model.quarter == quarter)
             if user_id:
                 stmt = stmt.where(Model.user_id == user_id)
             rows = session.scalars(stmt).all()
             for row in rows:
                 d = _row_to_dict(row)
-                d["team"] = team_label
+                d["teamCode"] = result_team_code
+                d["teamName"] = team_label
                 results.append(d)
         return {"success": True, "data": {"results": results, "count": len(results)}}
     except Exception as e:
@@ -296,7 +301,7 @@ def calculate_member_quarter_performance_service(payload: Dict[str, Any]) -> Dic
     session = PerfSessionLocal()
     now = datetime.now(timezone.utc)
     try:
-        Model = _select_model_by_team_id(user_id)
+        Model = _select_model_by_team_code(user_id)
 
         stmt = select(Model).where(Model.year == year, Model.quarter == quarter, Model.user_id == user_id)
         row = session.scalars(stmt).first()
@@ -376,10 +381,8 @@ def calculate_member_quarter_performance_service(payload: Dict[str, Any]) -> Dic
         session.close()
 
 
-_TEAM_ID_MAP = {
-    "nav": {"nav", "0", "navigation"},
-    "servo": {"servo", "1", "service", "对接", "servo_team"},
-}
+_TEAM_CODE_BY_KEY = {"nav": "NAV", "servo": "INTEGRATION"}
+_TEAM_KEY_BY_CODE = {value: key for key, value in _TEAM_CODE_BY_KEY.items()}
 
 
 def list_team_import_users_service(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -391,24 +394,16 @@ def list_team_import_users_service(payload: Dict[str, Any]) -> Dict[str, Any]:
     payload = payload or {}
     year = int(payload.get("year"))
     quarter = int(payload.get("quarter"))
-    team = str(payload.get("team", "")).strip().lower()
-    if team not in _TEAM_ID_MAP:
-        return {"success": False, "error": f"unknown team: {team}, use nav/servo", "data": {}}
+    team_code = str(payload.get("teamCode", "") or "").strip().upper()
+    if team_code not in _TEAM_KEY_BY_CODE:
+        return {"success": False, "error": f"unknown teamCode: {team_code}", "data": {}}
 
-    team_ids = _TEAM_ID_MAP[team]
-    Model = NavPerfQuarterResult if team == "nav" else ServoPerfQuarterResult
+    Model = NavPerfQuarterResult if team_code == "NAV" else ServoPerfQuarterResult
 
-    uc_sess = SessionLocal()
     perf_sess = PerfSessionLocal()
     try:
-        # ── SQL 下推：按 team_id IN (...) 过滤，排除 character=9 ──
-        members = (
-            uc_sess.query(UserCharacter)
-            .filter(UserCharacter.team_id.in_(team_ids))
-            .filter(UserCharacter.character != "9")
-            .all()
-        )
-        members.sort(key=lambda u: str(getattr(u, "character", "")) in ("0", "9"), reverse=True)
+        # 统一从季度绩效 Scope 解析人员，保留两张绩效表的存储模型。
+        members = list_scope_members("QUARTER_PERFORMANCE", team_code)
 
         # ── 本季度绩效记录 ──
         perf_rows = perf_sess.query(Model).filter(
@@ -425,7 +420,7 @@ def list_team_import_users_service(payload: Dict[str, Any]) -> Dict[str, Any]:
 
         result = []
         for u in members:
-            uid = u.user_id
+            uid = u.get("userId")
             pr = perf_map.get(uid)
             pv = prev_map.get(uid)
 
@@ -442,8 +437,8 @@ def list_team_import_users_service(payload: Dict[str, Any]) -> Dict[str, Any]:
 
             result.append({
                 "userId": uid,
-                "userName": u.name or uid,
-                "isTeamLead": str(getattr(u, "character", "")) in ("0", "9"),
+                "userName": u.get("userName") or uid,
+                "isTeamLead": bool(u.get("isTeamLead")),
                 "workHourScore": pr.work_hour_score if pr else None,
                 "supervisorScore": pr.supervisor_score if pr else None,
                 "calcStatus": pr.calc_status if pr else None,
@@ -460,14 +455,13 @@ def list_team_import_users_service(payload: Dict[str, Any]) -> Dict[str, Any]:
             })
         return {"success": True, "data": {"members": result, "count": len(result)}}
     finally:
-        uc_sess.close()
         perf_sess.close()
 
 
 def batch_import_service(payload: Dict[str, Any]) -> Dict[str, Any]:
     """
     批量导入：接受 members 数组，逐条调用 fill。
-    payload: {year, quarter, team, members: [{userId, workHourScore, supervisorScore}, ...]}
+    payload: {year, quarter, members: [{userId, workHourScore, supervisorScore}, ...]}
     """
     payload = payload or {}
     year = int(payload.get("year"))
@@ -526,7 +520,7 @@ def update_member_performance_service(payload: Dict[str, Any]) -> Dict[str, Any]
     session = PerfSessionLocal()
     now = datetime.now(timezone.utc)
     try:
-        Model = _select_model_by_team_id(user_id)
+        Model = _select_model_by_team_code(user_id)
 
         stmt = select(Model).where(Model.year == year, Model.quarter == quarter, Model.user_id == user_id)
         row = session.scalars(stmt).first()
@@ -601,86 +595,42 @@ def update_member_performance_service(payload: Dict[str, Any]) -> Dict[str, Any]
 
 # ── 统一团队 / 成员查询（供所有下拉条使用）──
 
-_TEAM_LABELS = {
-    "0": "导航组", "nav": "导航组", "navigation": "导航组",
-    "1": "对接组", "servo": "对接组", "service": "对接组",
-}
-
-_ALL_TEAM_KEYS = {"nav": ["导航组"], "servo": ["对接组"]}
-
-
-def _normalize_team_key(team_id_raw) -> str:
-    tid = str(team_id_raw or "").strip()
-    label = _TEAM_LABELS.get(tid)
-    if label == "导航组":
-        return "nav"
-    if label == "对接组":
-        return "servo"
-    return tid  # fallback: 原样返回
-
-
 def list_teams_service() -> Dict[str, Any]:
-    """获取所有团队列表（从 user_character.team_id 去重）。排除算法组(team_id=2)。"""
-    uc_sess = SessionLocal()
-    try:
-        rows = uc_sess.query(UserCharacter.team_id).distinct().all()
-        seen = set()
-        teams = []
-        for (tid,) in rows:
-            key = str(tid).strip() if tid else ""
-            # 算法组不出现在绩效管理下拉中
-            if not key or key in seen or key == "2":
-                continue
-            label = _TEAM_LABELS.get(key, key)
-            tk = _normalize_team_key(key)
-            seen.add(key)
-            teams.append({"key": tk, "label": label})
-        return {"success": True, "data": {"teams": teams}}
-    finally:
-        uc_sess.close()
+    """获取季度绩效 Scope 的固定团队选项（仅导航、对接）。"""
+    teams = [
+        {
+            "teamCode": team.get("teamCode") or team.get("code"),
+            "teamName": team.get("teamName") or team.get("name"),
+        }
+        for team in list_scope_teams("QUARTER_PERFORMANCE")["teams"]
+        if (team.get("teamCode") or team.get("code")) in _TEAM_KEY_BY_CODE
+    ]
+    return {"success": True, "data": {"teams": teams}}
 
 
 def list_members_service(payload: Dict[str, Any] = None) -> Dict[str, Any]:
     """
-    统一成员列表接口。可选 ?team=nav 过滤。
-    返回: [{userId, userName, teamKey, teamLabel, character, isTeamLead}, ...]
+    统一成员列表接口。可选 ?teamCode=NAV 过滤。
     """
     payload = payload or {}
-    team_filter = str(payload.get("team", "")).strip().lower() or None
+    team_filter = str(payload.get("teamCode", "") or "").strip().upper() or None
+    team_code = team_filter if team_filter in _TEAM_KEY_BY_CODE else None
+    if team_filter and not team_code:
+        return {"success": False, "error": f"unknown teamCode: {team_filter}", "data": {}}
 
-    uc_sess = SessionLocal()
-    try:
-        query = uc_sess.query(UserCharacter).filter(
-            UserCharacter.character != "9",
-            UserCharacter.team_id != "2",  # 排除算法组
-        ).order_by(UserCharacter.user_id.asc())
-        if team_filter:
-            allowed_ids = _TEAM_ID_MAP.get(team_filter)
-            if not allowed_ids:
-                return {"success": False, "error": f"unknown team: {team_filter}", "data": {}}
-            query = query.filter(UserCharacter.team_id.in_(allowed_ids))
-
-        rows = query.all()
-        members = []
-        for row in rows:
-            uid = str(getattr(row, "user_id", "") or "").strip()
-            if not uid:
-                continue
-            raw_team_id = str(getattr(row, "team_id", "") or "").strip()
-            char_val = str(getattr(row, "character", "") or "").strip()
-            members.append({
-                "userId": uid,
-                "userName": str(getattr(row, "name", "") or uid).strip() or uid,
-                "teamKey": _normalize_team_key(raw_team_id),
-                "teamLabel": _TEAM_LABELS.get(raw_team_id, raw_team_id or "未分组"),
-                "character": int(char_val) if char_val.isdigit() else 0,
-                "isTeamLead": char_val in ("0", "9"),
-                "isNavLead": bool(getattr(row, "is_nav_lead", False)),
-                "isServoLead": bool(getattr(row, "is_servo_lead", False)),
-            })
-        return {"success": True, "data": {"members": members, "count": len(members)}}
-    finally:
-        uc_sess.close()
+    members = []
+    for member in list_scope_members("QUARTER_PERFORMANCE", team_code):
+        if member.get("teamCode") not in _TEAM_KEY_BY_CODE:
+            continue
+        members.append({
+            "userId": member.get("userId"),
+            "userName": member.get("userName") or member.get("userId"),
+            "teamCode": member.get("teamCode"),
+            "teamName": member.get("teamName") or "未分组",
+            "jobRoleCode": member.get("jobRoleCode"),
+            "jobRoleName": member.get("jobRoleName") or "未设置",
+        })
+    return {"success": True, "data": {"members": members, "count": len(members)}}
 
 
 # ── 绩效历史查询（供 /dashboard/performance-history 使用）──
@@ -705,15 +655,15 @@ def performance_history_service(payload: Dict[str, Any]) -> Dict[str, Any]:
 
         user_id = str(user_row.user_id)
         user_name = str(user_row.name or user_id)
-        team_id_raw = str(getattr(user_row, "team_id", "") or "").strip()
+        team_code = stable_team_code(getattr(user_row, "team_code", None))
 
         # 确定绩效表
-        if team_id_raw in {"0", "nav", "navigation"}:
+        if team_code == "NAV":
             Model = NavPerfQuarterResult
-        elif team_id_raw in {"1", "servo", "service", "对接", "servo_team"}:
+        elif team_code == "INTEGRATION":
             Model = ServoPerfQuarterResult
         else:
-            return {"success": False, "error": f"unknown team: {team_id_raw}", "data": {}}
+            return {"success": False, "error": f"unknown team: {team_code}", "data": {}}
 
     finally:
         uc_sess.close()

@@ -431,70 +431,6 @@ def _flatten_userids(raw_userids: Any) -> Dict[str, Any]:
     return out
 
 
-def _normalize_userids(raw_userids: Any) -> Dict[str, str]:
-    """
-    兼容两种写法：
-    1) "张三": "012345"
-    2) "张三": {"userId": "012345", "character": 1}
-
-    也兼容分组格式（通过 _flatten_userids 递归拉平）。
-    """
-    flat = _flatten_userids(raw_userids)
-    out: Dict[str, str] = {}
-    for name, v in flat.items():
-        if isinstance(v, dict):
-            uid = v.get("userId", v.get("user_id", v.get("id", "")))
-        else:
-            uid = v
-        uid_s = str(uid or "").strip()
-        if uid_s:
-            out[str(name)] = uid_s
-    return out
-
-
-def get_config_user_characters() -> Dict[str, int]:
-    """
-    从 ids.json/config.json 读取用户默认 character（按中文名索引）。
-    仅在 value 为对象且包含 character 字段时返回。
-    兼容扁平格式和分组格式。
-    """
-    ids_path = Path(__file__).with_name("ids.json")
-    try:
-        raw = ids_path.read_text(encoding="utf-8")
-        data = json.loads(raw) if raw.strip() else {}
-        userids = (data or {}).get("userids")
-    except Exception:
-        cfg = _load_config_json()
-        userids = cfg.get("userids")
-
-    flat = _flatten_userids(userids)
-    out: Dict[str, int] = {}
-    for name, v in flat.items():
-        if not isinstance(v, dict):
-            continue
-        ch = v.get("character")
-        try:
-            out[str(name)] = int(ch)
-        except Exception:
-            continue
-    return out
-
-
-def get_config_userids() -> Dict[str, str]:
-    """读取 config.json 里的 userids 配置。"""
-    ids_path = Path(__file__).with_name("ids.json")
-    try:
-        raw = ids_path.read_text(encoding="utf-8")
-        data = json.loads(raw) if raw.strip() else {}
-        userids = (data or {}).get("userids")
-        return _normalize_userids(userids)
-    except Exception:
-        # fallback：兼容旧逻辑（可能存在 config.json）
-        cfg = _load_config_json()
-        userids = cfg.get("userids")
-        return _normalize_userids(userids)
-
-
 def get_config_user_meta() -> Dict[str, Dict[str, Any]]:
     """
     读取 ids.json 里的 userids 扩展信息（按中文名索引）。
@@ -505,7 +441,7 @@ def get_config_user_meta() -> Dict[str, Dict[str, Any]]:
     {
       "userids": {
         "导航组": {
-          "张三": { "userId": "...", "character": 1, "team_id": 0, "is_nav_lead": false, "is_servo_lead": false }
+          "张三": { "userId": "...", "character": 1, "team_id": 0, "is_nav_lead": false, "is_servo_lead": false, "is_p3_lead": false }
         }
       }
     }
@@ -518,7 +454,7 @@ def get_config_user_meta() -> Dict[str, Dict[str, Any]]:
     }
 
     返回：
-    { "张三": { "userId": "...", "character": 1, "team_id": 0, "is_nav_lead": False, "is_servo_lead": False }, ... }
+    { "张三": { "userId": "...", "character": 1, "team_id": 0, "is_nav_lead": False, "is_servo_lead": False, "is_p3_lead": False }, ... }
     """
     ids_path = Path(__file__).with_name("ids.json")
     try:
@@ -545,12 +481,14 @@ def get_config_user_meta() -> Dict[str, Dict[str, Any]]:
             # 允许 ids.json 里用 true/false 或 0/1
             is_nav_lead = bool(v.get("is_nav_lead", v.get("isNavLead", False)))
             is_servo_lead = bool(v.get("is_servo_lead", v.get("isServoLead", False)))
+            is_p3_lead = bool(v.get("is_p3_lead", v.get("isP3Lead", False)))
         else:
             uid = v
             character = 0
             team_id = None
             is_nav_lead = False
             is_servo_lead = False
+            is_p3_lead = False
 
         uid_s = str(uid or "").strip()
         if not uid_s:
@@ -562,6 +500,7 @@ def get_config_user_meta() -> Dict[str, Dict[str, Any]]:
             "team_id": team_id,
             "is_nav_lead": is_nav_lead,
             "is_servo_lead": is_servo_lead,
+            "is_p3_lead": is_p3_lead,
         }
 
     return out
